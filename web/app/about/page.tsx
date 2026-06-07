@@ -4,8 +4,12 @@ const techStack = [
     role: "Mobile-friendly website and article feed",
   },
   {
+    name: "GitHub → Vercel CI/CD",
+    role: "Every push to the main branch triggers an automatic Vercel build and production deployment.",
+  },
+  {
     name: "Vercel",
-    role: "Frontend hosting and deployment",
+    role: "Frontend hosting, HTTPS, custom domain, and production deployment",
   },
   {
     name: "Supabase",
@@ -24,6 +28,39 @@ const techStack = [
     role: "Story sources from trusted publishers",
   },
 ];
+
+<section className="mb-8 rounded-3xl border border-amber-500/20 bg-neutral-900 p-5 shadow-lg shadow-black/20">
+  <h2 className="text-2xl font-bold text-white">Production Deployment</h2>
+
+  <div className="mt-5 space-y-3 text-sm">
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+      <p className="font-bold text-amber-200">1. Code commit</p>
+      <p className="mt-1 leading-6 text-neutral-400">
+        Changes are committed locally and pushed to GitHub on the main branch.
+      </p>
+    </div>
+
+    <div className="flex justify-center text-amber-400">↓</div>
+
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+      <p className="font-bold text-amber-200">2. Vercel build</p>
+      <p className="mt-1 leading-6 text-neutral-400">
+        Vercel detects the push, installs dependencies, runs the Next.js build,
+        and prepares the production deployment.
+      </p>
+    </div>
+
+    <div className="flex justify-center text-amber-400">↓</div>
+
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+      <p className="font-bold text-amber-200">3. Production release</p>
+      <p className="mt-1 leading-6 text-neutral-400">
+        If the build succeeds, Vercel automatically publishes the latest version
+        to the production NutsNews domain.
+      </p>
+    </div>
+  </div>
+</section>
 
 const pipelineSteps = [
   "RSS feeds",
@@ -189,6 +226,67 @@ export default function AboutPage() {
             ))}
           </div>
         </section>
+
+        <section className="mb-8 rounded-3xl border border-amber-500/20 bg-neutral-900 p-5 shadow-lg shadow-black/20">
+  <h2 className="text-2xl font-bold text-white">Platform Cost</h2>
+
+  <p className="mt-3 text-sm leading-6 text-neutral-300">
+    NutsNews was built to keep startup costs extremely low by using free-tier
+    cloud services wherever possible.
+  </p>
+
+  <div className="mt-5 space-y-3">
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+      <div className="flex items-center justify-between gap-4">
+        <p className="font-bold text-amber-200">Domain</p>
+        <p className="font-bold text-white">$11.95</p>
+      </div>
+      <p className="mt-1 text-sm leading-6 text-neutral-400">
+        The only paid cost so far is the nutsnews.com domain registration.
+      </p>
+    </div>
+
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+      <div className="flex items-center justify-between gap-4">
+        <p className="font-bold text-amber-200">Vercel</p>
+        <p className="font-bold text-white">$0</p>
+      </div>
+      <p className="mt-1 text-sm leading-6 text-neutral-400">
+        The Next.js website is hosted on Vercel using the free tier.
+      </p>
+    </div>
+
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+      <div className="flex items-center justify-between gap-4">
+        <p className="font-bold text-amber-200">Supabase</p>
+        <p className="font-bold text-white">$0</p>
+      </div>
+      <p className="mt-1 text-sm leading-6 text-neutral-400">
+        Article storage uses Supabase on the free tier.
+      </p>
+    </div>
+
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+      <div className="flex items-center justify-between gap-4">
+        <p className="font-bold text-amber-200">Cloudflare Workers</p>
+        <p className="font-bold text-white">$0</p>
+      </div>
+      <p className="mt-1 text-sm leading-6 text-neutral-400">
+        Scheduled RSS automation runs on the Cloudflare free tier.
+      </p>
+    </div>
+
+    <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
+      <div className="flex items-center justify-between gap-4">
+        <p className="font-bold text-amber-200">Total current cost</p>
+        <p className="text-xl font-black text-white">$11.95</p>
+      </div>
+      <p className="mt-1 text-sm leading-6 text-neutral-300">
+        Everything except the domain is currently running on free-tier services.
+      </p>
+    </div>
+  </div>
+</section>
 
         <section className="rounded-3xl border border-amber-500/20 bg-neutral-900 p-5 shadow-lg shadow-black/20">
           <h2 className="text-2xl font-bold text-white">Content Safety</h2>
