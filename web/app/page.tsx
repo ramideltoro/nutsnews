@@ -12,19 +12,26 @@ type Article = {
   positivity_score: number | null;
 };
 
-async function getArticles() {
-  const result = await supabase
+async function getArticles(): Promise<Article[]> {
+  const { data, error } = await supabase
     .from("articles")
     .select(
-      "id, source, title, original_url, image_url, published_at, ai_summary, category, positivity_score, status",
+      "id, source, title, original_url, image_url, published_at, ai_summary, category, positivity_score",
     )
+    .eq("status", "published")
+    .order("positivity_score", { ascending: false })
+    .order("published_at", { ascending: false })
     .limit(100);
 
-  return result;
+  if (error) {
+    return [];
+  }
+
+  return data ?? [];
 }
 
 export default async function Home() {
-  const { data: articles, error } = await getArticles();
+  const articles = await getArticles();
 
   return (
     <main className="min-h-screen bg-neutral-950 text-amber-50">
@@ -43,20 +50,14 @@ export default async function Home() {
           </p>
         </header>
 
-        {error && (
-          <pre className="mb-6 overflow-auto rounded-2xl border border-red-500/30 bg-red-950/40 p-4 text-sm text-red-200">
-            {JSON.stringify(error, null, 2)}
-          </pre>
-        )}
-
-        {!error && articles?.length === 0 && (
-          <div className="rounded-2xl border border-amber-500/20 bg-neutral-900 p-5 text-neutral-300">
-            Connected to Supabase, but no articles were returned.
+        {articles.length === 0 && (
+          <div className="rounded-3xl border border-amber-500/20 bg-neutral-900 p-5 text-neutral-300">
+            No uplifting stories are available yet. Please check back soon.
           </div>
         )}
 
         <div className="space-y-5">
-          {(articles as Article[] | null)?.map((article) => (
+          {articles.map((article) => (
             <article
               key={article.id}
               className="rounded-3xl border border-amber-500/20 bg-neutral-900 p-5 shadow-lg shadow-black/20"
