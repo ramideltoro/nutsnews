@@ -17,11 +17,11 @@ export async function GET(request: Request) {
   const { data, error } = await supabase
     .from("articles")
     .select(
-      "id, source, title, original_url, image_url, published_at, ai_summary, category, positivity_score",
+      "id, source, title, original_url, image_url, published_at, published_on_site_at, ai_summary, category, positivity_score",
     )
     .eq("status", "published")
+    .order("published_on_site_at", { ascending: false })
     .order("positivity_score", { ascending: false })
-    .order("published_at", { ascending: false })
     .range(from, to);
 
   if (error) {

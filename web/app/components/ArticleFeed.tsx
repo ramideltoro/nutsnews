@@ -9,6 +9,7 @@ type Article = {
   original_url: string;
   image_url: string | null;
   published_at: string | null;
+  published_on_site_at: string | null;
   ai_summary: string | null;
   category: string | null;
   positivity_score: number | null;
@@ -18,6 +19,18 @@ type ArticlesResponse = {
   articles: Article[];
   nextPage: number | null;
 };
+
+function formatSiteDate(dateValue: string | null) {
+  if (!dateValue) {
+    return "Published recently";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(dateValue));
+}
 
 export function ArticleFeed() {
   const [articles, setArticles] = useState<Article[]>([]);
@@ -41,10 +54,15 @@ export function ArticleFeed() {
 
       const data = (await response.json()) as ArticlesResponse;
 
-      setArticles((currentArticles) => [
-        ...currentArticles,
-        ...data.articles,
-      ]);
+        setArticles((currentArticles) => {
+        const existingIds = new Set(currentArticles.map((article) => article.id));
+
+        const newArticles = data.articles.filter(
+            (article) => !existingIds.has(article.id),
+        );
+
+        return [...currentArticles, ...newArticles];
+        });
 
       setNextPage(data.nextPage);
     } catch (error) {
@@ -70,8 +88,8 @@ export function ArticleFeed() {
       (entries) => {
         const firstEntry = entries[0];
 
-        if (firstEntry.isIntersecting) {
-          loadArticles();
+        if (firstEntry.isIntersecting && !isLoading && nextPage !== null) {
+        loadArticles();
         }
       },
       {
@@ -108,9 +126,9 @@ export function ArticleFeed() {
                 {article.category ?? "Uplifting"}
               </span>
 
-              <span className="text-xs font-medium text-neutral-400">
-                {article.source}
-              </span>
+                <span className="text-xs font-medium text-neutral-400">
+                {article.source} • {formatSiteDate(article.published_on_site_at)}
+                </span>
             </div>
 
             <h2 className="text-xl font-semibold leading-snug text-amber-50">
