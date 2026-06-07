@@ -14,13 +14,6 @@ export default function Home() {
     <div className="relative z-10">
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1">
-            <span className="h-2 w-2 rounded-full bg-amber-300 shadow-[0_0_12px_rgba(252,211,77,0.9)]" />
-            <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-amber-200">
-              Uplifting stories
-            </span>
-          </div>
-
           <h1 className="text-5xl font-black tracking-tight text-white">
             Nuts<span className="text-amber-300">News</span>
           </h1>
@@ -32,7 +25,7 @@ export default function Home() {
       </div>
 
       <p className="max-w-sm text-base leading-7 text-neutral-300">
-        A calm, feel-good feed of inspiring stories from around the world.
+        A positive news feed that is curated by AI.
       </p>
 
     </div>
@@ -73,10 +66,29 @@ export default function Home() {
               >
                 f
               </a>
+
+              <a
+                href="https://github.com/ramideltoro"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="GitHub"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-amber-400/20 bg-neutral-900 text-sm font-bold text-amber-300 transition hover:bg-amber-500 hover:text-neutral-950"
+              >
+                GH
+            </a>
             </div>
 
             <p className="text-right text-[11px] leading-4 text-neutral-500">
-              © {currentYear} Rami Del Toro, All Rights Reserved.
+              © {currentYear}{" "}
+              <a
+                href="https://www.ramideltoro.com"
+                target="_blank"
+                rel="noreferrer"
+                className="text-amber-300 transition hover:text-amber-200"
+              >
+                Rami Del Toro
+              </a>
+              , All Rights Reserved.
             </p>
           </div>
         </footer>
