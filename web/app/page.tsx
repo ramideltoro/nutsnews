@@ -25,8 +25,17 @@ export default function Home() {
       </div>
 
       <p className="max-w-sm text-base leading-7 text-neutral-300">
-        A positive news feed that is curated by AI.
+        A positive news feed curated by AI.
       </p>
+
+      <div className="mt-5">
+  <a
+    href="/about"
+    className="inline-flex items-center justify-center rounded-full border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-sm font-semibold text-amber-200 transition hover:bg-amber-500 hover:text-neutral-950"
+  >
+    About NutsNews
+  </a>
+</div>
 
     </div>
   </div>
