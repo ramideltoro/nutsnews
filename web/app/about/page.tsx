@@ -204,7 +204,7 @@ export default function AboutPage() {
           </div>
 
           <div className="rounded-3xl border border-amber-500/20 bg-neutral-900 p-4 shadow-lg shadow-black/20">
-            <p className="text-2xl font-black text-amber-300">1h</p>
+            <p className="text-2xl font-black text-amber-300">60 minute</p>
             <p className="mt-1 text-xs leading-5 text-neutral-400">
               Scheduled refresh
             </p>
@@ -218,9 +218,9 @@ export default function AboutPage() {
           </div>
 
           <div className="rounded-3xl border border-amber-500/20 bg-neutral-900 p-4 shadow-lg shadow-black/20">
-            <p className="text-2xl font-black text-amber-300">AI</p>
+            <p className="text-2xl font-black text-amber-300">A.I.</p>
             <p className="mt-1 text-xs leading-5 text-neutral-400">
-              Curated summaries
+              Article selection & summary
             </p>
           </div>
         </section>
