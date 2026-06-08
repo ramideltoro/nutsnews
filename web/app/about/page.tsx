@@ -79,6 +79,49 @@ const costItems = [
   },
 ];
 
+const projectBenefits = [
+  {
+    title: "Fully automated news agency",
+    description:
+      "The platform can discover, filter, summarize, store, and publish stories automatically without a traditional editorial production team.",
+  },
+  {
+    title: "Low operating cost",
+    description:
+      "Using free-tier cloud services keeps the project inexpensive to launch and easy to experiment with.",
+  },
+  {
+    title: "Always-fresh content",
+    description:
+      "The scheduled worker refreshes the article queue throughout the day, keeping the feed active with no manual work.",
+  },
+  {
+    title: "Focused editorial voice",
+    description:
+      "AI filtering helps keep the product aligned with a peaceful, uplifting, and positive content strategy.",
+  },
+  {
+    title: "Mobile-first experience",
+    description:
+      "The site is designed around a simple scrolling feed that feels natural on phones.",
+  },
+  {
+    title: "Scalable architecture",
+    description:
+      "The system separates the frontend, database, AI workflow, and scheduled worker so each part can grow independently.",
+  },
+  {
+    title: "Fast experimentation",
+    description:
+      "New RSS sources, categories, prompts, and layout ideas can be tested quickly without rebuilding the whole platform.",
+  },
+  {
+    title: "Source-friendly publishing",
+    description:
+      "The site avoids republishing full articles and links readers back to the original publishers.",
+  },
+];
+
 export default function AboutPage() {
   const currentYear = new Date().getFullYear();
 
@@ -134,18 +177,18 @@ export default function AboutPage() {
                   Home
                 </a>
 
+                                <a
+                  href="#project-benefits"
+                  className="inline-flex items-center justify-center rounded-full border border-white/10 bg-black/20 px-4 py-2 text-sm font-semibold text-neutral-300 transition hover:border-amber-400/30 hover:text-amber-200"
+                >
+                  Project Benefits
+                </a>
+
                 <a
                   href="#how-it-works"
                   className="inline-flex items-center justify-center rounded-full border border-white/10 bg-black/20 px-4 py-2 text-sm font-semibold text-neutral-300 transition hover:border-amber-400/30 hover:text-amber-200"
                 >
                   How it works
-                </a>
-
-                <a
-                  href="#cost"
-                  className="inline-flex items-center justify-center rounded-full border border-white/10 bg-black/20 px-4 py-2 text-sm font-semibold text-neutral-300 transition hover:border-amber-400/30 hover:text-amber-200"
-                >
-                  Cost
                 </a>
               </div>
             </div>
@@ -204,6 +247,34 @@ export default function AboutPage() {
           </p>
         </section>
 
+        <section id="project-benefits" className="mb-6 rounded-3xl border border-amber-500/20 bg-neutral-900 p-5 shadow-lg shadow-black/20">
+  <div className="mb-4 flex items-center justify-between gap-4">
+    <h2 className="text-2xl font-bold text-white">Project Benefits</h2>
+    <span className="rounded-full bg-amber-400/10 px-3 py-1 text-xs font-bold text-amber-200 ring-1 ring-amber-400/20">
+      Why it matters
+    </span>
+  </div>
+
+  <p className="text-sm leading-6 text-neutral-300">
+    A project like NutsNews shows how to use automation, AI, and
+    cloud platforms to build a focused media product with very low overhead.
+  </p>
+
+  <div className="mt-5 grid gap-3">
+    {projectBenefits.map((benefit) => (
+      <div
+        key={benefit.title}
+        className="rounded-2xl border border-white/10 bg-black/20 p-4"
+      >
+        <p className="font-bold text-amber-200">{benefit.title}</p>
+        <p className="mt-1 text-sm leading-6 text-neutral-400">
+          {benefit.description}
+        </p>
+      </div>
+    ))}
+  </div>
+</section>
+
         <section
           id="how-it-works"
           className="mb-6 rounded-3xl border border-amber-500/20 bg-neutral-900 p-5 shadow-lg shadow-black/20"
@@ -235,7 +306,7 @@ export default function AboutPage() {
 
         <section className="mb-6 rounded-3xl border border-amber-500/20 bg-neutral-900 p-5 shadow-lg shadow-black/20">
           <h2 className="text-2xl font-bold text-white">
-            Architecture Diagram
+            Flow Diagram
           </h2>
 
           <div className="mt-5 rounded-2xl border border-white/10 bg-black/25 p-4">

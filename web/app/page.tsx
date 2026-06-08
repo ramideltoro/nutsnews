@@ -25,7 +25,7 @@ export default function Home() {
       </div>
 
       <p className="max-w-sm text-base leading-7 text-neutral-300">
-        A positive news feed curated by AI.
+        A positive news feed curated by Artificial Intelligence
       </p>
 
       <div className="mt-5">
