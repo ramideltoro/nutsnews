@@ -2,7 +2,7 @@ export function SiteFooter() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="fixed bottom-0 left-0 right-0 z-50 border-t border-amber-500/20 bg-neutral-950/95 px-5 py-4 backdrop-blur">
+    <footer className="fixed bottom-0 left-0 right-0 z-50 border-t border-amber-500/20 bg-neutral-950/90 px-5 py-4 shadow-2xl shadow-black/60 backdrop-blur-xl">
       <div className="mx-auto flex max-w-md items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <a

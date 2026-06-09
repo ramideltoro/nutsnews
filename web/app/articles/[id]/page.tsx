@@ -103,69 +103,79 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   };
 
   return (
-    <main className="min-h-screen bg-neutral-950 px-4 py-6 pb-28 text-neutral-100">
+    <main className="min-h-screen overflow-hidden bg-neutral-950 px-4 pb-28 pt-6 text-neutral-100">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
       />
 
-      <article className="mx-auto max-w-2xl">
-        <nav className="mb-6">
-          <Link href="/" className="text-sm font-semibold text-amber-300">
+      <section className="mx-auto w-full max-w-md">
+        <nav className="mb-5">
+          <Link
+            href="/"
+            className="inline-flex rounded-full border border-amber-400/20 bg-neutral-900 px-4 py-2 text-sm font-bold text-amber-300 transition hover:bg-amber-400 hover:text-neutral-950"
+          >
             ← Back to NutsNews
           </Link>
         </nav>
 
-        <header className="rounded-3xl border border-amber-500/20 bg-neutral-900 p-6 shadow-2xl shadow-amber-950/20">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-amber-400">
-            {article.category ?? "Uplifting"} · {article.source} ·{" "}
-            {formatDate(article.published_on_site_at)}
-          </p>
+        <article>
+          <header className="overflow-hidden rounded-[2rem] border border-amber-500/20 bg-neutral-900 shadow-2xl shadow-black/40">
+            {article.image_url ? (
+              <div className="relative h-64 overflow-hidden bg-neutral-800">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={article.image_url}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  fetchPriority="high"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-neutral-950/85 via-neutral-950/20 to-transparent" />
+              </div>
+            ) : null}
 
-          <h1 className="text-4xl font-bold leading-tight text-white">
-            {article.title}
-          </h1>
+            <div className="p-6">
+              <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-amber-400">
+                {article.category ?? "Uplifting"} · {article.source} ·{" "}
+                {formatDate(article.published_on_site_at)}
+              </p>
 
-          {article.image_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={article.image_url}
-              alt=""
-              className="mt-6 h-64 w-full rounded-2xl object-cover"
-              fetchPriority="high"
-            />
-          ) : null}
-        </header>
+              <h1 className="text-4xl font-black leading-tight text-white">
+                {article.title}
+              </h1>
+            </div>
+          </header>
 
-        <section className="mt-6 rounded-3xl border border-neutral-800 bg-neutral-900 p-6">
-          <p className="text-lg leading-8 text-neutral-200">
-            {article.ai_summary}
-          </p>
+          <section className="mt-5 rounded-[2rem] border border-white/10 bg-neutral-900 p-6 shadow-xl shadow-black/20">
+            <p className="text-lg leading-8 text-neutral-200">
+              {article.ai_summary}
+            </p>
 
-          <div className="mt-6 rounded-2xl border border-amber-500/20 bg-amber-400/10 p-4 text-sm leading-6 text-neutral-300">
-            NutsNews provides a short original summary and sends readers back to
-            the original publisher for the complete story.
-          </div>
+            <div className="mt-6 rounded-2xl border border-amber-500/20 bg-amber-400/10 p-4 text-sm leading-6 text-neutral-300">
+              NutsNews provides a short original summary and sends readers back
+              to the original publisher for the complete story.
+            </div>
 
-          <div className="mt-6 flex flex-wrap gap-3">
-            <a
-              href={article.original_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-full bg-amber-400 px-5 py-3 text-sm font-semibold text-neutral-950 hover:bg-amber-300"
-            >
-              Read full story at {article.source}
-            </a>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <a
+                href={article.original_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-full bg-amber-400 px-5 py-3 text-sm font-bold text-neutral-950 transition hover:bg-amber-300"
+              >
+                Read full story
+              </a>
 
-            <Link
-              href="/about"
-              className="rounded-full border border-amber-400/40 px-5 py-3 text-sm font-semibold text-amber-300 hover:bg-amber-400/10"
-            >
-              About NutsNews
-            </Link>
-          </div>
-        </section>
-      </article>
+              <Link
+                href="/about"
+                className="rounded-full border border-amber-400/30 bg-black/20 px-5 py-3 text-sm font-semibold text-amber-300 transition hover:bg-amber-400/10"
+              >
+                About NutsNews
+              </Link>
+            </div>
+          </section>
+        </article>
+      </section>
 
       <SiteFooter />
     </main>

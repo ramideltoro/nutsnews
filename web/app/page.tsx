@@ -29,35 +29,83 @@ export default async function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-neutral-950 px-4 py-6 pb-28 text-neutral-100">
+    <main className="min-h-screen overflow-hidden bg-neutral-950 px-4 pb-28 pt-6 text-neutral-100">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(homeJsonLd) }}
       />
 
-      <section className="mx-auto max-w-2xl">
-        <header className="mb-8 rounded-3xl border border-amber-500/20 bg-neutral-900 p-6 shadow-2xl shadow-amber-950/20">
-          <p className="mb-2 text-sm font-semibold uppercase tracking-[0.25em] text-amber-400">
-            Positive news, simplified
-          </p>
+      <div className="pointer-events-none fixed inset-0 -z-10">
+        <div className="absolute left-1/2 top-0 h-96 w-96 -translate-x-1/2 rounded-full bg-amber-500/20 blur-3xl" />
+        <div className="absolute bottom-20 right-0 h-80 w-80 rounded-full bg-orange-700/10 blur-3xl" />
+      </div>
 
-          <h1 className="text-4xl font-bold tracking-tight text-white">
-            Nuts News
-          </h1>
+      <section className="mx-auto w-full max-w-md">
+        <header className="mb-6">
+          <div className="relative overflow-hidden rounded-[2.25rem] border border-amber-400/20 bg-[radial-gradient(circle_at_top_right,_rgba(245,158,11,0.28),_transparent_36%),linear-gradient(135deg,_#171717,_#0a0a0a_58%,_#451a03)] p-6 shadow-2xl shadow-black/50">
+            <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-amber-400/20 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-24 -left-20 h-56 w-56 rounded-full bg-orange-500/10 blur-3xl" />
 
-          <p className="mt-3 text-base leading-7 text-neutral-300">
-            A positive news feed curated by Artificial Intelligence
-          </p>
+            <div className="relative z-10">
+              <div className="mb-7 flex items-start justify-between gap-4">
+                <div>
+                  <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1">
+                    <span className="h-2 w-2 rounded-full bg-amber-300 shadow-[0_0_12px_rgba(252,211,77,0.9)]" />
+                    <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-amber-200">
+                      Positive news, simplified
+                    </span>
+                  </div>
 
-          <nav className="mt-5 flex flex-wrap gap-3 text-sm">
-            <Link
-              href="/about"
-              className="rounded-full bg-amber-400 px-4 py-2 font-semibold text-neutral-950 hover:bg-amber-300"
-            >
-              About NutsNews
-            </Link>
-          </nav>
+                  <h1 className="text-5xl font-black tracking-tight text-white">
+                    Nuts<span className="text-amber-300">News</span>
+                  </h1>
+                </div>
+
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-amber-300/20 bg-black/25 text-3xl shadow-lg shadow-black/30">
+                  🥜
+                </div>
+              </div>
+
+              <p className="max-w-sm text-base leading-7 text-neutral-300">
+                A calm mobile feed of uplifting stories, filtered by AI and
+                linked back to trusted original publishers.
+              </p>
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                <Link
+                  href="/about"
+                  className="inline-flex items-center justify-center rounded-full bg-amber-400 px-4 py-2 text-sm font-bold text-neutral-950 transition hover:bg-amber-300"
+                >
+                  About NutsNews
+                </Link>
+
+              </div>
+            </div>
+          </div>
         </header>
+
+        <section className="mb-5 grid grid-cols-3 gap-3">
+          <div className="rounded-3xl border border-amber-500/20 bg-neutral-900/90 p-4 shadow-lg shadow-black/20">
+            <p className="text-xl font-black text-amber-300">AI</p>
+            <p className="mt-1 text-[11px] leading-4 text-neutral-400">
+              Curated feed
+            </p>
+          </div>
+
+          <div className="rounded-3xl border border-amber-500/20 bg-neutral-900/90 p-4 shadow-lg shadow-black/20">
+            <p className="text-xl font-black text-amber-300">Calm</p>
+            <p className="mt-1 text-[11px] leading-4 text-neutral-400">
+              No doomscroll
+            </p>
+          </div>
+
+          <div className="rounded-3xl border border-amber-500/20 bg-neutral-900/90 p-4 shadow-lg shadow-black/20">
+            <p className="text-xl font-black text-amber-300">Fresh</p>
+            <p className="mt-1 text-[11px] leading-4 text-neutral-400">
+              Auto updated
+            </p>
+          </div>
+        </section>
 
         <ArticleFeed initialArticles={articles} initialNextPage={nextPage} />
       </section>
