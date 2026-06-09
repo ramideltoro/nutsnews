@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { Article } from "@/lib/articles";
 
@@ -155,12 +154,7 @@ export function ArticleFeed({
             </div>
 
             <h2 className="text-2xl font-black leading-tight text-white">
-              <Link
-                href={`/articles/${article.id}`}
-                className="transition hover:text-amber-300"
-              >
-                {article.title}
-              </Link>
+              {article.title}
             </h2>
 
             {article.ai_summary ? (
