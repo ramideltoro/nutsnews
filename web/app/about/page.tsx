@@ -183,6 +183,9 @@ export default function AboutPage() {
               </div>
 
               <div className="space-y-1">
+                 <p className="text-sm font-semibold text-amber-200">
+                  Media Owner: Rami Del Toro
+                </p>
                 <p className="text-sm font-semibold text-amber-200">
                   Editor-in-Chief: OpenAI
                 </p>
