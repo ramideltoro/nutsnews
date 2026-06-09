@@ -1,3 +1,21 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "About NutsNews",
+  description:
+    "Learn how NutsNews uses RSS feeds, Cloudflare Workers, Supabase, and AI to create a calm feed of uplifting stories.",
+  alternates: {
+    canonical: "/about",
+  },
+  openGraph: {
+    title: "About NutsNews",
+    description:
+      "How NutsNews automatically discovers, filters, summarizes, and publishes uplifting stories.",
+    url: "/about",
+    type: "website",
+  },
+};
+
 const techStack = [
   {
     name: "Next.js",
@@ -40,11 +58,13 @@ const pipelineSteps = [
   },
   {
     title: "AI filter",
-    description: "OpenAI filters out politics, war, money, crime, fear, and stressful topics.",
+    description:
+      "OpenAI filters out politics, war, money, crime, fear, and stressful topics.",
   },
   {
     title: "AI summary",
-    description: "Accepted articles receive a short calm summary without copying the full article.",
+    description:
+      "Accepted articles receive a short calm summary without copying the full article.",
   },
   {
     title: "Supabase",
@@ -149,7 +169,7 @@ export default function AboutPage() {
                 </div>
 
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-amber-300/20 bg-black/25 text-3xl shadow-lg shadow-black/30">
-                  🌰
+                  
                 </div>
               </div>
 
@@ -177,7 +197,7 @@ export default function AboutPage() {
                   Home
                 </a>
 
-                                <a
+                <a
                   href="#project-benefits"
                   className="inline-flex items-center justify-center rounded-full border border-white/10 bg-black/20 px-4 py-2 text-sm font-semibold text-neutral-300 transition hover:border-amber-400/30 hover:text-amber-200"
                 >
@@ -197,7 +217,7 @@ export default function AboutPage() {
 
         <section className="mb-6 grid grid-cols-2 gap-3">
           <div className="rounded-3xl border border-amber-500/20 bg-neutral-900 p-4 shadow-lg shadow-black/20">
-            <p className="text-2xl font-black text-amber-300">100</p>
+            <p className="text-2xl font-black text-amber-300">1000</p>
             <p className="mt-1 text-xs leading-5 text-neutral-400">
               Candidate articles scanned per refresh
             </p>
@@ -247,33 +267,36 @@ export default function AboutPage() {
           </p>
         </section>
 
-        <section id="project-benefits" className="mb-6 rounded-3xl border border-amber-500/20 bg-neutral-900 p-5 shadow-lg shadow-black/20">
-  <div className="mb-4 flex items-center justify-between gap-4">
-    <h2 className="text-2xl font-bold text-white">Project Benefits</h2>
-    <span className="rounded-full bg-amber-400/10 px-3 py-1 text-xs font-bold text-amber-200 ring-1 ring-amber-400/20">
-      Why it matters
-    </span>
-  </div>
+        <section
+          id="project-benefits"
+          className="mb-6 rounded-3xl border border-amber-500/20 bg-neutral-900 p-5 shadow-lg shadow-black/20"
+        >
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <h2 className="text-2xl font-bold text-white">Project Benefits</h2>
+            <span className="rounded-full bg-amber-400/10 px-3 py-1 text-xs font-bold text-amber-200 ring-1 ring-amber-400/20">
+              Why it matters
+            </span>
+          </div>
 
-  <p className="text-sm leading-6 text-neutral-300">
-    A project like NutsNews shows how to use automation, AI, and
-    cloud platforms to build a focused media product with very low overhead.
-  </p>
+          <p className="text-sm leading-6 text-neutral-300">
+            A project like NutsNews shows how to use automation, AI, and cloud
+            platforms to build a focused media product with very low overhead.
+          </p>
 
-  <div className="mt-5 grid gap-3">
-    {projectBenefits.map((benefit) => (
-      <div
-        key={benefit.title}
-        className="rounded-2xl border border-white/10 bg-black/20 p-4"
-      >
-        <p className="font-bold text-amber-200">{benefit.title}</p>
-        <p className="mt-1 text-sm leading-6 text-neutral-400">
-          {benefit.description}
-        </p>
-      </div>
-    ))}
-  </div>
-</section>
+          <div className="mt-5 grid gap-3">
+            {projectBenefits.map((benefit) => (
+              <div
+                key={benefit.title}
+                className="rounded-2xl border border-white/10 bg-black/20 p-4"
+              >
+                <p className="font-bold text-amber-200">{benefit.title}</p>
+                <p className="mt-1 text-sm leading-6 text-neutral-400">
+                  {benefit.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
 
         <section
           id="how-it-works"
@@ -305,9 +328,7 @@ export default function AboutPage() {
         </section>
 
         <section className="mb-6 rounded-3xl border border-amber-500/20 bg-neutral-900 p-5 shadow-lg shadow-black/20">
-          <h2 className="text-2xl font-bold text-white">
-            Flow Diagram
-          </h2>
+          <h2 className="text-2xl font-bold text-white">Flow Diagram</h2>
 
           <div className="mt-5 rounded-2xl border border-white/10 bg-black/25 p-4">
             <div className="space-y-3 text-sm">
@@ -432,6 +453,7 @@ export default function AboutPage() {
                   <p className="font-bold text-amber-200">{item.name}</p>
                   <p className="font-bold text-white">{item.cost}</p>
                 </div>
+
                 <p className="mt-1 text-sm leading-6 text-neutral-400">
                   {item.description}
                 </p>
@@ -443,6 +465,7 @@ export default function AboutPage() {
                 <p className="font-bold text-amber-200">Total current cost</p>
                 <p className="text-xl font-black text-white">$11.95</p>
               </div>
+
               <p className="mt-1 text-sm leading-6 text-neutral-300">
                 Everything except the domain is currently running on free-tier
                 services.
@@ -456,8 +479,9 @@ export default function AboutPage() {
 
           <p className="mt-3 text-sm leading-6 text-neutral-300">
             NutsNews does not republish full copyrighted articles. It stores the
-            source title, original link, article metadata, and a short AI-written
-            summary. Every story links back to the original publisher.
+            source title, original link, article metadata, and a short
+            AI-written summary. Every story links back to the original
+            publisher.
           </p>
         </section>
 

@@ -1,23 +1,17 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-
-type Article = {
-  id: string;
-  source: string;
-  title: string;
-  original_url: string;
-  image_url: string | null;
-  published_at: string | null;
-  published_on_site_at: string | null;
-  ai_summary: string | null;
-  category: string | null;
-  positivity_score: number | null;
-};
+import type { Article } from "@/lib/articles";
 
 type ArticlesResponse = {
   articles: Article[];
   nextPage: number | null;
+};
+
+type ArticleFeedProps = {
+  initialArticles: Article[];
+  initialNextPage: number | null;
 };
 
 function formatSiteDate(dateValue: string | null) {
@@ -32,9 +26,12 @@ function formatSiteDate(dateValue: string | null) {
   }).format(new Date(dateValue));
 }
 
-export function ArticleFeed() {
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [nextPage, setNextPage] = useState<number | null>(0);
+export function ArticleFeed({
+  initialArticles,
+  initialNextPage,
+}: ArticleFeedProps) {
+  const [articles, setArticles] = useState<Article[]>(initialArticles);
+  const [nextPage, setNextPage] = useState<number | null>(initialNextPage);
   const [isLoading, setIsLoading] = useState(false);
   const loaderRef = useRef<HTMLDivElement | null>(null);
 
@@ -54,15 +51,17 @@ export function ArticleFeed() {
 
       const data = (await response.json()) as ArticlesResponse;
 
-        setArticles((currentArticles) => {
-        const existingIds = new Set(currentArticles.map((article) => article.id));
+      setArticles((currentArticles) => {
+        const existingIds = new Set(
+          currentArticles.map((article) => article.id),
+        );
 
         const newArticles = data.articles.filter(
-            (article) => !existingIds.has(article.id),
+          (article) => !existingIds.has(article.id),
         );
 
         return [...currentArticles, ...newArticles];
-        });
+      });
 
       setNextPage(data.nextPage);
     } catch (error) {
@@ -71,11 +70,6 @@ export function ArticleFeed() {
       setIsLoading(false);
     }
   }
-
-  useEffect(() => {
-    loadArticles();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     const loader = loaderRef.current;
@@ -89,7 +83,7 @@ export function ArticleFeed() {
         const firstEntry = entries[0];
 
         if (firstEntry.isIntersecting && !isLoading && nextPage !== null) {
-        loadArticles();
+          loadArticles();
         }
       },
       {
@@ -102,59 +96,79 @@ export function ArticleFeed() {
     return () => {
       observer.disconnect();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nextPage, isLoading]);
 
   if (!isLoading && articles.length === 0) {
     return (
-      <div className="rounded-3xl border border-amber-500/20 bg-neutral-900 p-5 text-neutral-300">
+      <p className="rounded-2xl border border-amber-500/20 bg-neutral-900 p-5 text-neutral-300">
         No uplifting stories are available yet. Please check back soon.
-      </div>
+      </p>
     );
   }
 
   return (
     <>
-      <div className="space-y-5">
+      <section className="space-y-5" aria-label="Latest uplifting stories">
         {articles.map((article) => (
           <article
             key={article.id}
-            className="rounded-3xl border border-amber-500/20 bg-neutral-900 p-5 shadow-lg shadow-black/20"
+            className="rounded-3xl border border-neutral-800 bg-neutral-900 p-5 shadow-xl shadow-black/20"
           >
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <span className="rounded-full bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-300 ring-1 ring-amber-400/20">
-                {article.category ?? "Uplifting"}
-              </span>
+            {article.image_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={article.image_url}
+                alt=""
+                className="mb-4 h-48 w-full rounded-2xl object-cover"
+                loading="lazy"
+              />
+            ) : null}
 
-                <span className="text-xs font-medium text-neutral-400">
-                {article.source} • {formatSiteDate(article.published_on_site_at)}
-                </span>
-            </div>
-
-            <h2 className="text-xl font-semibold leading-snug text-amber-50">
-              {article.title}
-            </h2>
-
-            <p className="mt-3 text-sm leading-6 text-neutral-300">
-              {article.ai_summary}
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-amber-400">
+              {article.category ?? "Uplifting"} · {article.source} ·{" "}
+              {formatSiteDate(article.published_on_site_at)}
             </p>
 
-            <a
-              href={article.original_url}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-5 inline-flex rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-neutral-950 shadow-sm hover:bg-amber-400"
-            >
-              Read full story
-            </a>
+            <h2 className="text-2xl font-bold leading-tight text-white">
+              <Link
+                href={`/articles/${article.id}`}
+                className="hover:text-amber-300"
+              >
+                {article.title}
+              </Link>
+            </h2>
+
+            {article.ai_summary ? (
+              <p className="mt-3 leading-7 text-neutral-300">
+                {article.ai_summary}
+              </p>
+            ) : null}
+
+            <div className="mt-5">
+              <a
+                href={article.original_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-neutral-950 hover:bg-amber-300"
+              >
+                Read full story
+              </a>
+            </div>
           </article>
         ))}
-      </div>
+      </section>
 
-      <div ref={loaderRef} className="py-8 text-center text-sm text-neutral-500">
+      <div
+        ref={loaderRef}
+        className="py-8 text-center text-sm text-neutral-500"
+        aria-live="polite"
+      >
         {isLoading && "Loading more peaceful stories..."}
         {!isLoading && nextPage !== null && "Scroll for more stories"}
-        {!isLoading && nextPage === null && articles.length > 0 && "You’re all caught up"}
+        {!isLoading &&
+          nextPage === null &&
+          articles.length > 0 &&
+          "You’re all caught up"}
       </div>
     </>
   );
