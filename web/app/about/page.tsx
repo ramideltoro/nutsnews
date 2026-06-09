@@ -15,6 +15,12 @@ export const metadata: Metadata = {
     url: "/about",
     type: "website",
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "About NutsNews",
+    description:
+      "Learn how NutsNews uses automation and AI to curate positive stories from trusted sources.",
+  },
 };
 
 const techStack = [
