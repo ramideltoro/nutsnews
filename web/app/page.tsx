@@ -84,29 +84,6 @@ export default async function Home() {
           </div>
         </header>
 
-        <section className="mb-5 grid grid-cols-3 gap-3">
-          <div className="rounded-3xl border border-amber-500/20 bg-neutral-900/90 p-4 shadow-lg shadow-black/20">
-            <p className="text-xl font-black text-amber-300">AI</p>
-            <p className="mt-1 text-[11px] leading-4 text-neutral-400">
-              Curated feed
-            </p>
-          </div>
-
-          <div className="rounded-3xl border border-amber-500/20 bg-neutral-900/90 p-4 shadow-lg shadow-black/20">
-            <p className="text-xl font-black text-amber-300">Calm</p>
-            <p className="mt-1 text-[11px] leading-4 text-neutral-400">
-              No doomscroll
-            </p>
-          </div>
-
-          <div className="rounded-3xl border border-amber-500/20 bg-neutral-900/90 p-4 shadow-lg shadow-black/20">
-            <p className="text-xl font-black text-amber-300">Fresh</p>
-            <p className="mt-1 text-[11px] leading-4 text-neutral-400">
-              Auto updated
-            </p>
-          </div>
-        </section>
-
         <ArticleFeed initialArticles={articles} initialNextPage={nextPage} />
       </section>
 
