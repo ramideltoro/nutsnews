@@ -16,7 +16,7 @@ type ArticleFeedProps = {
 
 function formatSiteDate(dateValue: string | null) {
   if (!dateValue) {
-    return "Published recently";
+    return "Recently";
   }
 
   return new Intl.DateTimeFormat("en-US", {
@@ -112,52 +112,60 @@ export function ArticleFeed({
         {articles.map((article) => (
           <article
             key={article.id}
-            className="group overflow-hidden rounded-[2rem] border border-white/10 bg-neutral-900/95 shadow-xl shadow-black/30 transition hover:border-amber-400/30"
+            className="rounded-[2rem] border border-white/10 bg-neutral-900/95 p-5 shadow-xl shadow-black/30 transition hover:border-amber-400/30"
           >
-            {article.image_url ? (
-              <div className="relative h-52 overflow-hidden bg-neutral-800">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={article.image_url}
-                  alt=""
-                  className="h-full w-full object-cover opacity-90 transition duration-500 group-hover:scale-105 group-hover:opacity-100"
-                  loading="lazy"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-neutral-950/80 via-neutral-950/10 to-transparent" />
-              </div>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <span className="rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-amber-300">
+                {article.category ?? "Uplifting"}
+              </span>
+            </div>
+
+            <h2 className="text-2xl font-black leading-tight text-white">
+              <Link
+                href={`/articles/${article.id}`}
+                className="transition hover:text-amber-300"
+              >
+                {article.title}
+              </Link>
+            </h2>
+
+            {article.ai_summary ? (
+              <p className="mt-4 border-l border-amber-400/30 pl-4 text-sm leading-7 text-neutral-300">
+                {article.ai_summary}
+              </p>
             ) : null}
 
-            <div className="p-5">
-              <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-amber-400">
-                {article.category ?? "Uplifting"} · {article.source} ·{" "}
-                {formatSiteDate(article.published_on_site_at)}
-              </p>
+            <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-neutral-500">
+                    Date
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-neutral-300">
+                    {formatSiteDate(article.published_on_site_at)}
+                  </p>
+                </div>
 
-              <h2 className="text-2xl font-black leading-tight text-white">
-                <Link
-                  href={`/articles/${article.id}`}
-                  className="transition hover:text-amber-300"
-                >
-                  {article.title}
-                </Link>
-              </h2>
-
-              {article.ai_summary ? (
-                <p className="mt-3 text-sm leading-7 text-neutral-300">
-                  {article.ai_summary}
-                </p>
-              ) : null}
+                <div className="text-right">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-neutral-500">
+                    Source
+                  </p>
+                  <p className="mt-1 truncate text-sm font-semibold text-amber-300">
+                    {article.source}
+                  </p>
+                </div>
+              </div>
+            </div>
 
             <div className="mt-5">
               <a
                 href={article.original_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex rounded-full bg-amber-400 px-4 py-2 text-sm font-bold text-neutral-950 transition hover:bg-amber-300"
+                className="inline-flex w-full items-center justify-center rounded-full bg-amber-400 px-4 py-3 text-sm font-bold text-neutral-950 transition hover:bg-amber-300"
               >
                 Read full story
               </a>
-            </div>
             </div>
           </article>
         ))}
