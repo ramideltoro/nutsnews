@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { SiteFooter } from "@/app/components/SiteFooter";
 import { getArticleById, SITE_URL } from "@/lib/articles";
 
 type ArticlePageProps = {
@@ -102,7 +103,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   };
 
   return (
-    <main className="min-h-screen bg-neutral-950 px-4 py-6 text-neutral-100">
+    <main className="min-h-screen bg-neutral-950 px-4 py-6 pb-28 text-neutral-100">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
@@ -165,6 +166,8 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           </div>
         </section>
       </article>
+
+      <SiteFooter />
     </main>
   );
 }

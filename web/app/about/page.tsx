@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SiteFooter } from "../components/SiteFooter";
 
 export const metadata: Metadata = {
   title: "About NutsNews",
@@ -50,11 +51,13 @@ const techStack = [
 const pipelineSteps = [
   {
     title: "RSS feeds",
-    description: "BBC, NPR, and other trusted RSS sources provide story candidates.",
+    description:
+      "BBC, NPR, and other trusted RSS sources provide story candidates.",
   },
   {
     title: "Cloudflare Worker",
-    description: "A scheduled Worker runs every hour and fetches the latest feed items.",
+    description:
+      "A scheduled Worker runs every hour and fetches the latest feed items.",
   },
   {
     title: "AI filter",
@@ -80,7 +83,8 @@ const costItems = [
   {
     name: "Domain",
     cost: "$11.95",
-    description: "The only paid cost so far is the nutsnews.com domain registration.",
+    description:
+      "The only paid cost so far is the nutsnews.com domain registration.",
   },
   {
     name: "Vercel",
@@ -95,7 +99,8 @@ const costItems = [
   {
     name: "Cloudflare Workers",
     cost: "$0",
-    description: "Scheduled RSS automation runs on the Cloudflare free tier.",
+    description:
+      "Scheduled RSS automation runs on the Cloudflare free tier.",
   },
 ];
 
@@ -143,8 +148,6 @@ const projectBenefits = [
 ];
 
 export default function AboutPage() {
-  const currentYear = new Date().getFullYear();
-
   return (
     <main className="min-h-screen bg-neutral-950 text-amber-50">
       <section className="mx-auto min-h-screen w-full max-w-md px-5 pb-28 pt-8">
@@ -169,7 +172,7 @@ export default function AboutPage() {
                 </div>
 
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-amber-300/20 bg-black/25 text-3xl shadow-lg shadow-black/30">
-                  
+                  🥜
                 </div>
               </div>
 
@@ -423,7 +426,9 @@ export default function AboutPage() {
             </div>
 
             <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
-              <p className="font-bold text-amber-200">3. Production release</p>
+              <p className="font-bold text-amber-200">
+                3. Production release
+              </p>
               <p className="mt-1 text-sm leading-6 text-neutral-300">
                 If the build succeeds, Vercel automatically publishes the latest
                 version to the production NutsNews domain.
@@ -484,66 +489,9 @@ export default function AboutPage() {
             publisher.
           </p>
         </section>
-
-        <footer className="fixed bottom-0 left-0 right-0 z-50 border-t border-amber-500/20 bg-neutral-950/95 px-5 py-4 backdrop-blur">
-          <div className="mx-auto flex max-w-md items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <a
-                href="https://www.linkedin.com/in/ramideltoro"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="LinkedIn"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-amber-400/20 bg-neutral-900 text-sm font-bold text-amber-300 transition hover:bg-amber-500 hover:text-neutral-950"
-              >
-                in
-              </a>
-
-              <a
-                href="https://www.youtube.com/channel/UCJGCyP50Jy6o6AfMdchVOww"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="YouTube"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-amber-400/20 bg-neutral-900 text-sm font-bold text-amber-300 transition hover:bg-amber-500 hover:text-neutral-950"
-              >
-                ▶
-              </a>
-
-              <a
-                href="https://www.facebook.com/rami.del.toro.2025"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Facebook"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-amber-400/20 bg-neutral-900 text-sm font-bold text-amber-300 transition hover:bg-amber-500 hover:text-neutral-950"
-              >
-                f
-              </a>
-
-              <a
-                href="https://github.com/ramideltoro"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="GitHub"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-amber-400/20 bg-neutral-900 text-sm font-bold text-amber-300 transition hover:bg-amber-500 hover:text-neutral-950"
-              >
-                GH
-              </a>
-            </div>
-
-            <p className="text-right text-[11px] leading-4 text-neutral-500">
-              © {currentYear}{" "}
-              <a
-                href="https://www.ramideltoro.com"
-                target="_blank"
-                rel="noreferrer"
-                className="text-amber-300 transition hover:text-amber-200"
-              >
-                Rami Del Toro
-              </a>
-              , All Rights Reserved.
-            </p>
-          </div>
-        </footer>
       </section>
+
+      <SiteFooter />
     </main>
   );
 }

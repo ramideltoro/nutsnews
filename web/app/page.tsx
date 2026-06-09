@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { ArticleFeed } from "./components/ArticleFeed";
+import { SiteFooter } from "./components/SiteFooter";
 import { getPublishedArticles, SITE_URL } from "@/lib/articles";
 
 export default async function Home() {
-  const currentYear = new Date().getFullYear();
   const { articles, nextPage } = await getPublishedArticles(0);
 
   const homeJsonLd = {
@@ -29,7 +29,7 @@ export default async function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-neutral-950 px-4 py-6 text-neutral-100">
+    <main className="min-h-screen bg-neutral-950 px-4 py-6 pb-28 text-neutral-100">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(homeJsonLd) }}
@@ -46,73 +46,23 @@ export default async function Home() {
           </h1>
 
           <p className="mt-3 text-base leading-7 text-neutral-300">
-            A calm daily feed of uplifting stories from around the world,
-            curated by Artificial Intelligence and linked back to trusted
-            original publishers.
+            A positive news feed curated by Artificial Intelligence
           </p>
 
-        <nav className="mt-5 flex flex-wrap gap-3 text-sm">
-          <Link
-            href="/about"
-            className="rounded-full bg-amber-400 px-4 py-2 font-semibold text-neutral-950 hover:bg-amber-300"
-          >
-            About NutsNews
-          </Link>
-        </nav>
+          <nav className="mt-5 flex flex-wrap gap-3 text-sm">
+            <Link
+              href="/about"
+              className="rounded-full bg-amber-400 px-4 py-2 font-semibold text-neutral-950 hover:bg-amber-300"
+            >
+              About NutsNews
+            </Link>
+          </nav>
         </header>
 
         <ArticleFeed initialArticles={articles} initialNextPage={nextPage} />
-
-        <footer className="mt-10 border-t border-neutral-800 py-6 text-center text-sm text-neutral-500">
-          <div className="mb-3 flex justify-center gap-4">
-            <a
-              href="https://www.linkedin.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-amber-300"
-            >
-              in
-            </a>
-            <a
-              href="https://www.youtube.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-amber-300"
-            >
-              ▶
-            </a>
-            <a
-              href="https://www.facebook.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-amber-300"
-            >
-              f
-            </a>
-            <a
-              href="https://github.com/ramideltoro/nutsnews"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-amber-300"
-            >
-              GH
-            </a>
-          </div>
-
-          <p>
-            © {currentYear}{" "}
-            <a
-              href="https://www.ramideltoro.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-amber-300"
-            >
-              Rami Del Toro
-            </a>
-            , All Rights Reserved.
-          </p>
-        </footer>
       </section>
+
+      <SiteFooter />
     </main>
   );
 }
