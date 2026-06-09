@@ -199,7 +199,7 @@ export default function AboutPage() {
           <div className="rounded-3xl border border-amber-500/20 bg-neutral-900 p-4 shadow-lg shadow-black/20">
             <p className="text-2xl font-black text-amber-300">100</p>
             <p className="mt-1 text-xs leading-5 text-neutral-400">
-              Article queue target
+              Candidate articles scanned per refresh
             </p>
           </div>
 
