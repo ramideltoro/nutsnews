@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+
 import { SiteFooter } from "../components/SiteFooter";
 
 export const metadata: Metadata = {
@@ -57,8 +58,7 @@ const techStack = [
 const pipelineSteps = [
   {
     title: "RSS feeds",
-    description:
-      "BBC, NPR, and other trusted RSS sources provide story candidates.",
+    description: "BBC, NPR, and other trusted RSS sources provide story candidates.",
   },
   {
     title: "Cloudflare Worker",
@@ -153,156 +153,123 @@ const projectBenefits = [
   },
 ];
 
+function SectionHeading({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className="mb-5">
+      <p className="text-xs font-black uppercase tracking-[0.24em] text-amber-300/80">
+        {eyebrow}
+      </p>
+      <h2 className="mt-2 text-2xl font-black tracking-tight text-amber-50">
+        {title}
+      </h2>
+      {description ? (
+        <p className="mt-3 text-sm leading-7 text-neutral-300">
+          {description}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export default function AboutPage() {
   return (
-    <main className="min-h-screen bg-neutral-950 text-amber-50">
-      <section className="mx-auto min-h-screen w-full max-w-md px-5 pb-28 pt-8">
-        <header className="mb-6">
-          <div className="relative overflow-hidden rounded-[2rem] border border-amber-400/20 bg-[radial-gradient(circle_at_top_right,_rgba(245,158,11,0.24),_transparent_34%),linear-gradient(135deg,_#171717,_#0a0a0a_55%,_#451a03)] p-6 shadow-2xl shadow-black/40">
-            <div className="pointer-events-none absolute -right-20 -top-20 h-52 w-52 rounded-full bg-amber-400/20 blur-3xl" />
-            <div className="pointer-events-none absolute -bottom-24 -left-20 h-56 w-56 rounded-full bg-orange-500/10 blur-3xl" />
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.16),_transparent_34%),linear-gradient(180deg,_#0a0a0a_0%,_#17120a_45%,_#0a0a0a_100%)] text-neutral-50">
+      <section className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 lg:px-8">
+        <section className="overflow-hidden rounded-[2rem] border border-amber-300/15 bg-gradient-to-br from-neutral-950 via-neutral-900 to-amber-950/25 p-5 shadow-2xl shadow-amber-950/25 ring-1 ring-amber-300/5">
+          <div className="rounded-[1.5rem] border border-amber-300/15 bg-gradient-to-br from-black/35 via-neutral-950/80 to-amber-950/25 p-5 shadow-inner shadow-amber-950/10">
+            <p className="text-xs font-black uppercase tracking-[0.28em] text-amber-300/80">
+              About the project
+            </p>
 
-            <div className="relative z-10">
-              <div className="mb-6 flex items-start justify-between gap-4">
-                <div>
-                  <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1">
-                    <span className="h-2 w-2 rounded-full bg-amber-300 shadow-[0_0_12px_rgba(252,211,77,0.9)]" />
-                    <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-amber-200">
-                      About the project
-                    </span>
-                  </div>
+            <h1 className="mt-3 text-4xl font-black tracking-tight text-amber-50">
+              NutsNews
+            </h1>
 
-                  <h1 className="text-5xl font-black tracking-tight text-white">
-                    Nuts<span className="text-amber-300">News</span>
-                  </h1>
-                </div>
-
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-amber-300/20 bg-black/25 text-3xl shadow-lg shadow-black/30">
-                  🥜
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                 <p className="text-sm font-semibold text-amber-200">
-                  Media Owner: Rami Del Toro
-                </p>
-                <p className="text-sm font-semibold text-amber-200">
-                  Editor-in-Chief: OpenAI
-                </p>
-                <p className="text-sm font-semibold text-amber-200">
-                  Managing Editor: OpenAI
-                </p>
-              </div>
-
-              <p className="mt-4 max-w-sm text-base leading-7 text-neutral-300">
-                NutsNews is a calm, uplifting news experience that collects
-                positive stories from trusted RSS feeds, filters out stressful
-                topics, and presents short cheerful summaries in a mobile-first
-                format.
+            <div className="mt-5 space-y-3 text-sm font-semibold text-amber-200/85">
+              <p className="rounded-2xl border border-amber-300/15 bg-black/20 p-3">
+                Media Owner: Rami Del Toro
               </p>
-
-              <div className="mt-5 flex flex-wrap gap-2">
-                <a
-                  href="/"
-                  className="inline-flex items-center justify-center rounded-full border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-sm font-semibold text-amber-200 transition hover:bg-amber-500 hover:text-neutral-950"
-                >
-                  Home
-                </a>
-
-                <a
-                  href="#project-benefits"
-                  className="inline-flex items-center justify-center rounded-full border border-white/10 bg-black/20 px-4 py-2 text-sm font-semibold text-neutral-300 transition hover:border-amber-400/30 hover:text-amber-200"
-                >
-                  Project Benefits
-                </a>
-
-                <a
-                  href="#how-it-works"
-                  className="inline-flex items-center justify-center rounded-full border border-white/10 bg-black/20 px-4 py-2 text-sm font-semibold text-neutral-300 transition hover:border-amber-400/30 hover:text-amber-200"
-                >
-                  How it works
-                </a>
-              </div>
+              <p className="rounded-2xl border border-amber-300/15 bg-black/20 p-3">
+                Editor-in-Chief: OpenAI
+              </p>
+              <p className="rounded-2xl border border-amber-300/15 bg-black/20 p-3">
+                Managing Editor: OpenAI
+              </p>
             </div>
-          </div>
-        </header>
 
-        <section className="mb-6 grid grid-cols-2 gap-3">
-          <div className="rounded-3xl border border-amber-500/20 bg-neutral-900 p-4 shadow-lg shadow-black/20">
-            <p className="text-2xl font-black text-amber-300">1000</p>
-            <p className="mt-1 text-xs leading-5 text-neutral-400">
-              Candidate articles scanned per refresh
+            <p className="mt-6 text-base leading-8 text-neutral-300">
+              NutsNews is a calm, uplifting news experience that collects positive
+              stories from trusted RSS feeds, filters out stressful topics, and
+              presents short cheerful summaries in a mobile-first format.
             </p>
           </div>
 
-          <div className="rounded-3xl border border-amber-500/20 bg-neutral-900 p-4 shadow-lg shadow-black/20">
-            <p className="text-2xl font-black text-amber-300">60 minute</p>
-            <p className="mt-1 text-xs leading-5 text-neutral-400">
-              Scheduled refresh
-            </p>
-          </div>
-
-          <div className="rounded-3xl border border-amber-500/20 bg-neutral-900 p-4 shadow-lg shadow-black/20">
-            <p className="text-2xl font-black text-amber-300">$11.95</p>
-            <p className="mt-1 text-xs leading-5 text-neutral-400">
-              Current platform cost
-            </p>
-          </div>
-
-          <div className="rounded-3xl border border-amber-500/20 bg-neutral-900 p-4 shadow-lg shadow-black/20">
-            <p className="text-2xl font-black text-amber-300">A.I.</p>
-            <p className="mt-1 text-xs leading-5 text-neutral-400">
-              Article selection & summary
-            </p>
+          <div className="mt-5 grid gap-3">
+            {[
+              ["1000", "Candidate articles scanned per refresh"],
+              ["60 minute", "Scheduled refresh"],
+              ["$11.95", "Current platform cost"],
+              ["A.I.", "Article selection & summary"],
+            ].map(([value, label]) => (
+              <div
+                key={label}
+                className="rounded-3xl border border-amber-300/15 bg-black/25 p-4 shadow-lg shadow-amber-950/10"
+              >
+                <p className="text-3xl font-black text-amber-300">{value}</p>
+                <p className="mt-2 text-xs font-bold uppercase tracking-[0.16em] text-neutral-400">
+                  {label}
+                </p>
+              </div>
+            ))}
           </div>
         </section>
 
-        <section className="mb-6 rounded-3xl border border-amber-500/20 bg-neutral-900 p-5 shadow-lg shadow-black/20">
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <h2 className="text-2xl font-bold text-white">Project Summary</h2>
-            <span className="rounded-full bg-amber-400/10 px-3 py-1 text-xs font-bold text-amber-200 ring-1 ring-amber-400/20">
-              MVP
-            </span>
+        <section className="mt-6 rounded-[2rem] border border-amber-300/15 bg-neutral-900/80 p-5 shadow-xl shadow-black/25">
+          <SectionHeading eyebrow="MVP" title="Project Summary" />
+
+          <div className="rounded-3xl border border-white/10 bg-black/20 p-5">
+            <p className="text-sm leading-7 text-neutral-300">
+              The goal of NutsNews is to create a peaceful daily feed of
+              uplifting, inspiring, human-interest, science, culture, travel,
+              wellness, community, animal, and achievement stories.
+            </p>
+            <p className="mt-4 text-sm leading-7 text-neutral-300">
+              The platform avoids politics, war, money, crime, and fear-driven
+              content. Articles are discovered through RSS feeds, reviewed by AI,
+              rewritten only as short original summaries, stored in Supabase, and
+              displayed through a mobile-friendly Next.js website.
+            </p>
           </div>
-
-          <p className="text-sm leading-6 text-neutral-300">
-            The goal of NutsNews is to create a peaceful daily feed of
-            uplifting, inspiring, human-interest, science, culture, travel,
-            wellness, community, animal, and achievement stories.
-          </p>
-
-          <p className="mt-3 text-sm leading-6 text-neutral-300">
-            The platform avoids politics, war, money, crime, and fear-driven
-            content. Articles are discovered through RSS feeds, reviewed by AI,
-            rewritten only as short original summaries, stored in Supabase, and
-            displayed through a mobile-friendly Next.js website.
-          </p>
         </section>
 
         <section
-          id="project-benefits"
-          className="mb-6 rounded-3xl border border-amber-500/20 bg-neutral-900 p-5 shadow-lg shadow-black/20"
+          id="benefits"
+          className="mt-6 rounded-[2rem] border border-amber-300/15 bg-gradient-to-br from-neutral-950 via-neutral-900 to-amber-950/20 p-5 shadow-xl shadow-amber-950/15"
         >
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <h2 className="text-2xl font-bold text-white">Project Benefits</h2>
-            <span className="rounded-full bg-amber-400/10 px-3 py-1 text-xs font-bold text-amber-200 ring-1 ring-amber-400/20">
-              Why it matters
-            </span>
-          </div>
+          <SectionHeading
+            eyebrow="Why it matters"
+            title="Project Benefits"
+            description="A project like NutsNews shows how to use automation, AI, and cloud platforms to build a focused media product with very low overhead."
+          />
 
-          <p className="text-sm leading-6 text-neutral-300">
-            A project like NutsNews shows how to use automation, AI, and cloud
-            platforms to build a focused media product with very low overhead.
-          </p>
-
-          <div className="mt-5 grid gap-3">
+          <div className="grid gap-3">
             {projectBenefits.map((benefit) => (
               <div
                 key={benefit.title}
-                className="rounded-2xl border border-white/10 bg-black/20 p-4"
+                className="rounded-3xl border border-amber-300/15 bg-black/25 p-5 transition hover:border-amber-300/30"
               >
-                <p className="font-bold text-amber-200">{benefit.title}</p>
-                <p className="mt-1 text-sm leading-6 text-neutral-400">
+                <h3 className="text-base font-black text-amber-100">
+                  {benefit.title}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-neutral-300">
                   {benefit.description}
                 </p>
               </div>
@@ -312,99 +279,74 @@ export default function AboutPage() {
 
         <section
           id="how-it-works"
-          className="mb-6 rounded-3xl border border-amber-500/20 bg-neutral-900 p-5 shadow-lg shadow-black/20"
+          className="mt-6 rounded-[2rem] border border-amber-300/15 bg-neutral-900/80 p-5 shadow-xl shadow-black/25"
         >
-          <h2 className="text-2xl font-bold text-white">How It Works</h2>
+          <SectionHeading eyebrow="Pipeline" title="How It Works" />
 
-          <div className="mt-5 space-y-3">
+          <div className="grid gap-3">
             {pipelineSteps.map((step, index) => (
               <div
                 key={step.title}
-                className="rounded-2xl border border-white/10 bg-black/20 p-4"
+                className="rounded-3xl border border-white/10 bg-black/20 p-5"
               >
-                <div className="flex items-start gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-500 text-sm font-black text-neutral-950">
-                    {index + 1}
-                  </div>
-
-                  <div>
-                    <p className="font-bold text-amber-200">{step.title}</p>
-                    <p className="mt-1 text-sm leading-6 text-neutral-400">
-                      {step.description}
-                    </p>
-                  </div>
+                <div className="flex h-9 w-9 items-center justify-center rounded-full border border-amber-300/30 bg-amber-400/15 text-sm font-black text-amber-200">
+                  {index + 1}
                 </div>
+                <h3 className="mt-4 text-base font-black text-amber-50">
+                  {step.title}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-neutral-300">
+                  {step.description}
+                </p>
               </div>
             ))}
           </div>
         </section>
 
-        <section className="mb-6 rounded-3xl border border-amber-500/20 bg-neutral-900 p-5 shadow-lg shadow-black/20">
-          <h2 className="text-2xl font-bold text-white">Flow Diagram</h2>
+        <section className="mt-6 rounded-[2rem] border border-amber-300/15 bg-gradient-to-br from-neutral-950 via-neutral-900 to-amber-950/20 p-5 shadow-xl shadow-amber-950/15">
+          <SectionHeading eyebrow="System view" title="Flow Diagram" />
 
-          <div className="mt-5 rounded-2xl border border-white/10 bg-black/25 p-4">
-            <div className="space-y-3 text-sm">
-              <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-center">
-                <p className="font-bold text-amber-200">Content Sources</p>
-                <p className="mt-1 text-xs text-neutral-400">
-                  BBC / NPR / RSS Feeds
-                </p>
+          <div className="grid gap-3">
+            {[
+              ["Content Sources", "BBC / NPR / RSS Feeds"],
+              ["Automation Layer", "Cloudflare Worker runs hourly"],
+              ["AI Curation Layer", "Filter, classify, summarize"],
+              ["Data Layer", "Supabase Postgres article queue"],
+              ["NutsNews Mobile Website", "Next.js hosted on Vercel"],
+            ].map(([title, description], index) => (
+              <div key={title}>
+                <div className="rounded-3xl border border-amber-300/15 bg-black/25 p-5">
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-amber-300/75">
+                    {title}
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-neutral-200">
+                    {description}
+                  </p>
+                </div>
+
+                {index < 4 ? (
+                  <div className="flex justify-center py-2 text-xl font-black text-amber-400/70">
+                    ↓
+                  </div>
+                ) : null}
               </div>
-
-              <div className="flex justify-center text-amber-400">↓</div>
-
-              <div className="rounded-2xl border border-white/10 bg-neutral-800 p-4 text-center">
-                <p className="font-bold text-white">Automation Layer</p>
-                <p className="mt-1 text-xs text-neutral-400">
-                  Cloudflare Worker runs hourly
-                </p>
-              </div>
-
-              <div className="flex justify-center text-amber-400">↓</div>
-
-              <div className="rounded-2xl border border-white/10 bg-neutral-800 p-4 text-center">
-                <p className="font-bold text-white">AI Curation Layer</p>
-                <p className="mt-1 text-xs text-neutral-400">
-                  Filter, classify, summarize
-                </p>
-              </div>
-
-              <div className="flex justify-center text-amber-400">↓</div>
-
-              <div className="rounded-2xl border border-white/10 bg-neutral-800 p-4 text-center">
-                <p className="font-bold text-white">Data Layer</p>
-                <p className="mt-1 text-xs text-neutral-400">
-                  Supabase Postgres article queue
-                </p>
-              </div>
-
-              <div className="flex justify-center text-amber-400">↓</div>
-
-              <div className="rounded-2xl bg-amber-500 p-4 text-center">
-                <p className="font-black text-neutral-950">
-                  NutsNews Mobile Website
-                </p>
-                <p className="mt-1 text-xs text-neutral-900">
-                  Next.js hosted on Vercel
-                </p>
-              </div>
-            </div>
+            ))}
           </div>
         </section>
 
-        <section className="mb-6 rounded-3xl border border-amber-500/20 bg-neutral-900 p-5 shadow-lg shadow-black/20">
-          <h2 className="text-2xl font-bold text-white">Tech Stack</h2>
+        <section className="mt-6 rounded-[2rem] border border-amber-300/15 bg-neutral-900/80 p-5 shadow-xl shadow-black/25">
+          <SectionHeading eyebrow="Infrastructure" title="Tech Stack" />
 
-          <div className="mt-5 grid gap-3">
+          <div className="grid gap-3">
             {techStack.map((item) => (
               <div
                 key={item.name}
-                className="rounded-2xl border border-white/10 bg-black/20 p-4"
+                className="rounded-3xl border border-white/10 bg-black/20 p-5"
               >
-                <p className="text-base font-bold text-amber-200">
+                <h3 className="text-base font-black text-amber-200">
                   {item.name}
-                </p>
-                <p className="mt-1 text-sm leading-6 text-neutral-400">
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-neutral-300">
                   {item.role}
                 </p>
               </div>
@@ -412,91 +354,90 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <section className="mb-6 rounded-3xl border border-amber-500/20 bg-neutral-900 p-5 shadow-lg shadow-black/20">
-          <h2 className="text-2xl font-bold text-white">
-            Production Deployment
-          </h2>
+        <section className="mt-6 rounded-[2rem] border border-amber-300/15 bg-gradient-to-br from-neutral-950 via-neutral-900 to-amber-950/20 p-5 shadow-xl shadow-amber-950/15">
+          <SectionHeading eyebrow="Shipping" title="Production Deployment" />
 
-          <div className="mt-5 space-y-3">
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <p className="font-bold text-amber-200">1. Code commit</p>
-              <p className="mt-1 text-sm leading-6 text-neutral-400">
-                Changes are committed locally and pushed to GitHub on the main
-                branch.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <p className="font-bold text-amber-200">2. Vercel build</p>
-              <p className="mt-1 text-sm leading-6 text-neutral-400">
-                Vercel detects the push, installs dependencies, runs the Next.js
-                build, and prepares the production deployment.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
-              <p className="font-bold text-amber-200">
-                3. Production release
-              </p>
-              <p className="mt-1 text-sm leading-6 text-neutral-300">
-                If the build succeeds, Vercel automatically publishes the latest
-                version to the production NutsNews domain.
-              </p>
-            </div>
+          <div className="grid gap-3">
+            {[
+              [
+                "1. Code commit",
+                "Changes are committed locally and pushed to GitHub on the main branch.",
+              ],
+              [
+                "2. Vercel build",
+                "Vercel detects the push, installs dependencies, runs the Next.js build, and prepares the production deployment.",
+              ],
+              [
+                "3. Production release",
+                "If the build succeeds, Vercel automatically publishes the latest version to the production NutsNews domain.",
+              ],
+            ].map(([title, description]) => (
+              <div
+                key={title}
+                className="rounded-3xl border border-amber-300/15 bg-black/25 p-5"
+              >
+                <h3 className="text-base font-black text-amber-100">
+                  {title}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-neutral-300">
+                  {description}
+                </p>
+              </div>
+            ))}
           </div>
         </section>
 
-        <section
-          id="cost"
-          className="mb-6 rounded-3xl border border-amber-500/20 bg-neutral-900 p-5 shadow-lg shadow-black/20"
-        >
-          <h2 className="text-2xl font-bold text-white">Platform Cost</h2>
+        <section className="mt-6 rounded-[2rem] border border-amber-300/15 bg-neutral-900/80 p-5 shadow-xl shadow-black/25">
+          <SectionHeading
+            eyebrow="Lean startup"
+            title="Platform Cost"
+            description="NutsNews was built to keep startup costs extremely low by using free-tier cloud services wherever possible."
+          />
 
-          <p className="mt-3 text-sm leading-6 text-neutral-300">
-            NutsNews was built to keep startup costs extremely low by using
-            free-tier cloud services wherever possible.
-          </p>
-
-          <div className="mt-5 space-y-3">
+          <div className="grid gap-3">
             {costItems.map((item) => (
               <div
                 key={item.name}
-                className="rounded-2xl border border-white/10 bg-black/20 p-4"
+                className="rounded-3xl border border-white/10 bg-black/20 p-5"
               >
-                <div className="flex items-center justify-between gap-4">
-                  <p className="font-bold text-amber-200">{item.name}</p>
-                  <p className="font-bold text-white">{item.cost}</p>
+                <div className="flex items-start justify-between gap-4">
+                  <h3 className="text-base font-black text-amber-200">
+                    {item.name}
+                  </h3>
+                  <p className="rounded-full border border-amber-300/25 bg-amber-400/10 px-3 py-1 text-sm font-black text-amber-200">
+                    {item.cost}
+                  </p>
                 </div>
-
-                <p className="mt-1 text-sm leading-6 text-neutral-400">
+                <p className="mt-3 text-sm leading-6 text-neutral-300">
                   {item.description}
                 </p>
               </div>
             ))}
+          </div>
 
-            <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
-              <div className="flex items-center justify-between gap-4">
-                <p className="font-bold text-amber-200">Total current cost</p>
-                <p className="text-xl font-black text-white">$11.95</p>
-              </div>
-
-              <p className="mt-1 text-sm leading-6 text-neutral-300">
-                Everything except the domain is currently running on free-tier
-                services.
-              </p>
-            </div>
+          <div className="mt-4 rounded-3xl border border-amber-300/20 bg-gradient-to-r from-amber-400/15 to-orange-500/10 p-5">
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-amber-300/80">
+              Total current cost
+            </p>
+            <p className="mt-2 text-4xl font-black text-amber-200">$11.95</p>
+            <p className="mt-2 text-sm leading-6 text-neutral-300">
+              Everything except the domain is currently running on free-tier
+              services.
+            </p>
           </div>
         </section>
 
-        <section className="mb-8 rounded-3xl border border-amber-500/20 bg-neutral-900 p-5 shadow-lg shadow-black/20">
-          <h2 className="text-2xl font-bold text-white">Content Safety</h2>
+        <section className="mt-6 rounded-[2rem] border border-amber-300/15 bg-gradient-to-br from-neutral-950 via-neutral-900 to-amber-950/20 p-5 shadow-xl shadow-amber-950/15">
+          <SectionHeading eyebrow="Publishing policy" title="Content Safety" />
 
-          <p className="mt-3 text-sm leading-6 text-neutral-300">
-            NutsNews does not republish full copyrighted articles. It stores the
-            source title, original link, article metadata, and a short
-            AI-written summary. Every story links back to the original
-            publisher.
-          </p>
+          <div className="rounded-3xl border border-amber-300/15 bg-black/25 p-5">
+            <p className="text-sm leading-7 text-neutral-300">
+              NutsNews does not republish full copyrighted articles. It stores
+              the source title, original link, article metadata, and a short
+              AI-written summary. Every story links back to the original
+              publisher.
+            </p>
+          </div>
         </section>
       </section>
 

@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 const siteUrl = "https://www.nutsnews.com";
+
 const gaId =
   process.env.NODE_ENV === "production"
     ? process.env.NEXT_PUBLIC_GA_ID
@@ -48,14 +49,12 @@ export const metadata: Metadata = {
     url: siteUrl,
     siteName: "NutsNews",
     title: "NutsNews | Positive News Curated by AI",
-    description:
-      "A calm daily feed of uplifting stories from around the world.",
+    description: "A calm daily feed of uplifting stories from around the world.",
   },
   twitter: {
     card: "summary_large_image",
     title: "NutsNews | Positive News Curated by AI",
-    description:
-      "A calm daily feed of uplifting stories from around the world.",
+    description: "A calm daily feed of uplifting stories from around the world.",
   },
   robots: {
     index: true,
@@ -70,33 +69,16 @@ export const metadata: Metadata = {
   },
 };
 
-const websiteJsonLd = {
-  "@context": "https://schema.org",
-  "@type": "WebSite",
-  name: "NutsNews",
-  url: siteUrl,
-  description:
-    "A calm, uplifting news feed curated by AI and linked back to trusted original sources.",
-  publisher: {
-    "@type": "Organization",
-    name: "NutsNews",
-    url: siteUrl,
-  },
-};
-
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
-        />
-
+    <html lang="en" suppressHydrationWarning>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} bg-neutral-950 text-neutral-50 antialiased`}
+      >
         {gaId ? (
           <>
             <Script

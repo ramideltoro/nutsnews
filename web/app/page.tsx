@@ -1,6 +1,9 @@
 export const dynamic = "force-dynamic";
+
 export const revalidate = 0;
+
 import Link from "next/link";
+
 import { ArticleFeed } from "./components/ArticleFeed";
 import { SiteFooter } from "./components/SiteFooter";
 import { getPublishedArticles, SITE_URL } from "@/lib/articles";
@@ -31,16 +34,11 @@ export default async function Home() {
   };
 
   return (
-    <main className="min-h-screen overflow-hidden bg-neutral-950 px-4 pb-28 pt-6 text-neutral-100">
+    <main className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.16),_transparent_34%),linear-gradient(180deg,_#0a0a0a_0%,_#17120a_45%,_#0a0a0a_100%)] px-4 pb-28 pt-6 text-neutral-100">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(homeJsonLd) }}
       />
-
-      <div className="pointer-events-none fixed inset-0 -z-10">
-        <div className="absolute left-1/2 top-0 h-96 w-96 -translate-x-1/2 rounded-full bg-amber-500/20 blur-3xl" />
-        <div className="absolute bottom-20 right-0 h-80 w-80 rounded-full bg-orange-700/10 blur-3xl" />
-      </div>
 
       <section className="mx-auto w-full max-w-md">
         <header className="mb-6">
@@ -80,7 +78,6 @@ export default async function Home() {
                 >
                   About NutsNews
                 </Link>
-
               </div>
             </div>
           </div>

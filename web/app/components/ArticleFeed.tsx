@@ -15,12 +15,12 @@ type ArticleFeedProps = {
 };
 
 const categoryDotStyles = [
-  "bg-amber-200 shadow-[0_0_8px_rgba(253,230,138,0.9)]",
-  "bg-amber-300 shadow-[0_0_8px_rgba(252,211,77,0.9)]",
-  "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)]",
-  "bg-orange-300 shadow-[0_0_8px_rgba(253,186,116,0.9)]",
-  "bg-orange-400 shadow-[0_0_8px_rgba(251,146,60,0.9)]",
-  "bg-yellow-300 shadow-[0_0_8px_rgba(253,224,71,0.9)]",
+  "bg-amber-200 shadow-[0_0_10px_rgba(253,230,138,0.95)]",
+  "bg-amber-300 shadow-[0_0_10px_rgba(252,211,77,0.95)]",
+  "bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.95)]",
+  "bg-orange-300 shadow-[0_0_10px_rgba(253,186,116,0.95)]",
+  "bg-orange-400 shadow-[0_0_10px_rgba(251,146,60,0.95)]",
+  "bg-yellow-300 shadow-[0_0_10px_rgba(253,224,71,0.95)]",
 ];
 
 function formatSiteDate(dateValue: string | null) {
@@ -124,7 +124,7 @@ export function ArticleFeed({
 
   if (!isLoading && articles.length === 0) {
     return (
-      <p className="rounded-3xl border border-amber-500/20 bg-neutral-900 p-5 text-sm leading-6 text-neutral-300 shadow-lg shadow-black/20">
+      <p className="rounded-3xl border border-amber-400/30 bg-gradient-to-br from-neutral-950 via-neutral-900 to-amber-950/30 p-5 text-sm leading-6 text-amber-100 shadow-lg shadow-amber-950/20">
         No uplifting stories are available yet. Please check back soon.
       </p>
     );
@@ -139,10 +139,10 @@ export function ArticleFeed({
           return (
             <article
               key={article.id}
-              className="rounded-[2rem] border border-white/10 bg-neutral-900/95 p-5 shadow-xl shadow-black/30 transition hover:border-amber-400/30"
+              className="rounded-[2rem] border border-amber-300/15 bg-gradient-to-br from-neutral-950 via-neutral-900 to-amber-950/20 p-5 shadow-xl shadow-amber-950/20 ring-1 ring-amber-300/5 transition hover:border-amber-300/35 hover:shadow-amber-900/25"
             >
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                <h2 className="text-left text-2xl font-black leading-tight text-white">
+              <div className="rounded-2xl border border-amber-300/15 bg-gradient-to-br from-black/35 via-neutral-950/80 to-amber-950/25 p-4 shadow-inner shadow-amber-950/10">
+                <h2 className="text-left text-2xl font-black leading-tight text-amber-50">
                   {article.title}
                 </h2>
 
@@ -158,7 +158,7 @@ export function ArticleFeed({
                   href={article.original_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex w-full items-center justify-center rounded-full bg-amber-400 px-4 py-3 text-sm font-bold text-neutral-950 transition hover:bg-amber-300"
+                  className="inline-flex w-full items-center justify-center rounded-full border border-amber-200/50 bg-gradient-to-r from-amber-300 via-amber-400 to-orange-400 px-4 py-3 text-sm font-black text-neutral-950 shadow-lg shadow-amber-950/30 transition hover:scale-[1.01] hover:from-amber-200 hover:via-amber-300 hover:to-orange-300"
                 >
                   Read full story
                 </a>
@@ -168,7 +168,7 @@ export function ArticleFeed({
                 {categoryBadges.map((category, index) => (
                   <span
                     key={`${article.id}-${category}-${index}`}
-                    className="inline-flex items-center rounded-full border border-amber-400/20 bg-gradient-to-r from-amber-400/15 to-orange-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-amber-200 shadow-sm shadow-amber-950/20"
+                    className="inline-flex items-center rounded-full border border-amber-300/25 bg-gradient-to-r from-amber-400/20 via-yellow-400/10 to-orange-500/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-amber-100 shadow-sm shadow-amber-950/30"
                   >
                     <span
                       className={`mr-1.5 h-1.5 w-1.5 rounded-full ${
@@ -180,7 +180,7 @@ export function ArticleFeed({
                 ))}
               </div>
 
-              <div className="mt-5 flex items-center justify-between gap-4 border-t border-amber-400/10 pt-4 text-[11px] font-semibold text-amber-300/80">
+              <div className="mt-5 flex items-center justify-between gap-4 border-t border-amber-300/15 pt-4 text-[11px] font-bold text-amber-300/85">
                 <span>{formatSiteDate(article.published_on_site_at)}</span>
 
                 <span className="min-w-0 truncate text-right">
@@ -194,7 +194,7 @@ export function ArticleFeed({
 
       <div
         ref={loaderRef}
-        className="py-8 text-center text-sm text-neutral-500"
+        className="py-8 text-center text-sm font-semibold text-amber-300/60"
         aria-live="polite"
       >
         {isLoading && "Loading more peaceful stories..."}
