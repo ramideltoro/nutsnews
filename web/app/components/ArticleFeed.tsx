@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+
 import type { Article } from "@/lib/articles";
 
 type ArticlesResponse = {
@@ -132,71 +133,61 @@ export function ArticleFeed({
   return (
     <>
       <section className="space-y-5" aria-label="Latest uplifting stories">
-        {articles.map((article) => (
-          <article
-            key={article.id}
-            className="rounded-[2rem] border border-white/10 bg-neutral-900/95 p-5 shadow-xl shadow-black/30 transition hover:border-amber-400/30"
-          >
-            <div className="mb-4 flex flex-wrap gap-2">
-              {getCategoryBadges(article.category).map((category, index) => (
-                <span
-                  key={`${article.id}-${category}`}
-                  className="inline-flex items-center rounded-full border border-amber-400/20 bg-gradient-to-r from-amber-400/15 to-orange-500/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-amber-200 shadow-sm shadow-amber-950/20"
+        {articles.map((article) => {
+          const categoryBadges = getCategoryBadges(article.category);
+
+          return (
+            <article
+              key={article.id}
+              className="rounded-[2rem] border border-white/10 bg-neutral-900/95 p-5 shadow-xl shadow-black/30 transition hover:border-amber-400/30"
+            >
+              <h2 className="text-2xl font-black leading-tight text-white">
+                {article.title}
+              </h2>
+
+              {article.ai_summary ? (
+                <p className="mt-3 text-base leading-7 text-neutral-300">
+                  {article.ai_summary}
+                </p>
+              ) : null}
+
+              <div className="mt-5">
+                <a
+                  href={article.original_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex w-full items-center justify-center rounded-full bg-amber-400 px-4 py-3 text-sm font-bold text-neutral-950 transition hover:bg-amber-300"
                 >
-                  <span
-                    className={`mr-1.5 h-1.5 w-1.5 rounded-full ${
-                      categoryDotStyles[index % categoryDotStyles.length]
-                    }`}
-                  />
-                  {category}
-                </span>
-              ))}
-            </div>
-
-            <h2 className="text-2xl font-black leading-tight text-white">
-              {article.title}
-            </h2>
-
-            {article.ai_summary ? (
-              <p className="mt-4 border-l border-amber-400/30 pl-4 text-sm leading-7 text-neutral-300">
-                {article.ai_summary}
-              </p>
-            ) : null}
-
-            <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-neutral-500">
-                    Date
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-neutral-300">
-                    {formatSiteDate(article.published_on_site_at)}
-                  </p>
-                </div>
-
-                <div className="text-right">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-neutral-500">
-                    Source
-                  </p>
-                  <p className="mt-1 truncate text-sm font-semibold text-amber-300">
-                    {article.source}
-                  </p>
-                </div>
+                  Read full story
+                </a>
               </div>
-            </div>
 
-            <div className="mt-5">
-              <a
-                href={article.original_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex w-full items-center justify-center rounded-full bg-amber-400 px-4 py-3 text-sm font-bold text-neutral-950 transition hover:bg-amber-300"
-              >
-                Read full story
-              </a>
-            </div>
-          </article>
-        ))}
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                {categoryBadges.map((category, index) => (
+                  <span
+                    key={`${article.id}-${category}-${index}`}
+                    className="inline-flex items-center rounded-full border border-amber-400/20 bg-gradient-to-r from-amber-400/15 to-orange-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-amber-200 shadow-sm shadow-amber-950/20"
+                  >
+                    <span
+                      className={`mr-1.5 h-1.5 w-1.5 rounded-full ${
+                        categoryDotStyles[index % categoryDotStyles.length]
+                      }`}
+                    />
+                    {category}
+                  </span>
+                ))}
+              </div>
+
+              <div className="mt-5 flex items-center justify-between gap-4 border-t border-white/5 pt-4 text-[11px] font-medium text-neutral-500">
+                <span>{formatSiteDate(article.published_on_site_at)}</span>
+
+                <span className="min-w-0 truncate text-right">
+                  {article.source}
+                </span>
+              </div>
+            </article>
+          );
+        })}
       </section>
 
       <div
