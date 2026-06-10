@@ -141,15 +141,17 @@ export function ArticleFeed({
               key={article.id}
               className="rounded-[2rem] border border-white/10 bg-neutral-900/95 p-5 shadow-xl shadow-black/30 transition hover:border-amber-400/30"
             >
-              <h2 className="text-2xl font-black leading-tight text-white">
-                {article.title}
-              </h2>
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <h2 className="text-left text-2xl font-black leading-tight text-white">
+                  {article.title}
+                </h2>
 
-              {article.ai_summary ? (
-                <p className="mt-3 text-base leading-7 text-neutral-300">
-                  {article.ai_summary}
-                </p>
-              ) : null}
+                {article.ai_summary ? (
+                  <p className="mt-3 text-left text-base leading-7 text-neutral-300">
+                    {article.ai_summary}
+                  </p>
+                ) : null}
+              </div>
 
               <div className="mt-5">
                 <a
@@ -178,7 +180,7 @@ export function ArticleFeed({
                 ))}
               </div>
 
-              <div className="mt-5 flex items-center justify-between gap-4 border-t border-white/5 pt-4 text-[11px] font-medium text-neutral-500">
+              <div className="mt-5 flex items-center justify-between gap-4 border-t border-amber-400/10 pt-4 text-[11px] font-semibold text-amber-300/80">
                 <span>{formatSiteDate(article.published_on_site_at)}</span>
 
                 <span className="min-w-0 truncate text-right">
