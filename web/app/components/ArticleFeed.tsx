@@ -269,8 +269,40 @@ export function ArticleFeed({
             return (
               <article
                 key={article.id}
-                className="rounded-[2rem] border border-amber-300/15 bg-gradient-to-br from-neutral-950 via-neutral-900 to-amber-950/20 p-5 shadow-xl shadow-amber-950/20 ring-1 ring-amber-300/5 transition hover:border-amber-300/35 hover:shadow-amber-900/25"
+                className="overflow-hidden rounded-[2rem] border border-amber-300/15 bg-gradient-to-br from-neutral-950 via-neutral-900 to-amber-950/20 p-5 shadow-xl shadow-amber-950/20 ring-1 ring-amber-300/5 transition hover:border-amber-300/35 hover:shadow-amber-900/25"
               >
+                <div className="mb-4 overflow-hidden rounded-[1.6rem] border border-amber-300/15 bg-black/30 shadow-inner shadow-amber-950/10">
+                  {article.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={article.image_url}
+                      alt=""
+                      className="h-44 w-full object-cover"
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="relative flex h-44 w-full items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top_right,_rgba(245,158,11,0.42),_transparent_36%),linear-gradient(135deg,_#171717,_#0a0a0a_58%,_#451a03)]">
+                      <div className="pointer-events-none absolute -right-14 -top-14 h-40 w-40 rounded-full bg-amber-400/25 blur-3xl" />
+                      <div className="pointer-events-none absolute -bottom-16 -left-14 h-40 w-40 rounded-full bg-orange-500/20 blur-3xl" />
+
+                      <div className="relative z-10 text-center">
+                        <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-300/25 bg-black/25 text-4xl shadow-lg shadow-black/30">
+                          🥜
+                        </div>
+
+                        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-200">
+                          Positive story
+                        </p>
+
+                        <p className="mt-1 text-2xl font-black tracking-tight text-white">
+                          Nuts<span className="text-amber-300">News</span>
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div className="rounded-2xl border border-amber-300/15 bg-gradient-to-br from-black/35 via-neutral-950/80 to-amber-950/25 p-4 shadow-inner shadow-amber-950/10">
                   <h2 className="text-left text-2xl font-black leading-tight text-amber-50">
                     {article.title}
