@@ -179,29 +179,33 @@ export function ArticleFeed({
   return (
     <>
       <nav
-        className="sticky top-3 z-30 mb-5"
+        className="sticky top-0 z-50 -mx-1 mb-5 pt-2"
         aria-label="Article categories"
       >
-        <div className="relative rounded-[2rem] border border-amber-300/15 bg-gradient-to-br from-neutral-950/95 via-neutral-900/95 to-amber-950/25 p-2 shadow-2xl shadow-black/35 ring-1 ring-amber-300/5 backdrop-blur-xl">
+        <div className="relative rounded-[2rem] border border-amber-300/30 bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.26),_transparent_55%),linear-gradient(135deg,_rgba(23,23,23,0.98),_rgba(10,10,10,0.98)_58%,_rgba(69,26,3,0.75))] p-2 shadow-[0_0_34px_rgba(245,158,11,0.22),0_22px_55px_rgba(0,0,0,0.55)] ring-1 ring-amber-300/20 backdrop-blur-2xl">
+          <div className="pointer-events-none absolute inset-0 rounded-[2rem] border border-amber-200/10" />
+          <div className="pointer-events-none absolute -inset-1 -z-10 rounded-[2.2rem] bg-amber-400/12 blur-xl" />
+
           <button
             type="button"
             onClick={() => setIsCategoryMenuOpen((isOpen) => !isOpen)}
-            className="flex w-full items-center justify-between gap-3 rounded-[1.55rem] border border-amber-300/15 bg-gradient-to-br from-black/35 via-neutral-950/80 to-amber-950/20 px-4 py-3 text-left shadow-inner shadow-amber-950/10 transition hover:border-amber-300/35 hover:bg-amber-400/10"
+            className="relative flex w-full items-center justify-between gap-3 rounded-[1.55rem] border border-amber-300/25 bg-gradient-to-br from-black/45 via-neutral-950/85 to-amber-950/25 px-4 py-3 text-left shadow-inner shadow-amber-950/10 transition hover:border-amber-300/50 hover:bg-amber-400/10"
             aria-expanded={isCategoryMenuOpen}
             aria-controls="category-menu"
           >
             <span className="min-w-0">
-              <span className="block text-[10px] font-black uppercase tracking-[0.22em] text-amber-300/70">
-                Browse stories
+              <span className="block text-[10px] font-black uppercase tracking-[0.22em] text-amber-200">
+                Click to Filter
               </span>
+
               <span className="mt-1 flex items-center text-sm font-black uppercase tracking-[0.13em] text-amber-50">
-                <span className="mr-2 h-2 w-2 rounded-full bg-amber-300 shadow-[0_0_10px_rgba(252,211,77,0.95)]" />
+                <span className="mr-2 h-2.5 w-2.5 rounded-full bg-amber-300 shadow-[0_0_14px_rgba(252,211,77,1)]" />
                 {selectedCategory}
               </span>
             </span>
 
             <span
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-amber-300/20 bg-amber-400/10 text-lg font-black text-amber-200 transition ${
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-amber-200/45 bg-gradient-to-br from-amber-300 via-amber-400 to-orange-400 text-xl font-black text-neutral-950 shadow-lg shadow-amber-950/35 transition ${
                 isCategoryMenuOpen ? "rotate-180" : ""
               }`}
               aria-hidden="true"
@@ -213,7 +217,7 @@ export function ArticleFeed({
           {isCategoryMenuOpen ? (
             <div
               id="category-menu"
-              className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-40 max-h-80 overflow-y-auto rounded-[2rem] border border-amber-300/20 bg-gradient-to-br from-neutral-950 via-neutral-900 to-amber-950/30 p-2 shadow-2xl shadow-black/60 ring-1 ring-amber-300/10 backdrop-blur-xl"
+              className="absolute left-0 right-0 top-[calc(100%+0.55rem)] z-50 max-h-80 overflow-y-auto rounded-[2rem] border border-amber-300/30 bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.22),_transparent_52%),linear-gradient(135deg,_#0a0a0a,_#171717_55%,_#451a03)] p-2 shadow-[0_0_36px_rgba(245,158,11,0.24),0_28px_70px_rgba(0,0,0,0.65)] ring-1 ring-amber-300/20 backdrop-blur-2xl"
             >
               {menuCategories.map((category, index) => {
                 const isActive = category === selectedCategory;
@@ -226,7 +230,7 @@ export function ArticleFeed({
                     className={`mb-1 flex w-full items-center justify-between rounded-[1.35rem] border px-3.5 py-3 text-left text-[11px] font-black uppercase tracking-[0.13em] transition last:mb-0 ${
                       isActive
                         ? "border-amber-200/70 bg-gradient-to-r from-amber-300 via-amber-400 to-orange-400 text-neutral-950 shadow-lg shadow-amber-950/30"
-                        : "border-amber-300/10 bg-black/25 text-amber-100 hover:border-amber-300/45 hover:bg-amber-400/10"
+                        : "border-amber-300/15 bg-black/30 text-amber-100 hover:border-amber-300/50 hover:bg-amber-400/10"
                     }`}
                     aria-pressed={isActive}
                   >
