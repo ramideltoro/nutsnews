@@ -6,10 +6,17 @@ import Link from "next/link";
 
 import { ArticleFeed } from "./components/ArticleFeed";
 import { SiteFooter } from "./components/SiteFooter";
-import { getPublishedArticles, SITE_URL } from "@/lib/articles";
+import {
+  getPublishedArticles,
+  getPublishedCategories,
+  SITE_URL,
+} from "@/lib/articles";
 
 export default async function Home() {
-  const { articles, nextPage } = await getPublishedArticles(0);
+  const [{ articles, nextPage }, categories] = await Promise.all([
+    getPublishedArticles(0),
+    getPublishedCategories(),
+  ]);
 
   const homeJsonLd = {
     "@context": "https://schema.org",
@@ -41,7 +48,7 @@ export default async function Home() {
       />
 
       <section className="mx-auto w-full max-w-md">
-        <header className="mb-6">
+        <header className="mb-5">
           <div className="relative overflow-hidden rounded-[2.25rem] border border-amber-400/20 bg-[radial-gradient(circle_at_top_right,_rgba(245,158,11,0.28),_transparent_36%),linear-gradient(135deg,_#171717,_#0a0a0a_58%,_#451a03)] p-6 shadow-2xl shadow-black/50">
             <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-amber-400/20 blur-3xl" />
             <div className="pointer-events-none absolute -bottom-24 -left-20 h-56 w-56 rounded-full bg-orange-500/10 blur-3xl" />
@@ -83,7 +90,11 @@ export default async function Home() {
           </div>
         </header>
 
-        <ArticleFeed initialArticles={articles} initialNextPage={nextPage} />
+        <ArticleFeed
+          initialArticles={articles}
+          initialNextPage={nextPage}
+          categories={categories}
+        />
       </section>
 
       <SiteFooter />
