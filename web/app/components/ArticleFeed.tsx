@@ -211,6 +211,17 @@ function formatSiteDate(dateValue: string | null) {
   }).format(new Date(dateValue));
 }
 
+function formatSourceLabel(source: string | null) {
+  if (!source) {
+    return "NutsNews";
+  }
+
+  return source
+    .replace(/^Google\s+News\s*-\s*/i, "")
+    .replace(/^Google\s*-\s*/i, "")
+    .trim();
+}
+
 function getCategoryBadges(category: string | null) {
   const fallback = ["Uplifting"];
 
@@ -491,14 +502,13 @@ export function ArticleFeed({
                       </div>
 
                       <div className="relative z-10 px-5 text-center">
-                        <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-[1.35rem] border border-amber-300/25 bg-black/25 text-5xl shadow-lg shadow-black/30">
+                        <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-[1.5rem] border border-amber-300/25 bg-black/25 text-6xl shadow-lg shadow-black/30">
                           {generatedThumbnail.emoji}
                         </div>
 
-                        <p className="text-xs font-black uppercase tracking-[0.24em] text-amber-200">
+                        <p className="text-sm font-black uppercase tracking-[0.24em] text-amber-200">
                           {generatedThumbnail.label}
                         </p>
-
                       </div>
                     </div>
                   )}
@@ -548,7 +558,7 @@ export function ArticleFeed({
                 <div className="mt-5 flex items-center justify-between gap-4 border-t border-amber-300/15 pt-4 text-[11px] font-bold text-amber-300/85">
                   <span>{formatSiteDate(article.published_on_site_at)}</span>
                   <span className="min-w-0 truncate text-right">
-                    {article.source}
+                    {formatSourceLabel(article.source)}
                   </span>
                 </div>
               </article>
