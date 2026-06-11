@@ -15,6 +15,13 @@ type ArticleFeedProps = {
   categories: string[];
 };
 
+type GeneratedThumbnail = {
+  emoji: string;
+  label: string;
+  gradient: string;
+  shapes: string[];
+};
+
 const ALL_CATEGORY = "All";
 
 const categoryDotStyles = [
@@ -25,6 +32,172 @@ const categoryDotStyles = [
   "bg-orange-400 shadow-[0_0_10px_rgba(251,146,60,0.95)]",
   "bg-yellow-300 shadow-[0_0_10px_rgba(253,224,71,0.95)]",
 ];
+
+const generatedThumbnailThemes: Array<{
+  keywords: string[];
+  thumbnail: GeneratedThumbnail;
+}> = [
+  {
+    keywords: [
+      "science",
+      "scientist",
+      "research",
+      "discovery",
+      "study",
+      "space",
+      "planet",
+      "star",
+      "moon",
+      "nasa",
+    ],
+    thumbnail: {
+      emoji: "🔭",
+      label: "Bright Discovery",
+      gradient:
+        "bg-[radial-gradient(circle_at_top_right,_rgba(251,191,36,0.36),_transparent_32%),radial-gradient(circle_at_bottom_left,_rgba(59,130,246,0.28),_transparent_34%),linear-gradient(135deg,_#111827,_#0a0a0a_58%,_#451a03)]",
+      shapes: ["✦", "●", "✧"],
+    },
+  },
+  {
+    keywords: [
+      "health",
+      "doctor",
+      "hospital",
+      "medical",
+      "patient",
+      "wellness",
+      "therapy",
+      "care",
+      "healing",
+    ],
+    thumbnail: {
+      emoji: "💛",
+      label: "Hopeful Health",
+      gradient:
+        "bg-[radial-gradient(circle_at_top_right,_rgba(252,211,77,0.42),_transparent_34%),radial-gradient(circle_at_bottom_left,_rgba(16,185,129,0.24),_transparent_36%),linear-gradient(135deg,_#0f172a,_#0a0a0a_58%,_#365314)]",
+      shapes: ["+", "●", "✦"],
+    },
+  },
+  {
+    keywords: [
+      "tree",
+      "forest",
+      "plant",
+      "garden",
+      "nature",
+      "wildlife",
+      "animal",
+      "dog",
+      "cat",
+      "bird",
+      "ocean",
+      "river",
+      "earth",
+    ],
+    thumbnail: {
+      emoji: "🌿",
+      label: "Nature Win",
+      gradient:
+        "bg-[radial-gradient(circle_at_top_right,_rgba(132,204,22,0.34),_transparent_34%),radial-gradient(circle_at_bottom_left,_rgba(245,158,11,0.26),_transparent_36%),linear-gradient(135deg,_#052e16,_#0a0a0a_58%,_#451a03)]",
+      shapes: ["✿", "●", "◇"],
+    },
+  },
+  {
+    keywords: [
+      "community",
+      "volunteer",
+      "neighbors",
+      "school",
+      "students",
+      "teacher",
+      "family",
+      "village",
+      "town",
+      "city",
+      "help",
+      "kindness",
+    ],
+    thumbnail: {
+      emoji: "🤝",
+      label: "Community Joy",
+      gradient:
+        "bg-[radial-gradient(circle_at_top_right,_rgba(251,146,60,0.38),_transparent_34%),radial-gradient(circle_at_bottom_left,_rgba(252,211,77,0.28),_transparent_36%),linear-gradient(135deg,_#171717,_#0a0a0a_58%,_#7c2d12)]",
+      shapes: ["●", "✦", "●"],
+    },
+  },
+  {
+    keywords: [
+      "art",
+      "music",
+      "artist",
+      "song",
+      "museum",
+      "dance",
+      "film",
+      "book",
+      "library",
+      "creative",
+      "design",
+    ],
+    thumbnail: {
+      emoji: "🎨",
+      label: "Creative Spark",
+      gradient:
+        "bg-[radial-gradient(circle_at_top_right,_rgba(253,224,71,0.38),_transparent_34%),radial-gradient(circle_at_bottom_left,_rgba(236,72,153,0.22),_transparent_36%),linear-gradient(135deg,_#18181b,_#0a0a0a_58%,_#713f12)]",
+      shapes: ["✺", "●", "✦"],
+    },
+  },
+  {
+    keywords: [
+      "sport",
+      "athlete",
+      "team",
+      "game",
+      "race",
+      "marathon",
+      "soccer",
+      "football",
+      "basketball",
+      "baseball",
+      "tennis",
+    ],
+    thumbnail: {
+      emoji: "🏆",
+      label: "Winning Moment",
+      gradient:
+        "bg-[radial-gradient(circle_at_top_right,_rgba(251,191,36,0.44),_transparent_34%),radial-gradient(circle_at_bottom_left,_rgba(249,115,22,0.25),_transparent_36%),linear-gradient(135deg,_#111827,_#0a0a0a_58%,_#78350f)]",
+      shapes: ["★", "●", "✦"],
+    },
+  },
+  {
+    keywords: [
+      "food",
+      "chef",
+      "restaurant",
+      "farm",
+      "meal",
+      "recipe",
+      "bakery",
+      "coffee",
+      "chocolate",
+    ],
+    thumbnail: {
+      emoji: "🍯",
+      label: "Sweet Story",
+      gradient:
+        "bg-[radial-gradient(circle_at_top_right,_rgba(251,191,36,0.42),_transparent_34%),radial-gradient(circle_at_bottom_left,_rgba(217,119,6,0.26),_transparent_36%),linear-gradient(135deg,_#1c1917,_#0a0a0a_58%,_#451a03)]",
+      shapes: ["●", "✦", "◇"],
+    },
+  },
+];
+
+const defaultGeneratedThumbnail: GeneratedThumbnail = {
+  emoji: "✨",
+  label: "Positive Story",
+  gradient:
+    "bg-[radial-gradient(circle_at_top_right,_rgba(245,158,11,0.42),_transparent_36%),linear-gradient(135deg,_#171717,_#0a0a0a_58%,_#451a03)]",
+  shapes: ["✦", "●", "✧"],
+};
 
 function formatSiteDate(dateValue: string | null) {
   if (!dateValue) {
@@ -65,6 +238,24 @@ function buildArticlesUrl(page: number, category: string) {
   return `/api/articles?${params.toString()}`;
 }
 
+function getGeneratedThumbnail(article: Article): GeneratedThumbnail {
+  const searchableText = [
+    article.title,
+    article.ai_summary,
+    article.category,
+    article.source,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  const matchedTheme = generatedThumbnailThemes.find((theme) =>
+    theme.keywords.some((keyword) => searchableText.includes(keyword)),
+  );
+
+  return matchedTheme?.thumbnail ?? defaultGeneratedThumbnail;
+}
+
 export function ArticleFeed({
   initialArticles,
   initialNextPage,
@@ -75,6 +266,7 @@ export function ArticleFeed({
   const [isLoading, setIsLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORY);
   const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
+
   const loaderRef = useRef<HTMLDivElement | null>(null);
 
   const menuCategories = [ALL_CATEGORY, ...categories];
@@ -197,7 +389,6 @@ export function ArticleFeed({
               <span className="block text-[10px] font-black uppercase tracking-[0.22em] text-amber-200">
                 Click to Filter
               </span>
-
               <span className="mt-1 flex items-center text-sm font-black uppercase tracking-[0.13em] text-amber-50">
                 <span className="mr-2 h-2.5 w-2.5 rounded-full bg-amber-300 shadow-[0_0_14px_rgba(252,211,77,1)]" />
                 {selectedCategory}
@@ -265,6 +456,7 @@ export function ArticleFeed({
         <section className="space-y-5" aria-label="Latest uplifting stories">
           {articles.map((article) => {
             const categoryBadges = getCategoryBadges(article.category);
+            const generatedThumbnail = getGeneratedThumbnail(article);
 
             return (
               <article
@@ -277,27 +469,36 @@ export function ArticleFeed({
                     <img
                       src={article.image_url}
                       alt=""
-                      className="h-44 w-full object-cover"
+                      className="h-52 w-full object-cover"
                       loading="lazy"
                       referrerPolicy="no-referrer"
                     />
                   ) : (
-                    <div className="relative flex h-44 w-full items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top_right,_rgba(245,158,11,0.42),_transparent_36%),linear-gradient(135deg,_#171717,_#0a0a0a_58%,_#451a03)]">
-                      <div className="pointer-events-none absolute -right-14 -top-14 h-40 w-40 rounded-full bg-amber-400/25 blur-3xl" />
-                      <div className="pointer-events-none absolute -bottom-16 -left-14 h-40 w-40 rounded-full bg-orange-500/20 blur-3xl" />
+                    <div
+                      className={`relative flex h-52 w-full items-center justify-center overflow-hidden ${generatedThumbnail.gradient}`}
+                      aria-label={`Generated thumbnail for ${article.title}`}
+                    >
+                      <div className="pointer-events-none absolute -right-14 -top-14 h-44 w-44 rounded-full bg-amber-400/25 blur-3xl" />
+                      <div className="pointer-events-none absolute -bottom-16 -left-14 h-44 w-44 rounded-full bg-orange-500/20 blur-3xl" />
+                      <div className="pointer-events-none absolute left-5 top-5 text-4xl font-black text-amber-200/25">
+                        {generatedThumbnail.shapes[0]}
+                      </div>
+                      <div className="pointer-events-none absolute bottom-6 right-8 text-6xl font-black text-white/10">
+                        {generatedThumbnail.shapes[1]}
+                      </div>
+                      <div className="pointer-events-none absolute right-16 top-8 text-3xl font-black text-orange-200/25">
+                        {generatedThumbnail.shapes[2]}
+                      </div>
 
-                      <div className="relative z-10 text-center">
-                        <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-300/25 bg-black/25 text-4xl shadow-lg shadow-black/30">
-                          🥜
+                      <div className="relative z-10 px-5 text-center">
+                        <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-[1.35rem] border border-amber-300/25 bg-black/25 text-5xl shadow-lg shadow-black/30">
+                          {generatedThumbnail.emoji}
                         </div>
 
-                        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-200">
-                          Positive story
+                        <p className="text-xs font-black uppercase tracking-[0.24em] text-amber-200">
+                          {generatedThumbnail.label}
                         </p>
 
-                        <p className="mt-1 text-2xl font-black tracking-tight text-white">
-                          Nuts<span className="text-amber-300">News</span>
-                        </p>
                       </div>
                     </div>
                   )}
