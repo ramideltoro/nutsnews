@@ -30,10 +30,6 @@ function cleanCategory(category?: string | null) {
   return cleanedCategory;
 }
 
-function onlyWithThumbnailQuery(query: any) {
-  return query.not("image_url", "is", null).neq("image_url", "");
-}
-
 export function getCategoryBadges(category: string | null) {
   const fallback = ["Uplifting"];
 
@@ -55,9 +51,12 @@ export async function getPublishedArticles(page = 0, category?: string | null) {
   const to = from + PAGE_SIZE - 1;
   const selectedCategory = cleanCategory(category);
 
-  let query = onlyWithThumbnailQuery(
-      supabase.from("articles").select(ARTICLE_SELECT).eq("status", "published"),
-  );
+  let query = supabase
+      .from("articles")
+      .select(ARTICLE_SELECT)
+      .eq("status", "published")
+      .not("image_url", "is", null)
+      .neq("image_url", "");
 
   if (selectedCategory) {
     query = query.ilike("category", `%${selectedCategory}%`);
@@ -84,13 +83,14 @@ export async function getPublishedArticles(page = 0, category?: string | null) {
 }
 
 export async function getPublishedCategories(limit = 1000) {
-  const { data, error } = await onlyWithThumbnailQuery(
-      supabase
-          .from("articles")
-          .select("category")
-          .eq("status", "published")
-          .not("category", "is", null),
-  ).limit(limit);
+  const { data, error } = await supabase
+      .from("articles")
+      .select("category")
+      .eq("status", "published")
+      .not("image_url", "is", null)
+      .neq("image_url", "")
+      .not("category", "is", null)
+      .limit(limit);
 
   if (error) {
     console.error("Failed to load article categories:", error);
@@ -109,13 +109,14 @@ export async function getPublishedCategories(limit = 1000) {
 }
 
 export const getArticleById = cache(async (id: string) => {
-  const { data, error } = await onlyWithThumbnailQuery(
-      supabase
-          .from("articles")
-          .select(ARTICLE_SELECT)
-          .eq("status", "published")
-          .eq("id", id),
-  ).single();
+  const { data, error } = await supabase
+      .from("articles")
+      .select(ARTICLE_SELECT)
+      .eq("status", "published")
+      .eq("id", id)
+      .not("image_url", "is", null)
+      .neq("image_url", "")
+      .single();
 
   if (error) {
     console.error("Failed to load article:", error);
@@ -126,12 +127,12 @@ export const getArticleById = cache(async (id: string) => {
 });
 
 export async function getRecentArticleSitemapItems(limit = 1000) {
-  const { data, error } = await onlyWithThumbnailQuery(
-      supabase
-          .from("articles")
-          .select("id, published_on_site_at, published_at")
-          .eq("status", "published"),
-  )
+  const { data, error } = await supabase
+      .from("articles")
+      .select("id, published_on_site_at, published_at")
+      .eq("status", "published")
+      .not("image_url", "is", null)
+      .neq("image_url", "")
       .order("published_on_site_at", { ascending: false })
       .limit(limit);
 
