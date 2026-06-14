@@ -5,21 +5,58 @@ const DEFAULT_STALE_MINUTES = 180;
 const DEFAULT_SLOW_RUN_MS = 15000;
 const DAILY_WINDOW_DAYS = 7;
 
+const WORKER_RUN_SELECT_COLUMNS = [
+    "id",
+    "created_at",
+    "run_started_at",
+    "run_completed_at",
+    "run_source",
+    "request_id",
+    "shard_index",
+    "feeds_per_shard",
+    "max_ai_reviews",
+    "success",
+    "error_name",
+    "error_message",
+    "feed_count",
+    "fetched_count",
+    "candidate_count",
+    "already_reviewed_count",
+    "unreviewed_count",
+    "eligible_for_ai_count",
+    "ai_reviewed_count",
+    "accepted_count",
+    "rejected_count",
+    "no_thumbnail_rejected_count",
+    "locally_rejected_count",
+    "image_hydration_lookup_count",
+    "image_hydration_found_count",
+    "review_save_ok",
+    "article_save_ok",
+    "ai_usage_save_ok",
+    "cost_protection_limit_reached",
+    "spike_warning_triggered",
+    "duration_ms",
+].join(",");
+
 type SupabaseConfig = {
     url: string;
     serviceRoleKey: string;
 };
 
-type ShardRunRow = {
+type WorkerRunRow = {
     id: number;
     created_at: string;
     run_started_at: string;
     run_completed_at: string;
-    run_source: string;
+    run_source: "manual" | "scheduled" | "unknown";
     request_id: string | null;
     shard_index: number;
     feeds_per_shard: number;
     max_ai_reviews: number;
+    success: boolean;
+    error_name: string | null;
+    error_message: string | null;
     feed_count: number;
     fetched_count: number;
     candidate_count: number;
@@ -27,30 +64,24 @@ type ShardRunRow = {
     unreviewed_count: number;
     eligible_for_ai_count: number;
     ai_reviewed_count: number;
-    openai_model: string;
-    openai_call_count: number;
-    openai_prompt_tokens: number;
-    openai_completion_tokens: number;
-    openai_total_tokens: number;
-    estimated_openai_cost_usd: string | number;
-    openai_accepted_count: number;
-    openai_rejected_count: number;
-    published_accepted_count: number;
-    total_rejected_count: number;
+    accepted_count: number;
+    rejected_count: number;
     no_thumbnail_rejected_count: number;
     locally_rejected_count: number;
     image_hydration_lookup_count: number;
     image_hydration_found_count: number;
-    cost_protection_limit_reached: boolean;
-    spike_warning_triggered: boolean;
     review_save_ok: boolean;
     article_save_ok: boolean;
+    ai_usage_save_ok: boolean;
+    cost_protection_limit_reached: boolean;
+    spike_warning_triggered: boolean;
     duration_ms: number;
 };
 
 export type ShardHealthStatus =
     | "healthy"
     | "warning"
+    | "failed"
     | "stale"
     | "no-feeds"
     | "missing";
@@ -65,6 +96,11 @@ export type ShardHealthRow = {
     minutesSinceLastRun: number | null;
     runSource: string | null;
     runCount: number;
+    successCount: number;
+    failureCount: number;
+    consecutiveFailureCount: number;
+    latestErrorName: string | null;
+    latestErrorMessage: string | null;
     feedCount: number;
     fetchedCount: number;
     candidateCount: number;
@@ -81,6 +117,7 @@ export type ShardHealthRow = {
     maxDurationMs: number;
     reviewSaveOk: boolean;
     articleSaveOk: boolean;
+    aiUsageSaveOk: boolean;
     costProtectionHitCount: number;
     spikeWarningCount: number;
 };
@@ -90,8 +127,11 @@ export type RecentShardRun = {
     runStartedAt: string;
     runSource: string;
     shardIndex: number;
+    success: boolean;
     status: ShardHealthStatus;
     statusLabel: string;
+    errorName: string | null;
+    errorMessage: string | null;
     feedCount: number;
     fetchedCount: number;
     candidateCount: number;
@@ -105,11 +145,14 @@ export type RecentShardRun = {
     durationMs: number;
     reviewSaveOk: boolean;
     articleSaveOk: boolean;
+    aiUsageSaveOk: boolean;
 };
 
 export type WorkerHealthDailyPoint = {
     date: string;
     runCount: number;
+    successCount: number;
+    failureCount: number;
     fetchedCount: number;
     candidateCount: number;
     acceptedCount: number;
@@ -126,10 +169,14 @@ export type ShardHealthSummary = {
     totalShards: number;
     healthyShards: number;
     warningShards: number;
+    failedShards: number;
     staleShards: number;
     noFeedShards: number;
     missingShards: number;
     totalRuns: number;
+    totalSuccessfulRuns: number;
+    totalFailedRuns: number;
+    totalConsecutiveFailures: number;
     totalFeeds: number;
     totalFetched: number;
     totalCandidates: number;
@@ -143,6 +190,7 @@ export type ShardHealthSummary = {
     acceptanceRate: number;
     averageDurationMs: number;
     latestRunAt: string | null;
+    latestFailureAt: string | null;
 };
 
 export type ShardHealthDashboardData = {
@@ -155,6 +203,7 @@ export type ShardHealthDashboardData = {
     shards: ShardHealthRow[];
     slowestShards: ShardHealthRow[];
     problemShards: ShardHealthRow[];
+    failedShards: ShardHealthRow[];
     daily: WorkerHealthDailyPoint[];
     recentRuns: RecentShardRun[];
 };
@@ -233,15 +282,37 @@ function getDailyWindowKeys(days: number) {
     return keys;
 }
 
+function getConsecutiveFailureCount(runs: WorkerRunRow[]) {
+    let count = 0;
+
+    for (const run of runs) {
+        if (run.success) {
+            break;
+        }
+
+        count += 1;
+    }
+
+    return count;
+}
+
+function getLatestSuccessfulRunAt(runs: WorkerRunRow[]) {
+    return runs.find((run) => run.success)?.run_started_at ?? null;
+}
+
 function emptySummary(totalShards = DEFAULT_SHARD_COUNT): ShardHealthSummary {
     return {
         totalShards,
         healthyShards: 0,
         warningShards: 0,
+        failedShards: 0,
         staleShards: 0,
         noFeedShards: 0,
         missingShards: totalShards,
         totalRuns: 0,
+        totalSuccessfulRuns: 0,
+        totalFailedRuns: 0,
+        totalConsecutiveFailures: 0,
         totalFeeds: 0,
         totalFetched: 0,
         totalCandidates: 0,
@@ -255,6 +326,7 @@ function emptySummary(totalShards = DEFAULT_SHARD_COUNT): ShardHealthSummary {
         acceptanceRate: 0,
         averageDurationMs: 0,
         latestRunAt: null,
+        latestFailureAt: null,
     };
 }
 
@@ -269,6 +341,11 @@ function createMissingShard(shardIndex: number): ShardHealthRow {
         minutesSinceLastRun: null,
         runSource: null,
         runCount: 0,
+        successCount: 0,
+        failureCount: 0,
+        consecutiveFailureCount: 0,
+        latestErrorName: null,
+        latestErrorMessage: null,
         feedCount: 0,
         fetchedCount: 0,
         candidateCount: 0,
@@ -285,6 +362,7 @@ function createMissingShard(shardIndex: number): ShardHealthRow {
         maxDurationMs: 0,
         reviewSaveOk: false,
         articleSaveOk: false,
+        aiUsageSaveOk: false,
         costProtectionHitCount: 0,
         spikeWarningCount: 0,
     };
@@ -296,16 +374,27 @@ function getShardStatus({
                             staleAfterMinutes,
                             slowRunMs,
                         }: {
-    latestRun: ShardRunRow;
+    latestRun: WorkerRunRow;
     minutesSinceLastRun: number | null;
     staleAfterMinutes: number;
     slowRunMs: number;
 }): Pick<ShardHealthRow, "status" | "statusLabel" | "reason"> {
+    if (!latestRun.success) {
+        return {
+            status: "failed",
+            statusLabel: "Failed",
+            reason:
+                latestRun.error_message ||
+                latestRun.error_name ||
+                "The latest saved Worker run failed.",
+        };
+    }
+
     if (latestRun.feed_count === 0) {
         return {
             status: "no-feeds",
             statusLabel: "No Feeds",
-            reason: "The latest run found zero feeds for this shard.",
+            reason: "The latest successful run found zero feeds for this shard.",
         };
     }
 
@@ -321,7 +410,15 @@ function getShardStatus({
         return {
             status: "warning",
             statusLabel: "Save Warning",
-            reason: "The latest run had a review or article save warning.",
+            reason: "The latest successful run had a review or article save warning.",
+        };
+    }
+
+    if (!latestRun.ai_usage_save_ok) {
+        return {
+            status: "warning",
+            statusLabel: "Usage Save Warning",
+            reason: "The latest successful run did not save AI usage telemetry cleanly.",
         };
     }
 
@@ -329,7 +426,7 @@ function getShardStatus({
         return {
             status: "warning",
             statusLabel: "Slow",
-            reason: `The latest run took more than ${Math.round(
+            reason: `The latest successful run took more than ${Math.round(
                 slowRunMs / 1000,
             )} seconds.`,
         };
@@ -339,7 +436,7 @@ function getShardStatus({
         return {
             status: "warning",
             statusLabel: "No Fetches",
-            reason: "The latest run completed but fetched zero articles.",
+            reason: "The latest successful run completed but fetched zero articles.",
         };
     }
 
@@ -350,14 +447,14 @@ function getShardStatus({
         return {
             status: "warning",
             statusLabel: "No Images Found",
-            reason: "The latest run tried image hydration but found zero images.",
+            reason: "The latest successful run tried image hydration but found zero images.",
         };
     }
 
     return {
         status: "healthy",
         statusLabel: "Healthy",
-        reason: "Latest run is recent and completed with expected activity.",
+        reason: "Latest saved run is recent and completed with expected activity.",
     };
 }
 
@@ -367,7 +464,7 @@ function buildShardRows({
                             staleAfterMinutes,
                             slowRunMs,
                         }: {
-    runs: ShardRunRow[];
+    runs: WorkerRunRow[];
     shardCount: number;
     staleAfterMinutes: number;
     slowRunMs: number;
@@ -401,6 +498,9 @@ function buildShardRows({
         });
 
         const runCount = shardRuns.length;
+        const successCount = shardRuns.filter((run) => run.success).length;
+        const failureCount = shardRuns.filter((run) => !run.success).length;
+        const consecutiveFailureCount = getConsecutiveFailureCount(shardRuns);
         const totalDuration = shardRuns.reduce(
             (sum, run) => sum + run.duration_ms,
             0,
@@ -420,15 +520,20 @@ function buildShardRows({
             shardIndex,
             ...status,
             lastRunAt: latestRunAt,
-            lastSuccessfulRunAt: latestRunAt,
+            lastSuccessfulRunAt: getLatestSuccessfulRunAt(shardRuns),
             minutesSinceLastRun: minutes,
             runSource: latestRun.run_source,
             runCount,
+            successCount,
+            failureCount,
+            consecutiveFailureCount,
+            latestErrorName: latestRun.success ? null : latestRun.error_name,
+            latestErrorMessage: latestRun.success ? null : latestRun.error_message,
             feedCount: latestRun.feed_count,
             fetchedCount: latestRun.fetched_count,
             candidateCount: latestRun.candidate_count,
-            acceptedCount: latestRun.published_accepted_count,
-            rejectedCount: latestRun.total_rejected_count,
+            acceptedCount: latestRun.accepted_count,
+            rejectedCount: latestRun.rejected_count,
             noThumbnailRejectedCount: latestRun.no_thumbnail_rejected_count,
             locallyRejectedCount: latestRun.locally_rejected_count,
             imageHydrationLookupCount: latestRun.image_hydration_lookup_count,
@@ -443,6 +548,7 @@ function buildShardRows({
             maxDurationMs: maxDuration,
             reviewSaveOk: latestRun.review_save_ok,
             articleSaveOk: latestRun.article_save_ok,
+            aiUsageSaveOk: latestRun.ai_usage_save_ok,
             costProtectionHitCount,
             spikeWarningCount,
         });
@@ -456,7 +562,7 @@ function buildRecentRuns({
                              staleAfterMinutes,
                              slowRunMs,
                          }: {
-    runs: ShardRunRow[];
+    runs: WorkerRunRow[];
     staleAfterMinutes: number;
     slowRunMs: number;
 }): RecentShardRun[] {
@@ -475,13 +581,16 @@ function buildRecentRuns({
             runStartedAt: run.run_started_at,
             runSource: run.run_source,
             shardIndex: run.shard_index,
+            success: run.success,
             status: status.status,
             statusLabel: status.statusLabel,
+            errorName: run.error_name,
+            errorMessage: run.error_message,
             feedCount: run.feed_count,
             fetchedCount: run.fetched_count,
             candidateCount: run.candidate_count,
-            acceptedCount: run.published_accepted_count,
-            rejectedCount: run.total_rejected_count,
+            acceptedCount: run.accepted_count,
+            rejectedCount: run.rejected_count,
             noThumbnailRejectedCount: run.no_thumbnail_rejected_count,
             imageHydrationLookupCount: run.image_hydration_lookup_count,
             imageHydrationFoundCount: run.image_hydration_found_count,
@@ -493,11 +602,12 @@ function buildRecentRuns({
             durationMs: run.duration_ms,
             reviewSaveOk: run.review_save_ok,
             articleSaveOk: run.article_save_ok,
+            aiUsageSaveOk: run.ai_usage_save_ok,
         };
     });
 }
 
-function buildDailyPoints(runs: ShardRunRow[]): WorkerHealthDailyPoint[] {
+function buildDailyPoints(runs: WorkerRunRow[]): WorkerHealthDailyPoint[] {
     const keys = getDailyWindowKeys(DAILY_WINDOW_DAYS);
 
     return keys.map((key) => {
@@ -518,19 +628,15 @@ function buildDailyPoints(runs: ShardRunRow[]): WorkerHealthDailyPoint[] {
         return {
             date: key,
             runCount: dayRuns.length,
+            successCount: dayRuns.filter((run) => run.success).length,
+            failureCount: dayRuns.filter((run) => !run.success).length,
             fetchedCount: dayRuns.reduce((sum, run) => sum + run.fetched_count, 0),
             candidateCount: dayRuns.reduce(
                 (sum, run) => sum + run.candidate_count,
                 0,
             ),
-            acceptedCount: dayRuns.reduce(
-                (sum, run) => sum + run.published_accepted_count,
-                0,
-            ),
-            rejectedCount: dayRuns.reduce(
-                (sum, run) => sum + run.total_rejected_count,
-                0,
-            ),
+            acceptedCount: dayRuns.reduce((sum, run) => sum + run.accepted_count, 0),
+            rejectedCount: dayRuns.reduce((sum, run) => sum + run.rejected_count, 0),
             noThumbnailRejectedCount: dayRuns.reduce(
                 (sum, run) => sum + run.no_thumbnail_rejected_count,
                 0,
@@ -557,7 +663,7 @@ function buildSummary({
                           shardCount,
                       }: {
     shards: ShardHealthRow[];
-    runs: ShardRunRow[];
+    runs: WorkerRunRow[];
     shardCount: number;
 }): ShardHealthSummary {
     const totalDuration = runs.reduce((sum, run) => sum + run.duration_ms, 0);
@@ -582,10 +688,17 @@ function buildSummary({
         totalShards: shardCount,
         healthyShards: shards.filter((shard) => shard.status === "healthy").length,
         warningShards: shards.filter((shard) => shard.status === "warning").length,
+        failedShards: shards.filter((shard) => shard.status === "failed").length,
         staleShards: shards.filter((shard) => shard.status === "stale").length,
         noFeedShards: shards.filter((shard) => shard.status === "no-feeds").length,
         missingShards: shards.filter((shard) => shard.status === "missing").length,
         totalRuns: runs.length,
+        totalSuccessfulRuns: runs.filter((run) => run.success).length,
+        totalFailedRuns: runs.filter((run) => !run.success).length,
+        totalConsecutiveFailures: shards.reduce(
+            (sum, shard) => sum + shard.consecutiveFailureCount,
+            0,
+        ),
         totalFeeds: shards.reduce((sum, shard) => sum + shard.feedCount, 0),
         totalFetched: shards.reduce((sum, shard) => sum + shard.fetchedCount, 0),
         totalCandidates: shards.reduce(
@@ -612,10 +725,12 @@ function buildSummary({
         averageDurationMs:
             runs.length > 0 ? Math.round(totalDuration / runs.length) : 0,
         latestRunAt: runs[0]?.run_started_at ?? null,
+        latestFailureAt:
+            runs.find((run) => !run.success)?.run_started_at ?? null,
     };
 }
 
-async function getShardRunRows() {
+async function getWorkerRunRows() {
     const config = getSupabaseConfig();
 
     if (!config) {
@@ -632,46 +747,8 @@ async function getShardRunRows() {
     });
 
     const { data, error } = await supabase
-        .from("ai_usage_runs")
-        .select(
-            [
-                "id",
-                "created_at",
-                "run_started_at",
-                "run_completed_at",
-                "run_source",
-                "request_id",
-                "shard_index",
-                "feeds_per_shard",
-                "max_ai_reviews",
-                "feed_count",
-                "fetched_count",
-                "candidate_count",
-                "already_reviewed_count",
-                "unreviewed_count",
-                "eligible_for_ai_count",
-                "ai_reviewed_count",
-                "openai_model",
-                "openai_call_count",
-                "openai_prompt_tokens",
-                "openai_completion_tokens",
-                "openai_total_tokens",
-                "estimated_openai_cost_usd",
-                "openai_accepted_count",
-                "openai_rejected_count",
-                "published_accepted_count",
-                "total_rejected_count",
-                "no_thumbnail_rejected_count",
-                "locally_rejected_count",
-                "image_hydration_lookup_count",
-                "image_hydration_found_count",
-                "cost_protection_limit_reached",
-                "spike_warning_triggered",
-                "review_save_ok",
-                "article_save_ok",
-                "duration_ms",
-            ].join(","),
-        )
+        .from("worker_runs")
+        .select(WORKER_RUN_SELECT_COLUMNS)
         .order("run_started_at", {
             ascending: false,
         })
@@ -681,7 +758,7 @@ async function getShardRunRows() {
         throw new Error(error.message);
     }
 
-    return (data ?? []) as unknown as ShardRunRow[];
+    return (data ?? []) as unknown as WorkerRunRow[];
 }
 
 export async function getAdminShardHealthDashboardData(): Promise<ShardHealthDashboardData> {
@@ -699,7 +776,7 @@ export async function getAdminShardHealthDashboardData(): Promise<ShardHealthDas
     );
 
     try {
-        const runs = await getShardRunRows();
+        const runs = await getWorkerRunRows();
         const shards = buildShardRows({
             runs,
             shardCount,
@@ -718,6 +795,7 @@ export async function getAdminShardHealthDashboardData(): Promise<ShardHealthDas
             shardCount,
         });
         const problemShards = shards.filter((shard) => shard.status !== "healthy");
+        const failedShards = shards.filter((shard) => shard.status === "failed");
         const slowestShards = [...shards]
             .filter((shard) => shard.runCount > 0)
             .sort((a, b) => b.durationMs - a.durationMs)
@@ -733,6 +811,7 @@ export async function getAdminShardHealthDashboardData(): Promise<ShardHealthDas
             shards,
             slowestShards,
             problemShards,
+            failedShards,
             daily,
             recentRuns,
         };
@@ -754,6 +833,7 @@ export async function getAdminShardHealthDashboardData(): Promise<ShardHealthDas
             shards,
             slowestShards: [],
             problemShards: shards,
+            failedShards: [],
             daily: buildDailyPoints([]),
             recentRuns: [],
         };

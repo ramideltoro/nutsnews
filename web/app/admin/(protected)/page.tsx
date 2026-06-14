@@ -5,41 +5,57 @@ export const metadata = {
     title: "Admin | NutsNews",
 };
 
+type DashboardStatus = "Live" | "Coming Soon";
+
+type DashboardCardProps = {
+    title: string;
+    description: string;
+    href?: string;
+    status: DashboardStatus;
+    eyebrow: string;
+};
+
 function DashboardCard({
                            title,
                            description,
                            href,
                            status,
-                       }: {
-    title: string;
-    description: string;
-    href?: string;
-    status: "Live" | "Coming Soon";
-}) {
+                           eyebrow,
+                       }: DashboardCardProps) {
     const isLive = status === "Live";
 
     const card = (
         <div className="group h-full rounded-[1.75rem] border border-amber-300/20 bg-gradient-to-br from-black/45 via-neutral-950/85 to-amber-950/25 p-5 shadow-xl shadow-amber-950/20 transition hover:border-amber-300/45 hover:bg-amber-400/10">
             <div className="mb-4 flex items-center justify-between gap-3">
-        <span
-            className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${
-                isLive
-                    ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-100"
-                    : "border-amber-300/20 bg-black/30 text-amber-100/65"
-            }`}
-        >
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300/75">
+                    {eyebrow}
+                </p>
+
+                <span
+                    className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${
+                        isLive
+                            ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-100"
+                            : "border-amber-300/20 bg-black/30 text-amber-100/65"
+                    }`}
+                >
           {status}
         </span>
+            </div>
+
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <h2 className="text-2xl font-black text-amber-50">{title}</h2>
+                    <p className="mt-3 text-sm leading-6 text-amber-100/65">
+                        {description}
+                    </p>
+                </div>
 
                 {isLive ? (
-                    <span className="text-lg text-amber-200 transition group-hover:translate-x-1">
+                    <span className="mt-1 text-lg text-amber-200 transition group-hover:translate-x-1">
             →
           </span>
                 ) : null}
             </div>
-
-            <h2 className="text-2xl font-black text-amber-50">{title}</h2>
-            <p className="mt-3 text-sm leading-6 text-amber-100/65">{description}</p>
         </div>
     );
 
@@ -51,6 +67,28 @@ function DashboardCard({
         <Link href={href} className="block h-full">
             {card}
         </Link>
+    );
+}
+
+function SectionHeader({
+                           eyebrow,
+                           title,
+                           description,
+                       }: {
+    eyebrow: string;
+    title: string;
+    description: string;
+}) {
+    return (
+        <div className="mb-5">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300/75">
+                {eyebrow}
+            </p>
+            <h2 className="mt-2 text-2xl font-black text-amber-50">{title}</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-amber-100/60">
+                {description}
+            </p>
+        </div>
     );
 }
 
@@ -74,13 +112,13 @@ export default async function AdminPage() {
                             </p>
 
                             <h1 className="text-3xl font-black tracking-tight text-amber-50 sm:text-5xl">
-                                Control Center
+                                Admin Landing Page
                             </h1>
 
                             <p className="mt-3 max-w-3xl text-sm leading-6 text-amber-100/70">
-                                Internal dashboards and future controls for AI usage, worker
-                                shards, RSS feeds, observability, backups, and platform
-                                operations.
+                                Choose a focused dashboard below. This page is only the landing
+                                page and dashboard directory, so detailed operations stay on
+                                their own admin routes.
                             </p>
                         </div>
 
@@ -113,55 +151,82 @@ export default async function AdminPage() {
                     </div>
                 </header>
 
-                <section className="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    <DashboardCard
-                        title="AI Usage"
-                        description="Track OpenAI calls, tokens, estimated cost, accepted decisions, rejected decisions, cost protection hits, and spike warnings."
-                        href="/admin/ai-usage"
-                        status="Live"
+                <section className="mb-5 rounded-[2rem] border border-amber-300/20 bg-black/25 p-5 shadow-xl shadow-amber-950/10 sm:p-6">
+                    <SectionHeader
+                        eyebrow="Live Dashboards"
+                        title="Operations"
+                        description="Use these dashboards for day-to-day monitoring. Each dashboard has its own route so /admin stays clean and easy to navigate."
                     />
 
-                    <DashboardCard
-                        title="Worker Shards"
-                        description="Monitor shard freshness, feed counts, fetch volume, accepted/rejected counts, run duration, stale shards, and problem shards."
-                        href="/admin/shards"
-                        status="Live"
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <DashboardCard
+                            eyebrow="AI Cost"
+                            title="AI Usage"
+                            description="Track OpenAI calls, prompt tokens, completion tokens, estimated cost, accepted decisions, rejected decisions, cost protection hits, and spike warnings."
+                            href="/admin/ai-usage"
+                            status="Live"
+                        />
+
+                        <DashboardCard
+                            eyebrow="Worker Health"
+                            title="Worker Shards"
+                            description="Monitor Worker refreshes, failed shard executions, latest error messages, consecutive failures, stale shards, feed counts, fetch volume, image hydration, and duration by shard."
+                            href="/admin/shards"
+                            status="Live"
+                        />
+                    </div>
+                </section>
+
+                <section className="mb-5 rounded-[2rem] border border-amber-300/20 bg-black/25 p-5 shadow-xl shadow-amber-950/10 sm:p-6">
+                    <SectionHeader
+                        eyebrow="Future Dashboards"
+                        title="Planned Admin Areas"
+                        description="These cards reserve space for future dashboards without crowding the landing page with detailed operational data."
                     />
 
-                    <DashboardCard
-                        title="RSS Feeds"
-                        description="Review feed coverage, failing sources, direct publisher feeds, active feeds, inactive feeds, and future feed maintenance actions."
-                        status="Coming Soon"
-                    />
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        <DashboardCard
+                            eyebrow="Sources"
+                            title="RSS Feeds"
+                            description="Review feed coverage, failing sources, direct publisher feeds, active feeds, inactive feeds, and future feed maintenance actions."
+                            status="Coming Soon"
+                        />
 
-                    <DashboardCard
-                        title="Articles"
-                        description="Inspect article queue health, accepted articles, rejected articles, thumbnail availability, categories, and source mix."
-                        status="Coming Soon"
-                    />
+                        <DashboardCard
+                            eyebrow="Content"
+                            title="Articles"
+                            description="Inspect article queue health, accepted articles, rejected articles, thumbnail availability, categories, and source mix."
+                            status="Coming Soon"
+                        />
 
-                    <DashboardCard
-                        title="Backups"
-                        description="View backup freshness, restore readiness, Supabase export status, and future scheduled backup automation."
-                        status="Coming Soon"
-                    />
+                        <DashboardCard
+                            eyebrow="Recovery"
+                            title="Backups"
+                            description="View backup freshness, restore readiness, Supabase export status, and future scheduled backup automation."
+                            status="Coming Soon"
+                        />
 
-                    <DashboardCard
-                        title="Controls"
-                        description="Future operational controls for manual refresh, pause mode, maintenance mode, feed toggles, and safe admin actions."
-                        status="Coming Soon"
-                    />
+                        <DashboardCard
+                            eyebrow="Actions"
+                            title="Controls"
+                            description="Future operational controls for manual refresh, pause mode, maintenance mode, feed toggles, and safe admin actions."
+                            status="Coming Soon"
+                        />
+                    </div>
                 </section>
 
                 <section className="grid gap-4 lg:grid-cols-2">
                     <div className="rounded-[2rem] border border-amber-300/20 bg-gradient-to-br from-black/45 via-neutral-950/85 to-amber-950/25 p-5 shadow-xl shadow-amber-950/20 sm:p-6">
                         <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300/75">
-                            Admin Status
+                            Page Role
                         </p>
-                        <h2 className="mt-2 text-2xl font-black text-amber-50">Active</h2>
+                        <h2 className="mt-2 text-2xl font-black text-amber-50">
+                            Landing Page Only
+                        </h2>
                         <p className="mt-3 text-sm leading-6 text-amber-100/65">
-                            Google login is enabled and access is restricted to the approved
-                            admin account.
+                            The `/admin` route should stay lightweight. It links to focused
+                            dashboards, while detailed monitoring lives under dedicated admin
+                            routes like `/admin/ai-usage` and `/admin/shards`.
                         </p>
                     </div>
 

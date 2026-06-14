@@ -78,6 +78,10 @@ function statusClasses(status: ShardHealthStatus) {
         return "border-orange-300/25 bg-orange-400/10 text-orange-100";
     }
 
+    if (status === "failed") {
+        return "border-red-300/35 bg-red-500/15 text-red-100";
+    }
+
     if (status === "stale") {
         return "border-red-300/25 bg-red-400/10 text-red-100";
     }
@@ -163,10 +167,12 @@ function Section({
 function QuickNav() {
     const links = [
         ["Fleet", "#fleet-health"],
+        ["Errors", "#error-counts"],
         ["Ingestion", "#ingestion-summary"],
         ["Trends", "#ingestion-trends"],
         ["Images", "#image-hydration"],
         ["Duration", "#duration-by-shard"],
+        ["Failures", "#failed-shards"],
         ["Problems", "#problem-shards"],
         ["Shards", "#shard-table"],
         ["Runs", "#recent-runs"],
@@ -196,8 +202,8 @@ function DailyTrend({ daily }: { daily: WorkerHealthDailyPoint[] }) {
         <Section
             id="ingestion-trends"
             eyebrow="Ingestion Trends"
-            title="Accepted, Rejected, and Thumbnail Rejections Over Time"
-            description="A seven-day view of Worker ingestion activity from saved run telemetry."
+            title="Accepted, Rejected, Failures, and Thumbnail Rejections Over Time"
+            description="A seven-day view of Worker ingestion activity, successful runs, failed runs, and content outcomes from saved run telemetry."
         >
             <div className="grid gap-3">
                 {daily.map((point) => {
@@ -224,6 +230,12 @@ function DailyTrend({ daily }: { daily: WorkerHealthDailyPoint[] }) {
 
                                 <div className="flex flex-wrap gap-2 text-xs text-amber-100/60">
                   <span className="rounded-full border border-emerald-300/15 bg-emerald-400/10 px-3 py-1 text-emerald-100/80">
+                    Success: {formatNumber(point.successCount)}
+                  </span>
+                                    <span className="rounded-full border border-red-300/15 bg-red-400/10 px-3 py-1 text-red-100/80">
+                    Failed: {formatNumber(point.failureCount)}
+                  </span>
+                                    <span className="rounded-full border border-emerald-300/15 bg-emerald-400/10 px-3 py-1 text-emerald-100/80">
                     Accepted: {formatNumber(point.acceptedCount)}
                   </span>
                                     <span className="rounded-full border border-red-300/15 bg-red-400/10 px-3 py-1 text-red-100/80">
@@ -383,13 +395,69 @@ function DurationByShard({ shards }: { shards: ShardHealthRow[] }) {
     );
 }
 
+function FailedShards({ shards }: { shards: ShardHealthRow[] }) {
+    return (
+        <Section
+            id="failed-shards"
+            eyebrow="Failed Shards"
+            title="Failed Shards"
+            description="Shows shards whose latest saved Worker execution failed, including the latest error, total error count, and consecutive failure count."
+        >
+            {shards.length === 0 ? (
+                <div className="rounded-[1.35rem] border border-emerald-300/20 bg-emerald-400/10 p-5 text-sm text-emerald-100/85">
+                    No failed shards right now.
+                </div>
+            ) : (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {shards.map((shard) => (
+                        <div
+                            key={shard.shardIndex}
+                            className="rounded-[1.35rem] border border-red-300/20 bg-red-500/10 p-4"
+                        >
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                                <h3 className="text-lg font-black text-red-50">
+                                    Shard {shard.shardIndex}
+                                </h3>
+                                <StatusPill status="failed" label="Failed" />
+                            </div>
+
+                            <p className="text-sm leading-6 text-red-100/80">
+                                {shard.latestErrorMessage || shard.reason}
+                            </p>
+
+                            <div className="mt-4 grid gap-2 text-xs text-red-100/70">
+                                <p>Latest error: {shard.latestErrorName || "Unknown"}</p>
+                                <p>
+                                    Consecutive failures: {formatNumber(shard.consecutiveFailureCount)}
+                                </p>
+                                <p>Total failures: {formatNumber(shard.failureCount)}</p>
+                                <p>Last run: {formatDateTime(shard.lastRunAt)}</p>
+                                <p>
+                                    Last successful run: {formatDateTime(shard.lastSuccessfulRunAt)}
+                                </p>
+                                <p>Duration: {formatDuration(shard.durationMs)}</p>
+                                <p>
+                                    Consecutive failures: {formatNumber(shard.consecutiveFailureCount)}
+                                </p>
+                                {shard.latestErrorMessage ? (
+                                    <p>Latest error: {shard.latestErrorMessage}</p>
+                                ) : null}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </Section>
+    );
+}
+
 function ProblemShards({ shards }: { shards: ShardHealthRow[] }) {
     return (
         <Section
             id="problem-shards"
             eyebrow="Problem Shards"
             title="Problem Shards"
-            description="These are shards that are stale, missing, slow, not saving correctly, fetching zero articles, missing images, or have no feeds."
+            description="These are shards that failed, are stale, missing, slow, not saving correctly, fetching zero articles, missing images, or have no feeds."
         >
             {shards.length === 0 ? (
                 <div className="rounded-[1.35rem] border border-emerald-300/20 bg-emerald-400/10 p-5 text-sm text-emerald-100/85">
@@ -437,7 +505,7 @@ function ShardTable({ shards }: { shards: ShardHealthRow[] }) {
             id="shard-table"
             eyebrow="Shard Table"
             title="Shard Status Table"
-            description="One row per shard, showing freshness, feed coverage, fetch volume, publishing results, image hydration, duration, and save status."
+            description="One row per shard, showing freshness, failures, latest error, feed coverage, fetch volume, publishing results, image hydration, duration, and save status."
         >
             <div className="overflow-hidden rounded-[1.35rem] border border-amber-300/15">
                 <div className="overflow-x-auto">
@@ -446,6 +514,9 @@ function ShardTable({ shards }: { shards: ShardHealthRow[] }) {
                         <tr>
                             <th className="px-4 py-3 font-black">Shard</th>
                             <th className="px-4 py-3 font-black">Status</th>
+                            <th className="px-4 py-3 font-black">Error Count</th>
+                            <th className="px-4 py-3 font-black">Consecutive</th>
+                            <th className="px-4 py-3 font-black">Latest Error</th>
                             <th className="px-4 py-3 font-black">Last Run</th>
                             <th className="px-4 py-3 font-black">Age</th>
                             <th className="px-4 py-3 font-black">Feeds</th>
@@ -471,6 +542,15 @@ function ShardTable({ shards }: { shards: ShardHealthRow[] }) {
                                         status={shard.status}
                                         label={shard.statusLabel}
                                     />
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-3 text-red-100/80">
+                                    {formatNumber(shard.failureCount)}
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-3 text-red-100/80">
+                                    {formatNumber(shard.consecutiveFailureCount)}
+                                </td>
+                                <td className="max-w-xs truncate px-4 py-3 text-amber-100/70">
+                                    {shard.latestErrorMessage || "—"}
                                 </td>
                                 <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
                                     {formatDateTime(shard.lastRunAt)}
@@ -528,7 +608,7 @@ function RecentRunsTable({ runs }: { runs: RecentShardRun[] }) {
             id="recent-runs"
             eyebrow="Recent Runs"
             title="Recent Worker Refresh Events"
-            description="The latest saved Worker refresh rows across all shards. This mirrors the operational view of worker.refresh.completed events."
+            description="The latest saved Worker execution rows across all shards, including successful refreshes and failed executions."
         >
             <div className="overflow-hidden rounded-[1.35rem] border border-amber-300/15">
                 <div className="overflow-x-auto">
@@ -539,6 +619,7 @@ function RecentRunsTable({ runs }: { runs: RecentShardRun[] }) {
                             <th className="px-4 py-3 font-black">Source</th>
                             <th className="px-4 py-3 font-black">Shard</th>
                             <th className="px-4 py-3 font-black">Status</th>
+                            <th className="px-4 py-3 font-black">Error Message</th>
                             <th className="px-4 py-3 font-black">Fetched</th>
                             <th className="px-4 py-3 font-black">Accepted</th>
                             <th className="px-4 py-3 font-black">Rejected</th>
@@ -553,7 +634,7 @@ function RecentRunsTable({ runs }: { runs: RecentShardRun[] }) {
                         {runs.length === 0 ? (
                             <tr>
                                 <td
-                                    colSpan={11}
+                                    colSpan={12}
                                     className="px-4 py-5 text-center text-amber-100/65"
                                 >
                                     No Worker runs found yet.
@@ -576,6 +657,9 @@ function RecentRunsTable({ runs }: { runs: RecentShardRun[] }) {
                                             status={run.status}
                                             label={run.statusLabel}
                                         />
+                                    </td>
+                                    <td className="max-w-xs truncate px-4 py-3 text-amber-100/70">
+                                        {run.errorMessage || run.errorName || "—"}
                                     </td>
                                     <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
                                         {formatNumber(run.fetchedCount)}
@@ -645,7 +729,7 @@ export default async function AdminShardsPage() {
                             <p className="mt-3 max-w-3xl text-sm leading-6 text-amber-100/70">
                                 Monitor Worker ingestion health, accepted articles, rejected
                                 articles, thumbnail rejections, image hydration, shard duration,
-                                stale shards, and recent refresh events.
+                                failed executions, stale shards, and recent refresh events.
                             </p>
                         </div>
 
@@ -696,7 +780,7 @@ export default async function AdminShardsPage() {
 
                 <section
                     id="fleet-health"
-                    className="mb-5 scroll-mt-6 grid gap-4 md:grid-cols-3 xl:grid-cols-6"
+                    className="mb-5 scroll-mt-6 grid gap-4 md:grid-cols-3 xl:grid-cols-7"
                 >
                     <MetricCard
                         label="Total Shards"
@@ -712,6 +796,11 @@ export default async function AdminShardsPage() {
                         label="Warnings"
                         value={formatNumber(dashboardData.summary.warningShards)}
                         helper="Slow, empty fetch, image, or save-warning shards."
+                    />
+                    <MetricCard
+                        label="Failed"
+                        value={formatNumber(dashboardData.summary.failedShards)}
+                        helper={`${formatNumber(dashboardData.summary.totalConsecutiveFailures)} consecutive failures.`}
                     />
                     <MetricCard
                         label="Stale"
@@ -733,12 +822,57 @@ export default async function AdminShardsPage() {
                 </section>
 
                 <Section
+                    id="error-counts"
+                    eyebrow="Error Counts"
+                    title="Worker Error Counts"
+                    description="Shows failed Worker executions as first-class records from worker_runs, including failed shards, failed runs, consecutive failures, and latest failure time."
+                >
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                        <MetricCard
+                            label="Failed Shards"
+                            value={formatNumber(dashboardData.summary.failedShards)}
+                            helper="Shards whose latest saved run failed."
+                        />
+                        <MetricCard
+                            label="Failed Runs"
+                            value={formatNumber(dashboardData.summary.totalFailedRuns)}
+                            helper="Total failed Worker executions in the loaded run window."
+                        />
+                        <MetricCard
+                            label="Consecutive Failures"
+                            value={formatNumber(dashboardData.summary.totalConsecutiveFailures)}
+                            helper="Current consecutive failures across all shards."
+                        />
+                        <MetricCard
+                            label="Successful Runs"
+                            value={formatNumber(dashboardData.summary.totalSuccessfulRuns)}
+                            helper="Total successful Worker executions in the loaded run window."
+                        />
+                        <MetricCard
+                            label="Latest Failure"
+                            value={formatDateTime(dashboardData.summary.latestFailureAt)}
+                            helper="Most recent failed Worker execution."
+                        />
+                    </div>
+                </Section>
+
+                <Section
                     id="ingestion-summary"
                     eyebrow="Ingestion Summary"
                     title="Worker Ingestion Summary"
                     description="Answers whether articles are being accepted, rejected, fetched, and processed correctly."
                 >
-                    <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
+                    <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-8">
+                        <MetricCard
+                            label="Successful Runs"
+                            value={formatNumber(dashboardData.summary.totalSuccessfulRuns)}
+                            helper="Saved successful Worker runs."
+                        />
+                        <MetricCard
+                            label="Failed Runs"
+                            value={formatNumber(dashboardData.summary.totalFailedRuns)}
+                            helper="Saved failed Worker executions."
+                        />
                         <MetricCard
                             label="Fetched"
                             value={formatNumber(dashboardData.summary.totalFetched)}
@@ -785,6 +919,8 @@ export default async function AdminShardsPage() {
                     />
 
                     <DurationByShard shards={dashboardData.slowestShards} />
+
+                    <FailedShards shards={dashboardData.failedShards} />
 
                     <ProblemShards shards={dashboardData.problemShards} />
 
