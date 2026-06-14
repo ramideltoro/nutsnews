@@ -8,19 +8,63 @@ import {
   SITE_URL,
 } from "@/lib/articles";
 
-export default async function Home() {
+type HomeProps = {
+  searchParams?: Promise<{
+    category?: string | string[];
+    page?: string | string[];
+  }>;
+};
+
+function getSingleSearchValue(value?: string | string[]) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function getCurrentPage(pageValue?: string | string[]) {
+  const rawPage = getSingleSearchValue(pageValue);
+  const parsedPage = rawPage ? Number(rawPage) : 0;
+
+  if (!Number.isFinite(parsedPage) || parsedPage < 0) {
+    return 0;
+  }
+
+  return Math.floor(parsedPage);
+}
+
+function getSelectedCategory(categoryValue?: string | string[]) {
+  const rawCategory = getSingleSearchValue(categoryValue)?.trim();
+
+  if (!rawCategory || rawCategory.toLowerCase() === "all") {
+    return null;
+  }
+
+  return rawCategory;
+}
+
+export default async function Home({ searchParams }: HomeProps) {
+  const resolvedSearchParams = await searchParams;
+  const currentPage = getCurrentPage(resolvedSearchParams?.page);
+  const selectedCategory = getSelectedCategory(resolvedSearchParams?.category);
+
   const [{ articles, nextPage }, categories] = await Promise.all([
-    getPublishedArticles(0),
+    getPublishedArticles(currentPage, selectedCategory),
     getPublishedCategories(),
   ]);
+
+  const canonicalPath = selectedCategory
+    ? `/?category=${encodeURIComponent(selectedCategory)}${
+        currentPage > 0 ? `&page=${currentPage}` : ""
+      }`
+    : currentPage > 0
+      ? `/?page=${currentPage}`
+      : "/";
 
   const homeJsonLd = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
     name: "NutsNews",
-    url: SITE_URL,
+    url: `${SITE_URL}${canonicalPath === "/" ? "" : canonicalPath}`,
     description:
-        "A positive news feed curated by AI with short uplifting summaries and links to original publishers.",
+      "A positive news feed curated by AI with short uplifting summaries and links to original publishers.",
     mainEntity: articles.map((article) => ({
       "@type": "Article",
       headline: article.title,
@@ -37,54 +81,56 @@ export default async function Home() {
   };
 
   return (
-      <main className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.16),_transparent_34%),linear-gradient(180deg,_#0a0a0a_0%,_#17120a_45%,_#0a0a0a_100%)] px-4 pb-28 pt-6 text-neutral-100">
-        <script
-            type="application/ld+json"
-            dangerouslySetInnerHTML={{ __html: JSON.stringify(homeJsonLd) }}
-        />
+    <main className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.16),_transparent_34%),linear-gradient(180deg,_#0a0a0a_0%,_#17120a_45%,_#0a0a0a_100%)] px-4 pb-28 pt-6 text-neutral-100">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(homeJsonLd) }}
+      />
 
-        <section className="mx-auto w-full max-w-md">
-          <header className="mb-5">
-            <div className="relative overflow-hidden rounded-[2.25rem] border border-amber-400/20 bg-[radial-gradient(circle_at_top_right,_rgba(245,158,11,0.28),_transparent_36%),linear-gradient(135deg,_#171717,_#0a0a0a_58%,_#451a03)] p-6 shadow-2xl shadow-black/50">
-              <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-amber-400/20 blur-3xl" />
-              <div className="pointer-events-none absolute -bottom-24 -left-20 h-56 w-56 rounded-full bg-orange-500/10 blur-3xl" />
+      <section className="mx-auto w-full max-w-md">
+        <header className="mb-5">
+          <div className="relative overflow-hidden rounded-[2.25rem] border border-amber-400/20 bg-[radial-gradient(circle_at_top_right,_rgba(245,158,11,0.28),_transparent_36%),linear-gradient(135deg,_#171717,_#0a0a0a_58%,_#451a03)] p-6 shadow-2xl shadow-black/50">
+            <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-amber-400/20 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-24 -left-20 h-56 w-56 rounded-full bg-orange-500/10 blur-3xl" />
 
-              <div className="relative z-10">
-                <div className="mb-7 flex items-start justify-between gap-4">
-                  <div>
-                    <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1">
-                      <span className="h-2 w-2 rounded-full bg-amber-300 shadow-[0_0_12px_rgba(252,211,77,0.9)]" />
-                      <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-amber-200">
+            <div className="relative z-10">
+              <div className="mb-7 flex items-start justify-between gap-4">
+                <div>
+                  <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1">
+                    <span className="h-2 w-2 rounded-full bg-amber-300 shadow-[0_0_12px_rgba(252,211,77,0.9)]" />
+                    <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-amber-200">
                       Positive news, simplified
                     </span>
-                    </div>
-
-                    <h1 className="text-5xl font-black tracking-tight text-white">
-                      Nuts<span className="text-amber-300">News</span>
-                    </h1>
                   </div>
 
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-amber-300/20 bg-black/25 text-3xl shadow-lg shadow-black/30">
-                    🥜
-                  </div>
+                  <h1 className="text-5xl font-black tracking-tight text-white">
+                    Nuts<span className="text-amber-300">News</span>
+                  </h1>
                 </div>
 
-                <p className="max-w-sm text-base leading-7 text-neutral-300">
-                  A calm mobile feed of uplifting stories, filtered by AI and
-                  linked back to trusted original publishers.
-                </p>
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-amber-300/20 bg-black/25 text-3xl shadow-lg shadow-black/30">
+                  🥜
+                </div>
               </div>
+
+              <p className="max-w-sm text-base leading-7 text-neutral-300">
+                A calm mobile feed of uplifting stories, filtered by AI and
+                linked back to trusted original publishers.
+              </p>
             </div>
-          </header>
+          </div>
+        </header>
 
-          <ArticleFeed
-              initialArticles={articles}
-              initialNextPage={nextPage}
-              categories={categories}
-          />
-        </section>
+        <ArticleFeed
+          initialArticles={articles}
+          initialNextPage={nextPage}
+          categories={categories}
+          selectedCategory={selectedCategory ?? "All"}
+          currentPage={currentPage}
+        />
+      </section>
 
-        <SiteFooter />
-      </main>
+      <SiteFooter />
+    </main>
   );
 }
