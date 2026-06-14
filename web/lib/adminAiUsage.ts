@@ -1,4 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
+import {
+    getAdminDateKey,
+    getAdminTimeZone,
+    getLastAdminDateKeys,
+} from "@/lib/adminTime";
 
 type AiUsageRunRow = {
     id: number;
@@ -144,15 +149,12 @@ function dateDaysAgo(days: number) {
     return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 }
 
-function getUtcDateKey(date: Date) {
-    return date.toISOString().slice(0, 10);
+function getLocalDateKey(date: Date | string, timeZone: string) {
+    return getAdminDateKey(date, timeZone);
 }
 
-function getLastUtcDateKeys(days: number) {
-    return Array.from({ length: days }, (_value, index) => {
-        const date = dateDaysAgo(days - index - 1);
-        return getUtcDateKey(date);
-    });
+function getLastLocalDateKeys(days: number, timeZone: string) {
+    return getLastAdminDateKeys(days, timeZone);
 }
 
 function toNumber(value: number | string | null | undefined) {
@@ -258,13 +260,15 @@ function summarizeRuns(rows: AiUsageRunRow[]): AiUsageSummary {
 }
 
 function buildDailyPoints(rows: AiUsageRunRow[]): AiUsageDailyPoint[] {
-    return getLastUtcDateKeys(7).map((dateKey) => {
+    const timeZone = getAdminTimeZone();
+
+    return getLastLocalDateKeys(7, timeZone).map((dateKey) => {
         const dateRows = rows.filter((row) => {
             if (!row.run_started_at) {
                 return false;
             }
 
-            return row.run_started_at.slice(0, 10) === dateKey;
+            return getLocalDateKey(row.run_started_at, timeZone) === dateKey;
         });
 
         const summary = summarizeRuns(dateRows);

@@ -1,4 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
+import {
+    getAdminDateKey,
+    getAdminTimeZone,
+    getLastAdminDateKeys,
+} from "@/lib/adminTime";
 
 const DEFAULT_SHARD_COUNT = 25;
 const DEFAULT_STALE_MINUTES = 180;
@@ -259,27 +264,12 @@ function minutesSince(value: string | null, now: Date) {
     return Math.max(0, Math.round((now.getTime() - date.getTime()) / 60000));
 }
 
-function getDateKey(value: string) {
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-        return "unknown";
-    }
-
-    return date.toISOString().slice(0, 10);
+function getDateKey(value: string, timeZone: string) {
+    return getAdminDateKey(value, timeZone);
 }
 
-function getDailyWindowKeys(days: number) {
-    const keys: string[] = [];
-    const today = new Date();
-
-    for (let offset = days - 1; offset >= 0; offset -= 1) {
-        const date = new Date(today);
-        date.setUTCDate(today.getUTCDate() - offset);
-        keys.push(date.toISOString().slice(0, 10));
-    }
-
-    return keys;
+function getDailyWindowKeys(days: number, timeZone: string) {
+    return getLastAdminDateKeys(days, timeZone);
 }
 
 function getConsecutiveFailureCount(runs: WorkerRunRow[]) {
@@ -608,10 +598,13 @@ function buildRecentRuns({
 }
 
 function buildDailyPoints(runs: WorkerRunRow[]): WorkerHealthDailyPoint[] {
-    const keys = getDailyWindowKeys(DAILY_WINDOW_DAYS);
+    const timeZone = getAdminTimeZone();
+    const keys = getDailyWindowKeys(DAILY_WINDOW_DAYS, timeZone);
 
     return keys.map((key) => {
-        const dayRuns = runs.filter((run) => getDateKey(run.run_started_at) === key);
+        const dayRuns = runs.filter(
+            (run) => getDateKey(run.run_started_at, timeZone) === key,
+        );
         const totalDuration = dayRuns.reduce(
             (sum, run) => sum + run.duration_ms,
             0,

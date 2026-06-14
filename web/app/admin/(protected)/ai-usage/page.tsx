@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { formatAdminDateLabel, formatAdminDateTime } from "@/lib/adminTime";
 import { auth, signOut } from "@/auth";
 import {
     type AiUsageDailyPoint,
@@ -49,36 +50,11 @@ function formatDuration(value: number) {
 }
 
 function formatDateTime(value: string | null) {
-    if (!value) {
-        return "No runs yet";
-    }
-
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-        return "Unknown";
-    }
-
-    return new Intl.DateTimeFormat("en-US", {
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-    }).format(date);
+    return formatAdminDateTime(value, "No runs yet");
 }
 
 function formatDateLabel(value: string) {
-    const date = new Date(`${value}T00:00:00.000Z`);
-
-    if (Number.isNaN(date.getTime())) {
-        return value;
-    }
-
-    return new Intl.DateTimeFormat("en-US", {
-        month: "short",
-        day: "numeric",
-        timeZone: "UTC",
-    }).format(date);
+    return formatAdminDateLabel(value);
 }
 
 function StatusPill({
