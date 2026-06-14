@@ -50,11 +50,20 @@ export const metadata: Metadata = {
     siteName: "NutsNews",
     title: "NutsNews | Positive News Curated by AI",
     description: "A calm daily feed of uplifting stories from around the world.",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "NutsNews positive news social preview",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "NutsNews | Positive News Curated by AI",
     description: "A calm daily feed of uplifting stories from around the world.",
+    images: ["/opengraph-image"],
   },
   robots: {
     index: true,

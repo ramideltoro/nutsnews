@@ -44,6 +44,7 @@ export async function generateMetadata({
   const description =
       article.ai_summary ??
       "Read this uplifting story summary on NutsNews and visit the original publisher for the full article.";
+  const socialImageUrl = `/articles/${article.id}/opengraph-image`;
 
   return {
     title: article.title,
@@ -59,13 +60,20 @@ export async function generateMetadata({
       siteName: "NutsNews",
       publishedTime: article.published_at ?? undefined,
       modifiedTime: article.published_on_site_at ?? undefined,
-      images: article.image_url ? [article.image_url] : undefined,
+      images: [
+        {
+          url: socialImageUrl,
+          width: 1200,
+          height: 630,
+          alt: `${article.title} | NutsNews`,
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
       title: article.title,
       description,
-      images: article.image_url ? [article.image_url] : undefined,
+      images: [socialImageUrl],
     },
   };
 }
