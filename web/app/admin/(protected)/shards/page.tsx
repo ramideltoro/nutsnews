@@ -1,14 +1,16 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import {
     type RecentShardRun,
     type ShardHealthRow,
     type ShardHealthStatus,
+    type WorkerHealthDailyPoint,
     getAdminShardHealthDashboardData,
 } from "@/lib/adminShardHealth";
 
 export const metadata = {
-    title: "Worker Shards | NutsNews Admin",
+    title: "Worker Health | NutsNews Admin",
 };
 
 export const dynamic = "force-dynamic";
@@ -16,6 +18,10 @@ export const runtime = "nodejs";
 
 function formatNumber(value: number) {
     return new Intl.NumberFormat("en-US").format(Math.round(value));
+}
+
+function formatPercent(value: number) {
+    return `${formatNumber(value)}%`;
 }
 
 function formatDuration(value: number) {
@@ -46,6 +52,20 @@ function formatDateTime(value: string | null) {
         day: "numeric",
         hour: "numeric",
         minute: "2-digit",
+    }).format(date);
+}
+
+function formatDateLabel(value: string) {
+    const date = new Date(`${value}T00:00:00.000Z`);
+
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+
+    return new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+        timeZone: "UTC",
     }).format(date);
 }
 
@@ -118,7 +138,7 @@ function Section({
     eyebrow: string;
     title: string;
     description: string;
-    children: React.ReactNode;
+    children: ReactNode;
 }) {
     return (
         <section
@@ -142,10 +162,14 @@ function Section({
 
 function QuickNav() {
     const links = [
-        ["Fleet Health", "#fleet-health"],
-        ["Problem Shards", "#problem-shards"],
-        ["Shard Table", "#shard-table"],
-        ["Recent Runs", "#recent-runs"],
+        ["Fleet", "#fleet-health"],
+        ["Ingestion", "#ingestion-summary"],
+        ["Trends", "#ingestion-trends"],
+        ["Images", "#image-hydration"],
+        ["Duration", "#duration-by-shard"],
+        ["Problems", "#problem-shards"],
+        ["Shards", "#shard-table"],
+        ["Runs", "#recent-runs"],
     ];
 
     return (
@@ -165,23 +189,215 @@ function QuickNav() {
     );
 }
 
-function ProblemShards({ shards }: { shards: ShardHealthRow[] }) {
-    const problemShards = shards.filter((shard) => shard.status !== "healthy");
+function DailyTrend({ daily }: { daily: WorkerHealthDailyPoint[] }) {
+    const maxAccepted = Math.max(1, ...daily.map((point) => point.acceptedCount));
 
+    return (
+        <Section
+            id="ingestion-trends"
+            eyebrow="Ingestion Trends"
+            title="Accepted, Rejected, and Thumbnail Rejections Over Time"
+            description="A seven-day view of Worker ingestion activity from saved run telemetry."
+        >
+            <div className="grid gap-3">
+                {daily.map((point) => {
+                    const widthPercent = Math.max(
+                        4,
+                        Math.round((point.acceptedCount / maxAccepted) * 100),
+                    );
+
+                    return (
+                        <div
+                            key={point.date}
+                            className="rounded-[1.35rem] border border-amber-300/15 bg-black/30 p-4"
+                        >
+                            <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                                <div>
+                                    <p className="text-sm font-black text-amber-50">
+                                        {formatDateLabel(point.date)}
+                                    </p>
+                                    <p className="mt-1 text-xs text-amber-100/55">
+                                        {formatNumber(point.runCount)} runs ·{" "}
+                                        {formatDuration(point.averageDurationMs)} avg duration
+                                    </p>
+                                </div>
+
+                                <div className="flex flex-wrap gap-2 text-xs text-amber-100/60">
+                  <span className="rounded-full border border-emerald-300/15 bg-emerald-400/10 px-3 py-1 text-emerald-100/80">
+                    Accepted: {formatNumber(point.acceptedCount)}
+                  </span>
+                                    <span className="rounded-full border border-red-300/15 bg-red-400/10 px-3 py-1 text-red-100/80">
+                    Rejected: {formatNumber(point.rejectedCount)}
+                  </span>
+                                    <span className="rounded-full border border-orange-300/15 bg-orange-400/10 px-3 py-1 text-orange-100/80">
+                    No thumbnail:{" "}
+                                        {formatNumber(point.noThumbnailRejectedCount)}
+                  </span>
+                                    <span className="rounded-full border border-amber-300/15 bg-black/30 px-3 py-1">
+                    Fetched: {formatNumber(point.fetchedCount)}
+                  </span>
+                                    <span className="rounded-full border border-amber-300/15 bg-black/30 px-3 py-1">
+                    Images: {formatNumber(point.imageHydrationFoundCount)}
+                  </span>
+                                </div>
+                            </div>
+
+                            <div className="h-3 overflow-hidden rounded-full bg-amber-950/60">
+                                <div
+                                    className="h-full rounded-full bg-gradient-to-r from-amber-300 via-amber-400 to-orange-400 shadow-[0_0_18px_rgba(251,191,36,0.35)]"
+                                    style={{ width: `${widthPercent}%` }}
+                                />
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </Section>
+    );
+}
+
+function ImageHydrationSection({
+                                   summary,
+                                   daily,
+                               }: {
+    summary: {
+        totalImageHydrationLookups: number;
+        totalImageHydrationFound: number;
+        imageHydrationRate: number;
+        totalNoThumbnailRejected: number;
+    };
+    daily: WorkerHealthDailyPoint[];
+}) {
+    return (
+        <Section
+            id="image-hydration"
+            eyebrow="Image Hydration"
+            title="Image Hydration Health"
+            description="Shows whether the Worker is successfully finding article images when RSS items do not provide a usable thumbnail."
+        >
+            <div className="grid gap-4 md:grid-cols-4">
+                <MetricCard
+                    label="Lookups"
+                    value={formatNumber(summary.totalImageHydrationLookups)}
+                    helper="Article-page image lookups from latest shard telemetry."
+                />
+                <MetricCard
+                    label="Images Found"
+                    value={formatNumber(summary.totalImageHydrationFound)}
+                    helper="Images found through hydration."
+                />
+                <MetricCard
+                    label="Hydration Rate"
+                    value={formatPercent(summary.imageHydrationRate)}
+                    helper="Found images divided by image lookup attempts."
+                />
+                <MetricCard
+                    label="No Thumbnail Rejects"
+                    value={formatNumber(summary.totalNoThumbnailRejected)}
+                    helper="Articles rejected because no usable thumbnail was found."
+                />
+            </div>
+
+            <div className="mt-4 overflow-hidden rounded-[1.35rem] border border-amber-300/15">
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-amber-300/10 text-left text-sm">
+                        <thead className="bg-black/40 text-[10px] uppercase tracking-[0.16em] text-amber-300/75">
+                        <tr>
+                            <th className="px-4 py-3 font-black">Date</th>
+                            <th className="px-4 py-3 font-black">Lookups</th>
+                            <th className="px-4 py-3 font-black">Found</th>
+                            <th className="px-4 py-3 font-black">Rate</th>
+                            <th className="px-4 py-3 font-black">No Thumbnail Rejects</th>
+                        </tr>
+                        </thead>
+
+                        <tbody className="divide-y divide-amber-300/10 bg-black/20">
+                        {daily.map((point) => (
+                            <tr key={point.date}>
+                                <td className="whitespace-nowrap px-4 py-3 font-black text-amber-50">
+                                    {formatDateLabel(point.date)}
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
+                                    {formatNumber(point.imageHydrationLookupCount)}
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
+                                    {formatNumber(point.imageHydrationFoundCount)}
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
+                                    {formatPercent(point.imageHydrationRate)}
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-3 text-orange-100/80">
+                                    {formatNumber(point.noThumbnailRejectedCount)}
+                                </td>
+                            </tr>
+                        ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </Section>
+    );
+}
+
+function DurationByShard({ shards }: { shards: ShardHealthRow[] }) {
+    return (
+        <Section
+            id="duration-by-shard"
+            eyebrow="Duration by Shard"
+            title="Slowest Shards"
+            description="Highlights shards with the highest latest duration so slow ingestion can be spotted quickly."
+        >
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {shards.length === 0 ? (
+                    <div className="rounded-[1.35rem] border border-amber-300/15 bg-black/30 p-4 text-sm text-amber-100/65">
+                        No shard duration data yet.
+                    </div>
+                ) : (
+                    shards.map((shard) => (
+                        <div
+                            key={shard.shardIndex}
+                            className="rounded-[1.35rem] border border-amber-300/15 bg-black/30 p-4"
+                        >
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                                <h3 className="text-lg font-black text-amber-50">
+                                    Shard {shard.shardIndex}
+                                </h3>
+                                <StatusPill
+                                    status={shard.status}
+                                    label={shard.statusLabel}
+                                />
+                            </div>
+
+                            <p className="text-3xl font-black text-amber-50">
+                                {formatDuration(shard.durationMs)}
+                            </p>
+                            <p className="mt-2 text-sm text-amber-100/60">
+                                Avg: {formatDuration(shard.averageDurationMs)} · Max:{" "}
+                                {formatDuration(shard.maxDurationMs)}
+                            </p>
+                        </div>
+                    ))
+                )}
+            </div>
+        </Section>
+    );
+}
+
+function ProblemShards({ shards }: { shards: ShardHealthRow[] }) {
     return (
         <Section
             id="problem-shards"
             eyebrow="Problem Shards"
             title="Problem Shards"
-            description="These are shards that are stale, missing, slow, not saving correctly, fetching zero articles, or have no feeds."
+            description="These are shards that are stale, missing, slow, not saving correctly, fetching zero articles, missing images, or have no feeds."
         >
-            {problemShards.length === 0 ? (
+            {shards.length === 0 ? (
                 <div className="rounded-[1.35rem] border border-emerald-300/20 bg-emerald-400/10 p-5 text-sm text-emerald-100/85">
                     All shards look healthy right now.
                 </div>
             ) : (
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    {problemShards.map((shard) => (
+                    {shards.map((shard) => (
                         <div
                             key={shard.shardIndex}
                             className="rounded-[1.35rem] border border-amber-300/15 bg-black/30 p-4"
@@ -204,6 +420,7 @@ function ProblemShards({ shards }: { shards: ShardHealthRow[] }) {
                                 <p>Last run: {formatDateTime(shard.lastRunAt)}</p>
                                 <p>Feed count: {formatNumber(shard.feedCount)}</p>
                                 <p>Fetched: {formatNumber(shard.fetchedCount)}</p>
+                                <p>Accepted: {formatNumber(shard.acceptedCount)}</p>
                                 <p>Duration: {formatDuration(shard.durationMs)}</p>
                             </div>
                         </div>
@@ -220,7 +437,7 @@ function ShardTable({ shards }: { shards: ShardHealthRow[] }) {
             id="shard-table"
             eyebrow="Shard Table"
             title="Shard Status Table"
-            description="One row per shard, showing freshness, feed coverage, fetch volume, publishing results, duration, and save status."
+            description="One row per shard, showing freshness, feed coverage, fetch volume, publishing results, image hydration, duration, and save status."
         >
             <div className="overflow-hidden rounded-[1.35rem] border border-amber-300/15">
                 <div className="overflow-x-auto">
@@ -231,12 +448,12 @@ function ShardTable({ shards }: { shards: ShardHealthRow[] }) {
                             <th className="px-4 py-3 font-black">Status</th>
                             <th className="px-4 py-3 font-black">Last Run</th>
                             <th className="px-4 py-3 font-black">Age</th>
-                            <th className="px-4 py-3 font-black">Runs</th>
                             <th className="px-4 py-3 font-black">Feeds</th>
                             <th className="px-4 py-3 font-black">Fetched</th>
-                            <th className="px-4 py-3 font-black">Candidates</th>
                             <th className="px-4 py-3 font-black">Accepted</th>
                             <th className="px-4 py-3 font-black">Rejected</th>
+                            <th className="px-4 py-3 font-black">No Thumb</th>
+                            <th className="px-4 py-3 font-black">Images</th>
                             <th className="px-4 py-3 font-black">AI Reviews</th>
                             <th className="px-4 py-3 font-black">Duration</th>
                             <th className="px-4 py-3 font-black">Saves</th>
@@ -264,22 +481,23 @@ function ShardTable({ shards }: { shards: ShardHealthRow[] }) {
                                         : `${formatNumber(shard.minutesSinceLastRun)}m`}
                                 </td>
                                 <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
-                                    {formatNumber(shard.runCount)}
-                                </td>
-                                <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
                                     {formatNumber(shard.feedCount)}
                                 </td>
                                 <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
                                     {formatNumber(shard.fetchedCount)}
-                                </td>
-                                <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
-                                    {formatNumber(shard.candidateCount)}
                                 </td>
                                 <td className="whitespace-nowrap px-4 py-3 text-emerald-100/80">
                                     {formatNumber(shard.acceptedCount)}
                                 </td>
                                 <td className="whitespace-nowrap px-4 py-3 text-red-100/80">
                                     {formatNumber(shard.rejectedCount)}
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-3 text-orange-100/80">
+                                    {formatNumber(shard.noThumbnailRejectedCount)}
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
+                                    {formatNumber(shard.imageHydrationFoundCount)} /{" "}
+                                    {formatNumber(shard.imageHydrationLookupCount)}
                                 </td>
                                 <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
                                     {formatNumber(shard.aiReviewedCount)}
@@ -309,8 +527,8 @@ function RecentRunsTable({ runs }: { runs: RecentShardRun[] }) {
         <Section
             id="recent-runs"
             eyebrow="Recent Runs"
-            title="Recent Worker Runs"
-            description="The latest saved Worker run records across all shards."
+            title="Recent Worker Refresh Events"
+            description="The latest saved Worker refresh rows across all shards. This mirrors the operational view of worker.refresh.completed events."
         >
             <div className="overflow-hidden rounded-[1.35rem] border border-amber-300/15">
                 <div className="overflow-x-auto">
@@ -321,11 +539,11 @@ function RecentRunsTable({ runs }: { runs: RecentShardRun[] }) {
                             <th className="px-4 py-3 font-black">Source</th>
                             <th className="px-4 py-3 font-black">Shard</th>
                             <th className="px-4 py-3 font-black">Status</th>
-                            <th className="px-4 py-3 font-black">Feeds</th>
                             <th className="px-4 py-3 font-black">Fetched</th>
                             <th className="px-4 py-3 font-black">Accepted</th>
                             <th className="px-4 py-3 font-black">Rejected</th>
-                            <th className="px-4 py-3 font-black">AI Reviews</th>
+                            <th className="px-4 py-3 font-black">No Thumb</th>
+                            <th className="px-4 py-3 font-black">Images</th>
                             <th className="px-4 py-3 font-black">Duration</th>
                             <th className="px-4 py-3 font-black">Saves</th>
                         </tr>
@@ -360,9 +578,6 @@ function RecentRunsTable({ runs }: { runs: RecentShardRun[] }) {
                                         />
                                     </td>
                                     <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
-                                        {formatNumber(run.feedCount)}
-                                    </td>
-                                    <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
                                         {formatNumber(run.fetchedCount)}
                                     </td>
                                     <td className="whitespace-nowrap px-4 py-3 text-emerald-100/80">
@@ -371,8 +586,12 @@ function RecentRunsTable({ runs }: { runs: RecentShardRun[] }) {
                                     <td className="whitespace-nowrap px-4 py-3 text-red-100/80">
                                         {formatNumber(run.rejectedCount)}
                                     </td>
+                                    <td className="whitespace-nowrap px-4 py-3 text-orange-100/80">
+                                        {formatNumber(run.noThumbnailRejectedCount)}
+                                    </td>
                                     <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
-                                        {formatNumber(run.aiReviewedCount)}
+                                        {formatNumber(run.imageHydrationFoundCount)} /{" "}
+                                        {formatNumber(run.imageHydrationLookupCount)}
                                     </td>
                                     <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
                                         {formatDuration(run.durationMs)}
@@ -420,13 +639,13 @@ export default async function AdminShardsPage() {
                             </Link>
 
                             <h1 className="text-3xl font-black tracking-tight text-amber-50 sm:text-5xl">
-                                Worker Shard Health
+                                Worker Health
                             </h1>
 
                             <p className="mt-3 max-w-3xl text-sm leading-6 text-amber-100/70">
-                                Monitor each Cloudflare Worker shard, including freshness, feed
-                                coverage, fetch volume, accepted/rejected counts, run duration,
-                                and problem shards.
+                                Monitor Worker ingestion health, accepted articles, rejected
+                                articles, thumbnail rejections, image hydration, shard duration,
+                                stale shards, and recent refresh events.
                             </p>
                         </div>
 
@@ -467,7 +686,7 @@ export default async function AdminShardsPage() {
                             Dashboard Setup Needed
                         </p>
                         <h2 className="mt-2 text-2xl font-black text-red-50">
-                            Shard health data could not be loaded.
+                            Worker health data could not be loaded.
                         </h2>
                         <p className="mt-3 text-sm leading-6 text-red-100/75">
                             {dashboardData.errorMessage}
@@ -492,7 +711,7 @@ export default async function AdminShardsPage() {
                     <MetricCard
                         label="Warnings"
                         value={formatNumber(dashboardData.summary.warningShards)}
-                        helper="Slow, empty fetch, or save-warning shards."
+                        helper="Slow, empty fetch, image, or save-warning shards."
                     />
                     <MetricCard
                         label="Stale"
@@ -513,32 +732,64 @@ export default async function AdminShardsPage() {
                     />
                 </section>
 
-                <section className="mb-5 grid gap-4 md:grid-cols-4">
-                    <MetricCard
-                        label="Latest Run"
-                        value={formatDateTime(dashboardData.summary.latestRunAt)}
-                        helper="Most recent saved Worker run."
-                    />
-                    <MetricCard
-                        label="Total Fetched"
-                        value={formatNumber(dashboardData.summary.totalFetched)}
-                        helper="Fetched articles from latest shard rows."
-                    />
-                    <MetricCard
-                        label="Accepted"
-                        value={formatNumber(dashboardData.summary.totalAccepted)}
-                        helper="Published accepted count from latest shard rows."
-                    />
-                    <MetricCard
-                        label="Average Duration"
-                        value={formatDuration(dashboardData.summary.averageDurationMs)}
-                        helper="Average duration from saved runs."
-                    />
-                </section>
+                <Section
+                    id="ingestion-summary"
+                    eyebrow="Ingestion Summary"
+                    title="Worker Ingestion Summary"
+                    description="Answers whether articles are being accepted, rejected, fetched, and processed correctly."
+                >
+                    <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
+                        <MetricCard
+                            label="Fetched"
+                            value={formatNumber(dashboardData.summary.totalFetched)}
+                            helper="Fetched articles from latest shard rows."
+                        />
+                        <MetricCard
+                            label="Candidates"
+                            value={formatNumber(dashboardData.summary.totalCandidates)}
+                            helper="Candidate articles after fetch limits."
+                        />
+                        <MetricCard
+                            label="Accepted"
+                            value={formatNumber(dashboardData.summary.totalAccepted)}
+                            helper={`${formatPercent(
+                                dashboardData.summary.acceptanceRate,
+                            )} acceptance rate.`}
+                        />
+                        <MetricCard
+                            label="Rejected"
+                            value={formatNumber(dashboardData.summary.totalRejected)}
+                            helper="Rejected articles from latest shard rows."
+                        />
+                        <MetricCard
+                            label="No Thumbnail"
+                            value={formatNumber(
+                                dashboardData.summary.totalNoThumbnailRejected,
+                            )}
+                            helper="Rejected due to missing usable thumbnails."
+                        />
+                        <MetricCard
+                            label="Avg Duration"
+                            value={formatDuration(dashboardData.summary.averageDurationMs)}
+                            helper="Average duration from saved runs."
+                        />
+                    </div>
+                </Section>
 
-                <div className="grid gap-5">
-                    <ProblemShards shards={dashboardData.shards} />
+                <div className="mt-5 grid gap-5">
+                    <DailyTrend daily={dashboardData.daily} />
+
+                    <ImageHydrationSection
+                        summary={dashboardData.summary}
+                        daily={dashboardData.daily}
+                    />
+
+                    <DurationByShard shards={dashboardData.slowestShards} />
+
+                    <ProblemShards shards={dashboardData.problemShards} />
+
                     <ShardTable shards={dashboardData.shards} />
+
                     <RecentRunsTable runs={dashboardData.recentRuns} />
                 </div>
             </div>

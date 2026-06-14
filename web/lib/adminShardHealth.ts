@@ -1,8 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 
 const DEFAULT_SHARD_COUNT = 25;
-const DEFAULT_STALE_MINUTES = 15;
+const DEFAULT_STALE_MINUTES = 180;
 const DEFAULT_SLOW_RUN_MS = 15000;
+const DAILY_WINDOW_DAYS = 7;
 
 type SupabaseConfig = {
     url: string;
@@ -38,6 +39,8 @@ type ShardRunRow = {
     total_rejected_count: number;
     no_thumbnail_rejected_count: number;
     locally_rejected_count: number;
+    image_hydration_lookup_count: number;
+    image_hydration_found_count: number;
     cost_protection_limit_reached: boolean;
     spike_warning_triggered: boolean;
     review_save_ok: boolean;
@@ -69,6 +72,9 @@ export type ShardHealthRow = {
     rejectedCount: number;
     noThumbnailRejectedCount: number;
     locallyRejectedCount: number;
+    imageHydrationLookupCount: number;
+    imageHydrationFoundCount: number;
+    imageHydrationRate: number;
     aiReviewedCount: number;
     durationMs: number;
     averageDurationMs: number;
@@ -88,12 +94,32 @@ export type RecentShardRun = {
     statusLabel: string;
     feedCount: number;
     fetchedCount: number;
+    candidateCount: number;
     acceptedCount: number;
     rejectedCount: number;
+    noThumbnailRejectedCount: number;
+    imageHydrationLookupCount: number;
+    imageHydrationFoundCount: number;
+    imageHydrationRate: number;
     aiReviewedCount: number;
     durationMs: number;
     reviewSaveOk: boolean;
     articleSaveOk: boolean;
+};
+
+export type WorkerHealthDailyPoint = {
+    date: string;
+    runCount: number;
+    fetchedCount: number;
+    candidateCount: number;
+    acceptedCount: number;
+    rejectedCount: number;
+    noThumbnailRejectedCount: number;
+    imageHydrationLookupCount: number;
+    imageHydrationFoundCount: number;
+    imageHydrationRate: number;
+    aiReviewedCount: number;
+    averageDurationMs: number;
 };
 
 export type ShardHealthSummary = {
@@ -106,8 +132,15 @@ export type ShardHealthSummary = {
     totalRuns: number;
     totalFeeds: number;
     totalFetched: number;
+    totalCandidates: number;
     totalAccepted: number;
     totalRejected: number;
+    totalNoThumbnailRejected: number;
+    totalImageHydrationLookups: number;
+    totalImageHydrationFound: number;
+    imageHydrationRate: number;
+    totalAiReviewed: number;
+    acceptanceRate: number;
     averageDurationMs: number;
     latestRunAt: string | null;
 };
@@ -120,6 +153,9 @@ export type ShardHealthDashboardData = {
     slowRunMs: number;
     summary: ShardHealthSummary;
     shards: ShardHealthRow[];
+    slowestShards: ShardHealthRow[];
+    problemShards: ShardHealthRow[];
+    daily: WorkerHealthDailyPoint[];
     recentRuns: RecentShardRun[];
 };
 
@@ -152,18 +188,12 @@ function getOptionalNumber(value: string | undefined, fallback: number) {
     return parsed;
 }
 
-function toNumber(value: string | number | null | undefined) {
-    if (value === null || value === undefined) {
+function getRate(part: number, total: number) {
+    if (total <= 0) {
         return 0;
     }
 
-    const parsed = Number(value);
-
-    if (!Number.isFinite(parsed)) {
-        return 0;
-    }
-
-    return parsed;
+    return Math.round((part / total) * 100);
 }
 
 function minutesSince(value: string | null, now: Date) {
@@ -180,6 +210,29 @@ function minutesSince(value: string | null, now: Date) {
     return Math.max(0, Math.round((now.getTime() - date.getTime()) / 60000));
 }
 
+function getDateKey(value: string) {
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return "unknown";
+    }
+
+    return date.toISOString().slice(0, 10);
+}
+
+function getDailyWindowKeys(days: number) {
+    const keys: string[] = [];
+    const today = new Date();
+
+    for (let offset = days - 1; offset >= 0; offset -= 1) {
+        const date = new Date(today);
+        date.setUTCDate(today.getUTCDate() - offset);
+        keys.push(date.toISOString().slice(0, 10));
+    }
+
+    return keys;
+}
+
 function emptySummary(totalShards = DEFAULT_SHARD_COUNT): ShardHealthSummary {
     return {
         totalShards,
@@ -191,8 +244,15 @@ function emptySummary(totalShards = DEFAULT_SHARD_COUNT): ShardHealthSummary {
         totalRuns: 0,
         totalFeeds: 0,
         totalFetched: 0,
+        totalCandidates: 0,
         totalAccepted: 0,
         totalRejected: 0,
+        totalNoThumbnailRejected: 0,
+        totalImageHydrationLookups: 0,
+        totalImageHydrationFound: 0,
+        imageHydrationRate: 0,
+        totalAiReviewed: 0,
+        acceptanceRate: 0,
         averageDurationMs: 0,
         latestRunAt: null,
     };
@@ -216,6 +276,9 @@ function createMissingShard(shardIndex: number): ShardHealthRow {
         rejectedCount: 0,
         noThumbnailRejectedCount: 0,
         locallyRejectedCount: 0,
+        imageHydrationLookupCount: 0,
+        imageHydrationFoundCount: 0,
+        imageHydrationRate: 0,
         aiReviewedCount: 0,
         durationMs: 0,
         averageDurationMs: 0,
@@ -277,6 +340,17 @@ function getShardStatus({
             status: "warning",
             statusLabel: "No Fetches",
             reason: "The latest run completed but fetched zero articles.",
+        };
+    }
+
+    if (
+        latestRun.image_hydration_lookup_count > 0 &&
+        latestRun.image_hydration_found_count === 0
+    ) {
+        return {
+            status: "warning",
+            statusLabel: "No Images Found",
+            reason: "The latest run tried image hydration but found zero images.",
         };
     }
 
@@ -357,6 +431,12 @@ function buildShardRows({
             rejectedCount: latestRun.total_rejected_count,
             noThumbnailRejectedCount: latestRun.no_thumbnail_rejected_count,
             locallyRejectedCount: latestRun.locally_rejected_count,
+            imageHydrationLookupCount: latestRun.image_hydration_lookup_count,
+            imageHydrationFoundCount: latestRun.image_hydration_found_count,
+            imageHydrationRate: getRate(
+                latestRun.image_hydration_found_count,
+                latestRun.image_hydration_lookup_count,
+            ),
             aiReviewedCount: latestRun.ai_reviewed_count,
             durationMs: latestRun.duration_ms,
             averageDurationMs: runCount > 0 ? Math.round(totalDuration / runCount) : 0,
@@ -399,12 +479,74 @@ function buildRecentRuns({
             statusLabel: status.statusLabel,
             feedCount: run.feed_count,
             fetchedCount: run.fetched_count,
+            candidateCount: run.candidate_count,
             acceptedCount: run.published_accepted_count,
             rejectedCount: run.total_rejected_count,
+            noThumbnailRejectedCount: run.no_thumbnail_rejected_count,
+            imageHydrationLookupCount: run.image_hydration_lookup_count,
+            imageHydrationFoundCount: run.image_hydration_found_count,
+            imageHydrationRate: getRate(
+                run.image_hydration_found_count,
+                run.image_hydration_lookup_count,
+            ),
             aiReviewedCount: run.ai_reviewed_count,
             durationMs: run.duration_ms,
             reviewSaveOk: run.review_save_ok,
             articleSaveOk: run.article_save_ok,
+        };
+    });
+}
+
+function buildDailyPoints(runs: ShardRunRow[]): WorkerHealthDailyPoint[] {
+    const keys = getDailyWindowKeys(DAILY_WINDOW_DAYS);
+
+    return keys.map((key) => {
+        const dayRuns = runs.filter((run) => getDateKey(run.run_started_at) === key);
+        const totalDuration = dayRuns.reduce(
+            (sum, run) => sum + run.duration_ms,
+            0,
+        );
+        const imageHydrationLookupCount = dayRuns.reduce(
+            (sum, run) => sum + run.image_hydration_lookup_count,
+            0,
+        );
+        const imageHydrationFoundCount = dayRuns.reduce(
+            (sum, run) => sum + run.image_hydration_found_count,
+            0,
+        );
+
+        return {
+            date: key,
+            runCount: dayRuns.length,
+            fetchedCount: dayRuns.reduce((sum, run) => sum + run.fetched_count, 0),
+            candidateCount: dayRuns.reduce(
+                (sum, run) => sum + run.candidate_count,
+                0,
+            ),
+            acceptedCount: dayRuns.reduce(
+                (sum, run) => sum + run.published_accepted_count,
+                0,
+            ),
+            rejectedCount: dayRuns.reduce(
+                (sum, run) => sum + run.total_rejected_count,
+                0,
+            ),
+            noThumbnailRejectedCount: dayRuns.reduce(
+                (sum, run) => sum + run.no_thumbnail_rejected_count,
+                0,
+            ),
+            imageHydrationLookupCount,
+            imageHydrationFoundCount,
+            imageHydrationRate: getRate(
+                imageHydrationFoundCount,
+                imageHydrationLookupCount,
+            ),
+            aiReviewedCount: dayRuns.reduce(
+                (sum, run) => sum + run.ai_reviewed_count,
+                0,
+            ),
+            averageDurationMs:
+                dayRuns.length > 0 ? Math.round(totalDuration / dayRuns.length) : 0,
         };
     });
 }
@@ -419,6 +561,22 @@ function buildSummary({
     shardCount: number;
 }): ShardHealthSummary {
     const totalDuration = runs.reduce((sum, run) => sum + run.duration_ms, 0);
+    const totalAccepted = shards.reduce(
+        (sum, shard) => sum + shard.acceptedCount,
+        0,
+    );
+    const totalRejected = shards.reduce(
+        (sum, shard) => sum + shard.rejectedCount,
+        0,
+    );
+    const totalImageHydrationLookups = shards.reduce(
+        (sum, shard) => sum + shard.imageHydrationLookupCount,
+        0,
+    );
+    const totalImageHydrationFound = shards.reduce(
+        (sum, shard) => sum + shard.imageHydrationFoundCount,
+        0,
+    );
 
     return {
         totalShards: shardCount,
@@ -430,8 +588,27 @@ function buildSummary({
         totalRuns: runs.length,
         totalFeeds: shards.reduce((sum, shard) => sum + shard.feedCount, 0),
         totalFetched: shards.reduce((sum, shard) => sum + shard.fetchedCount, 0),
-        totalAccepted: shards.reduce((sum, shard) => sum + shard.acceptedCount, 0),
-        totalRejected: shards.reduce((sum, shard) => sum + shard.rejectedCount, 0),
+        totalCandidates: shards.reduce(
+            (sum, shard) => sum + shard.candidateCount,
+            0,
+        ),
+        totalAccepted,
+        totalRejected,
+        totalNoThumbnailRejected: shards.reduce(
+            (sum, shard) => sum + shard.noThumbnailRejectedCount,
+            0,
+        ),
+        totalImageHydrationLookups,
+        totalImageHydrationFound,
+        imageHydrationRate: getRate(
+            totalImageHydrationFound,
+            totalImageHydrationLookups,
+        ),
+        totalAiReviewed: shards.reduce(
+            (sum, shard) => sum + shard.aiReviewedCount,
+            0,
+        ),
+        acceptanceRate: getRate(totalAccepted, totalAccepted + totalRejected),
         averageDurationMs:
             runs.length > 0 ? Math.round(totalDuration / runs.length) : 0,
         latestRunAt: runs[0]?.run_started_at ?? null,
@@ -486,6 +663,8 @@ async function getShardRunRows() {
                 "total_rejected_count",
                 "no_thumbnail_rejected_count",
                 "locally_rejected_count",
+                "image_hydration_lookup_count",
+                "image_hydration_found_count",
                 "cost_protection_limit_reached",
                 "spike_warning_triggered",
                 "review_save_ok",
@@ -532,11 +711,17 @@ export async function getAdminShardHealthDashboardData(): Promise<ShardHealthDas
             staleAfterMinutes,
             slowRunMs,
         });
+        const daily = buildDailyPoints(runs);
         const summary = buildSummary({
             shards,
             runs,
             shardCount,
         });
+        const problemShards = shards.filter((shard) => shard.status !== "healthy");
+        const slowestShards = [...shards]
+            .filter((shard) => shard.runCount > 0)
+            .sort((a, b) => b.durationMs - a.durationMs)
+            .slice(0, 8);
 
         return {
             isConfigured: true,
@@ -546,9 +731,16 @@ export async function getAdminShardHealthDashboardData(): Promise<ShardHealthDas
             slowRunMs,
             summary,
             shards,
+            slowestShards,
+            problemShards,
+            daily,
             recentRuns,
         };
     } catch (error) {
+        const shards = Array.from({ length: shardCount }, (_, index) =>
+            createMissingShard(index),
+        );
+
         return {
             isConfigured: false,
             errorMessage:
@@ -559,9 +751,10 @@ export async function getAdminShardHealthDashboardData(): Promise<ShardHealthDas
             staleAfterMinutes,
             slowRunMs,
             summary: emptySummary(shardCount),
-            shards: Array.from({ length: shardCount }, (_, index) =>
-                createMissingShard(index),
-            ),
+            shards,
+            slowestShards: [],
+            problemShards: shards,
+            daily: buildDailyPoints([]),
             recentRuns: [],
         };
     }
