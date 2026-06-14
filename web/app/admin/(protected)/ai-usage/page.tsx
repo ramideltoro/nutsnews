@@ -1,7 +1,10 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import {
     type AiUsageDailyPoint,
+    type AiUsageLatestRun,
+    type AiUsageShardPoint,
     type AiUsageSummary,
     getAdminAiUsageDashboardData,
 } from "@/lib/adminAiUsage";
@@ -33,7 +36,23 @@ function formatCompactNumber(value: number) {
     }).format(Math.round(value));
 }
 
-function formatDateTime(value: string) {
+function formatDuration(value: number) {
+    if (!value) {
+        return "0ms";
+    }
+
+    if (value < 1000) {
+        return `${formatNumber(value)}ms`;
+    }
+
+    return `${(value / 1000).toFixed(1)}s`;
+}
+
+function formatDateTime(value: string | null) {
+    if (!value) {
+        return "No runs yet";
+    }
+
     const date = new Date(value);
 
     if (Number.isNaN(date.getTime())) {
@@ -62,84 +81,273 @@ function formatDateLabel(value: string) {
     }).format(date);
 }
 
-function StatCard({
-                      label,
-                      value,
-                      helper,
-                  }: {
+function StatusPill({
+                        status,
+                        variant,
+                    }: {
+    status: string;
+    variant: "ok" | "watch" | "neutral";
+}) {
+    const classes = {
+        ok: "border-emerald-300/25 bg-emerald-400/10 text-emerald-100",
+        watch: "border-orange-300/25 bg-orange-400/10 text-orange-100",
+        neutral: "border-amber-300/20 bg-black/30 text-amber-100/70",
+    };
+
+    return (
+        <span
+            className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${classes[variant]}`}
+        >
+      {status}
+    </span>
+    );
+}
+
+function MetricCard({
+                        label,
+                        value,
+                        helper,
+                        tone = "default",
+                    }: {
     label: string;
     value: string;
     helper: string;
+    tone?: "default" | "good" | "warning";
 }) {
+    const toneClasses = {
+        default: "from-black/45 via-neutral-950/85 to-amber-950/25",
+        good: "from-black/45 via-neutral-950/85 to-emerald-950/20",
+        warning: "from-black/45 via-neutral-950/85 to-orange-950/25",
+    };
+
     return (
-        <div className="rounded-[1.75rem] border border-amber-300/20 bg-gradient-to-br from-black/45 via-neutral-950/85 to-amber-950/25 p-5 shadow-xl shadow-amber-950/20">
+        <div
+            className={`rounded-[1.75rem] border border-amber-300/20 bg-gradient-to-br ${toneClasses[tone]} p-5 shadow-xl shadow-amber-950/20`}
+        >
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300/75">
                 {label}
             </p>
-            <h2 className="mt-3 text-3xl font-black text-amber-50">{value}</h2>
+            <h3 className="mt-3 text-3xl font-black text-amber-50">{value}</h3>
             <p className="mt-2 text-sm leading-6 text-amber-100/60">{helper}</p>
         </div>
     );
 }
 
-function SummaryCards({
-                          summary,
-                          windowLabel,
-                      }: {
-    summary: AiUsageSummary;
-    windowLabel: string;
+function DashboardSection({
+                              id,
+                              eyebrow,
+                              title,
+                              description,
+                              children,
+                          }: {
+    id: string;
+    eyebrow: string;
+    title: string;
+    description: string;
+    children: ReactNode;
 }) {
     return (
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <StatCard
-                label="Estimated OpenAI Cost"
-                value={formatCurrency(summary.estimatedCostUsd)}
-                helper={`${windowLabel}. Estimated from AI review count and configured token assumptions.`}
-            />
-            <StatCard
-                label="Estimated AI Reviews"
-                value={formatNumber(summary.estimatedAiReviewCount)}
-                helper="Rows that appear to have reached OpenAI. Local skipped rows are excluded."
-            />
-            <StatCard
-                label="Accepted"
-                value={formatNumber(summary.acceptedCount)}
-                helper={`${summary.acceptanceRate}% acceptance rate from estimated AI-reviewed articles.`}
-            />
-            <StatCard
-                label="Rejected"
-                value={formatNumber(summary.rejectedCount)}
-                helper={`${summary.rejectionRate}% rejection rate from estimated AI-reviewed articles.`}
-            />
+        <section
+            id={id}
+            className="scroll-mt-6 rounded-[2rem] border border-amber-300/20 bg-gradient-to-br from-black/45 via-neutral-950/85 to-amber-950/25 p-5 shadow-xl shadow-amber-950/20 sm:p-6"
+        >
+            <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300/75">
+                        {eyebrow}
+                    </p>
+                    <h2 className="mt-2 text-2xl font-black text-amber-50">{title}</h2>
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-amber-100/60">
+                        {description}
+                    </p>
+                </div>
+            </div>
+
+            {children}
         </section>
     );
 }
 
-function DailyUsageChart({ daily }: { daily: AiUsageDailyPoint[] }) {
-    const maxReviews = Math.max(
-        1,
-        ...daily.map((point) => point.estimatedAiReviewCount),
-    );
+function QuickNav() {
+    const links = [
+        ["Cost", "#cost"],
+        ["Tokens", "#tokens"],
+        ["Daily Usage", "#daily-usage"],
+        ["Shard Usage", "#shard-usage"],
+        ["Latest Runs", "#latest-worker-runs"],
+    ];
 
     return (
-        <div className="rounded-[2rem] border border-amber-300/20 bg-gradient-to-br from-black/45 via-neutral-950/85 to-amber-950/25 p-5 shadow-xl shadow-amber-950/20 sm:p-6">
-            <div className="mb-5">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300/75">
-                    7 Day Usage
-                </p>
-                <h2 className="mt-2 text-2xl font-black text-amber-50">
-                    AI reviews and estimated cost
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-amber-100/60">
-                    Daily buckets use UTC dates and exclude reviews skipped before AI.
-                </p>
+        <nav className="mb-5 rounded-[1.75rem] border border-amber-300/20 bg-black/30 p-3 shadow-xl shadow-amber-950/10">
+            <div className="flex flex-wrap gap-2">
+                {links.map(([label, href]) => (
+                    <a
+                        key={href}
+                        href={href}
+                        className="rounded-full border border-amber-300/20 bg-black/30 px-4 py-2 text-xs font-black uppercase tracking-[0.12em] text-amber-100 transition hover:border-amber-300/50 hover:bg-amber-400/10"
+                    >
+                        {label}
+                    </a>
+                ))}
+            </div>
+        </nav>
+    );
+}
+
+function CostSection({
+                         last24Hours,
+                         last7Days,
+                         last30Days,
+                     }: {
+    last24Hours: AiUsageSummary;
+    last7Days: AiUsageSummary;
+    last30Days: AiUsageSummary;
+}) {
+    return (
+        <DashboardSection
+            id="cost"
+            eyebrow="Cost"
+            title="Cost Overview"
+            description="Track estimated OpenAI cost across recent time windows using exact token usage saved from Worker runs."
+        >
+            <div className="grid gap-4 md:grid-cols-3">
+                <MetricCard
+                    label="Last 24 Hours"
+                    value={formatCurrency(last24Hours.estimatedCostUsd)}
+                    helper={`${formatNumber(
+                        last24Hours.openAiCallCount,
+                    )} OpenAI calls · ${formatNumber(last24Hours.aiReviewedCount)} AI reviews.`}
+                />
+                <MetricCard
+                    label="Last 7 Days"
+                    value={formatCurrency(last7Days.estimatedCostUsd)}
+                    helper={`${formatNumber(
+                        last7Days.costProtectionHitCount,
+                    )} cost protection hits · ${formatNumber(
+                        last7Days.spikeWarningCount,
+                    )} spike warnings.`}
+                    tone={
+                        last7Days.costProtectionHitCount > 0 || last7Days.spikeWarningCount > 0
+                            ? "warning"
+                            : "default"
+                    }
+                />
+                <MetricCard
+                    label="Last 30 Days"
+                    value={formatCurrency(last30Days.estimatedCostUsd)}
+                    helper={`${formatNumber(last30Days.runCount)} Worker runs across ${formatNumber(
+                        last30Days.shardCount,
+                    )} shards.`}
+                />
             </div>
 
+            <div className="mt-4 grid gap-4 md:grid-cols-4">
+                <MetricCard
+                    label="Accepted"
+                    value={formatNumber(last30Days.acceptedCount)}
+                    helper={`${last30Days.acceptanceRate}% acceptance rate over the last 30 days.`}
+                    tone="good"
+                />
+                <MetricCard
+                    label="Rejected"
+                    value={formatNumber(last30Days.rejectedCount)}
+                    helper={`${last30Days.rejectionRate}% rejection rate over the last 30 days.`}
+                />
+                <MetricCard
+                    label="OpenAI Calls"
+                    value={formatNumber(last30Days.openAiCallCount)}
+                    helper="Total OpenAI calls captured from Worker run metrics."
+                />
+                <MetricCard
+                    label="Average Run Time"
+                    value={formatDuration(last30Days.averageDurationMs)}
+                    helper="Average Worker duration for captured usage runs."
+                />
+            </div>
+        </DashboardSection>
+    );
+}
+
+function TokenSection({
+                          last24Hours,
+                          last7Days,
+                          last30Days,
+                          latestModel,
+                      }: {
+    last24Hours: AiUsageSummary;
+    last7Days: AiUsageSummary;
+    last30Days: AiUsageSummary;
+    latestModel: string;
+}) {
+    return (
+        <DashboardSection
+            id="tokens"
+            eyebrow="Tokens"
+            title="Token Usage"
+            description="Separate prompt/input tokens from completion/output tokens so OpenAI cost can be calculated more accurately."
+        >
+            <div className="grid gap-4 md:grid-cols-3">
+                <MetricCard
+                    label="Prompt Tokens"
+                    value={formatCompactNumber(last30Days.promptTokens)}
+                    helper="Last 30 days of OpenAI prompt/input tokens."
+                />
+                <MetricCard
+                    label="Completion Tokens"
+                    value={formatCompactNumber(last30Days.completionTokens)}
+                    helper="Last 30 days of OpenAI completion/output tokens."
+                />
+                <MetricCard
+                    label="Total Tokens"
+                    value={formatCompactNumber(last30Days.totalTokens)}
+                    helper="Prompt plus completion tokens over the last 30 days."
+                />
+            </div>
+
+            <div className="mt-4 grid gap-4 md:grid-cols-3">
+                <MetricCard
+                    label="Last 24 Hours"
+                    value={formatCompactNumber(last24Hours.totalTokens)}
+                    helper={`${formatCompactNumber(
+                        last24Hours.promptTokens,
+                    )} prompt · ${formatCompactNumber(
+                        last24Hours.completionTokens,
+                    )} completion tokens.`}
+                />
+                <MetricCard
+                    label="Last 7 Days"
+                    value={formatCompactNumber(last7Days.totalTokens)}
+                    helper={`${formatCompactNumber(
+                        last7Days.promptTokens,
+                    )} prompt · ${formatCompactNumber(
+                        last7Days.completionTokens,
+                    )} completion tokens.`}
+                />
+                <MetricCard
+                    label="Latest Model"
+                    value={latestModel}
+                    helper="Model name from the latest saved Worker AI usage run."
+                />
+            </div>
+        </DashboardSection>
+    );
+}
+
+function DailyUsageSection({ daily }: { daily: AiUsageDailyPoint[] }) {
+    const maxReviews = Math.max(1, ...daily.map((point) => point.aiReviewedCount));
+
+    return (
+        <DashboardSection
+            id="daily-usage"
+            eyebrow="Daily Usage"
+            title="Daily Usage"
+            description="A 7-day view of AI reviews, token use, cost, accepted decisions, rejected decisions, and cap hits."
+        >
             <div className="grid gap-3">
                 {daily.map((point) => {
                     const widthPercent = Math.max(
                         4,
-                        Math.round((point.estimatedAiReviewCount / maxReviews) * 100),
+                        Math.round((point.aiReviewedCount / maxReviews) * 100),
                     );
 
                     return (
@@ -147,21 +355,36 @@ function DailyUsageChart({ daily }: { daily: AiUsageDailyPoint[] }) {
                             key={point.date}
                             className="rounded-[1.35rem] border border-amber-300/15 bg-black/30 p-4"
                         >
-                            <div className="mb-3 flex items-center justify-between gap-4">
+                            <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                                 <div>
                                     <p className="text-sm font-black text-amber-50">
                                         {formatDateLabel(point.date)}
                                     </p>
                                     <p className="mt-1 text-xs text-amber-100/55">
-                                        {formatCurrency(point.estimatedCostUsd)} estimated
+                                        {formatCurrency(point.estimatedCostUsd)} ·{" "}
+                                        {formatCompactNumber(point.totalTokens)} tokens
                                     </p>
                                 </div>
 
-                                <div className="text-right">
-                                    <p className="text-sm font-black text-amber-50">
-                                        {formatNumber(point.estimatedAiReviewCount)}
-                                    </p>
-                                    <p className="mt-1 text-xs text-amber-100/55">AI reviews</p>
+                                <div className="flex flex-wrap gap-2 text-xs text-amber-100/60">
+                  <span className="rounded-full border border-amber-300/15 bg-black/30 px-3 py-1">
+                    Runs: {formatNumber(point.runCount)}
+                  </span>
+                                    <span className="rounded-full border border-amber-300/15 bg-black/30 px-3 py-1">
+                    Calls: {formatNumber(point.openAiCallCount)}
+                  </span>
+                                    <span className="rounded-full border border-amber-300/15 bg-black/30 px-3 py-1">
+                    Reviews: {formatNumber(point.aiReviewedCount)}
+                  </span>
+                                    <span className="rounded-full border border-emerald-300/15 bg-emerald-400/10 px-3 py-1 text-emerald-100/80">
+                    Accepted: {formatNumber(point.acceptedCount)}
+                  </span>
+                                    <span className="rounded-full border border-red-300/15 bg-red-400/10 px-3 py-1 text-red-100/80">
+                    Rejected: {formatNumber(point.rejectedCount)}
+                  </span>
+                                    <span className="rounded-full border border-orange-300/15 bg-orange-400/10 px-3 py-1 text-orange-100/80">
+                    Cap hits: {formatNumber(point.costProtectionHitCount)}
+                  </span>
                                 </div>
                             </div>
 
@@ -171,184 +394,222 @@ function DailyUsageChart({ daily }: { daily: AiUsageDailyPoint[] }) {
                                     style={{ width: `${widthPercent}%` }}
                                 />
                             </div>
-
-                            <div className="mt-3 flex flex-wrap gap-2 text-xs text-amber-100/60">
-                <span className="rounded-full border border-amber-300/15 bg-black/30 px-3 py-1">
-                  Accepted: {formatNumber(point.acceptedCount)}
-                </span>
-                                <span className="rounded-full border border-amber-300/15 bg-black/30 px-3 py-1">
-                  Rejected: {formatNumber(point.rejectedCount)}
-                </span>
-                                <span className="rounded-full border border-amber-300/15 bg-black/30 px-3 py-1">
-                  Skipped before AI: {formatNumber(point.skippedBeforeAiCount)}
-                </span>
-                            </div>
                         </div>
                     );
                 })}
             </div>
-        </div>
+        </DashboardSection>
     );
 }
 
-function CostMethodologyCard({
-                                 summary,
-                                 inputTokensPerReviewEstimate,
-                                 outputTokensPerReviewEstimate,
-                                 inputCostPerOneMillionTokens,
-                                 outputCostPerOneMillionTokens,
-                             }: {
-    summary: AiUsageSummary;
-    inputTokensPerReviewEstimate: number;
-    outputTokensPerReviewEstimate: number;
-    inputCostPerOneMillionTokens: number;
-    outputCostPerOneMillionTokens: number;
-}) {
+function ShardUsageSection({ shards }: { shards: AiUsageShardPoint[] }) {
     return (
-        <div className="rounded-[2rem] border border-amber-300/20 bg-gradient-to-br from-black/45 via-neutral-950/85 to-amber-950/25 p-5 shadow-xl shadow-amber-950/20 sm:p-6">
-            <div className="mb-5">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300/75">
-                    Cost Method
-                </p>
-                <h2 className="mt-2 text-2xl font-black text-amber-50">
-                    How this estimate is calculated
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-amber-100/60">
-                    This dashboard estimates cost until exact token usage is saved by the
-                    worker. You can tune the assumptions through environment variables.
-                </p>
+        <DashboardSection
+            id="shard-usage"
+            eyebrow="Shard Usage"
+            title="Shard Usage"
+            description="See which Worker shards are using OpenAI and whether any shard is hitting cost protection or spike thresholds."
+        >
+            <div className="mb-4 flex flex-wrap gap-3">
+                <StatusPill status={`${formatNumber(shards.length)} shard rows`} variant="neutral" />
+                {shards.some(
+                    (shard) => shard.costProtectionHitCount > 0 || shard.spikeWarningCount > 0,
+                ) ? (
+                    <StatusPill status="Watch items found" variant="watch" />
+                ) : (
+                    <StatusPill status="All shards OK" variant="ok" />
+                )}
             </div>
 
-            <div className="grid gap-3">
-                <div className="rounded-[1.35rem] border border-amber-300/15 bg-black/30 p-4">
-                    <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-300/70">
-                        Estimated tokens
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-amber-100/70">
-                        {formatCompactNumber(inputTokensPerReviewEstimate)} input tokens +{" "}
-                        {formatCompactNumber(outputTokensPerReviewEstimate)} output tokens
-                        per AI-reviewed article.
-                    </p>
-                </div>
+            <div className="overflow-hidden rounded-[1.35rem] border border-amber-300/15">
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-amber-300/10 text-left text-sm">
+                        <thead className="bg-black/40 text-[10px] uppercase tracking-[0.16em] text-amber-300/75">
+                        <tr>
+                            <th className="px-4 py-3 font-black">Shard</th>
+                            <th className="px-4 py-3 font-black">Runs</th>
+                            <th className="px-4 py-3 font-black">Calls</th>
+                            <th className="px-4 py-3 font-black">Reviews</th>
+                            <th className="px-4 py-3 font-black">Accepted</th>
+                            <th className="px-4 py-3 font-black">Rejected</th>
+                            <th className="px-4 py-3 font-black">Tokens</th>
+                            <th className="px-4 py-3 font-black">Cost</th>
+                            <th className="px-4 py-3 font-black">Latest</th>
+                            <th className="px-4 py-3 font-black">Status</th>
+                        </tr>
+                        </thead>
 
-                <div className="rounded-[1.35rem] border border-amber-300/15 bg-black/30 p-4">
-                    <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-300/70">
-                        Pricing assumptions
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-amber-100/70">
-                        {formatCurrency(inputCostPerOneMillionTokens)} per 1M input tokens
-                        and {formatCurrency(outputCostPerOneMillionTokens)} per 1M output
-                        tokens.
-                    </p>
-                </div>
-
-                <div className="rounded-[1.35rem] border border-amber-300/15 bg-black/30 p-4">
-                    <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-300/70">
-                        Last 30 day estimated tokens
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-amber-100/70">
-                        {formatCompactNumber(summary.estimatedTotalTokens)} total tokens:{" "}
-                        {formatCompactNumber(summary.estimatedInputTokens)} input and{" "}
-                        {formatCompactNumber(summary.estimatedOutputTokens)} output.
-                    </p>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function LatestReviewsTable({
-                                reviews,
-                            }: {
-    reviews: {
-        reviewedAt: string;
-        source: string;
-        title: string;
-        decision: "accept" | "reject";
-        category: string;
-        positivityScore: number;
-        estimatedCostUsd: number;
-    }[];
-}) {
-    return (
-        <div className="rounded-[2rem] border border-amber-300/20 bg-gradient-to-br from-black/45 via-neutral-950/85 to-amber-950/25 p-5 shadow-xl shadow-amber-950/20 sm:p-6">
-            <div className="mb-5">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300/75">
-                    Recent AI Decisions
-                </p>
-                <h2 className="mt-2 text-2xl font-black text-amber-50">
-                    Latest estimated OpenAI reviews
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-amber-100/60">
-                    Local prefilter skips are hidden here so this list focuses on reviews
-                    that likely reached OpenAI.
-                </p>
-            </div>
-
-            {reviews.length === 0 ? (
-                <div className="rounded-[1.35rem] border border-amber-300/15 bg-black/30 p-4 text-sm text-amber-100/65">
-                    No estimated AI-reviewed articles found yet.
-                </div>
-            ) : (
-                <div className="overflow-hidden rounded-[1.35rem] border border-amber-300/15">
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-amber-300/10 text-left text-sm">
-                            <thead className="bg-black/40 text-[10px] uppercase tracking-[0.16em] text-amber-300/75">
+                        <tbody className="divide-y divide-amber-300/10 bg-black/20">
+                        {shards.length === 0 ? (
                             <tr>
-                                <th className="px-4 py-3 font-black">Time</th>
-                                <th className="px-4 py-3 font-black">Decision</th>
-                                <th className="px-4 py-3 font-black">Source</th>
-                                <th className="px-4 py-3 font-black">Story</th>
-                                <th className="px-4 py-3 font-black">Score</th>
-                                <th className="px-4 py-3 font-black">Est. Cost</th>
+                                <td
+                                    colSpan={10}
+                                    className="px-4 py-5 text-center text-amber-100/65"
+                                >
+                                    No shard usage rows found yet.
+                                </td>
                             </tr>
-                            </thead>
-                            <tbody className="divide-y divide-amber-300/10 bg-black/20">
-                            {reviews.map((review) => (
-                                <tr key={`${review.reviewedAt}-${review.title}`}>
-                                    <td className="whitespace-nowrap px-4 py-3 text-amber-100/65">
-                                        {formatDateTime(review.reviewedAt)}
-                                    </td>
-                                    <td className="px-4 py-3">
-                      <span
-                          className={
-                              review.decision === "accept"
-                                  ? "rounded-full border border-emerald-300/25 bg-emerald-400/10 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-emerald-100"
-                                  : "rounded-full border border-red-300/25 bg-red-400/10 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-red-100"
-                          }
-                      >
-                        {review.decision}
-                      </span>
-                                    </td>
-                                    <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
-                                        {review.source}
-                                    </td>
-                                    <td className="max-w-lg px-4 py-3 text-amber-50">
-                                        <div>{review.title}</div>
-                                        <div className="mt-1 text-xs text-amber-100/45">
-                                            {review.category}
-                                        </div>
-                                    </td>
-                                    <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
-                                        {review.positivityScore}/10
-                                    </td>
-                                    <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
-                                        {formatCurrency(review.estimatedCostUsd)}
-                                    </td>
-                                </tr>
-                            ))}
-                            </tbody>
-                        </table>
-                    </div>
+                        ) : (
+                            shards.map((shard) => {
+                                const needsWatch =
+                                    shard.costProtectionHitCount > 0 || shard.spikeWarningCount > 0;
+
+                                return (
+                                    <tr key={shard.shardIndex}>
+                                        <td className="whitespace-nowrap px-4 py-3 font-black text-amber-50">
+                                            {shard.shardIndex}
+                                        </td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
+                                            {formatNumber(shard.runCount)}
+                                        </td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
+                                            {formatNumber(shard.openAiCallCount)}
+                                        </td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
+                                            {formatNumber(shard.aiReviewedCount)}
+                                        </td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-emerald-100/80">
+                                            {formatNumber(shard.acceptedCount)}
+                                        </td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-red-100/80">
+                                            {formatNumber(shard.rejectedCount)}
+                                        </td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
+                                            {formatCompactNumber(shard.totalTokens)}
+                                        </td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
+                                            {formatCurrency(shard.estimatedCostUsd)}
+                                        </td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
+                                            {formatDateTime(shard.latestRunAt)}
+                                        </td>
+                                        <td className="whitespace-nowrap px-4 py-3">
+                                            <StatusPill
+                                                status={needsWatch ? "Watch" : "OK"}
+                                                variant={needsWatch ? "watch" : "ok"}
+                                            />
+                                        </td>
+                                    </tr>
+                                );
+                            })
+                        )}
+                        </tbody>
+                    </table>
                 </div>
-            )}
-        </div>
+            </div>
+        </DashboardSection>
+    );
+}
+
+function LatestWorkerRunsSection({ runs }: { runs: AiUsageLatestRun[] }) {
+    return (
+        <DashboardSection
+            id="latest-worker-runs"
+            eyebrow="Latest Worker Runs"
+            title="Latest Worker Runs"
+            description="Review the most recent Worker usage rows saved into the ai_usage_runs table."
+        >
+            <div className="mb-4 flex flex-wrap gap-3">
+                <StatusPill status={`${formatNumber(runs.length)} latest rows`} variant="neutral" />
+                {runs.some((run) => run.spikeWarningTriggered || run.costProtectionLimitReached) ? (
+                    <StatusPill status="Watch items found" variant="watch" />
+                ) : (
+                    <StatusPill status="Latest runs OK" variant="ok" />
+                )}
+            </div>
+
+            <div className="overflow-hidden rounded-[1.35rem] border border-amber-300/15">
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-amber-300/10 text-left text-sm">
+                        <thead className="bg-black/40 text-[10px] uppercase tracking-[0.16em] text-amber-300/75">
+                        <tr>
+                            <th className="px-4 py-3 font-black">Time</th>
+                            <th className="px-4 py-3 font-black">Source</th>
+                            <th className="px-4 py-3 font-black">Shard</th>
+                            <th className="px-4 py-3 font-black">Model</th>
+                            <th className="px-4 py-3 font-black">Calls</th>
+                            <th className="px-4 py-3 font-black">Reviews</th>
+                            <th className="px-4 py-3 font-black">Accepted</th>
+                            <th className="px-4 py-3 font-black">Rejected</th>
+                            <th className="px-4 py-3 font-black">Tokens</th>
+                            <th className="px-4 py-3 font-black">Cost</th>
+                            <th className="px-4 py-3 font-black">Duration</th>
+                            <th className="px-4 py-3 font-black">Status</th>
+                        </tr>
+                        </thead>
+
+                        <tbody className="divide-y divide-amber-300/10 bg-black/20">
+                        {runs.length === 0 ? (
+                            <tr>
+                                <td
+                                    colSpan={12}
+                                    className="px-4 py-5 text-center text-amber-100/65"
+                                >
+                                    No Worker run rows found yet.
+                                </td>
+                            </tr>
+                        ) : (
+                            runs.map((run) => {
+                                const needsWatch =
+                                    run.spikeWarningTriggered || run.costProtectionLimitReached;
+
+                                return (
+                                    <tr key={run.id}>
+                                        <td className="whitespace-nowrap px-4 py-3 text-amber-100/65">
+                                            {formatDateTime(run.runStartedAt)}
+                                        </td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
+                                            {run.runSource}
+                                        </td>
+                                        <td className="whitespace-nowrap px-4 py-3 font-black text-amber-50">
+                                            {run.shardIndex}
+                                        </td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
+                                            {run.openAiModel}
+                                        </td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
+                                            {formatNumber(run.openAiCallCount)}
+                                        </td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
+                                            {formatNumber(run.aiReviewedCount)}
+                                        </td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-emerald-100/80">
+                                            {formatNumber(run.acceptedCount)}
+                                        </td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-red-100/80">
+                                            {formatNumber(run.rejectedCount)}
+                                        </td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
+                                            {formatCompactNumber(run.totalTokens)}
+                                        </td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
+                                            {formatCurrency(run.estimatedCostUsd)}
+                                        </td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
+                                            {formatDuration(run.durationMs)}
+                                        </td>
+                                        <td className="whitespace-nowrap px-4 py-3">
+                                            <StatusPill
+                                                status={needsWatch ? "Watch" : "OK"}
+                                                variant={needsWatch ? "watch" : "ok"}
+                                            />
+                                        </td>
+                                    </tr>
+                                );
+                            })
+                        )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </DashboardSection>
     );
 }
 
 export default async function AdminAiUsagePage() {
     const session = await auth();
     const dashboardData = await getAdminAiUsageDashboardData();
+    const latestModel = dashboardData.latestRuns[0]?.openAiModel ?? "No runs yet";
 
     return (
         <main className="min-h-screen overflow-hidden bg-[#0a0a0a] px-4 py-6 text-amber-50 sm:px-6 lg:px-8">
@@ -375,9 +636,8 @@ export default async function AdminAiUsagePage() {
                             </h1>
 
                             <p className="mt-3 max-w-3xl text-sm leading-6 text-amber-100/70">
-                                Monitor estimated OpenAI usage, accepted articles, rejected
-                                articles, local prefilter savings, token assumptions, and
-                                estimated cost.
+                                A clear operational view of OpenAI cost, token usage, daily
+                                activity, shard usage, and latest Worker runs.
                             </p>
                         </div>
 
@@ -410,6 +670,8 @@ export default async function AdminAiUsagePage() {
                     </div>
                 </header>
 
+                <QuickNav />
+
                 {!dashboardData.isConfigured ? (
                     <section className="mb-5 rounded-[2rem] border border-red-300/20 bg-red-500/10 p-5 shadow-xl shadow-red-950/20 sm:p-6">
                         <p className="text-[10px] font-black uppercase tracking-[0.16em] text-red-200">
@@ -424,76 +686,26 @@ export default async function AdminAiUsagePage() {
                     </section>
                 ) : null}
 
-                <div className="mb-5 grid gap-4 md:grid-cols-3">
-                    <StatCard
-                        label="Last 24 Hours"
-                        value={formatCurrency(dashboardData.last24Hours.estimatedCostUsd)}
-                        helper={`${formatNumber(
-                            dashboardData.last24Hours.estimatedAiReviewCount,
-                        )} estimated OpenAI reviews.`}
+                <div className="grid gap-5">
+                    <CostSection
+                        last24Hours={dashboardData.last24Hours}
+                        last7Days={dashboardData.last7Days}
+                        last30Days={dashboardData.last30Days}
                     />
-                    <StatCard
-                        label="Last 7 Days"
-                        value={formatCurrency(dashboardData.last7Days.estimatedCostUsd)}
-                        helper={`${formatNumber(
-                            dashboardData.last7Days.estimatedAiReviewCount,
-                        )} estimated OpenAI reviews.`}
+
+                    <TokenSection
+                        last24Hours={dashboardData.last24Hours}
+                        last7Days={dashboardData.last7Days}
+                        last30Days={dashboardData.last30Days}
+                        latestModel={latestModel}
                     />
-                    <StatCard
-                        label="Last 30 Days"
-                        value={formatCurrency(dashboardData.last30Days.estimatedCostUsd)}
-                        helper={`${formatNumber(
-                            dashboardData.last30Days.estimatedAiReviewCount,
-                        )} estimated OpenAI reviews.`}
-                    />
+
+                    <DailyUsageSection daily={dashboardData.daily} />
+
+                    <ShardUsageSection shards={dashboardData.shards} />
+
+                    <LatestWorkerRunsSection runs={dashboardData.latestRuns} />
                 </div>
-
-                <div className="mb-5">
-                    <SummaryCards
-                        summary={dashboardData.last24Hours}
-                        windowLabel="Last 24 hours"
-                    />
-                </div>
-
-                <section className="mb-5 grid gap-4 md:grid-cols-3">
-                    <StatCard
-                        label="Local Filter Savings"
-                        value={formatNumber(dashboardData.last30Days.skippedBeforeAiCount)}
-                        helper="Reviews skipped before OpenAI because local rules rejected them first."
-                    />
-                    <StatCard
-                        label="Saved Review Rows"
-                        value={formatNumber(dashboardData.last30Days.savedReviewCount)}
-                        helper="All review rows saved in the last 30 days, including local skips."
-                    />
-                    <StatCard
-                        label="Generated"
-                        value={formatDateTime(dashboardData.generatedAt)}
-                        helper="This page is server-rendered and uses no exposed service-role key in the browser."
-                    />
-                </section>
-
-                <section className="mb-5 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-                    <DailyUsageChart daily={dashboardData.daily} />
-
-                    <CostMethodologyCard
-                        summary={dashboardData.last30Days}
-                        inputTokensPerReviewEstimate={
-                            dashboardData.pricing.inputTokensPerReviewEstimate
-                        }
-                        outputTokensPerReviewEstimate={
-                            dashboardData.pricing.outputTokensPerReviewEstimate
-                        }
-                        inputCostPerOneMillionTokens={
-                            dashboardData.pricing.inputCostPerOneMillionTokens
-                        }
-                        outputCostPerOneMillionTokens={
-                            dashboardData.pricing.outputCostPerOneMillionTokens
-                        }
-                    />
-                </section>
-
-                <LatestReviewsTable reviews={dashboardData.latestAiReviews} />
             </div>
         </main>
     );

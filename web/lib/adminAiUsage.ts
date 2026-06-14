@@ -1,128 +1,138 @@
 import { createClient } from "@supabase/supabase-js";
 
-type AiDecision = "accept" | "reject";
-
-type ArticleAiReviewRow = {
-    original_url: string;
-    source: string;
-    title: string;
-    decision: AiDecision;
-    category: string;
-    positivity_score: number;
-    summary: string;
-    reason: string;
-    reviewed_at: string;
-};
-
-export type AiUsagePricingConfig = {
-    inputTokensPerReviewEstimate: number;
-    outputTokensPerReviewEstimate: number;
-    inputCostPerOneMillionTokens: number;
-    outputCostPerOneMillionTokens: number;
+type AiUsageRunRow = {
+    id: number;
+    created_at: string;
+    run_started_at: string;
+    run_completed_at: string;
+    run_source: "manual" | "scheduled" | "unknown";
+    request_id: string | null;
+    shard_index: number;
+    feeds_per_shard: number;
+    max_ai_reviews: number;
+    feed_count: number;
+    fetched_count: number;
+    candidate_count: number;
+    already_reviewed_count: number;
+    unreviewed_count: number;
+    eligible_for_ai_count: number;
+    ai_reviewed_count: number;
+    openai_model: string;
+    openai_call_count: number;
+    openai_prompt_tokens: number;
+    openai_completion_tokens: number;
+    openai_total_tokens: number;
+    estimated_openai_cost_usd: number | string;
+    openai_accepted_count: number;
+    openai_rejected_count: number;
+    published_accepted_count: number;
+    total_rejected_count: number;
+    no_thumbnail_rejected_count: number;
+    locally_rejected_count: number;
+    cost_protection_limit_reached: boolean;
+    spike_warning_triggered: boolean;
+    review_save_ok: boolean;
+    article_save_ok: boolean;
+    duration_ms: number;
 };
 
 export type AiUsageSummary = {
-    savedReviewCount: number;
-    estimatedAiReviewCount: number;
-    skippedBeforeAiCount: number;
+    runCount: number;
+    shardCount: number;
+    openAiCallCount: number;
+    aiReviewedCount: number;
     acceptedCount: number;
     rejectedCount: number;
     acceptanceRate: number;
     rejectionRate: number;
-    estimatedInputTokens: number;
-    estimatedOutputTokens: number;
-    estimatedTotalTokens: number;
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
     estimatedCostUsd: number;
+    costProtectionHitCount: number;
+    spikeWarningCount: number;
+    averageDurationMs: number;
+    latestRunAt: string | null;
 };
 
 export type AiUsageDailyPoint = {
     date: string;
-    savedReviewCount: number;
-    estimatedAiReviewCount: number;
+    runCount: number;
+    openAiCallCount: number;
+    aiReviewedCount: number;
     acceptedCount: number;
     rejectedCount: number;
-    skippedBeforeAiCount: number;
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
     estimatedCostUsd: number;
+    costProtectionHitCount: number;
+    spikeWarningCount: number;
 };
 
-export type AiUsageLatestReview = {
-    reviewedAt: string;
-    source: string;
-    title: string;
-    decision: AiDecision;
-    category: string;
-    positivityScore: number;
+export type AiUsageShardPoint = {
+    shardIndex: number;
+    runCount: number;
+    openAiCallCount: number;
+    aiReviewedCount: number;
+    acceptedCount: number;
+    rejectedCount: number;
+    totalTokens: number;
     estimatedCostUsd: number;
+    latestRunAt: string | null;
+    costProtectionHitCount: number;
+    spikeWarningCount: number;
+};
+
+export type AiUsageLatestRun = {
+    id: number;
+    runStartedAt: string;
+    runSource: "manual" | "scheduled" | "unknown";
+    shardIndex: number;
+    openAiModel: string;
+    openAiCallCount: number;
+    aiReviewedCount: number;
+    acceptedCount: number;
+    rejectedCount: number;
+    totalTokens: number;
+    estimatedCostUsd: number;
+    costProtectionLimitReached: boolean;
+    spikeWarningTriggered: boolean;
+    durationMs: number;
 };
 
 export type AiUsageDashboardData = {
     isConfigured: boolean;
     errorMessage: string | null;
     generatedAt: string;
-    pricing: AiUsagePricingConfig;
     last24Hours: AiUsageSummary;
     last7Days: AiUsageSummary;
     last30Days: AiUsageSummary;
     daily: AiUsageDailyPoint[];
-    latestAiReviews: AiUsageLatestReview[];
+    shards: AiUsageShardPoint[];
+    latestRuns: AiUsageLatestRun[];
 };
 
-const DEFAULT_INPUT_TOKENS_PER_REVIEW_ESTIMATE = 650;
-const DEFAULT_OUTPUT_TOKENS_PER_REVIEW_ESTIMATE = 160;
-const DEFAULT_INPUT_COST_PER_ONE_MILLION_TOKENS = 0.15;
-const DEFAULT_OUTPUT_COST_PER_ONE_MILLION_TOKENS = 0.6;
-const MAX_REVIEW_ROWS_TO_LOAD = 5000;
-
-function getNumberEnv(name: string, fallback: number) {
-    const value = process.env[name];
-
-    if (!value) {
-        return fallback;
-    }
-
-    const parsed = Number(value);
-
-    if (Number.isNaN(parsed) || parsed < 0) {
-        return fallback;
-    }
-
-    return parsed;
-}
-
-function getPricingConfig(): AiUsagePricingConfig {
-    return {
-        inputTokensPerReviewEstimate: getNumberEnv(
-            "OPENAI_INPUT_TOKENS_PER_REVIEW_ESTIMATE",
-            DEFAULT_INPUT_TOKENS_PER_REVIEW_ESTIMATE,
-        ),
-        outputTokensPerReviewEstimate: getNumberEnv(
-            "OPENAI_OUTPUT_TOKENS_PER_REVIEW_ESTIMATE",
-            DEFAULT_OUTPUT_TOKENS_PER_REVIEW_ESTIMATE,
-        ),
-        inputCostPerOneMillionTokens: getNumberEnv(
-            "OPENAI_INPUT_COST_PER_1M_TOKENS",
-            DEFAULT_INPUT_COST_PER_ONE_MILLION_TOKENS,
-        ),
-        outputCostPerOneMillionTokens: getNumberEnv(
-            "OPENAI_OUTPUT_COST_PER_1M_TOKENS",
-            DEFAULT_OUTPUT_COST_PER_ONE_MILLION_TOKENS,
-        ),
-    };
-}
+const MAX_RUN_ROWS_TO_LOAD = 5000;
 
 function emptySummary(): AiUsageSummary {
     return {
-        savedReviewCount: 0,
-        estimatedAiReviewCount: 0,
-        skippedBeforeAiCount: 0,
+        runCount: 0,
+        shardCount: 0,
+        openAiCallCount: 0,
+        aiReviewedCount: 0,
         acceptedCount: 0,
         rejectedCount: 0,
         acceptanceRate: 0,
         rejectionRate: 0,
-        estimatedInputTokens: 0,
-        estimatedOutputTokens: 0,
-        estimatedTotalTokens: 0,
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
         estimatedCostUsd: 0,
+        costProtectionHitCount: 0,
+        spikeWarningCount: 0,
+        averageDurationMs: 0,
+        latestRunAt: null,
     };
 }
 
@@ -145,131 +155,184 @@ function getLastUtcDateKeys(days: number) {
     });
 }
 
-function isSkippedBeforeAiReview(row: ArticleAiReviewRow) {
-    const reason = row.reason?.trim().toLowerCase() ?? "";
+function toNumber(value: number | string | null | undefined) {
+    if (typeof value === "number") {
+        return Number.isFinite(value) ? value : 0;
+    }
 
-    return reason.startsWith("skipped before ai");
+    if (typeof value === "string") {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    return 0;
 }
 
-function estimateUsageCost(
-    estimatedAiReviewCount: number,
-    pricing: AiUsagePricingConfig,
-) {
-    const estimatedInputTokens =
-        estimatedAiReviewCount * pricing.inputTokensPerReviewEstimate;
-    const estimatedOutputTokens =
-        estimatedAiReviewCount * pricing.outputTokensPerReviewEstimate;
-
-    const estimatedInputCostUsd =
-        (estimatedInputTokens / 1_000_000) *
-        pricing.inputCostPerOneMillionTokens;
-    const estimatedOutputCostUsd =
-        (estimatedOutputTokens / 1_000_000) *
-        pricing.outputCostPerOneMillionTokens;
-
-    return {
-        estimatedInputTokens,
-        estimatedOutputTokens,
-        estimatedTotalTokens: estimatedInputTokens + estimatedOutputTokens,
-        estimatedCostUsd: estimatedInputCostUsd + estimatedOutputCostUsd,
-    };
-}
-
-function summarizeRows(
-    rows: ArticleAiReviewRow[],
-    pricing: AiUsagePricingConfig,
-): AiUsageSummary {
-    const aiRows = rows.filter((row) => !isSkippedBeforeAiReview(row));
-    const acceptedCount = aiRows.filter(
-        (row) => row.decision === "accept",
-    ).length;
-    const rejectedCount = aiRows.filter(
-        (row) => row.decision === "reject",
-    ).length;
-    const estimatedAiReviewCount = aiRows.length;
-    const skippedBeforeAiCount = rows.length - estimatedAiReviewCount;
-
-    const estimatedUsage = estimateUsageCost(estimatedAiReviewCount, pricing);
-
-    return {
-        savedReviewCount: rows.length,
-        estimatedAiReviewCount,
-        skippedBeforeAiCount,
-        acceptedCount,
-        rejectedCount,
-        acceptanceRate:
-            estimatedAiReviewCount === 0
-                ? 0
-                : Math.round((acceptedCount / estimatedAiReviewCount) * 100),
-        rejectionRate:
-            estimatedAiReviewCount === 0
-                ? 0
-                : Math.round((rejectedCount / estimatedAiReviewCount) * 100),
-        ...estimatedUsage,
-    };
-}
-
-function filterRowsSince(rows: ArticleAiReviewRow[], since: Date) {
+function filterRowsSince(rows: AiUsageRunRow[], since: Date) {
     const sinceTime = since.getTime();
 
     return rows.filter((row) => {
-        const reviewedTime = new Date(row.reviewed_at).getTime();
+        const runTime = new Date(row.run_started_at).getTime();
 
-        if (Number.isNaN(reviewedTime)) {
+        if (Number.isNaN(runTime)) {
             return false;
         }
 
-        return reviewedTime >= sinceTime;
+        return runTime >= sinceTime;
     });
 }
 
-function buildDailyPoints(
-    rows: ArticleAiReviewRow[],
-    pricing: AiUsagePricingConfig,
-): AiUsageDailyPoint[] {
-    const dateKeys = getLastUtcDateKeys(7);
+function summarizeRuns(rows: AiUsageRunRow[]): AiUsageSummary {
+    if (rows.length === 0) {
+        return emptySummary();
+    }
 
-    return dateKeys.map((dateKey) => {
+    const shardIndexes = new Set(rows.map((row) => row.shard_index));
+    const openAiCallCount = rows.reduce(
+        (total, row) => total + row.openai_call_count,
+        0,
+    );
+    const aiReviewedCount = rows.reduce(
+        (total, row) => total + row.ai_reviewed_count,
+        0,
+    );
+    const acceptedCount = rows.reduce(
+        (total, row) => total + row.openai_accepted_count,
+        0,
+    );
+    const rejectedCount = rows.reduce(
+        (total, row) => total + row.openai_rejected_count,
+        0,
+    );
+    const promptTokens = rows.reduce(
+        (total, row) => total + row.openai_prompt_tokens,
+        0,
+    );
+    const completionTokens = rows.reduce(
+        (total, row) => total + row.openai_completion_tokens,
+        0,
+    );
+    const totalTokens = rows.reduce(
+        (total, row) => total + row.openai_total_tokens,
+        0,
+    );
+    const estimatedCostUsd = rows.reduce(
+        (total, row) => total + toNumber(row.estimated_openai_cost_usd),
+        0,
+    );
+    const costProtectionHitCount = rows.filter(
+        (row) => row.cost_protection_limit_reached,
+    ).length;
+    const spikeWarningCount = rows.filter(
+        (row) => row.spike_warning_triggered,
+    ).length;
+    const totalDurationMs = rows.reduce(
+        (total, row) => total + row.duration_ms,
+        0,
+    );
+
+    return {
+        runCount: rows.length,
+        shardCount: shardIndexes.size,
+        openAiCallCount,
+        aiReviewedCount,
+        acceptedCount,
+        rejectedCount,
+        acceptanceRate:
+            aiReviewedCount === 0
+                ? 0
+                : Math.round((acceptedCount / aiReviewedCount) * 100),
+        rejectionRate:
+            aiReviewedCount === 0
+                ? 0
+                : Math.round((rejectedCount / aiReviewedCount) * 100),
+        promptTokens,
+        completionTokens,
+        totalTokens,
+        estimatedCostUsd,
+        costProtectionHitCount,
+        spikeWarningCount,
+        averageDurationMs: Math.round(totalDurationMs / rows.length),
+        latestRunAt: rows[0]?.run_started_at ?? null,
+    };
+}
+
+function buildDailyPoints(rows: AiUsageRunRow[]): AiUsageDailyPoint[] {
+    return getLastUtcDateKeys(7).map((dateKey) => {
         const dateRows = rows.filter((row) => {
-            if (!row.reviewed_at) {
+            if (!row.run_started_at) {
                 return false;
             }
 
-            return row.reviewed_at.slice(0, 10) === dateKey;
+            return row.run_started_at.slice(0, 10) === dateKey;
         });
 
-        const summary = summarizeRows(dateRows, pricing);
+        const summary = summarizeRuns(dateRows);
 
         return {
             date: dateKey,
-            savedReviewCount: summary.savedReviewCount,
-            estimatedAiReviewCount: summary.estimatedAiReviewCount,
+            runCount: summary.runCount,
+            openAiCallCount: summary.openAiCallCount,
+            aiReviewedCount: summary.aiReviewedCount,
             acceptedCount: summary.acceptedCount,
             rejectedCount: summary.rejectedCount,
-            skippedBeforeAiCount: summary.skippedBeforeAiCount,
+            promptTokens: summary.promptTokens,
+            completionTokens: summary.completionTokens,
+            totalTokens: summary.totalTokens,
             estimatedCostUsd: summary.estimatedCostUsd,
+            costProtectionHitCount: summary.costProtectionHitCount,
+            spikeWarningCount: summary.spikeWarningCount,
         };
     });
 }
 
-function buildLatestAiReviews(
-    rows: ArticleAiReviewRow[],
-    pricing: AiUsagePricingConfig,
-): AiUsageLatestReview[] {
-    const singleReviewCost = estimateUsageCost(1, pricing).estimatedCostUsd;
+function buildShardPoints(rows: AiUsageRunRow[]): AiUsageShardPoint[] {
+    const rowsByShard = new Map<number, AiUsageRunRow[]>();
 
-    return rows
-        .filter((row) => !isSkippedBeforeAiReview(row))
-        .slice(0, 12)
-        .map((row) => ({
-            reviewedAt: row.reviewed_at,
-            source: row.source,
-            title: row.title,
-            decision: row.decision,
-            category: row.category,
-            positivityScore: row.positivity_score,
-            estimatedCostUsd: singleReviewCost,
-        }));
+    for (const row of rows) {
+        const currentRows = rowsByShard.get(row.shard_index) ?? [];
+        currentRows.push(row);
+        rowsByShard.set(row.shard_index, currentRows);
+    }
+
+    return Array.from(rowsByShard.entries())
+        .map(([shardIndex, shardRows]) => {
+            const summary = summarizeRuns(shardRows);
+
+            return {
+                shardIndex,
+                runCount: summary.runCount,
+                openAiCallCount: summary.openAiCallCount,
+                aiReviewedCount: summary.aiReviewedCount,
+                acceptedCount: summary.acceptedCount,
+                rejectedCount: summary.rejectedCount,
+                totalTokens: summary.totalTokens,
+                estimatedCostUsd: summary.estimatedCostUsd,
+                latestRunAt: summary.latestRunAt,
+                costProtectionHitCount: summary.costProtectionHitCount,
+                spikeWarningCount: summary.spikeWarningCount,
+            };
+        })
+        .sort((a, b) => a.shardIndex - b.shardIndex);
+}
+
+function buildLatestRuns(rows: AiUsageRunRow[]): AiUsageLatestRun[] {
+    return rows.slice(0, 20).map((row) => ({
+        id: row.id,
+        runStartedAt: row.run_started_at,
+        runSource: row.run_source,
+        shardIndex: row.shard_index,
+        openAiModel: row.openai_model,
+        openAiCallCount: row.openai_call_count,
+        aiReviewedCount: row.ai_reviewed_count,
+        acceptedCount: row.openai_accepted_count,
+        rejectedCount: row.openai_rejected_count,
+        totalTokens: row.openai_total_tokens,
+        estimatedCostUsd: toNumber(row.estimated_openai_cost_usd),
+        costProtectionLimitReached: row.cost_protection_limit_reached,
+        spikeWarningTriggered: row.spike_warning_triggered,
+        durationMs: row.duration_ms,
+    }));
 }
 
 function getSupabaseAdminConfig() {
@@ -283,7 +346,7 @@ function getSupabaseAdminConfig() {
     };
 }
 
-async function loadReviewRowsSince(since: Date) {
+async function loadUsageRunsSince(since: Date) {
     const { supabaseUrl, supabaseServiceRoleKey } = getSupabaseAdminConfig();
 
     if (!supabaseUrl) {
@@ -304,28 +367,60 @@ async function loadReviewRowsSince(since: Date) {
     });
 
     const { data, error } = await supabase
-        .from("article_ai_reviews")
+        .from("ai_usage_runs")
         .select(
-            "original_url, source, title, decision, category, positivity_score, summary, reason, reviewed_at",
+            [
+                "id",
+                "created_at",
+                "run_started_at",
+                "run_completed_at",
+                "run_source",
+                "request_id",
+                "shard_index",
+                "feeds_per_shard",
+                "max_ai_reviews",
+                "feed_count",
+                "fetched_count",
+                "candidate_count",
+                "already_reviewed_count",
+                "unreviewed_count",
+                "eligible_for_ai_count",
+                "ai_reviewed_count",
+                "openai_model",
+                "openai_call_count",
+                "openai_prompt_tokens",
+                "openai_completion_tokens",
+                "openai_total_tokens",
+                "estimated_openai_cost_usd",
+                "openai_accepted_count",
+                "openai_rejected_count",
+                "published_accepted_count",
+                "total_rejected_count",
+                "no_thumbnail_rejected_count",
+                "locally_rejected_count",
+                "cost_protection_limit_reached",
+                "spike_warning_triggered",
+                "review_save_ok",
+                "article_save_ok",
+                "duration_ms",
+            ].join(", "),
         )
-        .gte("reviewed_at", since.toISOString())
-        .order("reviewed_at", { ascending: false })
-        .limit(MAX_REVIEW_ROWS_TO_LOAD);
+        .gte("run_started_at", since.toISOString())
+        .order("run_started_at", { ascending: false })
+        .limit(MAX_RUN_ROWS_TO_LOAD);
 
     if (error) {
         throw new Error(error.message);
     }
 
-    return (data ?? []) as ArticleAiReviewRow[];
+    return (data ?? []) as unknown as AiUsageRunRow[];
 }
 
 export async function getAdminAiUsageDashboardData(): Promise<AiUsageDashboardData> {
-    const pricing = getPricingConfig();
     const generatedAt = new Date().toISOString();
 
     try {
-        const rows = await loadReviewRowsSince(dateDaysAgo(30));
-
+        const rows = await loadUsageRunsSince(dateDaysAgo(30));
         const last24HourRows = filterRowsSince(rows, dateHoursAgo(24));
         const last7DayRows = filterRowsSince(rows, dateDaysAgo(7));
         const last30DayRows = filterRowsSince(rows, dateDaysAgo(30));
@@ -334,12 +429,12 @@ export async function getAdminAiUsageDashboardData(): Promise<AiUsageDashboardDa
             isConfigured: true,
             errorMessage: null,
             generatedAt,
-            pricing,
-            last24Hours: summarizeRows(last24HourRows, pricing),
-            last7Days: summarizeRows(last7DayRows, pricing),
-            last30Days: summarizeRows(last30DayRows, pricing),
-            daily: buildDailyPoints(last7DayRows, pricing),
-            latestAiReviews: buildLatestAiReviews(rows, pricing),
+            last24Hours: summarizeRuns(last24HourRows),
+            last7Days: summarizeRuns(last7DayRows),
+            last30Days: summarizeRuns(last30DayRows),
+            daily: buildDailyPoints(last7DayRows),
+            shards: buildShardPoints(last7DayRows),
+            latestRuns: buildLatestRuns(rows),
         };
     } catch (error) {
         const message =
@@ -351,12 +446,12 @@ export async function getAdminAiUsageDashboardData(): Promise<AiUsageDashboardDa
             isConfigured: false,
             errorMessage: message,
             generatedAt,
-            pricing,
             last24Hours: emptySummary(),
             last7Days: emptySummary(),
             last30Days: emptySummary(),
-            daily: buildDailyPoints([], pricing),
-            latestAiReviews: [],
+            daily: buildDailyPoints([]),
+            shards: [],
+            latestRuns: [],
         };
     }
-}1
+}
