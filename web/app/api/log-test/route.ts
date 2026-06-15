@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { BYPASS_CACHE_HEADERS } from "@/lib/cacheHeaders";
 import { logInfo, logWarn } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -26,13 +27,18 @@ export async function GET() {
         durationMs: Date.now() - startedAt,
     });
 
-    return NextResponse.json({
-        ok: true,
-        message: "Better Stack test logs were emitted.",
-        searchInBetterStackFor: {
-            service: "nutsnews-web",
-            event: "api.log_test.completed",
-            level: "info",
+    return NextResponse.json(
+        {
+            ok: true,
+            message: "Better Stack test logs were emitted.",
+            searchInBetterStackFor: {
+                service: "nutsnews-web",
+                event: "api.log_test.completed",
+                level: "info",
+            },
         },
-    });
+        {
+            headers: BYPASS_CACHE_HEADERS,
+        },
+    );
 }

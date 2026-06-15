@@ -5,12 +5,11 @@ import {
   getPublishedArticlesByCursor,
   PAGE_SIZE,
 } from "@/lib/articles";
+import { ARTICLE_API_CACHE_HEADERS, BYPASS_CACHE_HEADERS } from "@/lib/cacheHeaders";
 import { logError, logInfo } from "@/lib/logger";
 
 export const revalidate = 300;
 
-const ARTICLE_API_CACHE_CONTROL =
-  "public, max-age=60, s-maxage=300, stale-while-revalidate=3600";
 const MAX_SAFE_OFFSET_PAGE = 1000;
 
 function parsePage(value: string | null) {
@@ -68,10 +67,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(result, {
       headers: {
-        "Cache-Control": ARTICLE_API_CACHE_CONTROL,
-        "CDN-Cache-Control": "public, max-age=300, stale-while-revalidate=3600",
-        "Vercel-CDN-Cache-Control":
-          "public, s-maxage=300, stale-while-revalidate=3600",
+        ...ARTICLE_API_CACHE_HEADERS,
         "X-NutsNews-Article-Page-Size": String(PAGE_SIZE),
         "X-NutsNews-Article-Pagination": paginationMode,
         "X-NutsNews-Article-Fields": "card",
@@ -104,9 +100,7 @@ export async function GET(request: Request) {
       },
       {
         status: 500,
-        headers: {
-          "Cache-Control": "no-store",
-        },
+        headers: BYPASS_CACHE_HEADERS,
       },
     );
   }
