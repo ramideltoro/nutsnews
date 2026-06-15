@@ -20,15 +20,6 @@ Sentry.init({
             maskAllText: true,
             blockAllMedia: true,
         }),
-        Sentry.feedbackIntegration({
-            colorScheme: "system",
-            showBranding: false,
-            buttonLabel: "Report a problem",
-            submitButtonLabel: "Send report",
-            formTitle: "Report a NutsNews issue",
-            messagePlaceholder:
-                "Tell us what happened. Please do not include passwords or private information.",
-        }),
     ],
 
     beforeSend(event) {
