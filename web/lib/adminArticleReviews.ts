@@ -475,7 +475,7 @@ export async function getAdminArticleReviewDashboardData(filters: ArticleReviewF
     };
   }
 
-  const reviewRows = (data ?? []) as ArticleReviewDbRow[];
+  const reviewRows = (data ?? []) as unknown as ArticleReviewDbRow[];
   const originalUrls = Array.from(new Set(reviewRows.map((row) => row.original_url).filter(Boolean)));
   const publishedByOriginalUrl = new Map<string, PublishedArticleDbRow>();
 
@@ -485,7 +485,7 @@ export async function getAdminArticleReviewDashboardData(filters: ArticleReviewF
       .select(PUBLISHED_ARTICLE_SELECT_COLUMNS)
       .in("original_url", originalUrls);
 
-    for (const article of (articleData ?? []) as PublishedArticleDbRow[]) {
+    for (const article of (articleData ?? []) as unknown as PublishedArticleDbRow[]) {
       publishedByOriginalUrl.set(article.original_url, article);
     }
   }
