@@ -158,7 +158,7 @@ export default async function AdminPage() {
                         description="Use these dashboards for day-to-day monitoring. Each dashboard has its own route so /admin stays clean and easy to navigate."
                     />
 
-                    <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                         <DashboardCard
                             eyebrow="AI Cost"
                             title="AI Usage"
@@ -174,6 +174,14 @@ export default async function AdminPage() {
                             href="/admin/shards"
                             status="Live"
                         />
+
+                        <DashboardCard
+                            eyebrow="Sources"
+                            title="RSS Feed Health"
+                            description="Review RSS feed quality, repeated failures, image coverage, accepted article output, weak feeds, best feeds, and Supabase disable actions."
+                            href="/admin/feed-health"
+                            status="Live"
+                        />
                     </div>
                 </section>
 
@@ -185,13 +193,6 @@ export default async function AdminPage() {
                     />
 
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                        <DashboardCard
-                            eyebrow="Sources"
-                            title="RSS Feeds"
-                            description="Review feed coverage, failing sources, direct publisher feeds, active feeds, inactive feeds, and future feed maintenance actions."
-                            status="Coming Soon"
-                        />
-
                         <DashboardCard
                             eyebrow="Content"
                             title="Articles"
