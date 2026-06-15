@@ -324,7 +324,7 @@ function buildReviewSql(filters: ArticleReviewFilters) {
   return `select\n  reviewed_at,\n  decision,\n  source,\n  category,\n  positivity_score,\n  title,\n  reason,\n  original_url\nfrom public.article_ai_reviews\nwhere ${conditions.join("\n  and ")}\norder by reviewed_at ${filters.sort === "oldest" ? "asc" : "desc"}\nlimit ${ARTICLE_REVIEW_PAGE_SIZE};`;
 }
 
-async function loadOptions(client: ReturnType<typeof createClient>) {
+async function loadOptions(client: any) {
   const { data, error } = await client
     .from("article_ai_reviews")
     .select("source, category")
