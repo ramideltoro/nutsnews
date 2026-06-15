@@ -158,7 +158,7 @@ export default async function AdminPage() {
                         description="Use these dashboards for day-to-day monitoring. Each dashboard has its own route so /admin stays clean and easy to navigate."
                     />
 
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                         <DashboardCard
                             eyebrow="AI Cost"
                             title="AI Usage"
@@ -180,6 +180,14 @@ export default async function AdminPage() {
                             title="RSS Feed Health"
                             description="Review RSS feed quality, repeated failures, image coverage, accepted article output, weak feeds, best feeds, and Supabase disable actions."
                             href="/admin/feed-health"
+                            status="Live"
+                        />
+
+                        <DashboardCard
+                            eyebrow="Source Controls"
+                            title="Feed Management"
+                            description="List RSS feeds, see active and inactive status, view positive-source flags, inspect health signals, and safely enable or disable feeds."
+                            href="/admin/feeds"
                             status="Live"
                         />
                     </div>
@@ -227,7 +235,7 @@ export default async function AdminPage() {
                         <p className="mt-3 text-sm leading-6 text-amber-100/65">
                             The `/admin` route should stay lightweight. It links to focused
                             dashboards, while detailed monitoring lives under dedicated admin
-                            routes like `/admin/ai-usage` and `/admin/shards`.
+                            routes like `/admin/ai-usage`, `/admin/shards`, `/admin/feed-health`, and `/admin/feeds`.
                         </p>
                     </div>
 
