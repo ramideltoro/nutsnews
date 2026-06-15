@@ -158,7 +158,15 @@ export default async function AdminPage() {
                         description="Use these dashboards for day-to-day monitoring. Each dashboard has its own route so /admin stays clean and easy to navigate."
                     />
 
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                        <DashboardCard
+                            eyebrow="Content"
+                            title="Article Reviews"
+                            description="Review accepted and rejected stories, filter by decision, source, category, positivity score, and investigate why the AI made each decision."
+                            href="/admin/articles"
+                            status="Live"
+                        />
+
                         <DashboardCard
                             eyebrow="AI Cost"
                             title="AI Usage"
@@ -202,13 +210,6 @@ export default async function AdminPage() {
 
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                         <DashboardCard
-                            eyebrow="Content"
-                            title="Articles"
-                            description="Inspect article queue health, accepted articles, rejected articles, thumbnail availability, categories, and source mix."
-                            status="Coming Soon"
-                        />
-
-                        <DashboardCard
                             eyebrow="Recovery"
                             title="Backups"
                             description="View backup freshness, restore readiness, Supabase export status, and future scheduled backup automation."
@@ -235,7 +236,7 @@ export default async function AdminPage() {
                         <p className="mt-3 text-sm leading-6 text-amber-100/65">
                             The `/admin` route should stay lightweight. It links to focused
                             dashboards, while detailed monitoring lives under dedicated admin
-                            routes like `/admin/ai-usage`, `/admin/shards`, `/admin/feed-health`, and `/admin/feeds`.
+                            routes like `/admin/articles`, `/admin/ai-usage`, `/admin/shards`, `/admin/feed-health`, and `/admin/feeds`.
                         </p>
                     </div>
 
