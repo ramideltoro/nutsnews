@@ -2,67 +2,16 @@ export const revalidate = 300;
 
 import { ArticleFeed } from "./components/ArticleFeed";
 import { SiteFooter } from "./components/SiteFooter";
-import {
-  getPublishedArticles,
-  getPublishedCategories,
-  SITE_URL,
-} from "@/lib/articles";
+import { getPublishedArticles, SITE_URL } from "@/lib/articles";
 
-type HomeProps = {
-  searchParams?: Promise<{
-    category?: string | string[];
-    page?: string | string[];
-  }>;
-};
-
-function getSingleSearchValue(value?: string | string[]) {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-function getCurrentPage(pageValue?: string | string[]) {
-  const rawPage = getSingleSearchValue(pageValue);
-  const parsedPage = rawPage ? Number(rawPage) : 0;
-
-  if (!Number.isFinite(parsedPage) || parsedPage < 0) {
-    return 0;
-  }
-
-  return Math.floor(parsedPage);
-}
-
-function getSelectedCategory(categoryValue?: string | string[]) {
-  const rawCategory = getSingleSearchValue(categoryValue)?.trim();
-
-  if (!rawCategory || rawCategory.toLowerCase() === "all") {
-    return null;
-  }
-
-  return rawCategory;
-}
-
-export default async function Home({ searchParams }: HomeProps) {
-  const resolvedSearchParams = await searchParams;
-  const currentPage = getCurrentPage(resolvedSearchParams?.page);
-  const selectedCategory = getSelectedCategory(resolvedSearchParams?.category);
-
-  const [{ articles, nextPage }, categories] = await Promise.all([
-    getPublishedArticles(currentPage, selectedCategory),
-    getPublishedCategories(),
-  ]);
-
-  const canonicalPath = selectedCategory
-    ? `/?category=${encodeURIComponent(selectedCategory)}${
-        currentPage > 0 ? `&page=${currentPage}` : ""
-      }`
-    : currentPage > 0
-      ? `/?page=${currentPage}`
-      : "/";
+export default async function Home() {
+  const { articles, nextCursor } = await getPublishedArticles();
 
   const homeJsonLd = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
     name: "NutsNews",
-    url: `${SITE_URL}${canonicalPath === "/" ? "" : canonicalPath}`,
+    url: SITE_URL,
     description:
       "A positive news feed curated by AI with short uplifting summaries and links to original publishers.",
     mainEntity: articles.map((article) => ({
@@ -123,10 +72,7 @@ export default async function Home({ searchParams }: HomeProps) {
 
         <ArticleFeed
           initialArticles={articles}
-          initialNextPage={nextPage}
-          categories={categories}
-          selectedCategory={selectedCategory ?? "All"}
-          currentPage={currentPage}
+          initialNextCursor={nextCursor}
         />
       </section>
 
