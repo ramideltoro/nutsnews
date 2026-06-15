@@ -45,27 +45,100 @@ export function getCategoryBadges(category: string | null) {
   return badges.length > 0 ? badges : fallback;
 }
 
-export async function getPublishedArticles(page = 0, category?: string | null) {
-  const safePage = Number.isFinite(page) && page >= 0 ? page : 0;
-  const from = safePage * PAGE_SIZE;
-  const to = from + PAGE_SIZE - 1;
-  const selectedCategory = cleanCategory(category);
+type ArticleCursor = {
+  publishedOnSiteAt: string;
+  id: string;
+};
 
+export type PublishedArticlesResult = {
+  articles: Article[];
+  nextPage: number | null;
+  nextCursor: string | null;
+};
+
+function encodeArticleCursor(article: Article) {
+  const publishedOnSiteAt = article.published_on_site_at;
+
+  if (!publishedOnSiteAt) {
+    return null;
+  }
+
+  return Buffer.from(
+    JSON.stringify({
+      publishedOnSiteAt,
+      id: article.id,
+    } satisfies ArticleCursor),
+    "utf8",
+  ).toString("base64url");
+}
+
+function decodeArticleCursor(cursor?: string | null): ArticleCursor | null {
+  if (!cursor) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as Partial<ArticleCursor>;
+
+    if (!parsed.publishedOnSiteAt || !parsed.id) {
+      return null;
+    }
+
+    return {
+      publishedOnSiteAt: parsed.publishedOnSiteAt,
+      id: parsed.id,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function basePublishedArticleQuery(category?: string | null) {
+  const selectedCategory = cleanCategory(category);
   let query = supabase
-      .from("articles")
-      .select(ARTICLE_SELECT)
-      .eq("status", "published")
-      .not("image_url", "is", null)
-      .neq("image_url", "");
+    .from("articles")
+    .select(ARTICLE_SELECT)
+    .eq("status", "published")
+    .not("image_url", "is", null)
+    .neq("image_url", "");
 
   if (selectedCategory) {
     query = query.ilike("category", `%${selectedCategory}%`);
   }
 
-  const { data, error } = await query
-      .order("published_on_site_at", { ascending: false })
-      .order("positivity_score", { ascending: false })
-      .range(from, to);
+  return query;
+}
+
+function shapePublishedArticlesResult({
+  data,
+  page,
+  includeNextPage,
+}: {
+  data: Article[] | null;
+  page: number;
+  includeNextPage: boolean;
+}): PublishedArticlesResult {
+  const rows = data ?? [];
+  const hasMore = rows.length > PAGE_SIZE;
+  const articles = rows.slice(0, PAGE_SIZE);
+  const lastArticle = articles.at(-1);
+
+  return {
+    articles,
+    nextPage: includeNextPage && hasMore ? page + 1 : null,
+    nextCursor: hasMore && lastArticle ? encodeArticleCursor(lastArticle) : null,
+  };
+}
+
+export async function getPublishedArticles(page = 0, category?: string | null): Promise<PublishedArticlesResult> {
+  const safePage = Number.isFinite(page) && page >= 0 ? Math.floor(page) : 0;
+  const from = safePage * PAGE_SIZE;
+  const to = from + PAGE_SIZE;
+
+  const { data, error } = await basePublishedArticleQuery(category)
+    .order("published_on_site_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(from, to);
 
   if (error) {
     console.error("Failed to load published articles:", error);
@@ -73,13 +146,50 @@ export async function getPublishedArticles(page = 0, category?: string | null) {
     return {
       articles: [] as Article[],
       nextPage: null as number | null,
+      nextCursor: null as string | null,
     };
   }
 
-  return {
-    articles: (data ?? []) as Article[],
-    nextPage: data && data.length === PAGE_SIZE ? safePage + 1 : null,
-  };
+  return shapePublishedArticlesResult({
+    data: (data ?? []) as Article[],
+    page: safePage,
+    includeNextPage: true,
+  });
+}
+
+export async function getPublishedArticlesByCursor(
+  cursor?: string | null,
+  category?: string | null,
+): Promise<PublishedArticlesResult> {
+  const decodedCursor = decodeArticleCursor(cursor);
+  let query = basePublishedArticleQuery(category);
+
+  if (decodedCursor) {
+    query = query.or(
+      `published_on_site_at.lt.${decodedCursor.publishedOnSiteAt},and(published_on_site_at.eq.${decodedCursor.publishedOnSiteAt},id.lt.${decodedCursor.id})`,
+    );
+  }
+
+  const { data, error } = await query
+    .order("published_on_site_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(PAGE_SIZE + 1);
+
+  if (error) {
+    console.error("Failed to load cursor-paginated published articles:", error);
+
+    return {
+      articles: [] as Article[],
+      nextPage: null,
+      nextCursor: null,
+    };
+  }
+
+  return shapePublishedArticlesResult({
+    data: (data ?? []) as Article[],
+    page: 0,
+    includeNextPage: false,
+  });
 }
 
 export async function getPublishedCategories(limit = 1000) {

@@ -1,44 +1,69 @@
 import { NextResponse } from "next/server";
 
-import { getPublishedArticles } from "@/lib/articles";
+import {
+  getPublishedArticles,
+  getPublishedArticlesByCursor,
+  PAGE_SIZE,
+} from "@/lib/articles";
 import { logError, logInfo } from "@/lib/logger";
 
 export const revalidate = 300;
 
 const ARTICLE_API_CACHE_CONTROL =
-    "public, max-age=60, s-maxage=300, stale-while-revalidate=3600";
+  "public, max-age=60, s-maxage=300, stale-while-revalidate=3600";
+const MAX_SAFE_OFFSET_PAGE = 1000;
+
+function parsePage(value: string | null) {
+  const parsedPage = Number(value ?? "0");
+
+  if (!Number.isFinite(parsedPage) || parsedPage < 0) {
+    return 0;
+  }
+
+  return Math.min(Math.floor(parsedPage), MAX_SAFE_OFFSET_PAGE);
+}
 
 export async function GET(request: Request) {
   const startedAt = Date.now();
   const { searchParams } = new URL(request.url);
 
-  const pageParam = searchParams.get("page") ?? "0";
+  const page = parsePage(searchParams.get("page"));
+  const cursor = searchParams.get("cursor");
   const category = searchParams.get("category");
-  const page = Number(pageParam);
+  const paginationMode = cursor ? "cursor" : "offset";
 
   await logInfo("api.articles.request_started", "Articles API request started", {
     route: "/api/articles",
     method: "GET",
     page,
+    hasCursor: Boolean(cursor),
+    paginationMode,
+    pageSize: PAGE_SIZE,
     category: category ?? "all",
   });
 
   try {
-    const result = await getPublishedArticles(page, category);
+    const result = cursor
+      ? await getPublishedArticlesByCursor(cursor, category)
+      : await getPublishedArticles(page, category);
 
     await logInfo(
-        "api.articles.request_completed",
-        "Articles API request completed",
-        {
-          route: "/api/articles",
-          method: "GET",
-          status: 200,
-          page,
-          category: category ?? "all",
-          articleCount: result.articles.length,
-          nextPage: result.nextPage,
-          durationMs: Date.now() - startedAt,
-        },
+      "api.articles.request_completed",
+      "Articles API request completed",
+      {
+        route: "/api/articles",
+        method: "GET",
+        status: 200,
+        page,
+        hasCursor: Boolean(cursor),
+        paginationMode,
+        pageSize: PAGE_SIZE,
+        category: category ?? "all",
+        articleCount: result.articles.length,
+        nextPage: result.nextPage,
+        hasNextCursor: Boolean(result.nextCursor),
+        durationMs: Date.now() - startedAt,
+      },
     );
 
     return NextResponse.json(result, {
@@ -46,36 +71,43 @@ export async function GET(request: Request) {
         "Cache-Control": ARTICLE_API_CACHE_CONTROL,
         "CDN-Cache-Control": "public, max-age=300, stale-while-revalidate=3600",
         "Vercel-CDN-Cache-Control":
-            "public, s-maxage=300, stale-while-revalidate=3600",
+          "public, s-maxage=300, stale-while-revalidate=3600",
+        "X-NutsNews-Article-Page-Size": String(PAGE_SIZE),
+        "X-NutsNews-Article-Pagination": paginationMode,
+        "X-NutsNews-Article-Fields": "card",
       },
     });
   } catch (error) {
     await logError(
-        "api.articles.request_failed",
-        "Articles API request failed",
-        error,
-        {
-          route: "/api/articles",
-          method: "GET",
-          status: 500,
-          page,
-          category: category ?? "all",
-          durationMs: Date.now() - startedAt,
-        },
+      "api.articles.request_failed",
+      "Articles API request failed",
+      error,
+      {
+        route: "/api/articles",
+        method: "GET",
+        status: 500,
+        page,
+        hasCursor: Boolean(cursor),
+        paginationMode,
+        pageSize: PAGE_SIZE,
+        category: category ?? "all",
+        durationMs: Date.now() - startedAt,
+      },
     );
 
     return NextResponse.json(
-        {
-          articles: [],
-          nextPage: null,
-          error: "Failed to load articles",
+      {
+        articles: [],
+        nextPage: null,
+        nextCursor: null,
+        error: "Failed to load articles",
+      },
+      {
+        status: 500,
+        headers: {
+          "Cache-Control": "no-store",
         },
-        {
-          status: 500,
-          headers: {
-            "Cache-Control": "no-store",
-          },
-        },
+      },
     );
   }
 }
