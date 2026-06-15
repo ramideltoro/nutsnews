@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   type FeedManagementStatus,
+  type FeedQualityGrade,
   type ManagedFeed,
   formatFeedManagementDateTime,
   getAdminFeedManagementDashboardData,
@@ -89,6 +90,30 @@ function statusClasses(status: FeedManagementStatus) {
   return "border-violet-300/25 bg-violet-400/10 text-violet-100";
 }
 
+function qualityClasses(grade: FeedQualityGrade) {
+  if (grade === "excellent") {
+    return "border-emerald-300/30 bg-emerald-400/15 text-emerald-100";
+  }
+
+  if (grade === "good") {
+    return "border-lime-300/25 bg-lime-400/10 text-lime-100";
+  }
+
+  if (grade === "review") {
+    return "border-amber-300/25 bg-amber-400/10 text-amber-100";
+  }
+
+  if (grade === "poor") {
+    return "border-red-300/35 bg-red-500/15 text-red-100";
+  }
+
+  if (grade === "inactive") {
+    return "border-neutral-300/20 bg-neutral-400/10 text-neutral-100";
+  }
+
+  return "border-violet-300/25 bg-violet-400/10 text-violet-100";
+}
+
 function StatusPill({ status, label }: { status: FeedManagementStatus; label: string }) {
   return (
     <span
@@ -97,6 +122,19 @@ function StatusPill({ status, label }: { status: FeedManagementStatus; label: st
       )}`}
     >
       {label}
+    </span>
+  );
+}
+
+function QualityScorePill({ feed }: { feed: ManagedFeed }) {
+  return (
+    <span
+      className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${qualityClasses(
+        feed.qualityGrade,
+      )}`}
+      title={feed.qualityReason}
+    >
+      Quality {formatNumber(feed.qualityScore)}/100 · {feed.qualityLabel}
     </span>
   );
 }
@@ -157,9 +195,12 @@ function Section({
 function QuickNav() {
   const links = [
     ["Summary", "#summary"],
+    ["Quality", "#quality-review"],
+    ["Best", "#best-quality"],
     ["Manage", "#manage-feeds"],
     ["Disable", "#recommended-disable"],
     ["Inactive", "#inactive-feeds"],
+    ["SQL", "#quality-sql"],
   ];
 
   return (
@@ -218,6 +259,7 @@ function FeedManagementCard({ feed }: { feed: ManagedFeed }) {
         <div className="min-w-0">
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <StatusPill status={feed.status} label={feed.statusLabel} />
+            <QualityScorePill feed={feed} />
             <span className="rounded-full border border-amber-300/15 bg-amber-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-100/75">
               DB is_active: {feed.rawIsActiveValue}
             </span>
@@ -229,6 +271,9 @@ function FeedManagementCard({ feed }: { feed: ManagedFeed }) {
           <h3 className="break-words text-lg font-black text-amber-50">{feed.source}</h3>
           <p className="mt-1 break-all text-xs leading-5 text-amber-100/45">{feed.url}</p>
           <p className="mt-3 text-sm leading-6 text-amber-100/65">{feed.reason}</p>
+          <p className="mt-2 text-xs leading-5 text-amber-100/50">
+            Quality reason: <span className="text-amber-50">{feed.qualityReason}</span>
+          </p>
 
           {feed.lastErrorMessage ? (
             <p className="mt-2 rounded-2xl border border-red-300/15 bg-red-500/10 px-3 py-2 text-xs leading-5 text-red-100/80">
@@ -249,10 +294,16 @@ function FeedManagementCard({ feed }: { feed: ManagedFeed }) {
       </div>
 
       <div className="mt-4 grid gap-2 border-t border-amber-300/10 pt-4 text-xs text-amber-100/55 sm:grid-cols-2 lg:grid-cols-4">
+        <p>Quality: <span className="text-amber-50">{formatNumber(feed.qualityScore)}/100</span></p>
+        <p>Grade: <span className="text-amber-50">{feed.qualityLabel}</span></p>
         <p>Success: <span className="text-amber-50">{formatPercent(feed.successRate)}</span></p>
         <p>Images: <span className="text-amber-50">{formatPercent(feed.imageRate)}</span></p>
+        <p>Accepted rate: <span className="text-amber-50">{formatPercent(feed.acceptanceRate)}</span></p>
+        <p>Failure rate: <span className="text-amber-50">{formatPercent(feed.failureRate)}</span></p>
+        <p>Duplicate rate: <span className="text-amber-50">{formatPercent(feed.duplicateRate)}</span></p>
         <p>Accepted: <span className="text-amber-50">{formatNumber(feed.totalAcceptedCount)}</span></p>
         <p>Rejected: <span className="text-amber-50">{formatNumber(feed.totalRejectedCount)}</span></p>
+        <p>Unique reviewed: <span className="text-amber-50">{formatNumber(feed.uniqueReviewedUrlCount)}</span></p>
         <p>Last checked: <span className="text-amber-50">{formatFeedManagementDateTime(feed.lastCheckedAt)}</span></p>
         <p>Last status: <span className="text-amber-50">{feed.lastStatus ?? "n/a"}</span></p>
         <p>Last articles: <span className="text-amber-50">{formatNumber(feed.lastArticleCount)}</span></p>
@@ -321,7 +372,7 @@ export default async function FeedManagementPage({ searchParams }: FeedManagemen
                 Feed Management
               </h1>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-amber-100/70">
-                Manage RSS sources without a code deploy. Review active status, positive-source flags, health metrics, and safely enable or disable feeds from the private admin portal.
+                Manage RSS sources without a code deploy. Review active status, positive-source flags, health metrics, quality scores, and safely enable or disable feeds from the private admin portal.
               </p>
             </div>
 
@@ -333,7 +384,7 @@ export default async function FeedManagementPage({ searchParams }: FeedManagemen
                 {formatFeedManagementDateTime(data.generatedAt)}
               </p>
               <p className="mt-2 text-xs leading-5 text-amber-100/55">
-                Toggle changes update Supabase `rss_feeds.is_active` immediately. Worker shards only load active feeds.
+                Quality scores come from Supabase `feed_quality_scores` and rank feeds from 0 to 100.
               </p>
             </div>
           </div>
@@ -346,22 +397,36 @@ export default async function FeedManagementPage({ searchParams }: FeedManagemen
 
         <section id="summary" className="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard label="Total Feeds" value={formatNumber(data.summary.totalFeeds)} helper={`${formatNumber(data.summary.activeFeeds)} active · ${formatNumber(data.summary.inactiveFeeds)} inactive`} />
-          <MetricCard label="Positive Sources" value={formatNumber(data.summary.positiveFeeds)} helper={`${formatNumber(data.summary.ordinaryFeeds)} general feeds are also available.`} />
+          <MetricCard label="Avg Quality" value={`${formatNumber(data.summary.averageQualityScore)}/100`} helper={`${formatNumber(data.summary.excellentFeeds + data.summary.goodFeeds)} excellent/good feeds · ${formatNumber(data.summary.poorFeeds)} poor feeds.`} />
           <MetricCard label="Weak or Failing" value={formatNumber(data.summary.failingFeeds + data.summary.weakFeeds)} helper="Feeds that may need disabling or replacement." />
-          <MetricCard label="Accepted Articles" value={formatNumber(data.summary.totalAcceptedCount)} helper={`${formatPercent(data.summary.acceptanceRate)} acceptance rate from tracked feed outcomes.`} />
+          <MetricCard label="Accepted Articles" value={formatNumber(data.summary.totalAcceptedCount)} helper={`${formatPercent(data.summary.acceptanceRate)} acceptance rate · ${formatPercent(data.summary.duplicateRate)} duplicate/already-seen rate.`} />
         </section>
 
         <div className="grid gap-5">
+          <Section id="quality-review" eyebrow="Source Quality" title="Lowest Quality Scores" description="Feeds listed here have poor or review-level quality scores based on success, thumbnails, accepted output, failures, and duplicate or already-seen signals.">
+            <FeedList feeds={data.lowQualityFeeds} emptyMessage="No low-quality active feeds detected right now." />
+          </Section>
+
+          <Section id="best-quality" eyebrow="Best Sources" title="Highest Quality Scores" description="These active feeds have the strongest source quality signals and are the safest sources to prioritize when expanding shards.">
+            <FeedList feeds={data.bestQualityFeeds} emptyMessage="No scored feeds yet. Run the Worker after applying the quality score migration." />
+          </Section>
+
           <Section id="manage-feeds" eyebrow="Source Controls" title="Manage All RSS Feeds" description="Enable or disable feeds safely from Supabase-backed admin controls. Disabled feeds are skipped by Worker shards without changing code.">
             <FeedList feeds={data.feeds} emptyMessage="No RSS feeds found." />
           </Section>
 
-          <Section id="recommended-disable" eyebrow="Recommended Review" title="Feeds to Consider Disabling" description="These active feeds are repeatedly failing or have poor source quality signals. Disable only after reviewing whether the source is still useful.">
+          <Section id="recommended-disable" eyebrow="Recommended Review" title="Feeds to Consider Disabling" description="These active feeds are repeatedly failing or have poor source quality scores. Disable only after reviewing whether the source is still useful.">
             <FeedList feeds={data.recommendedDisableFeeds} emptyMessage="No active weak feeds are currently recommended for disabling." />
           </Section>
 
           <Section id="inactive-feeds" eyebrow="Inactive Sources" title="Currently Disabled Feeds" description="Feeds listed here are inactive in Supabase and will not be used by Worker shards unless re-enabled.">
             <FeedList feeds={data.inactiveFeeds} emptyMessage="No feeds are currently disabled." />
+          </Section>
+
+          <Section id="quality-sql" eyebrow="Supabase Query" title="Rank Feeds by Quality" description="Use this query in Supabase SQL Editor to rank sources by quality score and quickly find the best or weakest feeds.">
+            <pre className="overflow-x-auto rounded-[1.5rem] border border-amber-300/15 bg-black/45 p-4 text-xs leading-6 text-amber-100/75">
+              <code>{data.rankingSql}</code>
+            </pre>
           </Section>
         </div>
       </div>

@@ -178,7 +178,7 @@ export default async function AdminPage() {
                         <DashboardCard
                             eyebrow="Sources"
                             title="RSS Feed Health"
-                            description="Review RSS feed quality, repeated failures, image coverage, accepted article output, weak feeds, best feeds, and Supabase disable actions."
+                            description="Review RSS feed quality, repeated failures, image coverage, accepted article output, weak feeds, best feeds, quality scores, and Supabase disable actions."
                             href="/admin/feed-health"
                             status="Live"
                         />
@@ -186,7 +186,7 @@ export default async function AdminPage() {
                         <DashboardCard
                             eyebrow="Source Controls"
                             title="Feed Management"
-                            description="List RSS feeds, see active and inactive status, view positive-source flags, inspect health signals, and safely enable or disable feeds."
+                            description="List RSS feeds, see active and inactive status, view positive-source flags, inspect 0-100 quality scores, and safely enable or disable feeds."
                             href="/admin/feeds"
                             status="Live"
                         />

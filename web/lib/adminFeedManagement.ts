@@ -1,16 +1,12 @@
 import { formatAdminDateTime } from "@/lib/adminTime";
 
-const RSS_FEED_SELECT_COLUMNS = [
-  "id",
-  "source",
-  "url",
-  "is_positive_source",
-  "is_active",
-].join(",");
-
-const FEED_HEALTH_SELECT_COLUMNS = [
+const FEED_QUALITY_SELECT_COLUMNS = [
+  "feed_id",
   "source",
   "feed_url",
+  "is_active",
+  "is_positive_source",
+  "feed_health_id",
   "last_checked_at",
   "last_success_at",
   "last_failure_at",
@@ -28,6 +24,16 @@ const FEED_HEALTH_SELECT_COLUMNS = [
   "total_image_count",
   "total_accepted_count",
   "total_rejected_count",
+  "unique_reviewed_url_count",
+  "unique_published_url_count",
+  "success_rate_pct",
+  "thumbnail_rate_pct",
+  "accepted_rate_pct",
+  "failure_rate_pct",
+  "duplicate_rate_pct",
+  "quality_score",
+  "quality_grade",
+  "quality_reason",
   "updated_at",
 ].join(",");
 
@@ -36,34 +42,42 @@ type SupabaseConfig = {
   serviceRoleKey: string;
 };
 
-type RssFeedDbRow = {
-  id: number;
-  source: string;
-  url: string;
-  is_positive_source: boolean | string | null;
-  is_active: boolean | string | null;
-};
+type NumericValue = number | string | null;
 
-type FeedHealthDbRow = {
+type FeedQualityDbRow = {
+  feed_id: number;
   source: string;
   feed_url: string;
+  is_active: boolean | string | null;
+  is_positive_source: boolean | string | null;
+  feed_health_id: number | null;
   last_checked_at: string | null;
   last_success_at: string | null;
   last_failure_at: string | null;
   last_status: number | null;
   last_error_message: string | null;
-  last_article_count: number | null;
-  last_image_count: number | null;
-  last_accepted_count: number | null;
-  last_rejected_count: number | null;
-  consecutive_failure_count: number | null;
-  total_fetch_count: number | null;
-  total_success_count: number | null;
-  total_failure_count: number | null;
-  total_article_count: number | null;
-  total_image_count: number | null;
-  total_accepted_count: number | null;
-  total_rejected_count: number | null;
+  last_article_count: NumericValue;
+  last_image_count: NumericValue;
+  last_accepted_count: NumericValue;
+  last_rejected_count: NumericValue;
+  consecutive_failure_count: NumericValue;
+  total_fetch_count: NumericValue;
+  total_success_count: NumericValue;
+  total_failure_count: NumericValue;
+  total_article_count: NumericValue;
+  total_image_count: NumericValue;
+  total_accepted_count: NumericValue;
+  total_rejected_count: NumericValue;
+  unique_reviewed_url_count: NumericValue;
+  unique_published_url_count: NumericValue;
+  success_rate_pct: NumericValue;
+  thumbnail_rate_pct: NumericValue;
+  accepted_rate_pct: NumericValue;
+  failure_rate_pct: NumericValue;
+  duplicate_rate_pct: NumericValue;
+  quality_score: NumericValue;
+  quality_grade: string | null;
+  quality_reason: string | null;
   updated_at: string | null;
 };
 
@@ -74,6 +88,14 @@ export type FeedManagementStatus =
   | "weak"
   | "untracked";
 
+export type FeedQualityGrade =
+  | "excellent"
+  | "good"
+  | "review"
+  | "poor"
+  | "untracked"
+  | "inactive";
+
 export type ManagedFeed = {
   id: number;
   source: string;
@@ -83,6 +105,10 @@ export type ManagedFeed = {
   status: FeedManagementStatus;
   statusLabel: string;
   reason: string;
+  qualityScore: number;
+  qualityGrade: FeedQualityGrade;
+  qualityLabel: string;
+  qualityReason: string;
   lastCheckedAt: string | null;
   lastSuccessAt: string | null;
   lastFailureAt: string | null;
@@ -100,9 +126,13 @@ export type ManagedFeed = {
   totalImageCount: number;
   totalAcceptedCount: number;
   totalRejectedCount: number;
+  uniqueReviewedUrlCount: number;
+  uniquePublishedUrlCount: number;
   successRate: number;
   imageRate: number;
   acceptanceRate: number;
+  failureRate: number;
+  duplicateRate: number;
   updatedAt: string | null;
   rawIsActiveValue: string;
   rawIsPositiveSourceValue: string;
@@ -118,6 +148,12 @@ export type FeedManagementSummary = {
   untrackedFeeds: number;
   failingFeeds: number;
   weakFeeds: number;
+  excellentFeeds: number;
+  goodFeeds: number;
+  reviewFeeds: number;
+  poorFeeds: number;
+  untrackedQualityFeeds: number;
+  inactiveQualityFeeds: number;
   totalAcceptedCount: number;
   totalRejectedCount: number;
   totalArticleCount: number;
@@ -125,6 +161,9 @@ export type FeedManagementSummary = {
   successRate: number;
   imageRate: number;
   acceptanceRate: number;
+  failureRate: number;
+  duplicateRate: number;
+  averageQualityScore: number;
 };
 
 export type FeedManagementDashboardData = {
@@ -137,7 +176,10 @@ export type FeedManagementDashboardData = {
   inactiveFeeds: ManagedFeed[];
   failingFeeds: ManagedFeed[];
   untrackedFeeds: ManagedFeed[];
+  lowQualityFeeds: ManagedFeed[];
+  bestQualityFeeds: ManagedFeed[];
   recommendedDisableFeeds: ManagedFeed[];
+  rankingSql: string;
 };
 
 function getSupabaseConfig(): SupabaseConfig | null {
@@ -165,6 +207,12 @@ function emptySummary(): FeedManagementSummary {
     untrackedFeeds: 0,
     failingFeeds: 0,
     weakFeeds: 0,
+    excellentFeeds: 0,
+    goodFeeds: 0,
+    reviewFeeds: 0,
+    poorFeeds: 0,
+    untrackedQualityFeeds: 0,
+    inactiveQualityFeeds: 0,
     totalAcceptedCount: 0,
     totalRejectedCount: 0,
     totalArticleCount: 0,
@@ -172,6 +220,9 @@ function emptySummary(): FeedManagementSummary {
     successRate: 0,
     imageRate: 0,
     acceptanceRate: 0,
+    failureRate: 0,
+    duplicateRate: 0,
+    averageQualityScore: 0,
   };
 }
 
@@ -186,12 +237,21 @@ function emptyDashboardData(errorMessage: string | null = null): FeedManagementD
     inactiveFeeds: [],
     failingFeeds: [],
     untrackedFeeds: [],
+    lowQualityFeeds: [],
+    bestQualityFeeds: [],
     recommendedDisableFeeds: [],
+    rankingSql: buildRankingSql(),
   };
 }
 
-function safeNumber(value: number | null | undefined) {
-  return Number(value ?? 0);
+function safeNumber(value: NumericValue | undefined) {
+  const numberValue = Number(value ?? 0);
+
+  if (!Number.isFinite(numberValue)) {
+    return 0;
+  }
+
+  return numberValue;
 }
 
 function safeBoolean(value: boolean | string | null | undefined, defaultValue = false) {
@@ -226,6 +286,45 @@ function percent(numerator: number, denominator: number) {
   return Math.round((numerator / denominator) * 100);
 }
 
+function normalizeQualityGrade(value: string | null | undefined): FeedQualityGrade {
+  if (
+    value === "excellent" ||
+    value === "good" ||
+    value === "review" ||
+    value === "poor" ||
+    value === "untracked" ||
+    value === "inactive"
+  ) {
+    return value;
+  }
+
+  return "untracked";
+}
+
+function getQualityLabel(grade: FeedQualityGrade) {
+  if (grade === "excellent") {
+    return "Excellent";
+  }
+
+  if (grade === "good") {
+    return "Good";
+  }
+
+  if (grade === "review") {
+    return "Review";
+  }
+
+  if (grade === "poor") {
+    return "Poor";
+  }
+
+  if (grade === "inactive") {
+    return "Inactive";
+  }
+
+  return "Untracked";
+}
+
 function resolveStatus(feed: ManagedFeed): Pick<ManagedFeed, "status" | "statusLabel" | "reason"> {
   if (!feed.isActive) {
     return {
@@ -251,6 +350,14 @@ function resolveStatus(feed: ManagedFeed): Pick<ManagedFeed, "status" | "statusL
     };
   }
 
+  if (feed.qualityScore < 50 || feed.qualityGrade === "poor") {
+    return {
+      status: "weak",
+      statusLabel: "Low quality",
+      reason: feed.qualityReason,
+    };
+  }
+
   if (feed.totalFetchCount >= 5 && feed.successRate < 70) {
     return {
       status: "weak",
@@ -270,37 +377,42 @@ function resolveStatus(feed: ManagedFeed): Pick<ManagedFeed, "status" | "statusL
   return {
     status: "active",
     statusLabel: "Active",
-    reason: "Feed is active and available to Worker shards.",
+    reason: feed.qualityReason || "Feed is active and available to Worker shards.",
   };
 }
 
-function buildManagedFeed(feed: RssFeedDbRow, health: FeedHealthDbRow | undefined): ManagedFeed {
-  const totalFetchCount = safeNumber(health?.total_fetch_count);
-  const totalSuccessCount = safeNumber(health?.total_success_count);
-  const totalFailureCount = safeNumber(health?.total_failure_count);
-  const totalArticleCount = safeNumber(health?.total_article_count);
-  const totalImageCount = safeNumber(health?.total_image_count);
-  const totalAcceptedCount = safeNumber(health?.total_accepted_count);
-  const totalRejectedCount = safeNumber(health?.total_rejected_count);
+function buildManagedFeed(row: FeedQualityDbRow): ManagedFeed {
+  const totalFetchCount = safeNumber(row.total_fetch_count);
+  const totalSuccessCount = safeNumber(row.total_success_count);
+  const totalFailureCount = safeNumber(row.total_failure_count);
+  const totalArticleCount = safeNumber(row.total_article_count);
+  const totalImageCount = safeNumber(row.total_image_count);
+  const totalAcceptedCount = safeNumber(row.total_accepted_count);
+  const totalRejectedCount = safeNumber(row.total_rejected_count);
+  const qualityGrade = normalizeQualityGrade(row.quality_grade);
   const baseFeed: ManagedFeed = {
-    id: feed.id,
-    source: feed.source,
-    url: feed.url,
-    isActive: safeBoolean(feed.is_active, true),
-    isPositiveSource: safeBoolean(feed.is_positive_source, false),
+    id: row.feed_id,
+    source: row.source,
+    url: row.feed_url,
+    isActive: safeBoolean(row.is_active, true),
+    isPositiveSource: safeBoolean(row.is_positive_source, false),
     status: "untracked",
     statusLabel: "Untracked",
     reason: "Feed is active but has not been checked since feed health tracking was enabled.",
-    lastCheckedAt: health?.last_checked_at ?? null,
-    lastSuccessAt: health?.last_success_at ?? null,
-    lastFailureAt: health?.last_failure_at ?? null,
-    lastStatus: health?.last_status ?? null,
-    lastErrorMessage: health?.last_error_message ?? null,
-    lastArticleCount: safeNumber(health?.last_article_count),
-    lastImageCount: safeNumber(health?.last_image_count),
-    lastAcceptedCount: safeNumber(health?.last_accepted_count),
-    lastRejectedCount: safeNumber(health?.last_rejected_count),
-    consecutiveFailureCount: safeNumber(health?.consecutive_failure_count),
+    qualityScore: Math.round(safeNumber(row.quality_score)),
+    qualityGrade,
+    qualityLabel: getQualityLabel(qualityGrade),
+    qualityReason: row.quality_reason || "Quality score is not available yet.",
+    lastCheckedAt: row.last_checked_at ?? null,
+    lastSuccessAt: row.last_success_at ?? null,
+    lastFailureAt: row.last_failure_at ?? null,
+    lastStatus: row.last_status ?? null,
+    lastErrorMessage: row.last_error_message ?? null,
+    lastArticleCount: safeNumber(row.last_article_count),
+    lastImageCount: safeNumber(row.last_image_count),
+    lastAcceptedCount: safeNumber(row.last_accepted_count),
+    lastRejectedCount: safeNumber(row.last_rejected_count),
+    consecutiveFailureCount: safeNumber(row.consecutive_failure_count),
     totalFetchCount,
     totalSuccessCount,
     totalFailureCount,
@@ -308,12 +420,18 @@ function buildManagedFeed(feed: RssFeedDbRow, health: FeedHealthDbRow | undefine
     totalImageCount,
     totalAcceptedCount,
     totalRejectedCount,
-    successRate: percent(totalSuccessCount, totalFetchCount),
-    imageRate: percent(totalImageCount, totalArticleCount),
-    acceptanceRate: percent(totalAcceptedCount, totalAcceptedCount + totalRejectedCount),
-    updatedAt: health?.updated_at ?? null,
-    rawIsActiveValue: getRawBooleanValue(feed.is_active),
-    rawIsPositiveSourceValue: getRawBooleanValue(feed.is_positive_source),
+    uniqueReviewedUrlCount: safeNumber(row.unique_reviewed_url_count),
+    uniquePublishedUrlCount: safeNumber(row.unique_published_url_count),
+    successRate: Math.round(safeNumber(row.success_rate_pct)) || percent(totalSuccessCount, totalFetchCount),
+    imageRate: Math.round(safeNumber(row.thumbnail_rate_pct)) || percent(totalImageCount, totalArticleCount),
+    acceptanceRate:
+      Math.round(safeNumber(row.accepted_rate_pct)) ||
+      percent(totalAcceptedCount, totalAcceptedCount + totalRejectedCount),
+    failureRate: Math.round(safeNumber(row.failure_rate_pct)) || percent(totalFailureCount, totalFetchCount),
+    duplicateRate: Math.round(safeNumber(row.duplicate_rate_pct)),
+    updatedAt: row.updated_at ?? null,
+    rawIsActiveValue: getRawBooleanValue(row.is_active),
+    rawIsPositiveSourceValue: getRawBooleanValue(row.is_positive_source),
   };
   const status = resolveStatus(baseFeed);
 
@@ -334,18 +452,28 @@ function buildSummary(feeds: ManagedFeed[]): FeedManagementSummary {
     acc.untrackedFeeds += feed.lastCheckedAt ? 0 : 1;
     acc.failingFeeds += feed.status === "failing" ? 1 : 0;
     acc.weakFeeds += feed.status === "weak" ? 1 : 0;
+    acc.excellentFeeds += feed.qualityGrade === "excellent" ? 1 : 0;
+    acc.goodFeeds += feed.qualityGrade === "good" ? 1 : 0;
+    acc.reviewFeeds += feed.qualityGrade === "review" ? 1 : 0;
+    acc.poorFeeds += feed.qualityGrade === "poor" ? 1 : 0;
+    acc.untrackedQualityFeeds += feed.qualityGrade === "untracked" ? 1 : 0;
+    acc.inactiveQualityFeeds += feed.qualityGrade === "inactive" ? 1 : 0;
     acc.totalAcceptedCount += feed.totalAcceptedCount;
     acc.totalRejectedCount += feed.totalRejectedCount;
     acc.totalArticleCount += feed.totalArticleCount;
     acc.totalImageCount += feed.totalImageCount;
-    acc.successRate = 0;
-    acc.imageRate = 0;
-    acc.acceptanceRate = 0;
 
     return acc;
   }, emptySummary());
   const totalFetchCount = feeds.reduce((sum, feed) => sum + feed.totalFetchCount, 0);
   const totalSuccessCount = feeds.reduce((sum, feed) => sum + feed.totalSuccessCount, 0);
+  const totalFailureCount = feeds.reduce((sum, feed) => sum + feed.totalFailureCount, 0);
+  const activeScoredFeeds = feeds.filter((feed) => feed.isActive && feed.totalFetchCount > 0);
+  const totalQualityScore = activeScoredFeeds.reduce((sum, feed) => sum + feed.qualityScore, 0);
+  const weightedDuplicateNumerator = feeds.reduce(
+    (sum, feed) => sum + feed.duplicateRate * feed.totalArticleCount,
+    0,
+  );
 
   return {
     ...summary,
@@ -355,6 +483,11 @@ function buildSummary(feeds: ManagedFeed[]): FeedManagementSummary {
       summary.totalAcceptedCount,
       summary.totalAcceptedCount + summary.totalRejectedCount,
     ),
+    failureRate: percent(totalFailureCount, totalFetchCount),
+    duplicateRate: summary.totalArticleCount ? Math.round(weightedDuplicateNumerator / summary.totalArticleCount) : 0,
+    averageQualityScore: activeScoredFeeds.length
+      ? Math.round(totalQualityScore / activeScoredFeeds.length)
+      : 0,
   };
 }
 
@@ -387,6 +520,25 @@ async function fetchSupabaseRows<T>(
   };
 }
 
+function buildRankingSql() {
+  return `select
+  source,
+  feed_url,
+  is_active,
+  quality_score,
+  quality_grade,
+  success_rate_pct,
+  thumbnail_rate_pct,
+  accepted_rate_pct,
+  failure_rate_pct,
+  duplicate_rate_pct,
+  total_fetch_count,
+  total_accepted_count,
+  quality_reason
+from public.feed_quality_scores
+order by quality_score desc, total_accepted_count desc, source asc;`;
+}
+
 export async function getAdminFeedManagementDashboardData(): Promise<FeedManagementDashboardData> {
   const config = getSupabaseConfig();
 
@@ -396,30 +548,19 @@ export async function getAdminFeedManagementDashboardData(): Promise<FeedManagem
     );
   }
 
-  const [feedsResult, healthResult] = await Promise.all([
-    fetchSupabaseRows<RssFeedDbRow>(
-      config,
-      `/rest/v1/rss_feeds?select=${RSS_FEED_SELECT_COLUMNS}&order=id.asc`,
-    ),
-    fetchSupabaseRows<FeedHealthDbRow>(
-      config,
-      `/rest/v1/feed_health?select=${FEED_HEALTH_SELECT_COLUMNS}&order=total_accepted_count.desc`,
-    ),
-  ]);
+  const qualityResult = await fetchSupabaseRows<FeedQualityDbRow>(
+    config,
+    `/rest/v1/feed_quality_scores?select=${FEED_QUALITY_SELECT_COLUMNS}&order=quality_score.asc,total_accepted_count.desc`,
+  );
 
-  if (feedsResult.errorMessage) {
-    return emptyDashboardData(`Failed to load rss_feeds: ${feedsResult.errorMessage}`);
+  if (qualityResult.errorMessage) {
+    return emptyDashboardData(
+      `Failed to load feed_quality_scores. Apply migration 20260615002000_create_feed_quality_scores.sql first. Supabase error: ${qualityResult.errorMessage}`,
+    );
   }
 
-  if (healthResult.errorMessage) {
-    return emptyDashboardData(`Failed to load feed_health: ${healthResult.errorMessage}`);
-  }
-
-  const feeds = feedsResult.data;
-  const healthRows = healthResult.data;
-  const healthByUrl = new Map(healthRows.map((row) => [row.feed_url, row]));
-  const managedFeeds = feeds
-    .map((feed) => buildManagedFeed(feed, healthByUrl.get(feed.url)))
+  const managedFeeds = qualityResult.data
+    .map((row) => buildManagedFeed(row))
     .sort((a, b) => {
       const statusWeight: Record<FeedManagementStatus, number> = {
         failing: 0,
@@ -431,12 +572,35 @@ export async function getAdminFeedManagementDashboardData(): Promise<FeedManagem
 
       return (
         statusWeight[a.status] - statusWeight[b.status] ||
+        a.qualityScore - b.qualityScore ||
         Number(b.isActive) - Number(a.isActive) ||
         b.consecutiveFailureCount - a.consecutiveFailureCount ||
         b.totalAcceptedCount - a.totalAcceptedCount ||
         a.source.localeCompare(b.source)
       );
     });
+
+  const lowQualityFeeds = managedFeeds
+    .filter(
+      (feed) =>
+        feed.isActive &&
+        (feed.qualityGrade === "poor" ||
+          feed.qualityGrade === "review" ||
+          feed.status === "failing" ||
+          feed.status === "weak"),
+    )
+    .slice(0, 20);
+  const bestQualityFeeds = [...managedFeeds]
+    .filter((feed) => feed.isActive && feed.totalFetchCount > 0)
+    .sort(
+      (a, b) =>
+        b.qualityScore - a.qualityScore ||
+        b.totalAcceptedCount - a.totalAcceptedCount ||
+        b.imageRate - a.imageRate ||
+        b.successRate - a.successRate ||
+        a.source.localeCompare(b.source),
+    )
+    .slice(0, 15);
 
   return {
     isConfigured: true,
@@ -448,9 +612,12 @@ export async function getAdminFeedManagementDashboardData(): Promise<FeedManagem
     inactiveFeeds: managedFeeds.filter((feed) => !feed.isActive),
     failingFeeds: managedFeeds.filter((feed) => feed.status === "failing"),
     untrackedFeeds: managedFeeds.filter((feed) => feed.status === "untracked"),
-    recommendedDisableFeeds: managedFeeds
-      .filter((feed) => feed.isActive && (feed.status === "failing" || feed.status === "weak"))
+    lowQualityFeeds,
+    bestQualityFeeds,
+    recommendedDisableFeeds: lowQualityFeeds
+      .filter((feed) => feed.status === "failing" || feed.qualityScore < 50)
       .slice(0, 20),
+    rankingSql: buildRankingSql(),
   };
 }
 
