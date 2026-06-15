@@ -61,6 +61,7 @@ export async function GET(request: Request) {
         articleCount: result.articles.length,
         nextPage: result.nextPage,
         hasNextCursor: Boolean(result.nextCursor),
+        dataSource: result.dataSource,
         durationMs: Date.now() - startedAt,
       },
     );
@@ -71,6 +72,8 @@ export async function GET(request: Request) {
         "X-NutsNews-Article-Page-Size": String(PAGE_SIZE),
         "X-NutsNews-Article-Pagination": paginationMode,
         "X-NutsNews-Article-Fields": "card",
+        "X-NutsNews-Article-Data-Source": result.dataSource,
+        "X-NutsNews-Feed-Snapshot": result.dataSource === "public_feed_snapshot" ? "hit" : "fallback",
       },
     });
   } catch (error) {
