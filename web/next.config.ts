@@ -90,12 +90,20 @@ const nextConfig: NextConfig = {
         headers: publicCacheHeaders("public-about-cache-300s"),
       },
       {
+        source: "/contact",
+        headers: publicCacheHeaders("public-contact-cache-300s"),
+      },
+      {
         source: "/articles/:path*",
         headers: publicCacheHeaders("public-article-cache-300s"),
       },
       {
         source: "/api/articles",
         headers: publicCacheHeaders("public-api-cache-300s"),
+      },
+      {
+        source: "/api/contact",
+        headers: noStoreHeaders("bypass-contact-api-cache"),
       },
       {
         source: "/opengraph-image",

@@ -46,12 +46,23 @@ export function SiteFooter() {
           </a>
         </div>
 
-        <a
-          href="/privacy"
-          className="justify-self-center whitespace-nowrap rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1.5 text-[11px] font-semibold text-amber-200 transition hover:border-amber-300/40 hover:bg-amber-400/20 hover:text-amber-100"
+        <nav
+          aria-label="Footer navigation"
+          className="flex justify-self-center rounded-full border border-amber-400/20 bg-amber-400/10 p-1"
         >
-          Privacy Policy
-        </a>
+          <a
+            href="/contact"
+            className="whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-semibold text-amber-200 transition hover:bg-amber-400/20 hover:text-amber-100"
+          >
+            Contact
+          </a>
+          <a
+            href="/privacy"
+            className="whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-semibold text-amber-200 transition hover:bg-amber-400/20 hover:text-amber-100"
+          >
+            Privacy
+          </a>
+        </nav>
 
         <div className="min-w-0 text-right text-[10px] leading-4 text-neutral-500">
           <p className="truncate">
