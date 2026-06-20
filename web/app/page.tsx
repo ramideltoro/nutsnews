@@ -1,3 +1,4 @@
+import Image from "next/image";
 export const revalidate = 300;
 
 import { ArticleFeed } from "./components/ArticleFeed";
@@ -57,8 +58,15 @@ export default async function Home() {
                   </h1>
                 </div>
 
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-amber-300/20 bg-black/25 text-3xl shadow-lg shadow-black/30">
-                  🥜
+                <div className="flex h-16 w-20 shrink-0 items-center justify-center rounded-2xl border border-amber-300/20 bg-black/25 p-1.5 shadow-lg shadow-black/30">
+                  <Image
+                    src="/nutsnews-logo.png"
+                    alt="NutsNews logo"
+                    width={120}
+                    height={96}
+                    priority
+                    className="h-full w-full object-contain"
+                  />
                 </div>
               </div>
 
