@@ -208,41 +208,25 @@ export async function getPublishedArticles(page = 0, category?: string | null): 
 
   const snapshotResult = await getPublishedArticlesFromSnapshot(safePage, category);
 
-  if (snapshotResult) {
-    return snapshotResult;
+  if (!snapshotResult) {
+    return getPublishedArticlesFromSourceTable(safePage, category);
   }
 
-  return getPublishedArticlesFromSourceTable(safePage, category);
-}
+  // Production can occasionally have a short or stale public_feed_snapshot.
+  // If the snapshot does not prove that another page exists, verify against the
+  // canonical articles table before telling the client pagination is finished.
+  if (snapshotResult.nextPage === null) {
+    const sourceResult = await getPublishedArticlesFromSourceTable(safePage, category);
 
-async function getPublishedArticlesByCursorFromSnapshot(
-  decodedCursor: ArticleCursor | null,
-  category?: string | null,
-): Promise<PublishedArticlesResult | null> {
-  let query = basePublicFeedSnapshotQuery(category);
-
-  if (decodedCursor) {
-    query = query.or(
-      `published_on_site_at.lt.${decodedCursor.publishedOnSiteAt},and(published_on_site_at.eq.${decodedCursor.publishedOnSiteAt},id.lt.${decodedCursor.id})`,
-    );
+    if (
+      sourceResult.nextPage !== null ||
+      sourceResult.articles.length > snapshotResult.articles.length
+    ) {
+      return sourceResult;
+    }
   }
 
-  const { data, error } = await query
-    .order("published_on_site_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(PAGE_SIZE + 1);
-
-  if (error) {
-    console.error("Failed to load cursor-paginated articles from public feed snapshot. Falling back to articles table:", error);
-    return null;
-  }
-
-  return shapePublishedArticlesResult({
-    data: (data ?? []) as Article[],
-    page: 0,
-    includeNextPage: false,
-    dataSource: "public_feed_snapshot",
-  });
+  return snapshotResult;
 }
 
 async function getPublishedArticlesByCursorFromSourceTable(
@@ -286,12 +270,10 @@ export async function getPublishedArticlesByCursor(
   category?: string | null,
 ): Promise<PublishedArticlesResult> {
   const decodedCursor = decodeArticleCursor(cursor);
-  const snapshotResult = await getPublishedArticlesByCursorFromSnapshot(decodedCursor, category);
 
-  if (snapshotResult) {
-    return snapshotResult;
-  }
-
+  // Cursor pagination is used as a backwards-compatible fallback for older
+  // cached homepage payloads. Use the canonical articles table here so it does
+  // not depend on the current state or ordering of the materialized snapshot.
   return getPublishedArticlesByCursorFromSourceTable(decodedCursor, category);
 }
 

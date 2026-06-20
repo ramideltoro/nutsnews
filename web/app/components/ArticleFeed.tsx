@@ -14,11 +14,13 @@ const categoryDotStyles = [
 
 type ArticleFeedProps = {
   initialArticles: Article[];
+  initialNextPage: number | null;
   initialNextCursor: string | null;
 };
 
 type ArticlesResponse = {
   articles: Article[];
+  nextPage: number | null;
   nextCursor: string | null;
   error?: string;
 };
@@ -165,16 +167,18 @@ function ArticleCard({ article }: { article: Article }) {
 
 export function ArticleFeed({
   initialArticles,
+  initialNextPage,
   initialNextCursor,
 }: ArticleFeedProps) {
   const [articles, setArticles] = useState(initialArticles);
+  const [nextPage, setNextPage] = useState(initialNextPage);
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const loadMoreArticles = useCallback(async () => {
-    if (!nextCursor || isLoading) {
+    if ((nextPage === null && !nextCursor) || isLoading) {
       return;
     }
 
@@ -182,14 +186,23 @@ export function ArticleFeed({
     setLoadError(null);
 
     try {
-      const response = await fetch(
-        `/api/articles?cursor=${encodeURIComponent(nextCursor)}`,
-        {
-          headers: {
-            Accept: "application/json",
-          },
+      const query = new URLSearchParams();
+
+      // Offset pagination is the primary path for the public feed because it
+      // works with both the public feed snapshot and the canonical articles
+      // table in production. Cursor pagination remains as a fallback for older
+      // cached homepage payloads that only contain a cursor.
+      if (nextPage !== null) {
+        query.set("page", String(nextPage));
+      } else if (nextCursor) {
+        query.set("cursor", nextCursor);
+      }
+
+      const response = await fetch(`/api/articles?${query.toString()}`, {
+        headers: {
+          Accept: "application/json",
         },
-      );
+      });
 
       if (!response.ok) {
         throw new Error(`Articles API returned ${response.status}`);
@@ -209,6 +222,7 @@ export function ArticleFeed({
 
         return [...currentArticles, ...newArticles];
       });
+      setNextPage(Number.isFinite(data.nextPage) ? data.nextPage : null);
       setNextCursor(data.nextCursor ?? null);
     } catch (error) {
       setLoadError(
@@ -219,12 +233,12 @@ export function ArticleFeed({
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, nextCursor]);
+  }, [isLoading, nextCursor, nextPage]);
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
 
-    if (!sentinel || !nextCursor) {
+    if (!sentinel || (nextPage === null && !nextCursor)) {
       return;
     }
 
@@ -243,7 +257,7 @@ export function ArticleFeed({
     observer.observe(sentinel);
 
     return () => observer.disconnect();
-  }, [loadMoreArticles, nextCursor]);
+  }, [loadMoreArticles, nextCursor, nextPage]);
 
   return (
     <>

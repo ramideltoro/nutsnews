@@ -5,7 +5,7 @@ import { SiteFooter } from "./components/SiteFooter";
 import { getPublishedArticles, SITE_URL } from "@/lib/articles";
 
 export default async function Home() {
-  const { articles, nextCursor } = await getPublishedArticles();
+  const { articles, nextPage, nextCursor } = await getPublishedArticles();
 
   const homeJsonLd = {
     "@context": "https://schema.org",
@@ -72,6 +72,7 @@ export default async function Home() {
 
         <ArticleFeed
           initialArticles={articles}
+          initialNextPage={nextPage}
           initialNextCursor={nextCursor}
         />
       </section>
