@@ -71,8 +71,7 @@ export default async function Home() {
               </div>
 
               <p className="max-w-sm text-base leading-7 text-neutral-300">
-                A calm mobile feed of uplifting stories, filtered by AI and
-                linked back to trusted original publishers.
+                A calm feed of uplifting stories from around the world, filtered by Artificial Intelligence.
               </p>
             </div>
           </div>
