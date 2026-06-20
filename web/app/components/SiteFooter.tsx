@@ -46,18 +46,26 @@ export function SiteFooter() {
             </a>
           </div>
 
-          <p className="text-right text-[11px] leading-4 text-neutral-500">
-            © {COPYRIGHT_YEAR}{" "}
+          <div className="text-right text-[11px] leading-4 text-neutral-500">
+            <p>
+              © {COPYRIGHT_YEAR}{" "}
+              <a
+                  href="https://www.ramideltoro.com"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-amber-300 transition hover:text-amber-200"
+              >
+                Rami Del Toro
+              </a>
+              , All Rights Reserved.
+            </p>
             <a
-                href="https://www.ramideltoro.com"
-                target="_blank"
-                rel="noreferrer"
-                className="text-amber-300 transition hover:text-amber-200"
+                href="/privacy"
+                className="mt-1 inline-flex text-amber-300 transition hover:text-amber-200"
             >
-              Rami Del Toro
+              Privacy Policy
             </a>
-            , All Rights Reserved.
-          </p>
+          </div>
         </div>
       </footer>
   );
