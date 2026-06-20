@@ -121,7 +121,7 @@ const sections = [
   {
     title: "Contact",
     body: [
-      "For questions about this privacy policy, contact Rami Del Toro at rami.deltoro@ramideltoro.com.",
+      "To ask questions about this privacy policy, request privacy help, or send general NutsNews feedback, please use the contact page.",
     ],
   },
 ];
@@ -145,6 +145,16 @@ function PolicySection({
           </p>
         ))}
       </div>
+
+      {title === "Contact" ? (
+        <Link
+          href="/contact"
+          className="mt-5 inline-flex rounded-full border border-amber-300/25 bg-amber-400/15 px-5 py-3 text-sm font-black text-amber-100 transition hover:border-amber-200/60 hover:bg-amber-300 hover:text-neutral-950"
+          aria-label="Open the NutsNews contact page to send a privacy question or feedback message"
+        >
+          Open the contact page
+        </Link>
+      ) : null}
     </section>
   );
 }
