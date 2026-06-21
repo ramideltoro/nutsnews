@@ -44,33 +44,28 @@ export default async function Home() {
             <div className="pointer-events-none absolute -bottom-24 -left-20 h-56 w-56 rounded-full bg-orange-500/10 blur-3xl" />
 
             <div className="relative z-10">
-              <div className="mb-7 flex items-start justify-between gap-4">
-                <div>
-                  <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1">
-                    <span className="h-2 w-2 rounded-full bg-amber-300 shadow-[0_0_12px_rgba(252,211,77,0.9)]" />
-                    <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-amber-200">
-                      Positive news, simplified
-                    </span>
-                  </div>
+              <div className="mb-7 text-center">
+                <h1 className="flex flex-wrap items-center justify-center gap-2 text-5xl font-black tracking-tight sm:gap-3">
+                  <span className="text-white">Nuts</span>
+                  <span className="flex h-[1em] w-[1em] shrink-0 items-center justify-center">
+                    <Image
+                      src="/nutsnews-logo.png"
+                      alt="NutsNews logo"
+                      width={96}
+                      height={96}
+                      priority
+                      className="h-full w-full object-contain"
+                    />
+                  </span>
+                  <span className="text-amber-300">News</span>
+                </h1>
 
-                  <h1 className="text-5xl font-black tracking-tight text-white">
-                    Nuts<span className="text-amber-300">News</span>
-                  </h1>
-                </div>
-
-                <div className="flex h-16 w-20 shrink-0 items-center justify-center rounded-2xl border border-amber-300/20 bg-black/25 p-1.5 shadow-lg shadow-black/30">
-                  <Image
-                    src="/nutsnews-logo.png"
-                    alt="NutsNews logo"
-                    width={120}
-                    height={96}
-                    priority
-                    className="h-full w-full object-contain"
-                  />
-                </div>
+                <p className="mt-3 text-sm font-bold uppercase tracking-[0.24em] text-amber-200 sm:text-base">
+                  Positive News, Simplified
+                </p>
               </div>
 
-              <p className="max-w-sm text-base leading-7 text-neutral-300">
+              <p className="mx-auto max-w-sm text-center text-base leading-7 text-neutral-300">
                 A calm feed of uplifting stories from around the world, filtered by Artificial Intelligence.
               </p>
             </div>
