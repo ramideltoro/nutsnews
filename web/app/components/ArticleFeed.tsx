@@ -83,11 +83,55 @@ function LoadingIndicator() {
   );
 }
 
-function ArticleCard({ article }: { article: Article }) {
+function ArticleCard({ article, index }: { article: Article; index: number }) {
   const categoryBadges = getCategoryBadges(article.category);
+  const cardRef = useRef<HTMLElement | null>(null);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const card = cardRef.current;
+
+    if (!card) {
+      return;
+    }
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setIsVisible(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+
+        if (entry?.isIntersecting) {
+          setIsVisible(true);
+          observer.unobserve(entry.target);
+        }
+      },
+      {
+        rootMargin: "0px 0px -8% 0px",
+        threshold: 0.14,
+      },
+    );
+
+    observer.observe(card);
+
+    return () => observer.disconnect();
+  }, []);
+
+  const revealDelay = `${Math.min(index % 5, 4) * 60}ms`;
 
   return (
-    <article className="overflow-hidden rounded-[2rem] border border-amber-300/20 bg-gradient-to-br from-neutral-950 via-neutral-950 to-amber-950/20 shadow-2xl shadow-black/50">
+    <article
+      ref={cardRef}
+      style={{ transitionDelay: isVisible ? revealDelay : "0ms" }}
+      className={`overflow-hidden rounded-[2rem] border border-amber-300/20 bg-gradient-to-br from-neutral-950 via-neutral-950 to-amber-950/20 shadow-2xl shadow-black/50 transition-all duration-700 ease-out will-change-transform motion-reduce:translate-y-0 motion-reduce:opacity-100 motion-reduce:blur-0 motion-reduce:transition-none ${
+        isVisible
+          ? "translate-y-0 opacity-100 blur-0"
+          : "translate-y-8 opacity-0 blur-[2px]"
+      }`}
+    >
       <div className="relative aspect-[16/10] overflow-hidden bg-neutral-900">
         {article.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -271,8 +315,8 @@ export function ArticleFeed({
 
       {articles.length > 0 ? (
         <div className="space-y-6">
-          {articles.map((article) => (
-            <ArticleCard key={article.id} article={article} />
+          {articles.map((article, index) => (
+            <ArticleCard key={article.id} article={article} index={index} />
           ))}
         </div>
       ) : null}
