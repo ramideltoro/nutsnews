@@ -12,6 +12,9 @@ const REVIEW_SELECT_COLUMNS = [
   "positivity_score",
   "summary",
   "reason",
+  "ai_provider",
+  "ai_model",
+  "review_duration_ms",
 ].join(",");
 
 const PUBLISHED_ARTICLE_SELECT_COLUMNS = [
@@ -64,6 +67,9 @@ type ArticleReviewDbRow = {
   positivity_score: number | string | null;
   summary: string | null;
   reason: string | null;
+  ai_provider: string | null;
+  ai_model: string | null;
+  review_duration_ms: number | string | null;
 };
 
 type PublishedArticleDbRow = {
@@ -107,6 +113,10 @@ export type ArticleReviewRow = {
   positivityScore: number;
   summary: string;
   reason: string;
+  aiProvider: string;
+  aiProviderLabel: string;
+  aiModel: string;
+  reviewDurationMs: number;
   isPublished: boolean;
   publishedArticle: ArticleReviewPublishedArticle | null;
 };
@@ -140,7 +150,8 @@ export type ArticleReviewDashboardData = {
 };
 
 function getSupabaseConfig(): SupabaseConfig | null {
-  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const url =
+    process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
   if (!url || !serviceRoleKey) {
@@ -193,13 +204,20 @@ function normalizeSort(value: string): ArticleReviewSort {
   return value === "oldest" ? "oldest" : "newest";
 }
 
-export function parseArticleReviewFilters(searchParams: ArticleReviewSearchParams = {}): ArticleReviewFilters {
-  const decision = normalizeDecision(getSingleSearchParam(searchParams.decision));
+export function parseArticleReviewFilters(
+  searchParams: ArticleReviewSearchParams = {},
+): ArticleReviewFilters {
+  const decision = normalizeDecision(
+    getSingleSearchParam(searchParams.decision),
+  );
   const source = getSingleSearchParam(searchParams.source).trim();
   const category = getSingleSearchParam(searchParams.category).trim();
   const minScore = parseScoreParam(getSingleSearchParam(searchParams.minScore));
   const maxScore = parseScoreParam(getSingleSearchParam(searchParams.maxScore));
-  const page = Math.max(0, parseIntegerParam(getSingleSearchParam(searchParams.page), 0));
+  const page = Math.max(
+    0,
+    parseIntegerParam(getSingleSearchParam(searchParams.page), 0),
+  );
   const sort = normalizeSort(getSingleSearchParam(searchParams.sort));
 
   return {
@@ -223,7 +241,10 @@ function emptySummary(filters: ArticleReviewFilters): ArticleReviewSummary {
     publishedVisibleReviews: 0,
     page: filters.page,
     pageSize: ARTICLE_REVIEW_PAGE_SIZE,
-    sortLabel: filters.sort === "oldest" ? "Oldest reviewed first" : "Newest reviewed first",
+    sortLabel:
+      filters.sort === "oldest"
+        ? "Oldest reviewed first"
+        : "Newest reviewed first",
   };
 }
 
@@ -263,7 +284,10 @@ function buildHref(filters: ArticleReviewFilters, page: number) {
   return query ? `/admin/articles?${query}` : "/admin/articles";
 }
 
-function emptyDashboardData(filters: ArticleReviewFilters, errorMessage: string | null = null): ArticleReviewDashboardData {
+function emptyDashboardData(
+  filters: ArticleReviewFilters,
+  errorMessage: string | null = null,
+): ArticleReviewDashboardData {
   return {
     isConfigured: !errorMessage,
     errorMessage,
@@ -310,7 +334,9 @@ function buildReviewSql(filters: ArticleReviewFilters) {
   }
 
   if (filters.category) {
-    conditions.push(`category ilike '%${filters.category.replaceAll("'", "''")}%'`);
+    conditions.push(
+      `category ilike '%${filters.category.replaceAll("'", "''")}%'`,
+    );
   }
 
   if (filters.minScore !== null) {
@@ -321,7 +347,7 @@ function buildReviewSql(filters: ArticleReviewFilters) {
     conditions.push(`positivity_score <= ${filters.maxScore}`);
   }
 
-  return `select\n  reviewed_at,\n  decision,\n  source,\n  category,\n  positivity_score,\n  title,\n  reason,\n  original_url\nfrom public.article_ai_reviews\nwhere ${conditions.join("\n  and ")}\norder by reviewed_at ${filters.sort === "oldest" ? "asc" : "desc"}\nlimit ${ARTICLE_REVIEW_PAGE_SIZE};`;
+  return `select\n  reviewed_at,\n  decision,\n  source,\n  category,\n  positivity_score,\n  ai_provider,\n  ai_model,\n  review_duration_ms,\n  title,\n  reason,\n  original_url\nfrom public.article_ai_reviews\nwhere ${conditions.join("\n  and ")}\norder by reviewed_at ${filters.sort === "oldest" ? "asc" : "desc"}\nlimit ${ARTICLE_REVIEW_PAGE_SIZE};`;
 }
 
 async function loadOptions(client: any) {
@@ -365,11 +391,28 @@ async function loadOptions(client: any) {
   };
 }
 
+function formatProviderLabel(provider: string) {
+  if (provider === "local") {
+    return "Local AI";
+  }
+
+  if (provider === "prefilter") {
+    return "Local Rule";
+  }
+
+  if (provider === "no_thumbnail") {
+    return "No Image Rule";
+  }
+
+  return "OpenAI";
+}
+
 function mapReviewRow(
   row: ArticleReviewDbRow,
   publishedByOriginalUrl: Map<string, PublishedArticleDbRow>,
 ): ArticleReviewRow {
   const publishedArticle = publishedByOriginalUrl.get(row.original_url) ?? null;
+  const aiProvider = row.ai_provider || "openai";
 
   return {
     id: row.id,
@@ -385,6 +428,10 @@ function mapReviewRow(
     positivityScore: toNumber(row.positivity_score),
     summary: row.summary || "No summary saved.",
     reason: row.reason || "No review reason saved.",
+    aiProvider,
+    aiProviderLabel: formatProviderLabel(aiProvider),
+    aiModel: row.ai_model || "gpt-4o-mini",
+    reviewDurationMs: toNumber(row.review_duration_ms),
     isPublished: Boolean(publishedArticle?.id),
     publishedArticle: publishedArticle
       ? {
@@ -398,12 +445,23 @@ function mapReviewRow(
   };
 }
 
-function summarizeVisibleReviews(filters: ArticleReviewFilters, reviews: ArticleReviewRow[], totalMatchingReviews: number): ArticleReviewSummary {
-  const acceptedVisibleReviews = reviews.filter((review) => review.decision === "accept").length;
-  const rejectedVisibleReviews = reviews.filter((review) => review.decision === "reject").length;
-  const publishedVisibleReviews = reviews.filter((review) => review.isPublished).length;
+function summarizeVisibleReviews(
+  filters: ArticleReviewFilters,
+  reviews: ArticleReviewRow[],
+  totalMatchingReviews: number,
+): ArticleReviewSummary {
+  const acceptedVisibleReviews = reviews.filter(
+    (review) => review.decision === "accept",
+  ).length;
+  const rejectedVisibleReviews = reviews.filter(
+    (review) => review.decision === "reject",
+  ).length;
+  const publishedVisibleReviews = reviews.filter(
+    (review) => review.isPublished,
+  ).length;
   const averageVisibleScore = reviews.length
-    ? reviews.reduce((total, review) => total + review.positivityScore, 0) / reviews.length
+    ? reviews.reduce((total, review) => total + review.positivityScore, 0) /
+      reviews.length
     : 0;
 
   return {
@@ -415,15 +473,23 @@ function summarizeVisibleReviews(filters: ArticleReviewFilters, reviews: Article
     publishedVisibleReviews,
     page: filters.page,
     pageSize: ARTICLE_REVIEW_PAGE_SIZE,
-    sortLabel: filters.sort === "oldest" ? "Oldest reviewed first" : "Newest reviewed first",
+    sortLabel:
+      filters.sort === "oldest"
+        ? "Oldest reviewed first"
+        : "Newest reviewed first",
   };
 }
 
-export async function getAdminArticleReviewDashboardData(filters: ArticleReviewFilters): Promise<ArticleReviewDashboardData> {
+export async function getAdminArticleReviewDashboardData(
+  filters: ArticleReviewFilters,
+): Promise<ArticleReviewDashboardData> {
   const config = getSupabaseConfig();
 
   if (!config) {
-    return emptyDashboardData(filters, "Missing SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.");
+    return emptyDashboardData(
+      filters,
+      "Missing SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.",
+    );
   }
 
   const client = createClient(config.url, config.serviceRoleKey, {
@@ -433,7 +499,9 @@ export async function getAdminArticleReviewDashboardData(filters: ArticleReviewF
     },
   });
 
-  const [{ sourceOptions, categoryOptions }] = await Promise.all([loadOptions(client)]);
+  const [{ sourceOptions, categoryOptions }] = await Promise.all([
+    loadOptions(client),
+  ]);
 
   const from = filters.page * ARTICLE_REVIEW_PAGE_SIZE;
   const to = from + ARTICLE_REVIEW_PAGE_SIZE - 1;
@@ -476,7 +544,9 @@ export async function getAdminArticleReviewDashboardData(filters: ArticleReviewF
   }
 
   const reviewRows = (data ?? []) as unknown as ArticleReviewDbRow[];
-  const originalUrls = Array.from(new Set(reviewRows.map((row) => row.original_url).filter(Boolean)));
+  const originalUrls = Array.from(
+    new Set(reviewRows.map((row) => row.original_url).filter(Boolean)),
+  );
   const publishedByOriginalUrl = new Map<string, PublishedArticleDbRow>();
 
   if (originalUrls.length > 0) {
@@ -485,12 +555,15 @@ export async function getAdminArticleReviewDashboardData(filters: ArticleReviewF
       .select(PUBLISHED_ARTICLE_SELECT_COLUMNS)
       .in("original_url", originalUrls);
 
-    for (const article of (articleData ?? []) as unknown as PublishedArticleDbRow[]) {
+    for (const article of (articleData ??
+      []) as unknown as PublishedArticleDbRow[]) {
       publishedByOriginalUrl.set(article.original_url, article);
     }
   }
 
-  const reviews = reviewRows.map((row) => mapReviewRow(row, publishedByOriginalUrl));
+  const reviews = reviewRows.map((row) =>
+    mapReviewRow(row, publishedByOriginalUrl),
+  );
   const totalMatchingReviews = count ?? reviews.length;
 
   return {

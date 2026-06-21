@@ -38,6 +38,18 @@ function formatDateTime(value: string | null) {
   return formatAdminDateTime(value, "Not published");
 }
 
+function formatDuration(value: number) {
+  if (!value) {
+    return "0ms";
+  }
+
+  if (value < 1000) {
+    return `${formatNumber(value)}ms`;
+  }
+
+  return `${(value / 1000).toFixed(1)}s`;
+}
+
 function DashboardSection({
   id,
   eyebrow,
@@ -90,7 +102,9 @@ function MetricCard({
   };
 
   return (
-    <div className={`rounded-[1.75rem] border border-amber-300/20 bg-gradient-to-br ${toneClasses[tone]} p-5 shadow-xl shadow-amber-950/20`}>
+    <div
+      className={`rounded-[1.75rem] border border-amber-300/20 bg-gradient-to-br ${toneClasses[tone]} p-5 shadow-xl shadow-amber-950/20`}
+    >
       <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300/75">
         {label}
       </p>
@@ -132,7 +146,9 @@ function DecisionPill({ decision }: { decision: ArticleReviewDecision }) {
       : "border-red-300/25 bg-red-500/10 text-red-100";
 
   return (
-    <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${classes}`}>
+    <span
+      className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${classes}`}
+    >
       {decision === "accept" ? "Accepted" : "Rejected"}
     </span>
   );
@@ -147,13 +163,21 @@ function ScorePill({ score }: { score: number }) {
         : "border-red-300/25 bg-red-500/10 text-red-100";
 
   return (
-    <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${classes}`}>
+    <span
+      className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${classes}`}
+    >
       Score {formatDecimal(score)}
     </span>
   );
 }
 
-function StatusPill({ label, tone }: { label: string; tone: "ok" | "watch" | "neutral" }) {
+function StatusPill({
+  label,
+  tone,
+}: {
+  label: string;
+  tone: "ok" | "watch" | "neutral";
+}) {
   const classes = {
     ok: "border-emerald-300/25 bg-emerald-400/10 text-emerald-100",
     watch: "border-orange-300/25 bg-orange-400/10 text-orange-100",
@@ -161,7 +185,9 @@ function StatusPill({ label, tone }: { label: string; tone: "ok" | "watch" | "ne
   };
 
   return (
-    <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${classes[tone]}`}>
+    <span
+      className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${classes[tone]}`}
+    >
       {label}
     </span>
   );
@@ -234,13 +260,21 @@ function ReviewFilters({ data }: { data: ArticleReviewDashboardData }) {
       description="Filter accepted and rejected article decisions by source, category, positivity score, and review time order."
     >
       <form action="/admin/articles" className="grid gap-4 lg:grid-cols-6">
-        <FilterSelect name="decision" label="Decision" defaultValue={filters.decision}>
+        <FilterSelect
+          name="decision"
+          label="Decision"
+          defaultValue={filters.decision}
+        >
           <option value="all">All decisions</option>
           <option value="accept">Accepted</option>
           <option value="reject">Rejected</option>
         </FilterSelect>
 
-        <FilterSelect name="source" label="Source" defaultValue={filters.source}>
+        <FilterSelect
+          name="source"
+          label="Source"
+          defaultValue={filters.source}
+        >
           <option value="">All sources</option>
           {data.sourceOptions.map((source) => (
             <option key={source} value={source}>
@@ -249,7 +283,11 @@ function ReviewFilters({ data }: { data: ArticleReviewDashboardData }) {
           ))}
         </FilterSelect>
 
-        <FilterSelect name="category" label="Category" defaultValue={filters.category}>
+        <FilterSelect
+          name="category"
+          label="Category"
+          defaultValue={filters.category}
+        >
           <option value="">All categories</option>
           {data.categoryOptions.map((category) => (
             <option key={category} value={category}>
@@ -261,14 +299,18 @@ function ReviewFilters({ data }: { data: ArticleReviewDashboardData }) {
         <FilterInput
           name="minScore"
           label="Min Score"
-          defaultValue={filters.minScore === null ? "" : String(filters.minScore)}
+          defaultValue={
+            filters.minScore === null ? "" : String(filters.minScore)
+          }
           placeholder="0"
         />
 
         <FilterInput
           name="maxScore"
           label="Max Score"
-          defaultValue={filters.maxScore === null ? "" : String(filters.maxScore)}
+          defaultValue={
+            filters.maxScore === null ? "" : String(filters.maxScore)
+          }
           placeholder="10"
         />
 
@@ -309,8 +351,14 @@ function SummarySection({ data }: { data: ArticleReviewDashboardData }) {
     >
       <div className="mb-4 flex flex-wrap gap-3">
         <StatusPill label={summary.sortLabel} tone="neutral" />
-        <StatusPill label={`Page ${formatNumber(summary.page + 1)}`} tone="neutral" />
-        <StatusPill label={`${formatNumber(summary.pageSize)} per page`} tone="neutral" />
+        <StatusPill
+          label={`Page ${formatNumber(summary.page + 1)}`}
+          tone="neutral"
+        />
+        <StatusPill
+          label={`${formatNumber(summary.pageSize)} per page`}
+          tone="neutral"
+        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -355,7 +403,15 @@ function ArticleReviewCard({ review }: { review: ArticleReviewRow }) {
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <DecisionPill decision={review.decision} />
             <ScorePill score={review.positivityScore} />
-            <StatusPill label={review.isPublished ? "Published" : "Not Published"} tone={review.isPublished ? "ok" : "neutral"} />
+            <StatusPill
+              label={review.aiProviderLabel}
+              tone={review.aiProvider === "openai" ? "watch" : "ok"}
+            />
+            <StatusPill label={review.aiModel} tone="neutral" />
+            <StatusPill
+              label={review.isPublished ? "Published" : "Not Published"}
+              tone={review.isPublished ? "ok" : "neutral"}
+            />
           </div>
 
           <h3 className="text-xl font-black leading-snug text-amber-50">
@@ -363,7 +419,8 @@ function ArticleReviewCard({ review }: { review: ArticleReviewRow }) {
           </h3>
 
           <p className="mt-2 text-xs font-black uppercase tracking-[0.14em] text-amber-300/70">
-            {review.source} • {review.category} • Reviewed {review.reviewedAtLabel}
+            {review.source} • {review.category} • {review.aiProviderLabel} /{" "}
+            {review.aiModel} • Reviewed {review.reviewedAtLabel}
           </p>
         </div>
 
@@ -408,17 +465,30 @@ function ArticleReviewCard({ review }: { review: ArticleReviewRow }) {
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3 text-xs text-amber-100/55 md:grid-cols-3">
+      <div className="mt-4 grid gap-3 text-xs text-amber-100/55 md:grid-cols-4">
         <p>
-          <span className="font-black uppercase tracking-[0.12em] text-amber-300/70">Reviewed:</span>{" "}
+          <span className="font-black uppercase tracking-[0.12em] text-amber-300/70">
+            Reviewed:
+          </span>{" "}
           {review.reviewedAtLabel}
         </p>
         <p>
-          <span className="font-black uppercase tracking-[0.12em] text-amber-300/70">Published:</span>{" "}
+          <span className="font-black uppercase tracking-[0.12em] text-amber-300/70">
+            Published:
+          </span>{" "}
           {formatDateTime(review.publishedArticle?.publishedOnSiteAt ?? null)}
         </p>
+        <p>
+          <span className="font-black uppercase tracking-[0.12em] text-amber-300/70">
+            AI:
+          </span>{" "}
+          {review.aiProviderLabel} · {review.aiModel} ·{" "}
+          {formatDuration(review.reviewDurationMs)}
+        </p>
         <p className="truncate">
-          <span className="font-black uppercase tracking-[0.12em] text-amber-300/70">URL:</span>{" "}
+          <span className="font-black uppercase tracking-[0.12em] text-amber-300/70">
+            URL:
+          </span>{" "}
           {review.originalUrl}
         </p>
       </div>
@@ -436,7 +506,10 @@ function ReviewsSection({ data }: { data: ArticleReviewDashboardData }) {
     >
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
-          <StatusPill label={`${formatNumber(data.summary.totalMatchingReviews)} matching`} tone="neutral" />
+          <StatusPill
+            label={`${formatNumber(data.summary.totalMatchingReviews)} matching`}
+            tone="neutral"
+          />
           <StatusPill label={data.summary.sortLabel} tone="neutral" />
         </div>
 
@@ -467,7 +540,9 @@ function ReviewsSection({ data }: { data: ArticleReviewDashboardData }) {
             No reviewed articles match the current filters.
           </div>
         ) : (
-          data.reviews.map((review) => <ArticleReviewCard key={review.id} review={review} />)
+          data.reviews.map((review) => (
+            <ArticleReviewCard key={review.id} review={review} />
+          ))
         )}
       </div>
     </DashboardSection>
@@ -489,10 +564,13 @@ function ReviewSqlSection({ data }: { data: ArticleReviewDashboardData }) {
   );
 }
 
-export default async function AdminArticlesPage({ searchParams = {} }: AdminArticlesPageProps) {
+export default async function AdminArticlesPage({
+  searchParams = {},
+}: AdminArticlesPageProps) {
   const session = await auth();
   const resolvedSearchParams = await searchParams;
-  const filters: ArticleReviewFilters = parseArticleReviewFilters(resolvedSearchParams);
+  const filters: ArticleReviewFilters =
+    parseArticleReviewFilters(resolvedSearchParams);
   const data = await getAdminArticleReviewDashboardData(filters);
 
   return (
@@ -520,7 +598,10 @@ export default async function AdminArticlesPage({ searchParams = {} }: AdminArti
               </h1>
 
               <p className="mt-3 max-w-3xl text-sm leading-6 text-amber-100/70">
-                Review accepted and rejected stories, filter by decision/source/category/score, sort by review time, and investigate why an article was accepted or rejected.
+                Review accepted and rejected stories, filter by
+                decision/source/category/score, see whether OpenAI or the local
+                Qwen/Ollama model made the decision, and investigate why an
+                article was accepted or rejected.
               </p>
             </div>
 
