@@ -176,10 +176,18 @@ export default async function AdminPage() {
             />
 
             <DashboardCard
-              eyebrow="Oracle AI"
+              eyebrow="Home AI"
               title="Local AI"
-              description="Monitor the Oracle-hosted Ollama model, qwen/local AI article decisions, fallback OpenAI calls, review latency, and model-level quality signals."
+              description="Monitor the home-server Ollama model, qwen/local AI article decisions, fallback OpenAI calls, review latency, and model-level quality signals."
               href="/admin/local-ai"
+              status="Live"
+            />
+
+            <DashboardCard
+              eyebrow="Instance"
+              title="Home Server"
+              description="View live home-server instance stats including uptime, CPU load, memory, disk, Ollama, local AI service, and Cloudflare Tunnel status."
+              href="/admin/home-server"
               status="Live"
             />
 
