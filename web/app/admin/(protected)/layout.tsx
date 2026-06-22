@@ -3,20 +3,20 @@ import { auth } from "@/auth";
 import { isAllowedAdminEmail } from "@/lib/adminAuth";
 
 export default async function ProtectedAdminLayout({
-                                                       children,
-                                                   }: Readonly<{
-    children: React.ReactNode;
+  children,
+}: Readonly<{
+  children: React.ReactNode;
 }>) {
-    const session = await auth();
-    const email = session?.user?.email;
+  const session = await auth();
+  const email = session?.user?.email;
 
-    if (!email) {
-        redirect("/admin/login");
-    }
+  if (!email) {
+    redirect("/admin/login");
+  }
 
-    if (!isAllowedAdminEmail(email)) {
-        redirect("/admin/access-denied");
-    }
+  if (!isAllowedAdminEmail(email)) {
+    redirect("/admin/access-denied");
+  }
 
-    return <>{children}</>;
+  return <div className="admin-responsive-shell">{children}</div>;
 }
