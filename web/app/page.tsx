@@ -66,7 +66,7 @@ export default async function Home() {
               </div>
 
               <p className="mx-auto max-w-sm text-center text-base leading-7 text-neutral-300">
-                A calm feed of uplifting stories from around the world, filtered by Artificial Intelligence.
+                A calm feed of uplifting stories, curated by Artificial Intelligence.
               </p>
             </div>
           </div>
