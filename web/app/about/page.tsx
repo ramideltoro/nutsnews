@@ -276,6 +276,40 @@ export default function AboutPage() {
 
         <section className="mt-6 rounded-[2rem] border border-amber-300/15 bg-gradient-to-br from-neutral-950 via-neutral-900 to-amber-950/20 p-5 shadow-xl shadow-amber-950/15 sm:p-7">
           <SectionHeading
+            eyebrow="The name"
+            title="Why it is called NutsNews"
+            description="The name came from the same search that shaped the product: a search for something positive, memorable, and worthy of a .com home."
+          />
+
+          <div className="rounded-3xl border border-amber-300/15 bg-black/25 p-5">
+            <div className="space-y-4 text-sm leading-8 text-neutral-300 sm:text-base sm:leading-8">
+              <p>
+                The first idea was the most obvious one: GoodNews.com. It said
+                exactly what the site was meant to be. But that domain was
+                already taken, and so were the clean, simple variations around
+                good news. The project needed a name that could stand on its own,
+                feel distinctive, and still live at a classic .com address.
+              </p>
+              <p>
+                During that search, the name moved from domain checkers to the
+                thesaurus. While looking through synonyms for &ldquo;good,&rdquo; one word
+                stood out: &ldquo;nuts.&rdquo; In poker, the nuts means the best possible
+                hand. That meaning changed the whole name from a compromise into
+                a perfect fit.
+              </p>
+              <p>
+                NutsNews became more than a playful title. It became a statement
+                of intent: this is a place for the best kind of news, the stories
+                that feel worth keeping, sharing, and returning to. The name is
+                short, memorable, a little unexpected, and quietly connected to
+                the idea at the center of the site, finding the good stuff.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-[2rem] border border-amber-300/15 bg-gradient-to-br from-neutral-950 via-neutral-900 to-amber-950/20 p-5 shadow-xl shadow-amber-950/15 sm:p-7">
+          <SectionHeading
             eyebrow="What it is trying to do"
             title="Turn the news feed into a better habit"
             description="The project is not trying to pretend hard things do not exist. It is trying to make room for the other side of the story too: the helpers, the builders, the breakthroughs, the recoveries, the tiny wins, and the reminders that people are still doing good work everywhere."

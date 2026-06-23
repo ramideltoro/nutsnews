@@ -1,6 +1,6 @@
-# NutsNews About Workflow Icons Update
+# NutsNews Name Story Update
 
-This update replaces the two-letter abbreviations in the About page workflow circles with inline SVG icons.
+This update adds one new section to the About page explaining the story behind the NutsNews name.
 
 Updated file:
 
@@ -8,14 +8,18 @@ Updated file:
 
 ## What changed
 
-In the `A careful pipeline behind a simple feed` section:
+Added a new `The name` section after `Good news should be easier to find`.
 
-- Discover now uses an RSS / broadcast icon.
-- Filter now uses a filtering / narrowing icon.
-- Summarize now uses a document summary icon.
-- Send readers onward now uses an external-link icon.
+The new section explains:
 
-No copy, layout, footer, banner, or icon positioning changes were made.
+- The original idea was to use `GoodNews.com`.
+- The `.com` domain was important.
+- Good-news synonym domains were already taken.
+- The name came from searching synonyms for `good`.
+- `nuts` stood out because, in poker, it means the best possible hand.
+- NutsNews became a fitting name for a site focused on the best kind of news.
+
+No other page copy, layout, banner, footer, or workflow icon changes were made.
 
 ## Validation performed
 
