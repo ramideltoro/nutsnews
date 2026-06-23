@@ -3,12 +3,10 @@ const COPYRIGHT_YEAR = 2026;
 export function SiteFooter() {
   return (
     <footer className="fixed bottom-0 left-0 right-0 z-50 border-t border-amber-500/20 bg-neutral-950/90 px-3 py-3 shadow-2xl shadow-black/60 backdrop-blur-xl">
-      <div className="mx-auto grid w-full max-w-md grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
-        <div aria-hidden="true" className="min-w-0" />
-
+      <div className="mx-auto flex w-full max-w-md flex-col items-center gap-2">
         <nav
           aria-label="Footer navigation"
-          className="flex justify-self-center rounded-full border border-amber-400/20 bg-amber-400/10 p-1"
+          className="flex rounded-full border border-amber-400/20 bg-amber-400/10 p-1"
         >
           <a
             href="/about"
@@ -30,20 +28,18 @@ export function SiteFooter() {
           </a>
         </nav>
 
-        <div className="min-w-0 text-right text-[10px] leading-4 text-neutral-500">
-          <p className="truncate">
-            © {COPYRIGHT_YEAR}{" "}
-            <a
-              href="https://www.ramideltoro.com"
-              target="_blank"
-              rel="noreferrer"
-              className="text-amber-300 transition hover:text-amber-200"
-            >
-              Rami Del Toro
-            </a>
-          </p>
-          <p>All Rights Reserved.</p>
-        </div>
+        <p className="whitespace-nowrap text-center text-[10px] leading-4 text-neutral-500">
+          © {COPYRIGHT_YEAR} {" "}
+          <a
+            href="https://www.ramideltoro.com"
+            target="_blank"
+            rel="noreferrer"
+            className="text-amber-300 transition hover:text-amber-200"
+          >
+            Rami Del Toro
+          </a>{" "}
+          · All Rights Reserved.
+        </p>
       </div>
     </footer>
   );

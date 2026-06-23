@@ -1,32 +1,25 @@
-# NutsNews Name Story Update
+# NutsNews Footer One-Line Copyright Update
 
-This update adds one new section to the About page explaining the story behind the NutsNews name.
+This update changes the footer layout so the footer links stay centered on the first row and the copyright text appears below the links as one centered line.
 
 Updated file:
 
-- `web/app/about/page.tsx`
+- `web/app/components/SiteFooter.tsx`
 
 ## What changed
 
-Added a new `The name` section after `Good news should be easier to find`.
-
-The new section explains:
-
-- The original idea was to use `GoodNews.com`.
-- The `.com` domain was important.
-- Good-news synonym domains were already taken.
-- The name came from searching synonyms for `good`.
-- `nuts` stood out because, in poker, it means the best possible hand.
-- NutsNews became a fitting name for a site focused on the best kind of news.
-
-No other page copy, layout, banner, footer, or workflow icon changes were made.
+- Footer navigation remains: `About`, `Contact`, `Privacy`.
+- Copyright moved under the footer links.
+- Copyright now displays as one line:
+  - `© 2026 Rami Del Toro · All Rights Reserved.`
+- The Rami Del Toro link remains clickable.
 
 ## Validation performed
 
 From `web/`:
 
 ```bash
-npx eslint app/about/page.tsx
+npx eslint app/components/SiteFooter.tsx
 npx tsc --noEmit
 ```
 
