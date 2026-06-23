@@ -45,9 +45,9 @@ export default async function Home() {
 
             <div className="relative z-10">
               <div className="mb-7 text-center">
-                <h1 className="flex flex-wrap items-center justify-center gap-2 text-5xl font-black tracking-tight sm:gap-3">
+                <h1 className="flex flex-nowrap items-center justify-center gap-2 text-[2.25rem] font-black leading-none tracking-tight sm:gap-3 sm:text-5xl">
                   <span className="text-white">Nuts</span>
-                  <span className="flex h-[1em] w-[1em] shrink-0 items-center justify-center">
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center">
                     <Image
                       src="/nutsnews-logo.png"
                       alt="NutsNews logo"
@@ -60,7 +60,7 @@ export default async function Home() {
                   <span className="text-amber-300">News</span>
                 </h1>
 
-                <p className="mt-3 text-sm font-bold uppercase tracking-[0.24em] text-amber-200 sm:text-base">
+                <p className="mt-3 whitespace-nowrap text-[0.7rem] font-bold uppercase tracking-[0.16em] text-amber-200 sm:text-base sm:tracking-[0.24em]">
                   Positive News, Simplified
                 </p>
               </div>

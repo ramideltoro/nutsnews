@@ -11,6 +11,12 @@ export function SiteFooter() {
           className="flex justify-self-center rounded-full border border-amber-400/20 bg-amber-400/10 p-1"
         >
           <a
+            href="/about"
+            className="whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-semibold text-amber-200 transition hover:bg-amber-400/20 hover:text-amber-100"
+          >
+            About
+          </a>
+          <a
             href="/contact"
             className="whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-semibold text-amber-200 transition hover:bg-amber-400/20 hover:text-amber-100"
           >

@@ -1,18 +1,19 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { SiteFooter } from "../components/SiteFooter";
 
 export const metadata: Metadata = {
   title: "About NutsNews",
   description:
-    "Learn how NutsNews uses RSS feeds, Cloudflare Workers, Supabase, and AI to create a calm feed of uplifting stories.",
+    "Learn why NutsNews exists and how it brings positive, uplifting stories together through thoughtful automation, AI curation, and a calm reader experience.",
   alternates: {
     canonical: "/about",
   },
   openGraph: {
     title: "About NutsNews",
     description:
-      "How NutsNews automatically discovers, filters, summarizes, and publishes uplifting stories.",
+      "A calmer way to follow the world: positive stories, thoughtful summaries, source-friendly links, and technology built around uplifting news.",
     url: "/about",
     type: "website",
   },
@@ -20,136 +21,90 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "About NutsNews",
     description:
-      "Learn how NutsNews uses automation and AI to curate positive stories from trusted sources.",
+      "NutsNews is a positive news experience built to make the internet feel calmer, kinder, and easier to enjoy.",
   },
 };
 
-const techStack = [
+const promises = [
   {
-    name: "Next.js",
-    role: "Mobile-friendly website and article feed",
+    title: "Positive by design",
+    description:
+      "NutsNews looks for stories that leave readers feeling encouraged: community wins, inspiring people, helpful science, wellness, animals, travel, culture, and small moments of progress.",
   },
   {
-    name: "GitHub → Vercel CI/CD",
-    role: "Every push to the main branch triggers an automatic Vercel build and production deployment.",
+    title: "Simple on purpose",
+    description:
+      "The experience is built around a clean scrolling feed, short summaries, useful categories, and a clear path back to the original publisher.",
   },
   {
-    name: "Vercel",
-    role: "Frontend hosting, HTTPS, custom domain, and production deployment",
-  },
-  {
-    name: "Supabase",
-    role: "Postgres database for article storage",
-  },
-  {
-    name: "Cloudflare Workers",
-    role: "Scheduled RSS ingestion and automation",
-  },
-  {
-    name: "OpenAI",
-    role: "Article filtering and cheerful summary generation",
-  },
-  {
-    name: "RSS Feeds",
-    role: "Story sources from trusted publishers",
+    title: "Respectful of attention",
+    description:
+      "The goal is not to keep readers doom-scrolling. The goal is to make it easy to find something good, feel a little better, and move on with your day.",
   },
 ];
 
-const pipelineSteps = [
+const builtFeatures = [
+  "A mobile-first NutsNews website with a calm amber visual identity",
+  "Publisher RSS ingestion that discovers fresh story candidates automatically",
+  "AI-assisted filtering for uplifting, non-stressful stories",
+  "Short, original summaries that help readers decide what to open",
+  "Article categories for browsing by mood and theme",
+  "Thumbnail-first story cards with source and date context",
+  "Infinite scrolling for a lightweight daily feed experience",
+  "Contact and privacy pages for a more complete public site",
+  "Admin dashboards for reviewing operations, AI usage, feeds, and system health",
+  "Cloudflare, Vercel, and Supabase infrastructure for speed, scale, and low operating cost",
+  "Better Stack and Sentry observability so issues are easier to detect and fix",
+  "A native iOS companion app built around the same positive-news experience",
+];
+
+const workflow = [
   {
-    title: "RSS feeds",
-    description: "BBC, NPR, and other trusted RSS sources provide story candidates.",
-  },
-  {
-    title: "Cloudflare Worker",
+    step: "Discover",
+    title: "Fresh stories come from publisher feeds",
     description:
-      "A scheduled Worker runs every hour and fetches the latest feed items.",
+      "NutsNews starts with RSS sources from real publishers, then continuously checks for new articles that may fit the tone of the site.",
   },
   {
-    title: "AI filter",
+    step: "Filter",
+    title: "AI helps protect the mood of the feed",
     description:
-      "OpenAI filters out politics, war, money, crime, fear, and stressful topics.",
+      "The curation layer rejects stressful topics and favors stories that are constructive, human, useful, hopeful, or simply delightful.",
   },
   {
-    title: "AI summary",
+    step: "Summarize",
+    title: "Readers get the calm version first",
     description:
-      "Accepted articles receive a short calm summary without copying the full article.",
+      "Accepted articles are presented with short summaries, metadata, and categories so the feed stays quick, readable, and easy to explore.",
   },
   {
-    title: "Supabase",
-    description: "Approved stories are stored in a Postgres database.",
-  },
-  {
-    title: "NutsNews website",
-    description: "The mobile website displays the latest uplifting stories.",
+    step: "Send readers onward",
+    title: "Original publishers remain the destination",
+    description:
+      "NutsNews does not try to replace the article. Every story points back to the original source so readers can continue with the publisher who reported it.",
   },
 ];
 
-const costItems = [
+const principles = [
   {
-    name: "Domain",
-    cost: "$11.95",
+    title: "Calm technology",
     description:
-      "The only paid cost so far is the nutsnews.com domain registration.",
+      "The engineering behind NutsNews is meant to disappear into the background. Workers, caching, monitoring, and dashboards all support a simple reader promise: the site should feel fast, steady, and peaceful.",
   },
   {
-    name: "Vercel",
-    cost: "$0",
-    description: "The Next.js website is hosted on Vercel using the free tier.",
-  },
-  {
-    name: "Supabase",
-    cost: "$0",
-    description: "Article storage uses Supabase on the free tier.",
-  },
-  {
-    name: "Cloudflare Workers",
-    cost: "$0",
+    title: "Human-centered curation",
     description:
-      "Scheduled RSS automation runs on the Cloudflare free tier.",
-  },
-];
-
-const projectBenefits = [
-  {
-    title: "Fully automated news agency",
-    description:
-      "The platform can discover, filter, summarize, store, and publish stories automatically without a traditional editorial production team.",
+      "AI is used as a helper, not as a replacement for taste. The product is shaped around a clear editorial direction: fewer stressful headlines, more stories worth smiling about.",
   },
   {
-    title: "Low operating cost",
+    title: "Lean and resilient",
     description:
-      "Using free-tier cloud services keeps the project inexpensive to launch and easy to experiment with.",
+      "The platform was built with practical tools that can scale gradually: Next.js for the website, Cloudflare Workers for automation, Supabase for storage, Vercel for deployment, and observability for reliability.",
   },
   {
-    title: "Always-fresh content",
+    title: "Room to grow",
     description:
-      "The scheduled worker refreshes the article queue throughout the day, keeping the feed active with no manual work.",
-  },
-  {
-    title: "Focused editorial voice",
-    description:
-      "AI filtering helps keep the product aligned with a peaceful, uplifting, and positive content strategy.",
-  },
-  {
-    title: "Mobile-first experience",
-    description:
-      "The site is designed around a simple scrolling feed that feels natural on phones.",
-  },
-  {
-    title: "Scalable architecture",
-    description:
-      "The system separates the frontend, database, AI workflow, and scheduled worker so each part can grow independently.",
-  },
-  {
-    title: "Fast experimentation",
-    description:
-      "New RSS sources, categories, prompts, and layout ideas can be tested quickly without rebuilding the whole platform.",
-  },
-  {
-    title: "Source-friendly publishing",
-    description:
-      "The site avoids republishing full articles and links readers back to the original publishers.",
+      "NutsNews is still evolving. The foundation supports more feeds, richer categories, better dashboards, smarter quality controls, and a smoother experience across web and mobile.",
   },
 ];
 
@@ -167,11 +122,11 @@ function SectionHeading({
       <p className="text-xs font-black uppercase tracking-[0.24em] text-amber-300/80">
         {eyebrow}
       </p>
-      <h2 className="mt-2 text-2xl font-black tracking-tight text-amber-50">
+      <h2 className="mt-2 text-2xl font-black tracking-tight text-amber-50 sm:text-3xl">
         {title}
       </h2>
       {description ? (
-        <p className="mt-3 text-sm leading-7 text-neutral-300">
+        <p className="mt-3 text-sm leading-7 text-neutral-300 sm:text-base sm:leading-8">
           {description}
         </p>
       ) : null}
@@ -181,263 +136,175 @@ function SectionHeading({
 
 export default function AboutPage() {
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.16),_transparent_34%),linear-gradient(180deg,_#0a0a0a_0%,_#17120a_45%,_#0a0a0a_100%)] text-neutral-50">
-      <section className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 lg:px-8">
-        <section className="overflow-hidden rounded-[2rem] border border-amber-300/15 bg-gradient-to-br from-neutral-950 via-neutral-900 to-amber-950/25 p-5 shadow-2xl shadow-amber-950/25 ring-1 ring-amber-300/5">
-          <div className="rounded-[1.5rem] border border-amber-300/15 bg-gradient-to-br from-black/35 via-neutral-950/80 to-amber-950/25 p-5 shadow-inner shadow-amber-950/10">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.16),_transparent_34%),linear-gradient(180deg,_#0a0a0a_0%,_#17120a_45%,_#0a0a0a_100%)] pb-28 text-neutral-50">
+      <section className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
+        <section className="overflow-hidden rounded-[2rem] border border-amber-300/15 bg-[radial-gradient(circle_at_top_right,_rgba(245,158,11,0.24),_transparent_38%),linear-gradient(135deg,_#171717,_#0a0a0a_58%,_#451a03)] p-5 shadow-2xl shadow-black/40 ring-1 ring-amber-300/5 sm:p-8">
+          <div className="rounded-[1.5rem] border border-amber-300/15 bg-black/30 p-5 shadow-inner shadow-amber-950/10 sm:p-7">
             <p className="text-xs font-black uppercase tracking-[0.28em] text-amber-300/80">
-              About the project
+              About NutsNews
             </p>
-
-            <h1 className="mt-3 text-4xl font-black tracking-tight text-amber-50">
-              NutsNews
+            <h1 className="mt-4 max-w-3xl text-4xl font-black leading-tight tracking-tight text-amber-50 sm:text-6xl">
+              A calmer way to keep up with the good happening in the world.
             </h1>
-
-            <div className="mt-5 space-y-3 text-sm font-semibold text-amber-200/85">
-              <p className="rounded-2xl border border-amber-300/15 bg-black/20 p-3">
-                Media Owner: Rami Del Toro
-              </p>
-              <p className="rounded-2xl border border-amber-300/15 bg-black/20 p-3">
-                Editor-in-Chief: OpenAI
-              </p>
-              <p className="rounded-2xl border border-amber-300/15 bg-black/20 p-3">
-                Managing Editor: OpenAI
-              </p>
+            <p className="mt-5 max-w-3xl text-base leading-8 text-neutral-300 sm:text-lg sm:leading-9">
+              NutsNews exists because the internet can feel heavy. The world is
+              full of kindness, progress, creativity, courage, discovery, and
+              everyday people doing remarkable things, but those stories are easy
+              to miss. NutsNews brings them forward in one simple place.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link
+                href="/"
+                className="rounded-full border border-amber-300/30 bg-amber-300 px-5 py-2 text-sm font-black text-neutral-950 transition hover:bg-amber-200"
+              >
+                Read today&apos;s stories
+              </Link>
+              <Link
+                href="/contact"
+                className="rounded-full border border-amber-300/25 bg-amber-300/10 px-5 py-2 text-sm font-bold text-amber-100 transition hover:bg-amber-300/20"
+              >
+                Contact NutsNews
+              </Link>
             </div>
-
-            <p className="mt-6 text-base leading-8 text-neutral-300">
-              NutsNews is a calm, uplifting news experience that collects positive
-              stories from trusted RSS feeds, filters out stressful topics, and
-              presents short cheerful summaries in a mobile-first format.
-            </p>
-          </div>
-
-          <div className="mt-5 grid gap-3">
-            {[
-              ["1000", "Candidate articles scanned per refresh"],
-              ["60 minute", "Scheduled refresh"],
-              ["$11.95", "Current platform cost"],
-              ["A.I.", "Article selection & summary"],
-            ].map(([value, label]) => (
-              <div
-                key={label}
-                className="rounded-3xl border border-amber-300/15 bg-black/25 p-4 shadow-lg shadow-amber-950/10"
-              >
-                <p className="text-3xl font-black text-amber-300">{value}</p>
-                <p className="mt-2 text-xs font-bold uppercase tracking-[0.16em] text-neutral-400">
-                  {label}
-                </p>
-              </div>
-            ))}
           </div>
         </section>
 
-        <section className="mt-6 rounded-[2rem] border border-amber-300/15 bg-neutral-900/80 p-5 shadow-xl shadow-black/25">
-          <SectionHeading eyebrow="MVP" title="Project Summary" />
-
-          <div className="rounded-3xl border border-white/10 bg-black/20 p-5">
-            <p className="text-sm leading-7 text-neutral-300">
-              The goal of NutsNews is to create a peaceful daily feed of
-              uplifting, inspiring, human-interest, science, culture, travel,
-              wellness, community, animal, and achievement stories.
-            </p>
-            <p className="mt-4 text-sm leading-7 text-neutral-300">
-              The platform avoids politics, war, money, crime, and fear-driven
-              content. Articles are discovered through RSS feeds, reviewed by AI,
-              rewritten only as short original summaries, stored in Supabase, and
-              displayed through a mobile-friendly Next.js website.
-            </p>
-          </div>
-        </section>
-
-        <section
-          id="benefits"
-          className="mt-6 rounded-[2rem] border border-amber-300/15 bg-gradient-to-br from-neutral-950 via-neutral-900 to-amber-950/20 p-5 shadow-xl shadow-amber-950/15"
-        >
+        <section className="mt-6 rounded-[2rem] border border-amber-300/15 bg-neutral-900/80 p-5 shadow-xl shadow-black/25 sm:p-7">
           <SectionHeading
-            eyebrow="Why it matters"
-            title="Project Benefits"
-            description="A project like NutsNews shows how to use automation, AI, and cloud platforms to build a focused media product with very low overhead."
+            eyebrow="Why it exists"
+            title="Good news should be easier to find"
+            description="NutsNews is built for readers who want to stay connected to the world without being overwhelmed by it. The mission is to create a daily feed that feels optimistic, useful, and respectful of your attention."
           />
 
-          <div className="grid gap-3">
-            {projectBenefits.map((benefit) => (
-              <div
-                key={benefit.title}
-                className="rounded-3xl border border-amber-300/15 bg-black/25 p-5 transition hover:border-amber-300/30"
+          <div className="grid gap-3 md:grid-cols-3">
+            {promises.map((promise) => (
+              <article
+                key={promise.title}
+                className="rounded-3xl border border-white/10 bg-black/25 p-5"
               >
                 <h3 className="text-base font-black text-amber-100">
-                  {benefit.title}
+                  {promise.title}
                 </h3>
-                <p className="mt-2 text-sm leading-6 text-neutral-300">
-                  {benefit.description}
+                <p className="mt-3 text-sm leading-7 text-neutral-300">
+                  {promise.description}
                 </p>
-              </div>
+              </article>
             ))}
           </div>
         </section>
 
-        <section
-          id="how-it-works"
-          className="mt-6 rounded-[2rem] border border-amber-300/15 bg-neutral-900/80 p-5 shadow-xl shadow-black/25"
-        >
-          <SectionHeading eyebrow="Pipeline" title="How It Works" />
-
-          <div className="grid gap-3">
-            {pipelineSteps.map((step, index) => (
-              <div
-                key={step.title}
-                className="rounded-3xl border border-white/10 bg-black/20 p-5"
-              >
-                <div className="flex h-9 w-9 items-center justify-center rounded-full border border-amber-300/30 bg-amber-400/15 text-sm font-black text-amber-200">
-                  {index + 1}
-                </div>
-                <h3 className="mt-4 text-base font-black text-amber-50">
-                  {step.title}
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-neutral-300">
-                  {step.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-6 rounded-[2rem] border border-amber-300/15 bg-gradient-to-br from-neutral-950 via-neutral-900 to-amber-950/20 p-5 shadow-xl shadow-amber-950/15">
-          <SectionHeading eyebrow="System view" title="Flow Diagram" />
-
-          <div className="grid gap-3">
-            {[
-              ["Content Sources", "BBC / NPR / RSS Feeds"],
-              ["Automation Layer", "Cloudflare Worker runs hourly"],
-              ["AI Curation Layer", "Filter, classify, summarize"],
-              ["Data Layer", "Supabase Postgres article queue"],
-              ["NutsNews Mobile Website", "Next.js hosted on Vercel"],
-            ].map(([title, description], index) => (
-              <div key={title}>
-                <div className="rounded-3xl border border-amber-300/15 bg-black/25 p-5">
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-amber-300/75">
-                    {title}
-                  </p>
-                  <p className="mt-2 text-sm font-semibold text-neutral-200">
-                    {description}
-                  </p>
-                </div>
-
-                {index < 4 ? (
-                  <div className="flex justify-center py-2 text-xl font-black text-amber-400/70">
-                    ↓
-                  </div>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-6 rounded-[2rem] border border-amber-300/15 bg-neutral-900/80 p-5 shadow-xl shadow-black/25">
-          <SectionHeading eyebrow="Infrastructure" title="Tech Stack" />
-
-          <div className="grid gap-3">
-            {techStack.map((item) => (
-              <div
-                key={item.name}
-                className="rounded-3xl border border-white/10 bg-black/20 p-5"
-              >
-                <h3 className="text-base font-black text-amber-200">
-                  {item.name}
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-neutral-300">
-                  {item.role}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-6 rounded-[2rem] border border-amber-300/15 bg-gradient-to-br from-neutral-950 via-neutral-900 to-amber-950/20 p-5 shadow-xl shadow-amber-950/15">
-          <SectionHeading eyebrow="Shipping" title="Production Deployment" />
-
-          <div className="grid gap-3">
-            {[
-              [
-                "1. Code commit",
-                "Changes are committed locally and pushed to GitHub on the main branch.",
-              ],
-              [
-                "2. Vercel build",
-                "Vercel detects the push, installs dependencies, runs the Next.js build, and prepares the production deployment.",
-              ],
-              [
-                "3. Production release",
-                "If the build succeeds, Vercel automatically publishes the latest version to the production NutsNews domain.",
-              ],
-            ].map(([title, description]) => (
-              <div
-                key={title}
-                className="rounded-3xl border border-amber-300/15 bg-black/25 p-5"
-              >
-                <h3 className="text-base font-black text-amber-100">
-                  {title}
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-neutral-300">
-                  {description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-6 rounded-[2rem] border border-amber-300/15 bg-neutral-900/80 p-5 shadow-xl shadow-black/25">
+        <section className="mt-6 rounded-[2rem] border border-amber-300/15 bg-gradient-to-br from-neutral-950 via-neutral-900 to-amber-950/20 p-5 shadow-xl shadow-amber-950/15 sm:p-7">
           <SectionHeading
-            eyebrow="Lean startup"
-            title="Platform Cost"
-            description="NutsNews was built to keep startup costs extremely low by using free-tier cloud services wherever possible."
+            eyebrow="What it is trying to do"
+            title="Turn the news feed into a better habit"
+            description="The project is not trying to pretend hard things do not exist. It is trying to make room for the other side of the story too: the helpers, the builders, the breakthroughs, the recoveries, the tiny wins, and the reminders that people are still doing good work everywhere."
           />
-
-          <div className="grid gap-3">
-            {costItems.map((item) => (
-              <div
-                key={item.name}
-                className="rounded-3xl border border-white/10 bg-black/20 p-5"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <h3 className="text-base font-black text-amber-200">
-                    {item.name}
-                  </h3>
-                  <p className="rounded-full border border-amber-300/25 bg-amber-400/10 px-3 py-1 text-sm font-black text-amber-200">
-                    {item.cost}
-                  </p>
-                </div>
-                <p className="mt-3 text-sm leading-6 text-neutral-300">
-                  {item.description}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-4 rounded-3xl border border-amber-300/20 bg-gradient-to-r from-amber-400/15 to-orange-500/10 p-5">
-            <p className="text-xs font-black uppercase tracking-[0.22em] text-amber-300/80">
-              Total current cost
-            </p>
-            <p className="mt-2 text-4xl font-black text-amber-200">$11.95</p>
-            <p className="mt-2 text-sm leading-6 text-neutral-300">
-              Everything except the domain is currently running on free-tier
-              services.
-            </p>
-          </div>
-        </section>
-
-        <section className="mt-6 rounded-[2rem] border border-amber-300/15 bg-gradient-to-br from-neutral-950 via-neutral-900 to-amber-950/20 p-5 shadow-xl shadow-amber-950/15">
-          <SectionHeading eyebrow="Publishing policy" title="Content Safety" />
 
           <div className="rounded-3xl border border-amber-300/15 bg-black/25 p-5">
-            <p className="text-sm leading-7 text-neutral-300">
-              NutsNews does not republish full copyrighted articles. It stores
-              the source title, original link, article metadata, and a short
-              AI-written summary. Every story links back to the original
-              publisher.
+            <p className="text-sm leading-8 text-neutral-300 sm:text-base sm:leading-8">
+              A great NutsNews story should feel like a small reset. It may teach
+              you something, introduce you to a person worth knowing about,
+              highlight a community solving a problem, or simply give you a
+              moment of relief. The feed is intentionally focused, filtered, and
+              lightweight so readers can enjoy positive stories without digging
+              through a noisy internet first.
             </p>
           </div>
+        </section>
+
+        <section className="mt-6 rounded-[2rem] border border-amber-300/15 bg-neutral-900/80 p-5 shadow-xl shadow-black/25 sm:p-7">
+          <SectionHeading
+            eyebrow="What has been built"
+            title="A full positive-news platform, not just a page"
+            description="NutsNews has grown into a working product with a public website, automated article pipeline, admin tools, monitoring, mobile experience, and a native iOS app foundation."
+          />
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {builtFeatures.map((feature) => (
+              <div
+                key={feature}
+                className="rounded-3xl border border-white/10 bg-black/20 p-4"
+              >
+                <p className="text-sm font-semibold leading-6 text-neutral-200">
+                  {feature}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-[2rem] border border-amber-300/15 bg-gradient-to-br from-neutral-950 via-neutral-900 to-amber-950/20 p-5 shadow-xl shadow-amber-950/15 sm:p-7">
+          <SectionHeading
+            eyebrow="How it works"
+            title="A careful pipeline behind a simple feed"
+            description="Readers see a quiet list of stories. Behind that list is a system that discovers articles, filters them for tone and fit, prepares useful summaries, and keeps the site running with practical cloud infrastructure."
+          />
+
+          <div className="grid gap-4">
+            {workflow.map((item) => (
+              <article
+                key={item.step}
+                className="rounded-3xl border border-amber-300/15 bg-black/25 p-5"
+              >
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-amber-300/30 bg-amber-400/15 text-xs font-black uppercase tracking-[0.14em] text-amber-200">
+                    {item.step.slice(0, 2)}
+                  </div>
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.22em] text-amber-300/75">
+                      {item.step}
+                    </p>
+                    <h3 className="mt-1 text-lg font-black text-amber-50">
+                      {item.title}
+                    </h3>
+                    <p className="mt-2 text-sm leading-7 text-neutral-300">
+                      {item.description}
+                    </p>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-[2rem] border border-amber-300/15 bg-neutral-900/80 p-5 shadow-xl shadow-black/25 sm:p-7">
+          <SectionHeading
+            eyebrow="Built with intention"
+            title="The product values"
+            description="Every technical decision supports the same reader experience: faster access to better-feeling stories, fewer distractions, and a site that can grow without becoming complicated to use."
+          />
+
+          <div className="grid gap-3 md:grid-cols-2">
+            {principles.map((principle) => (
+              <article
+                key={principle.title}
+                className="rounded-3xl border border-white/10 bg-black/20 p-5 transition hover:border-amber-300/30"
+              >
+                <h3 className="text-base font-black text-amber-100">
+                  {principle.title}
+                </h3>
+                <p className="mt-3 text-sm leading-7 text-neutral-300">
+                  {principle.description}
+                </p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="mt-6 overflow-hidden rounded-[2rem] border border-amber-300/15 bg-[radial-gradient(circle_at_bottom_left,_rgba(245,158,11,0.18),_transparent_34%),linear-gradient(135deg,_#0a0a0a,_#171717_58%,_#451a03)] p-5 shadow-2xl shadow-black/40 sm:p-8">
+          <p className="text-xs font-black uppercase tracking-[0.28em] text-amber-300/80">
+            The bigger idea
+          </p>
+          <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-tight text-amber-50 sm:text-5xl">
+            NutsNews is a reminder that positive stories deserve great product
+            design too.
+          </h2>
+          <p className="mt-5 max-w-3xl text-sm leading-8 text-neutral-300 sm:text-base sm:leading-8">
+            The best version of NutsNews is warm, useful, trustworthy, and easy
+            to return to. It should feel like opening a window instead of
+            entering a storm. That is the story this project is trying to tell:
+            technology can help make media gentler, more focused, and more human.
+          </p>
         </section>
       </section>
 
