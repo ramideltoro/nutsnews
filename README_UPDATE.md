@@ -1,6 +1,9 @@
-# NutsNews Footer One-Line Copyright Update
+# NutsNews Shorter Footer Update
 
-This update changes the footer layout so the footer links stay centered on the first row and the copyright text appears below the links as one centered line.
+This update makes the fixed footer shorter while keeping the same layout:
+
+- Footer links centered on the first row.
+- One-line copyright centered underneath.
 
 Updated file:
 
@@ -8,11 +11,11 @@ Updated file:
 
 ## What changed
 
-- Footer navigation remains: `About`, `Contact`, `Privacy`.
-- Copyright moved under the footer links.
-- Copyright now displays as one line:
-  - `© 2026 Rami Del Toro · All Rights Reserved.`
-- The Rami Del Toro link remains clickable.
+- Reduced footer vertical padding from `py-3` to `py-2`.
+- Reduced row gap from `gap-2` to `gap-1`.
+- Reduced nav pill padding from `p-1` to `p-0.5`.
+- Reduced footer link vertical padding from `py-1` to `py-0.5`.
+- Reduced copyright text from `text-[10px] leading-4` to `text-[9px] leading-3`.
 
 ## Validation performed
 
