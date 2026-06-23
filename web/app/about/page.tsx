@@ -58,30 +58,111 @@ const builtFeatures = [
   "A native iOS companion app built around the same positive-news experience",
 ];
 
+function DiscoverIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+    >
+      <circle cx="6" cy="18" r="1.5" />
+      <path d="M5 11a8 8 0 0 1 8 8" />
+      <path d="M5 5a14 14 0 0 1 14 14" />
+    </svg>
+  );
+}
+
+function FilterIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+    >
+      <path d="M4 5h16" />
+      <path d="M7 11h10" />
+      <path d="M10 17h4" />
+    </svg>
+  );
+}
+
+function SummaryIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+    >
+      <path d="M7 3h7l4 4v14H7z" />
+      <path d="M14 3v5h5" />
+      <path d="M10 12h6" />
+      <path d="M10 16h4" />
+    </svg>
+  );
+}
+
+function ExternalStoryIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+    >
+      <path d="M14 4h6v6" />
+      <path d="M10 14 20 4" />
+      <path d="M20 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5" />
+    </svg>
+  );
+}
+
 const workflow = [
   {
     step: "Discover",
     title: "Fresh stories come from publisher feeds",
     description:
       "NutsNews starts with RSS sources from real publishers, then continuously checks for new articles that may fit the tone of the site.",
+    Icon: DiscoverIcon,
   },
   {
     step: "Filter",
     title: "AI helps protect the mood of the feed",
     description:
       "The curation layer rejects stressful topics and favors stories that are constructive, human, useful, hopeful, or simply delightful.",
+    Icon: FilterIcon,
   },
   {
     step: "Summarize",
     title: "Readers get the calm version first",
     description:
       "Accepted articles are presented with short summaries, metadata, and categories so the feed stays quick, readable, and easy to explore.",
+    Icon: SummaryIcon,
   },
   {
     step: "Send readers onward",
     title: "Original publishers remain the destination",
     description:
       "NutsNews does not try to replace the article. Every story points back to the original source so readers can continue with the publisher who reported it.",
+    Icon: ExternalStoryIcon,
   },
 ];
 
@@ -241,14 +322,17 @@ export default function AboutPage() {
           />
 
           <div className="grid gap-4">
-            {workflow.map((item) => (
-              <article
+            {workflow.map((item) => {
+              const Icon = item.Icon;
+
+              return (
+                <article
                 key={item.step}
                 className="rounded-3xl border border-amber-300/15 bg-black/25 p-5"
               >
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-amber-300/30 bg-amber-400/15 text-xs font-black uppercase tracking-[0.14em] text-amber-200">
-                    {item.step.slice(0, 2)}
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-amber-300/30 bg-amber-400/15 text-amber-200 shadow-lg shadow-amber-950/20">
+                    <Icon className="h-6 w-6" />
                   </div>
                   <div>
                     <p className="text-xs font-black uppercase tracking-[0.22em] text-amber-300/75">
@@ -262,8 +346,9 @@ export default function AboutPage() {
                     </p>
                   </div>
                 </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         </section>
 
