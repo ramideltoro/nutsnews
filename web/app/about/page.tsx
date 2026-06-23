@@ -291,11 +291,12 @@ export default function AboutPage() {
                 feel distinctive, and still live at a classic .com address.
               </p>
               <p>
-                During that search, the name moved from domain checkers to the
+                During that search, the name wandered from domain checkers to the
                 thesaurus. While looking through synonyms for &ldquo;good,&rdquo; one word
-                stood out: &ldquo;nuts.&rdquo; In poker, the nuts means the best possible
-                hand. That meaning changed the whole name from a compromise into
-                a perfect fit.
+                made itself impossible to ignore: &ldquo;nuts.&rdquo; In poker,
+                the nuts means the best possible hand.
+                That meaning changed the whole name from a compromise into
+                simply perfect.
               </p>
               <p>
                 NutsNews became more than a playful title. It became a statement
