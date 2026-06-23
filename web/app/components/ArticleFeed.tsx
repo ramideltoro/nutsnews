@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Article } from "@/lib/articles";
+import { OptimizedArticleImage } from "./OptimizedArticleImage";
 
 const categoryDotStyles = [
   "bg-amber-200 shadow-[0_0_10px_rgba(253,230,138,0.95)]",
@@ -96,7 +97,6 @@ function ArticleCard({ article, index }: { article: Article; index: number }) {
     }
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setIsVisible(true);
       return;
     }
 
@@ -133,34 +133,7 @@ function ArticleCard({ article, index }: { article: Article; index: number }) {
       }`}
     >
       <div className="relative aspect-[16/10] overflow-hidden bg-neutral-900">
-        {article.image_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={article.image_url}
-            alt=""
-            className="h-full w-full object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top_right,_rgba(245,158,11,0.42),_transparent_36%),linear-gradient(135deg,_#171717,_#0a0a0a_58%,_#451a03)]">
-            <span className="absolute left-7 top-6 text-5xl text-amber-200/25">
-              ✦
-            </span>
-            <span className="absolute bottom-7 right-8 text-6xl text-amber-300/20">
-              ●
-            </span>
-            <span className="absolute right-12 top-9 text-3xl text-orange-200/25">
-              ✧
-            </span>
-
-            <div className="relative z-10 rounded-[1.5rem] border border-amber-200/20 bg-black/30 px-5 py-4 text-center shadow-2xl shadow-black/30 backdrop-blur-md">
-              <div className="text-4xl">✨</div>
-              <p className="mt-2 text-[11px] font-black uppercase tracking-[0.2em] text-amber-100">
-                Positive Story
-              </p>
-            </div>
-          </div>
-        )}
+        <OptimizedArticleImage src={article.image_url} eager={index === 0} />
       </div>
 
       <div className="space-y-4 p-5">

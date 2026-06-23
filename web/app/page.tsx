@@ -53,7 +53,7 @@ export default async function Home() {
                       alt="NutsNews logo"
                       width={96}
                       height={96}
-                      priority
+                      preload
                       className="h-full w-full object-contain"
                     />
                   </span>

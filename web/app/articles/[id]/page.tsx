@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 
 import { SiteFooter } from "@/app/components/SiteFooter";
 import { getArticleById, SITE_URL } from "@/lib/articles";
+import { OptimizedArticleImage } from "@/app/components/OptimizedArticleImage";
+import { ARTICLE_DETAIL_IMAGE_SIZES } from "@/lib/imageDelivery";
 
 export const revalidate = 3600;
 
@@ -134,12 +136,10 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             <header className="overflow-hidden rounded-[2rem] border border-amber-500/20 bg-neutral-900 shadow-2xl shadow-black/40">
               {article.image_url ? (
                   <div className="relative h-64 overflow-hidden bg-neutral-800">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                    <OptimizedArticleImage
                         src={article.image_url}
-                        alt=""
-                        className="h-full w-full object-cover"
-                        fetchPriority="high"
+                        eager
+                        sizes={ARTICLE_DETAIL_IMAGE_SIZES}
                     />
 
                     <div className="absolute inset-0 bg-gradient-to-t from-neutral-950/85 via-neutral-950/20 to-transparent" />

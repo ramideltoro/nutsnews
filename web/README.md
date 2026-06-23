@@ -1195,6 +1195,28 @@ A stale threshold of 180 minutes gives the controller enough time to complete a 
 
 ---
 
+---
+
+## Article Image Delivery
+
+The public feed and article detail pages use `OptimizedArticleImage` to route publisher thumbnails through Next.js image optimization.
+
+Important files:
+
+```text
+app/components/OptimizedArticleImage.tsx
+lib/imageDelivery.ts
+next.config.ts
+```
+
+The first visible feed image loads eagerly. Lower feed images lazy-load. Optimized images use responsive widths, AVIF/WebP support, an amber loading placeholder, and a raw publisher-image fallback when a remote host blocks optimization.
+
+See the repository-level guide:
+
+```text
+../docs/IMAGE_DELIVERY.md
+```
+
 ## License
 
 This project is licensed under the MIT License.

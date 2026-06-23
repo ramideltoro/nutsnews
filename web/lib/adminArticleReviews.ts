@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { formatAdminDateTime } from "@/lib/adminTime";
 
 const REVIEW_SELECT_COLUMNS = [
@@ -350,7 +350,7 @@ function buildReviewSql(filters: ArticleReviewFilters) {
   return `select\n  reviewed_at,\n  decision,\n  source,\n  category,\n  positivity_score,\n  ai_provider,\n  ai_model,\n  review_duration_ms,\n  title,\n  reason,\n  original_url\nfrom public.article_ai_reviews\nwhere ${conditions.join("\n  and ")}\norder by reviewed_at ${filters.sort === "oldest" ? "asc" : "desc"}\nlimit ${ARTICLE_REVIEW_PAGE_SIZE};`;
 }
 
-async function loadOptions(client: any) {
+async function loadOptions(client: SupabaseClient) {
   const { data, error } = await client
     .from("article_ai_reviews")
     .select("source, category")

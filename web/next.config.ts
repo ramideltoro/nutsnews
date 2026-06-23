@@ -79,6 +79,29 @@ const nextConfig: NextConfig = {
     root: path.join(__dirname),
   },
 
+  images: {
+    // NutsNews stores publisher image URLs from many trusted RSS/article pages,
+    // so the optimizer needs to accept the image hosts discovered by ingestion.
+    // The ingestion pipeline still controls which image_url values reach the
+    // public feed, and SVG images are rendered unoptimized by the component.
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "**",
+      },
+      {
+        protocol: "http",
+        hostname: "**",
+      },
+    ],
+    formats: ["image/avif", "image/webp"],
+    deviceSizes: [360, 414, 640, 750, 828, 1080],
+    imageSizes: [96, 128, 256, 384, 512],
+    minimumCacheTTL: 86_400,
+    maximumRedirects: 2,
+    maximumResponseBody: 8_000_000,
+  },
+
   async headers() {
     return [
       {
