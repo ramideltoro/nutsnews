@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { ThemeSwitcher } from "./components/ThemeSwitcher";
 
 const siteUrl = "https://www.nutsnews.com";
 
@@ -111,6 +112,8 @@ export default function RootLayout({
             </Script>
           </>
         ) : null}
+
+        <ThemeSwitcher />
 
         {children}
       </body>

@@ -31,43 +31,54 @@ export default async function Home() {
   };
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.16),_transparent_34%),linear-gradient(180deg,_#0a0a0a_0%,_#17120a_45%,_#0a0a0a_100%)] px-4 pb-28 pt-6 text-neutral-100">
+    <main className="modern-home-shell min-h-screen overflow-hidden px-4 pb-32 pt-6 text-[var(--theme-text)] sm:px-6">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(homeJsonLd) }}
       />
 
-      <section className="mx-auto w-full max-w-md">
-        <header className="mb-5">
-          <div className="relative overflow-hidden rounded-[2.25rem] border border-amber-400/20 bg-[radial-gradient(circle_at_top_right,_rgba(245,158,11,0.28),_transparent_36%),linear-gradient(135deg,_#171717,_#0a0a0a_58%,_#451a03)] p-6 shadow-2xl shadow-black/50">
-            <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-amber-400/20 blur-3xl" />
-            <div className="pointer-events-none absolute -bottom-24 -left-20 h-56 w-56 rounded-full bg-orange-500/10 blur-3xl" />
+      <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
+        <div className="floating-orb floating-orb--one" />
+        <div className="floating-orb floating-orb--two" />
+        <div className="floating-orb floating-orb--three" />
+        <div className="ambient-grid" />
+      </div>
+
+      <section className="relative z-10 mx-auto w-full max-w-2xl">
+        <header className="mb-7">
+          <div className="hero-modern group">
+            <div className="hero-modern__shine" />
+            <div className="hero-modern__mesh" />
+            <div className="hero-modern__ring hero-modern__ring--one" />
+            <div className="hero-modern__ring hero-modern__ring--two" />
 
             <div className="relative z-10">
-              <div className="mb-7 text-center">
-                <h1 className="flex flex-nowrap items-center justify-center gap-2 text-[2.25rem] font-black leading-none tracking-tight sm:gap-3 sm:text-5xl">
-                  <span className="text-white">Nuts</span>
-                  <span className="flex h-12 w-12 shrink-0 items-center justify-center">
+              <div className="text-center">
+                <h1 className="hero-title flex flex-nowrap items-center justify-center gap-2 text-[2.5rem] font-black leading-none tracking-tight sm:gap-4 sm:text-6xl">
+                  <span className="text-[var(--theme-heading)]">Nuts</span>
+                  <span className="hero-logo-wrap flex h-14 w-14 shrink-0 items-center justify-center sm:h-16 sm:w-16">
                     <Image
                       src="/nutsnews-logo.png"
                       alt="NutsNews logo"
-                      width={96}
-                      height={96}
+                      width={128}
+                      height={128}
                       preload
                       className="h-full w-full object-contain"
                     />
                   </span>
-                  <span className="text-amber-300">News</span>
+                  <span className="text-[var(--theme-accent)]">News</span>
                 </h1>
 
-                <p className="mt-3 whitespace-nowrap text-[0.7rem] font-bold uppercase tracking-[0.16em] text-amber-200 sm:text-base sm:tracking-[0.24em]">
-                  Positive News, Simplified
-                </p>
+                <div className="mt-5 text-center">
+                  <p className="hero-tagline mx-auto max-w-max" aria-label="Positive News, Simplified">
+                    <span className="hero-tagline__spark" aria-hidden="true" />
+                    <span className="hero-tagline__text">
+                      <span className="hero-tagline__word hero-tagline__word--soft">Positive News,</span>
+                      <span className="hero-tagline__word hero-tagline__word--accent">Simplified</span>
+                    </span>
+                  </p>
+                </div>
               </div>
-
-              <p className="mx-auto max-w-sm text-center text-base leading-7 text-neutral-300">
-                A calm feed of uplifting stories, curated by Artificial Intelligence.
-              </p>
             </div>
           </div>
         </header>

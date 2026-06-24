@@ -4,14 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Article } from "@/lib/articles";
 import { OptimizedArticleImage } from "./OptimizedArticleImage";
 
-const categoryDotStyles = [
-  "bg-amber-200 shadow-[0_0_10px_rgba(253,230,138,0.95)]",
-  "bg-amber-300 shadow-[0_0_10px_rgba(252,211,77,0.95)]",
-  "bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.95)]",
-  "bg-orange-300 shadow-[0_0_10px_rgba(253,186,116,0.95)]",
-  "bg-orange-400 shadow-[0_0_10px_rgba(251,146,60,0.95)]",
-  "bg-yellow-300 shadow-[0_0_10px_rgba(253,224,71,0.95)]",
-];
 
 type ArticleFeedProps = {
   initialArticles: Article[];
@@ -76,8 +68,8 @@ function getCategoryBadges(category: string | null) {
 function LoadingIndicator() {
   return (
     <div className="flex items-center justify-center py-7" aria-live="polite">
-      <div className="inline-flex items-center gap-3 rounded-full border border-amber-300/15 bg-neutral-950/70 px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-amber-100 shadow-2xl shadow-black/40">
-        <span className="h-2 w-2 animate-pulse rounded-full bg-amber-300 shadow-[0_0_12px_rgba(252,211,77,0.9)]" />
+      <div className="loading-pill">
+        <span className="loading-pill__dot" />
         Loading more stories
       </div>
     </div>
@@ -126,40 +118,39 @@ function ArticleCard({ article, index }: { article: Article; index: number }) {
     <article
       ref={cardRef}
       style={{ transitionDelay: isVisible ? revealDelay : "0ms" }}
-      className={`overflow-hidden rounded-[2rem] border border-amber-300/20 bg-gradient-to-br from-neutral-950 via-neutral-950 to-amber-950/20 shadow-2xl shadow-black/50 transition-all duration-700 ease-out will-change-transform motion-reduce:translate-y-0 motion-reduce:opacity-100 motion-reduce:blur-0 motion-reduce:transition-none ${
+      className={`article-card-modern group transition-all duration-700 ease-out will-change-transform motion-reduce:translate-y-0 motion-reduce:opacity-100 motion-reduce:blur-0 motion-reduce:transition-none ${
         isVisible
           ? "translate-y-0 opacity-100 blur-0"
           : "translate-y-8 opacity-0 blur-[2px]"
       }`}
     >
-      <div className="relative aspect-[16/10] overflow-hidden bg-neutral-900">
+      <div className="article-card-modern__image relative aspect-[16/10] overflow-hidden">
         <OptimizedArticleImage src={article.image_url} eager={index === 0} />
+        <div className="article-card-modern__image-glow" aria-hidden="true" />
       </div>
 
-      <div className="space-y-4 p-5">
+      <div className="article-card-modern__body space-y-4 p-5 sm:p-6">
         <div className="flex flex-wrap gap-2">
           {categoryBadges.map((category, index) => (
             <span
               key={`${article.id}-${category}-${index}`}
-              className="inline-flex items-center gap-2 rounded-full border border-amber-300/25 bg-gradient-to-r from-amber-400/20 via-yellow-400/10 to-orange-500/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-amber-100 shadow-sm shadow-amber-950/30"
+              className="category-badge"
             >
               <span
                 aria-hidden="true"
-                className={`h-1.5 w-1.5 rounded-full ${
-                  categoryDotStyles[index % categoryDotStyles.length]
-                }`}
+                className="category-badge__dot"
               />
               {category}
             </span>
           ))}
         </div>
 
-        <h2 className="text-2xl font-black leading-tight tracking-[-0.04em] text-amber-50">
+        <h2 className="article-card-modern__title text-2xl font-black leading-tight tracking-[-0.04em] sm:text-[1.7rem]">
           {article.title}
         </h2>
 
         {article.ai_summary ? (
-          <p className="text-[15px] leading-7 text-neutral-300">
+          <p className="article-card-modern__summary text-[15px] leading-7">
             {article.ai_summary}
           </p>
         ) : null}
@@ -168,12 +159,12 @@ function ArticleCard({ article, index }: { article: Article; index: number }) {
           href={article.original_url}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-amber-300 via-amber-400 to-orange-400 px-5 py-3 text-sm font-black uppercase tracking-[0.12em] text-neutral-950 shadow-lg shadow-amber-950/30 transition hover:scale-[1.01] hover:from-amber-200 hover:to-orange-300"
+          className="read-story-button"
         >
           Read full story
         </a>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-amber-300/10 pt-4 text-[11px] font-bold uppercase tracking-[0.14em] text-neutral-500">
+        <div className="article-card-modern__meta flex flex-wrap items-center justify-between gap-3 border-t pt-4 text-[11px] font-bold uppercase tracking-[0.14em]">
           <span>{formatSiteDate(article.published_on_site_at)}</span>
           <span>{formatSourceLabel(article.source)}</span>
         </div>
@@ -279,15 +270,15 @@ export function ArticleFeed({
   return (
     <>
       {articles.length === 0 ? (
-        <div className="rounded-[2rem] border border-amber-300/20 bg-neutral-950/80 px-5 py-8 text-center shadow-2xl shadow-black/40">
-          <p className="text-sm font-semibold text-amber-100">
+        <div className="empty-feed-card px-5 py-8 text-center">
+          <p className="text-sm font-semibold">
             No uplifting stories are available yet. Please check back soon.
           </p>
         </div>
       ) : null}
 
       {articles.length > 0 ? (
-        <div className="space-y-6">
+        <div className="space-y-6 sm:space-y-7">
           {articles.map((article, index) => (
             <ArticleCard key={article.id} article={article} index={index} />
           ))}
@@ -299,14 +290,14 @@ export function ArticleFeed({
       {isLoading ? <LoadingIndicator /> : null}
 
       {loadError ? (
-        <div className="mt-5 rounded-[1.55rem] border border-amber-300/20 bg-neutral-950/80 p-4 text-center shadow-2xl shadow-black/40">
-          <p className="text-sm font-semibold text-amber-100">
+        <div className="empty-feed-card mt-5 p-4 text-center">
+          <p className="text-sm font-semibold">
             Could not load more stories.
           </p>
           <button
             type="button"
             onClick={() => void loadMoreArticles()}
-            className="mt-3 inline-flex items-center justify-center rounded-full bg-gradient-to-r from-amber-300 via-amber-400 to-orange-400 px-4 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-neutral-950 shadow-lg shadow-amber-950/30 transition hover:from-amber-200 hover:to-orange-300"
+            className="read-story-button mt-3 px-4 py-2 text-[11px]"
           >
             Try again
           </button>
