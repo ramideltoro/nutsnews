@@ -908,14 +908,17 @@ body {
 
 .language-option__badge {
   display: grid;
-  height: 1.95rem;
-  min-width: 2.45rem;
+  height: 2.55rem;
+  width: 2.55rem;
+  min-width: 2.55rem;
   place-items: center;
+  overflow: hidden;
   border: 1px solid var(--theme-border);
   border-radius: 9999px;
   background: var(--theme-glow-soft);
   color: var(--theme-accent-soft);
-  font-size: 1.02rem;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 1.5rem;
   font-weight: 950;
   letter-spacing: 0;
   line-height: 1;

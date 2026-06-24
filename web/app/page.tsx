@@ -2,6 +2,7 @@ import Image from "next/image";
 export const revalidate = 300;
 
 import { ArticleFeed } from "./components/ArticleFeed";
+import { HeroTagline } from "./components/HeroTagline";
 import { SiteFooter } from "./components/SiteFooter";
 import { getPublishedArticles, SITE_URL } from "@/lib/articles";
 
@@ -70,13 +71,7 @@ export default async function Home() {
                 </h1>
 
                 <div className="mt-5 text-center">
-                  <p className="hero-tagline mx-auto max-w-max" aria-label="Positive News, Simplified">
-                    <span className="hero-tagline__spark" aria-hidden="true" />
-                    <span className="hero-tagline__text">
-                      <span className="hero-tagline__word hero-tagline__word--soft">Positive News,</span>
-                      <span className="hero-tagline__word hero-tagline__word--accent">Simplified</span>
-                    </span>
-                  </p>
+                  <HeroTagline />
                 </div>
               </div>
             </div>
