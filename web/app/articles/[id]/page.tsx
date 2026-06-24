@@ -13,6 +13,9 @@ type ArticlePageProps = {
   params: Promise<{
     id: string;
   }>;
+  searchParams?: Promise<{
+    lang?: string;
+  }>;
 };
 
 function formatDate(dateValue: string | null) {
@@ -29,9 +32,11 @@ function formatDate(dateValue: string | null) {
 
 export async function generateMetadata({
                                          params,
+                                         searchParams,
                                        }: ArticlePageProps): Promise<Metadata> {
   const { id } = await params;
-  const article = await getArticleById(id);
+  const { lang } = (await searchParams) ?? {};
+  const article = await getArticleById(id, lang);
 
   if (!article) {
     return {
@@ -80,9 +85,10 @@ export async function generateMetadata({
   };
 }
 
-export default async function ArticlePage({ params }: ArticlePageProps) {
+export default async function ArticlePage({ params, searchParams }: ArticlePageProps) {
   const { id } = await params;
-  const article = await getArticleById(id);
+  const { lang } = (await searchParams) ?? {};
+  const article = await getArticleById(id, lang);
 
   if (!article) {
     notFound();

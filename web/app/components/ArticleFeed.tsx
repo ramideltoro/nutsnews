@@ -2,6 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Article } from "@/lib/articles";
+import {
+  DEFAULT_LANGUAGE_CODE,
+  LANGUAGE_CHANGE_EVENT,
+  LANGUAGE_STORAGE_KEY,
+  type LanguageCode,
+  isSupportedLanguageCode,
+} from "@/lib/languages";
 import { OptimizedArticleImage } from "./OptimizedArticleImage";
 
 
@@ -18,18 +25,70 @@ type ArticlesResponse = {
   error?: string;
 };
 
-function formatSiteDate(dateValue: string | null) {
+const copyByLanguage: Record<LanguageCode, {
+  recently: string;
+  loadingMore: string;
+  readFullStory: string;
+  emptyFeed: string;
+  loadError: string;
+  tryAgain: string;
+}> = {
+  en: {
+    recently: "Recently",
+    loadingMore: "Loading more stories",
+    readFullStory: "Read full story",
+    emptyFeed: "No uplifting stories are available yet. Please check back soon.",
+    loadError: "Could not load more stories.",
+    tryAgain: "Try again",
+  },
+  fr: {
+    recently: "Récemment",
+    loadingMore: "Chargement d’autres histoires",
+    readFullStory: "Lire l’article complet",
+    emptyFeed: "Aucune histoire positive n’est disponible pour le moment. Revenez bientôt.",
+    loadError: "Impossible de charger plus d’histoires.",
+    tryAgain: "Réessayer",
+  },
+};
+
+const categoryLabelsFr: Record<string, string> = {
+  Achievement: "Réussite",
+  Animals: "Animaux",
+  Community: "Communauté",
+  Creativity: "Créativité",
+  Culture: "Culture",
+  Lifestyle: "Art de vivre",
+  Nature: "Nature",
+  Science: "Science",
+  Space: "Espace",
+  Travel: "Voyage",
+  Uplifting: "Positif",
+  Wellness: "Bien-être",
+};
+
+function getStoredLanguage(): LanguageCode {
+  if (typeof window === "undefined") {
+    return DEFAULT_LANGUAGE_CODE;
+  }
+
+  const storedLanguage = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+  return isSupportedLanguageCode(storedLanguage)
+    ? storedLanguage
+    : DEFAULT_LANGUAGE_CODE;
+}
+
+function formatSiteDate(dateValue: string | null, languageCode: LanguageCode) {
   if (!dateValue) {
-    return "Recently";
+    return copyByLanguage[languageCode].recently;
   }
 
   const parsedDate = new Date(dateValue);
 
   if (Number.isNaN(parsedDate.getTime())) {
-    return "Recently";
+    return copyByLanguage[languageCode].recently;
   }
 
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat(languageCode === "fr" ? "fr-FR" : "en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -50,8 +109,16 @@ function formatSourceLabel(source: string | null) {
   return cleanedSource || "NutsNews";
 }
 
-function getCategoryBadges(category: string | null) {
-  const fallback = ["Uplifting"];
+function translateCategoryBadge(category: string, languageCode: LanguageCode) {
+  if (languageCode !== "fr") {
+    return category;
+  }
+
+  return categoryLabelsFr[category] ?? category;
+}
+
+function getCategoryBadges(category: string | null, languageCode: LanguageCode) {
+  const fallback = [languageCode === "fr" ? "Positif" : "Uplifting"];
 
   if (!category) {
     return fallback;
@@ -60,24 +127,33 @@ function getCategoryBadges(category: string | null) {
   const badges = category
     .split(/[|,;/]+/)
     .map((item) => item.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .map((item) => translateCategoryBadge(item, languageCode));
 
   return badges.length > 0 ? badges : fallback;
 }
 
-function LoadingIndicator() {
+function LoadingIndicator({ languageCode }: { languageCode: LanguageCode }) {
   return (
     <div className="flex items-center justify-center py-7" aria-live="polite">
       <div className="loading-pill">
         <span className="loading-pill__dot" />
-        Loading more stories
+        {copyByLanguage[languageCode].loadingMore}
       </div>
     </div>
   );
 }
 
-function ArticleCard({ article, index }: { article: Article; index: number }) {
-  const categoryBadges = getCategoryBadges(article.category);
+function ArticleCard({
+  article,
+  index,
+  languageCode,
+}: {
+  article: Article;
+  index: number;
+  languageCode: LanguageCode;
+}) {
+  const categoryBadges = getCategoryBadges(article.category, languageCode);
   const cardRef = useRef<HTMLElement | null>(null);
   const [isVisible, setIsVisible] = useState(false);
 
@@ -123,6 +199,7 @@ function ArticleCard({ article, index }: { article: Article; index: number }) {
           ? "translate-y-0 opacity-100 blur-0"
           : "translate-y-8 opacity-0 blur-[2px]"
       }`}
+      lang={article.language_code ?? languageCode}
     >
       <div className="article-card-modern__image relative aspect-[16/10] overflow-hidden">
         <OptimizedArticleImage src={article.image_url} eager={index === 0} />
@@ -161,11 +238,11 @@ function ArticleCard({ article, index }: { article: Article; index: number }) {
           rel="noreferrer"
           className="read-story-button"
         >
-          Read full story
+          {copyByLanguage[languageCode].readFullStory}
         </a>
 
         <div className="article-card-modern__meta flex flex-wrap items-center justify-between gap-3 border-t pt-4 text-[11px] font-bold uppercase tracking-[0.14em]">
-          <span>{formatSiteDate(article.published_on_site_at)}</span>
+          <span>{formatSiteDate(article.published_on_site_at, languageCode)}</span>
           <span>{formatSourceLabel(article.source)}</span>
         </div>
       </div>
@@ -181,12 +258,109 @@ export function ArticleFeed({
   const [articles, setArticles] = useState(initialArticles);
   const [nextPage, setNextPage] = useState(initialNextPage);
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
+  const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(DEFAULT_LANGUAGE_CODE);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const isReloadingLanguageRef = useRef(false);
+
+  const fetchArticles = useCallback(async ({
+    page,
+    cursor,
+    languageCode,
+  }: {
+    page: number | null;
+    cursor: string | null;
+    languageCode: LanguageCode;
+  }) => {
+    const query = new URLSearchParams();
+
+    if (page !== null) {
+      query.set("page", String(page));
+    } else if (cursor) {
+      query.set("cursor", cursor);
+    }
+
+    if (languageCode !== DEFAULT_LANGUAGE_CODE) {
+      query.set("lang", languageCode);
+    }
+
+    const response = await fetch(`/api/articles?${query.toString()}`, {
+      headers: {
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Articles API returned ${response.status}`);
+    }
+
+    const data = (await response.json()) as ArticlesResponse;
+
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    return data;
+  }, []);
+
+  const loadFirstPageForLanguage = useCallback(async (languageCode: LanguageCode) => {
+    isReloadingLanguageRef.current = true;
+    setIsLoading(true);
+    setLoadError(null);
+
+    try {
+      const data = await fetchArticles({
+        page: 0,
+        cursor: null,
+        languageCode,
+      });
+
+      setArticles(data.articles);
+      setNextPage(Number.isFinite(data.nextPage) ? data.nextPage : null);
+      setNextCursor(data.nextCursor ?? null);
+      document.documentElement.lang = languageCode;
+    } catch (error) {
+      setLoadError(
+        error instanceof Error
+          ? error.message
+          : copyByLanguage[languageCode].loadError,
+      );
+    } finally {
+      isReloadingLanguageRef.current = false;
+      setIsLoading(false);
+    }
+  }, [fetchArticles]);
+
+  useEffect(() => {
+    const storedLanguage = getStoredLanguage();
+    document.documentElement.lang = storedLanguage;
+
+    if (storedLanguage !== DEFAULT_LANGUAGE_CODE) {
+      window.setTimeout(() => {
+        setSelectedLanguage(storedLanguage);
+        void loadFirstPageForLanguage(storedLanguage);
+      }, 0);
+    }
+
+    const handleLanguageChange = (event: Event) => {
+      const nextLanguage = (event as CustomEvent<{ languageCode?: string }>).detail?.languageCode;
+
+      if (!isSupportedLanguageCode(nextLanguage)) {
+        return;
+      }
+
+      setSelectedLanguage(nextLanguage);
+      void loadFirstPageForLanguage(nextLanguage);
+    };
+
+    window.addEventListener(LANGUAGE_CHANGE_EVENT, handleLanguageChange);
+
+    return () => window.removeEventListener(LANGUAGE_CHANGE_EVENT, handleLanguageChange);
+  }, [loadFirstPageForLanguage]);
 
   const loadMoreArticles = useCallback(async () => {
-    if ((nextPage === null && !nextCursor) || isLoading) {
+    if ((nextPage === null && !nextCursor) || isLoading || isReloadingLanguageRef.current) {
       return;
     }
 
@@ -194,33 +368,11 @@ export function ArticleFeed({
     setLoadError(null);
 
     try {
-      const query = new URLSearchParams();
-
-      // Offset pagination is the primary path for the public feed because it
-      // works with both the public feed snapshot and the canonical articles
-      // table in production. Cursor pagination remains as a fallback for older
-      // cached homepage payloads that only contain a cursor.
-      if (nextPage !== null) {
-        query.set("page", String(nextPage));
-      } else if (nextCursor) {
-        query.set("cursor", nextCursor);
-      }
-
-      const response = await fetch(`/api/articles?${query.toString()}`, {
-        headers: {
-          Accept: "application/json",
-        },
+      const data = await fetchArticles({
+        page: nextPage,
+        cursor: nextCursor,
+        languageCode: selectedLanguage,
       });
-
-      if (!response.ok) {
-        throw new Error(`Articles API returned ${response.status}`);
-      }
-
-      const data = (await response.json()) as ArticlesResponse;
-
-      if (data.error) {
-        throw new Error(data.error);
-      }
 
       setArticles((currentArticles) => {
         const seenIds = new Set(currentArticles.map((article) => article.id));
@@ -236,12 +388,12 @@ export function ArticleFeed({
       setLoadError(
         error instanceof Error
           ? error.message
-          : "Could not load more stories right now.",
+          : copyByLanguage[selectedLanguage].loadError,
       );
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, nextCursor, nextPage]);
+  }, [fetchArticles, isLoading, nextCursor, nextPage, selectedLanguage]);
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -252,7 +404,9 @@ export function ArticleFeed({
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting) {
+        const entry = entries[0];
+
+        if (entry?.isIntersecting) {
           void loadMoreArticles();
         }
       },
@@ -272,7 +426,7 @@ export function ArticleFeed({
       {articles.length === 0 ? (
         <div className="empty-feed-card px-5 py-8 text-center">
           <p className="text-sm font-semibold">
-            No uplifting stories are available yet. Please check back soon.
+            {copyByLanguage[selectedLanguage].emptyFeed}
           </p>
         </div>
       ) : null}
@@ -280,26 +434,31 @@ export function ArticleFeed({
       {articles.length > 0 ? (
         <div className="space-y-6 sm:space-y-7">
           {articles.map((article, index) => (
-            <ArticleCard key={article.id} article={article} index={index} />
+            <ArticleCard
+              key={article.id}
+              article={article}
+              index={index}
+              languageCode={selectedLanguage}
+            />
           ))}
         </div>
       ) : null}
 
       <div ref={sentinelRef} aria-hidden="true" className="h-8" />
 
-      {isLoading ? <LoadingIndicator /> : null}
+      {isLoading ? <LoadingIndicator languageCode={selectedLanguage} /> : null}
 
       {loadError ? (
         <div className="empty-feed-card mt-5 p-4 text-center">
           <p className="text-sm font-semibold">
-            Could not load more stories.
+            {copyByLanguage[selectedLanguage].loadError}
           </p>
           <button
             type="button"
             onClick={() => void loadMoreArticles()}
             className="read-story-button mt-3 px-4 py-2 text-[11px]"
           >
-            Try again
+            {copyByLanguage[selectedLanguage].tryAgain}
           </button>
         </div>
       ) : null}

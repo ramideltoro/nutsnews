@@ -5,6 +5,7 @@ import {
   getPublishedArticlesByCursor,
   PAGE_SIZE,
 } from "@/lib/articles";
+import { normalizeLanguageCode } from "@/lib/languages";
 import { ARTICLE_API_CACHE_HEADERS, BYPASS_CACHE_HEADERS } from "@/lib/cacheHeaders";
 import { logError, logInfo } from "@/lib/logger";
 
@@ -29,6 +30,7 @@ export async function GET(request: Request) {
   const page = parsePage(searchParams.get("page"));
   const cursor = searchParams.get("cursor");
   const category = searchParams.get("category");
+  const languageCode = normalizeLanguageCode(searchParams.get("lang"));
   const paginationMode = cursor ? "cursor" : "offset";
 
   await logInfo("api.articles.request_started", "Articles API request started", {
@@ -39,12 +41,13 @@ export async function GET(request: Request) {
     paginationMode,
     pageSize: PAGE_SIZE,
     category: category ?? "all",
+    languageCode,
   });
 
   try {
     const result = cursor
-      ? await getPublishedArticlesByCursor(cursor, category)
-      : await getPublishedArticles(page, category);
+      ? await getPublishedArticlesByCursor(cursor, category, languageCode)
+      : await getPublishedArticles(page, category, languageCode);
 
     await logInfo(
       "api.articles.request_completed",
@@ -58,6 +61,7 @@ export async function GET(request: Request) {
         paginationMode,
         pageSize: PAGE_SIZE,
         category: category ?? "all",
+        languageCode,
         articleCount: result.articles.length,
         nextPage: result.nextPage,
         hasNextCursor: Boolean(result.nextCursor),
@@ -72,6 +76,7 @@ export async function GET(request: Request) {
         "X-NutsNews-Article-Page-Size": String(PAGE_SIZE),
         "X-NutsNews-Article-Pagination": paginationMode,
         "X-NutsNews-Article-Fields": "card",
+        "X-NutsNews-Article-Language": languageCode,
         "X-NutsNews-Article-Data-Source": result.dataSource,
         "X-NutsNews-Feed-Snapshot": result.dataSource === "public_feed_snapshot" ? "hit" : "fallback",
       },
@@ -90,6 +95,7 @@ export async function GET(request: Request) {
         paginationMode,
         pageSize: PAGE_SIZE,
         category: category ?? "all",
+        languageCode,
         durationMs: Date.now() - startedAt,
       },
     );

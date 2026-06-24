@@ -48,9 +48,16 @@ const themeInitScript = `
     root.setAttribute("data-nutsnews-theme", theme);
     root.style.colorScheme = "dark";
     updateBrowserThemeColor(theme);
+
+    var languageStorageKey = "nutsnews.web.language";
+    var allowedLanguages = { en: true, fr: true };
+    var storedLanguage = window.localStorage.getItem(languageStorageKey);
+    var language = allowedLanguages[storedLanguage] ? storedLanguage : "en";
+    root.setAttribute("lang", language);
   } catch (_) {
     document.documentElement.setAttribute("data-nutsnews-theme", "amber");
     document.documentElement.style.colorScheme = "dark";
+    document.documentElement.setAttribute("lang", "en");
     updateBrowserThemeColor("amber");
   }
 })();

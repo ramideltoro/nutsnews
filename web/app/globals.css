@@ -745,6 +745,39 @@ body {
   color: var(--theme-accent-soft);
 }
 
+.theme-panel__section {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.theme-panel__section + .theme-panel__section {
+  margin-top: 0.9rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  padding-top: 0.9rem;
+}
+
+.theme-panel__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0 0.12rem;
+}
+
+.theme-panel__section-title,
+.theme-panel__section-active {
+  color: var(--theme-muted-strong);
+  font-size: 0.64rem;
+  font-weight: 900;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.theme-panel__section-active {
+  color: var(--theme-accent-soft);
+  text-align: right;
+}
+
 .theme-panel__options {
   display: grid;
   gap: 0.55rem;
@@ -786,6 +819,20 @@ body {
 
 .theme-option__swatch + .theme-option__swatch {
   margin-left: -0.32rem;
+}
+
+.language-option__badge {
+  display: grid;
+  height: 1.95rem;
+  min-width: 2.45rem;
+  place-items: center;
+  border: 1px solid var(--theme-border);
+  border-radius: 9999px;
+  background: var(--theme-glow-soft);
+  color: var(--theme-accent-soft);
+  font-size: 0.7rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
 }
 
 .theme-option__copy {

@@ -1,5 +1,10 @@
 import { cache } from "react";
 import { supabase } from "@/lib/supabase";
+import {
+  DEFAULT_LANGUAGE_CODE,
+  type LanguageCode,
+  normalizeLanguageCode,
+} from "@/lib/languages";
 
 export const PAGE_SIZE = 5;
 export const SITE_URL = "https://www.nutsnews.com";
@@ -16,12 +21,22 @@ export type Article = {
   ai_summary: string | null;
   category: string | null;
   positivity_score: number | null;
+  language_code?: LanguageCode;
+  requested_language_code?: LanguageCode;
+  translation_available?: boolean;
 };
 
 export type PublishedArticleDataSource = "public_feed_snapshot" | "articles_fallback";
 
 const ARTICLE_SELECT =
   "id, source, title, original_url, image_url, published_at, published_on_site_at, ai_summary, category, positivity_score";
+
+type ArticleSummaryRow = {
+  original_url: string;
+  language_code: string;
+  title: string;
+  summary: string;
+};
 
 function cleanCategory(category?: string | null) {
   const cleanedCategory = category?.trim();
@@ -58,6 +73,7 @@ export type PublishedArticlesResult = {
   nextPage: number | null;
   nextCursor: string | null;
   dataSource: PublishedArticleDataSource;
+  languageCode: LanguageCode;
 };
 
 function encodeArticleCursor(article: Article) {
@@ -124,33 +140,107 @@ function basePublicFeedSnapshotQuery(category?: string | null) {
   return query;
 }
 
-function shapePublishedArticlesResult({
+async function applyArticleSummaries(
+  articles: Article[],
+  requestedLanguageCode: LanguageCode,
+): Promise<Article[]> {
+  if (requestedLanguageCode === DEFAULT_LANGUAGE_CODE || articles.length === 0) {
+    return articles.map((article) => ({
+      ...article,
+      language_code: DEFAULT_LANGUAGE_CODE,
+      requested_language_code: requestedLanguageCode,
+      translation_available: true,
+    }));
+  }
+
+  const originalUrls = articles
+    .map((article) => article.original_url)
+    .filter(Boolean);
+
+  if (originalUrls.length === 0) {
+    return articles.map((article) => ({
+      ...article,
+      language_code: DEFAULT_LANGUAGE_CODE,
+      requested_language_code: requestedLanguageCode,
+      translation_available: false,
+    }));
+  }
+
+  const { data, error } = await supabase
+    .from("article_summaries")
+    .select("original_url, language_code, title, summary")
+    .eq("language_code", requestedLanguageCode)
+    .in("original_url", originalUrls);
+
+  if (error) {
+    console.error("Failed to load localized article summaries. Falling back to English:", error);
+    return articles.map((article) => ({
+      ...article,
+      language_code: DEFAULT_LANGUAGE_CODE,
+      requested_language_code: requestedLanguageCode,
+      translation_available: false,
+    }));
+  }
+
+  const summariesByUrl = new Map(
+    ((data ?? []) as ArticleSummaryRow[]).map((summary) => [summary.original_url, summary]),
+  );
+
+  return articles.map((article) => {
+    const localizedSummary = summariesByUrl.get(article.original_url);
+
+    if (!localizedSummary) {
+      return {
+        ...article,
+        language_code: DEFAULT_LANGUAGE_CODE,
+        requested_language_code: requestedLanguageCode,
+        translation_available: false,
+      };
+    }
+
+    return {
+      ...article,
+      title: localizedSummary.title || article.title,
+      ai_summary: localizedSummary.summary || article.ai_summary,
+      language_code: requestedLanguageCode,
+      requested_language_code: requestedLanguageCode,
+      translation_available: true,
+    };
+  });
+}
+
+async function shapePublishedArticlesResult({
   data,
   page,
   includeNextPage,
   dataSource,
+  languageCode,
 }: {
   data: Article[] | null;
   page: number;
   includeNextPage: boolean;
   dataSource: PublishedArticleDataSource;
-}): PublishedArticlesResult {
+  languageCode: LanguageCode;
+}): Promise<PublishedArticlesResult> {
   const rows = data ?? [];
   const hasMore = rows.length > PAGE_SIZE;
-  const articles = rows.slice(0, PAGE_SIZE);
-  const lastArticle = articles.at(-1);
+  const baseArticles = rows.slice(0, PAGE_SIZE);
+  const articles = await applyArticleSummaries(baseArticles, languageCode);
+  const lastArticle = baseArticles.at(-1);
 
   return {
     articles,
     nextPage: includeNextPage && hasMore ? page + 1 : null,
     nextCursor: hasMore && lastArticle ? encodeArticleCursor(lastArticle) : null,
     dataSource,
+    languageCode,
   };
 }
 
 async function getPublishedArticlesFromSnapshot(
   safePage: number,
   category?: string | null,
+  languageCode: LanguageCode = DEFAULT_LANGUAGE_CODE,
 ): Promise<PublishedArticlesResult | null> {
   const from = safePage * PAGE_SIZE;
   const to = from + PAGE_SIZE;
@@ -169,12 +259,14 @@ async function getPublishedArticlesFromSnapshot(
     page: safePage,
     includeNextPage: true,
     dataSource: "public_feed_snapshot",
+    languageCode,
   });
 }
 
 async function getPublishedArticlesFromSourceTable(
   safePage: number,
   category?: string | null,
+  languageCode: LanguageCode = DEFAULT_LANGUAGE_CODE,
 ): Promise<PublishedArticlesResult> {
   const from = safePage * PAGE_SIZE;
   const to = from + PAGE_SIZE;
@@ -192,6 +284,7 @@ async function getPublishedArticlesFromSourceTable(
       nextPage: null,
       nextCursor: null,
       dataSource: "articles_fallback",
+      languageCode,
     };
   }
 
@@ -200,23 +293,29 @@ async function getPublishedArticlesFromSourceTable(
     page: safePage,
     includeNextPage: true,
     dataSource: "articles_fallback",
+    languageCode,
   });
 }
 
-export async function getPublishedArticles(page = 0, category?: string | null): Promise<PublishedArticlesResult> {
+export async function getPublishedArticles(
+  page = 0,
+  category?: string | null,
+  requestedLanguageCode?: string | null,
+): Promise<PublishedArticlesResult> {
   const safePage = Number.isFinite(page) && page >= 0 ? Math.floor(page) : 0;
+  const languageCode = normalizeLanguageCode(requestedLanguageCode);
 
-  const snapshotResult = await getPublishedArticlesFromSnapshot(safePage, category);
+  const snapshotResult = await getPublishedArticlesFromSnapshot(safePage, category, languageCode);
 
   if (!snapshotResult) {
-    return getPublishedArticlesFromSourceTable(safePage, category);
+    return getPublishedArticlesFromSourceTable(safePage, category, languageCode);
   }
 
   // Production can occasionally have a short or stale public_feed_snapshot.
   // If the snapshot does not prove that another page exists, verify against the
   // canonical articles table before telling the client pagination is finished.
   if (snapshotResult.nextPage === null) {
-    const sourceResult = await getPublishedArticlesFromSourceTable(safePage, category);
+    const sourceResult = await getPublishedArticlesFromSourceTable(safePage, category, languageCode);
 
     if (
       sourceResult.nextPage !== null ||
@@ -232,6 +331,7 @@ export async function getPublishedArticles(page = 0, category?: string | null): 
 async function getPublishedArticlesByCursorFromSourceTable(
   decodedCursor: ArticleCursor | null,
   category?: string | null,
+  languageCode: LanguageCode = DEFAULT_LANGUAGE_CODE,
 ): Promise<PublishedArticlesResult> {
   let query = basePublishedArticleQuery(category);
 
@@ -254,6 +354,7 @@ async function getPublishedArticlesByCursorFromSourceTable(
       nextPage: null,
       nextCursor: null,
       dataSource: "articles_fallback",
+      languageCode,
     };
   }
 
@@ -262,19 +363,22 @@ async function getPublishedArticlesByCursorFromSourceTable(
     page: 0,
     includeNextPage: false,
     dataSource: "articles_fallback",
+    languageCode,
   });
 }
 
 export async function getPublishedArticlesByCursor(
   cursor?: string | null,
   category?: string | null,
+  requestedLanguageCode?: string | null,
 ): Promise<PublishedArticlesResult> {
   const decodedCursor = decodeArticleCursor(cursor);
+  const languageCode = normalizeLanguageCode(requestedLanguageCode);
 
   // Cursor pagination is used as a backwards-compatible fallback for older
   // cached homepage payloads. Use the canonical articles table here so it does
   // not depend on the current state or ordering of the materialized snapshot.
-  return getPublishedArticlesByCursorFromSourceTable(decodedCursor, category);
+  return getPublishedArticlesByCursorFromSourceTable(decodedCursor, category, languageCode);
 }
 
 export async function getPublishedCategories(limit = 1000) {
@@ -323,7 +427,8 @@ export async function getPublishedCategories(limit = 1000) {
   return Array.from(categories).sort((a, b) => a.localeCompare(b));
 }
 
-export const getArticleById = cache(async (id: string) => {
+export const getArticleById = cache(async (id: string, requestedLanguageCode?: string | null) => {
+  const languageCode = normalizeLanguageCode(requestedLanguageCode);
   const { data, error } = await supabase
     .from("articles")
     .select(ARTICLE_SELECT)
@@ -338,7 +443,8 @@ export const getArticleById = cache(async (id: string) => {
     return null;
   }
 
-  return data as Article;
+  const [article] = await applyArticleSummaries([data as Article], languageCode);
+  return article ?? null;
 });
 
 export async function getRecentArticleSitemapItems(limit = 1000) {

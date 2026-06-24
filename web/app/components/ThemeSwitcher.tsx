@@ -1,6 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  DEFAULT_LANGUAGE_CODE,
+  LANGUAGE_CHANGE_EVENT,
+  LANGUAGE_STORAGE_KEY,
+  SUPPORTED_LANGUAGES,
+  type LanguageCode,
+  isSupportedLanguageCode,
+  getLanguageLabel,
+} from "@/lib/languages";
 
 const THEME_STORAGE_KEY = "nutsnews.web.theme";
 
@@ -65,6 +74,27 @@ function applyTheme(themeId: ThemeId) {
   updateBrowserThemeColor(themeId);
 }
 
+function getStoredLanguage(): LanguageCode {
+  if (typeof window === "undefined") {
+    return DEFAULT_LANGUAGE_CODE;
+  }
+
+  const storedLanguage = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+  return isSupportedLanguageCode(storedLanguage)
+    ? storedLanguage
+    : DEFAULT_LANGUAGE_CODE;
+}
+
+function applyLanguage(languageCode: LanguageCode) {
+  document.documentElement.lang = languageCode;
+  window.localStorage.setItem(LANGUAGE_STORAGE_KEY, languageCode);
+  window.dispatchEvent(
+    new CustomEvent(LANGUAGE_CHANGE_EVENT, {
+      detail: { languageCode },
+    }),
+  );
+}
+
 function GearIcon({ className = "" }: { className?: string }) {
   return (
     <svg
@@ -92,6 +122,7 @@ export function ThemeSwitcher() {
     const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
     return isThemeId(storedTheme) ? storedTheme : "amber";
   });
+  const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(() => getStoredLanguage());
   const [isOpen, setIsOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
 
@@ -99,6 +130,10 @@ export function ThemeSwitcher() {
     applyTheme(selectedTheme);
     window.localStorage.setItem(THEME_STORAGE_KEY, selectedTheme);
   }, [selectedTheme]);
+
+  useEffect(() => {
+    document.documentElement.lang = selectedLanguage;
+  }, [selectedLanguage]);
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -119,8 +154,15 @@ export function ThemeSwitcher() {
     [selectedTheme],
   );
 
+  const activeLanguageLabel = getLanguageLabel(selectedLanguage);
+
   function handleThemeSelect(themeId: ThemeId) {
     setSelectedTheme(themeId);
+  }
+
+  function handleLanguageSelect(languageCode: LanguageCode) {
+    setSelectedLanguage(languageCode);
+    applyLanguage(languageCode);
   }
 
   return (
@@ -146,39 +188,81 @@ export function ThemeSwitcher() {
             <p className="theme-panel__active">{activeTheme.name}</p>
           </div>
 
-          <div className="theme-panel__options">
-            {themes.map((theme) => {
-              const isSelected = theme.id === selectedTheme;
+          <div className="theme-panel__section">
+            <div className="theme-panel__section-header">
+              <h3 className="theme-panel__section-title">Theme</h3>
+            </div>
 
-              return (
-                <button
-                  key={theme.id}
-                  type="button"
-                  className={`theme-option ${isSelected ? "theme-option--active" : ""}`}
-                  aria-pressed={isSelected}
-                  onClick={() => handleThemeSelect(theme.id)}
-                >
-                  <span className="theme-option__swatches" aria-hidden="true">
-                    {theme.swatches.map((swatch) => (
-                      <span
-                        key={swatch}
-                        className="theme-option__swatch"
-                        style={{ backgroundColor: swatch }}
-                      />
-                    ))}
-                  </span>
-                  <span className="theme-option__copy">
-                    <span className="theme-option__name">{theme.name}</span>
-                    <span className="theme-option__description">
-                      {theme.description}
+            <div className="theme-panel__options">
+              {themes.map((theme) => {
+                const isSelected = theme.id === selectedTheme;
+
+                return (
+                  <button
+                    key={theme.id}
+                    type="button"
+                    className={`theme-option ${isSelected ? "theme-option--active" : ""}`}
+                    aria-pressed={isSelected}
+                    onClick={() => handleThemeSelect(theme.id)}
+                  >
+                    <span className="theme-option__swatches" aria-hidden="true">
+                      {theme.swatches.map((swatch) => (
+                        <span
+                          key={swatch}
+                          className="theme-option__swatch"
+                          style={{ backgroundColor: swatch }}
+                        />
+                      ))}
                     </span>
-                  </span>
-                  <span className="theme-option__check" aria-hidden="true">
-                    {isSelected ? "✓" : ""}
-                  </span>
-                </button>
-              );
-            })}
+                    <span className="theme-option__copy">
+                      <span className="theme-option__name">{theme.name}</span>
+                      <span className="theme-option__description">
+                        {theme.description}
+                      </span>
+                    </span>
+                    <span className="theme-option__check" aria-hidden="true">
+                      {isSelected ? "✓" : ""}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="theme-panel__section">
+            <div className="theme-panel__section-header">
+              <h3 className="theme-panel__section-title">Language</h3>
+              <p className="theme-panel__section-active">{activeLanguageLabel}</p>
+            </div>
+
+            <div className="theme-panel__options">
+              {SUPPORTED_LANGUAGES.map((language) => {
+                const isSelected = language.code === selectedLanguage;
+
+                return (
+                  <button
+                    key={language.code}
+                    type="button"
+                    className={`theme-option ${isSelected ? "theme-option--active" : ""}`}
+                    aria-pressed={isSelected}
+                    onClick={() => handleLanguageSelect(language.code)}
+                  >
+                    <span className="language-option__badge" aria-hidden="true">
+                      {language.code.toUpperCase()}
+                    </span>
+                    <span className="theme-option__copy">
+                      <span className="theme-option__name">{language.nativeLabel}</span>
+                      <span className="theme-option__description">
+                        {language.label}
+                      </span>
+                    </span>
+                    <span className="theme-option__check" aria-hidden="true">
+                      {isSelected ? "✓" : ""}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </section>
       ) : null}
