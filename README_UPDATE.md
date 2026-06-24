@@ -1,52 +1,44 @@
-# Grafana Backup Monitoring Documentation Update
+# NutsNews Local AI Summary Length Update
 
-This update documents the Grafana Cloud / PromQL backup-monitoring work for the NutsNews home server.
+This update fixes the local AI review path so accepted article summaries stop coming back in the old short 150-160 character style.
 
 ## What changed
 
-Updated documentation files:
+- Updated `local-ai-service/server.mjs` to default accepted summaries to `260-340` characters.
+- Strengthened the local AI prompt to explicitly avoid 150-160 character summaries.
+- Increased the default Ollama completion budget from `260` to `320` tokens.
+- Added `summary_length`, `accepted_summary_min_chars`, and `accepted_summary_max_chars` to `/review` responses for easy verification.
+- Updated the Worker OpenAI fallback prompt to use the same 260-340 character target.
+- Updated the home-server local AI documentation and `.env.example`.
 
-- `docs/GRAFANA_BACKUP_MONITORING.md`
-- `docs/OBSERVABILITY.md`
-- `docs/HOME_SERVER_DASHBOARD.md`
-- `docs/README.md`
-- `README.md`
+## Updated files
 
-## New documentation added
+- `local-ai-service/server.mjs`
+- `local-ai-service/.env.example`
+- `worker/src/index.ts`
+- `docs/HOME_SERVER_LOCAL_AI.md`
+- `scripts/apply_local_ai_summary_length_update.sh`
 
-A new guide was added at:
+## Home server deploy command
 
-```text
-docs/GRAFANA_BACKUP_MONITORING.md
+From your Mac, after copying this update into `/Users/ramideltoro/WebstormProjects/nutsnews2`, run:
+
+```bash
+cd /Users/ramideltoro/WebstormProjects/nutsnews2
+
+bash scripts/apply_local_ai_summary_length_update.sh
 ```
 
-It covers:
+## Verify
 
-- Grafana Cloud Explore setup.
-- Prometheus data source selection.
-- How to switch to PromQL Code mode.
-- Confirmed backup metric query.
-- Backup dashboard panel recommendations.
-- PromQL for last backup success, failed state, successful state, backup age, backup count, and next backup time.
-- Alert ideas for failed backups, stale backups, and no available backups.
-- Troubleshooting when metrics do not appear.
-- Security notes about what should not be exposed in Grafana screenshots or panels.
+The `/review` response should now include:
 
-## Confirmed metric documented
-
-```promql
-home_server_backup_last_success{instance="chingadera", job="integrations/unix"}
+```json
+{
+  "summary_length": 260,
+  "accepted_summary_min_chars": 260,
+  "accepted_summary_max_chars": 340
+}
 ```
 
-Confirmed meaning:
-
-```text
-1 = last backup succeeded
-0 = last backup failed
-```
-
-## Validation performed
-
-Documentation-only update. No application source code, package files, or runtime behavior changed.
-
-Checked changed markdown files were written into the repo and included in the bundle.
+The exact `summary_length` will vary by article, but accepted stories should now land between 260 and 340 characters.
