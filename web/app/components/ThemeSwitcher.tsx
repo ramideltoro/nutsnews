@@ -14,19 +14,19 @@ const themes = [
   {
     id: "modern-saas",
     name: "The Modern SaaS",
-    description: "Charcoal, graphite, off-white, and electric blue.",
+    description: "Sleek dark blue polish.",
     swatches: ["#121212", "#1e1e1e", "#3b82f6"],
   },
   {
     id: "creative-premium",
     name: "The Creative Premium",
-    description: "Midnight navy, deep slate, muted silver, and neon purple.",
+    description: "Navy purple premium glow.",
     swatches: ["#0f172a", "#1e293b", "#7c3aed"],
   },
   {
     id: "moody-cyberpunk",
-    name: "The Moody Cyberpunk",
-    description: "Deep green-gray, oiled slate, soft gray, and cyber yellow.",
+    name: "Bambi",
+    description: "Green cyber yellow glow.",
     swatches: ["#1a211b", "#2c362f", "#facc15"],
   },
 ] as const;
