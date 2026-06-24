@@ -44,7 +44,7 @@ const promises = [
 ];
 
 const builtFeatures = [
-  "A mobile-first NutsNews website with a calm amber visual identity",
+  "A mobile first NutsNews website with a calm amber visual identity",
   "Publisher RSS ingestion that discovers fresh story candidates automatically",
   "AI-assisted filtering for uplifting, non-stressful stories",
   "Short, original summaries that help readers decide what to open",
@@ -173,7 +173,7 @@ const principles = [
       "The engineering behind NutsNews is meant to disappear into the background. Workers, caching, monitoring, and dashboards all support a simple reader promise: the site should feel fast, steady, and peaceful.",
   },
   {
-    title: "Human-centered curation",
+    title: "Human centered curation",
     description:
       "AI is used as a helper, not as a replacement for taste. The product is shaped around a clear editorial direction: fewer stressful headlines, more stories worth smiling about.",
   },
@@ -331,7 +331,7 @@ export default function AboutPage() {
         <section className="mt-6 rounded-[2rem] border border-amber-300/15 bg-neutral-900/80 p-5 shadow-xl shadow-black/25 sm:p-7">
           <SectionHeading
             eyebrow="What has been built"
-            title="A full positive-news platform, not just a page"
+            title="A full positive news platform, not just a page"
             description="NutsNews has grown into a working product with a public website, automated article pipeline, admin tools, monitoring, mobile experience, and a native iOS app foundation."
           />
 
