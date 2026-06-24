@@ -3,16 +3,16 @@ import path from "node:path";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const PUBLIC_PAGE_CACHE_CONTROL =
-  "public, max-age=60, s-maxage=300, stale-while-revalidate=3600";
+  "public, max-age=0, must-revalidate";
 
 const PUBLIC_CDN_CACHE_CONTROL =
-  "public, max-age=300, stale-while-revalidate=3600";
+  "public, s-maxage=300, stale-while-revalidate=300";
 
 const PUBLIC_LONG_CACHE_CONTROL =
-  "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400";
+  "public, max-age=0, must-revalidate";
 
 const STATIC_ASSET_CACHE_CONTROL =
-  "public, max-age=86400, stale-while-revalidate=604800";
+  "public, max-age=31536000, immutable";
 
 const NO_STORE_CACHE_CONTROL = "no-store, max-age=0";
 
@@ -135,6 +135,48 @@ const nextConfig: NextConfig = {
       {
         source: "/articles/:id/opengraph-image",
         headers: publicCacheHeaders("public-article-og-image-cache-3600s", PUBLIC_LONG_CACHE_CONTROL),
+      },
+      {
+        source: "/icon.png",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: STATIC_ASSET_CACHE_CONTROL,
+          },
+          {
+            key: "CDN-Cache-Control",
+            value: STATIC_ASSET_CACHE_CONTROL,
+          },
+          {
+            key: "Cloudflare-CDN-Cache-Control",
+            value: STATIC_ASSET_CACHE_CONTROL,
+          },
+          {
+            key: "X-NutsNews-Cache-Policy",
+            value: "public-static-asset-cache-immutable",
+          },
+        ],
+      },
+      {
+        source: "/apple-icon.png",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: STATIC_ASSET_CACHE_CONTROL,
+          },
+          {
+            key: "CDN-Cache-Control",
+            value: STATIC_ASSET_CACHE_CONTROL,
+          },
+          {
+            key: "Cloudflare-CDN-Cache-Control",
+            value: STATIC_ASSET_CACHE_CONTROL,
+          },
+          {
+            key: "X-NutsNews-Cache-Policy",
+            value: "public-static-asset-cache-immutable",
+          },
+        ],
       },
       {
         source: "/favicon.ico",

@@ -2,9 +2,17 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { AppVersionGuard } from "./components/AppVersionGuard";
 import { ThemeSwitcher } from "./components/ThemeSwitcher";
 
 const siteUrl = "https://www.nutsnews.com";
+
+const appVersion =
+  process.env.VERCEL_GIT_COMMIT_SHA ??
+  process.env.NEXT_PUBLIC_NUTSNEWS_BUILD_ID ??
+  process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ??
+  "development";
+
 
 const gaId =
   process.env.NODE_ENV === "production"
@@ -113,6 +121,7 @@ export default function RootLayout({
           </>
         ) : null}
 
+        <AppVersionGuard version={appVersion} />
         <ThemeSwitcher />
 
         {children}

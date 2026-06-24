@@ -1,13 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_PAGE_CACHE_CONTROL =
-  "public, max-age=60, s-maxage=300, stale-while-revalidate=3600";
+  "public, max-age=0, must-revalidate";
 
 const PUBLIC_CDN_CACHE_CONTROL =
-  "public, max-age=300, stale-while-revalidate=3600";
+  "public, s-maxage=300, stale-while-revalidate=300";
 
 const PUBLIC_LONG_CACHE_CONTROL =
-  "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400";
+  "public, max-age=0, must-revalidate";
 
 const NO_STORE_CACHE_CONTROL = "no-store, max-age=0";
 
@@ -64,6 +64,8 @@ function isPublicReaderRoute(pathname: string) {
   return (
     pathname === "/" ||
     pathname === "/about" ||
+    pathname === "/contact" ||
+    pathname === "/privacy" ||
     pathname === "/api/articles" ||
     pathname.startsWith("/articles/") ||
     isLongCachePublicRoute(pathname)
@@ -114,6 +116,8 @@ export const config = {
   matcher: [
     "/",
     "/about",
+    "/contact",
+    "/privacy",
     "/articles/:path*",
     "/api/articles",
     "/api/log-test",
