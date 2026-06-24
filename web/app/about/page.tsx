@@ -49,7 +49,7 @@ const builtFeatures = [
   "AI assisted filtering for uplifting, non-stressful stories",
   "Short, original summaries that help readers decide what to open",
   "Article categories for browsing by mood and theme",
-  "Thumbnail-first story cards with source and date context",
+  "Thumbnail first story cards with source and date context",
   "Infinite scrolling for a lightweight daily feed experience",
   "Contact and privacy pages for a more complete public site",
   "Admin dashboards for reviewing operations, AI usage, feeds, and system health",
