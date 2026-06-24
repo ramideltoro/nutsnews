@@ -745,6 +745,91 @@ body {
   color: var(--theme-accent-soft);
 }
 
+.theme-panel__header--with-back {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+}
+
+.theme-panel__back-button {
+  display: grid;
+  height: 2.1rem;
+  width: 2.1rem;
+  place-items: center;
+  border: 1px solid var(--theme-border);
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--theme-accent-soft);
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.theme-panel__back-button:hover {
+  border-color: var(--theme-border-strong);
+  background: var(--theme-glow-soft);
+  color: var(--theme-heading);
+  transform: translateX(-1px);
+}
+
+.theme-panel__back-icon {
+  height: 1rem;
+  width: 1rem;
+}
+
+.settings-menu-list {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.settings-menu-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.78rem;
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 1.15rem;
+  background: rgba(255, 255, 255, 0.045);
+  padding: 0.82rem 0.78rem;
+  text-align: left;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.settings-menu-item:hover {
+  border-color: var(--theme-border-strong);
+  background: var(--theme-glow-soft);
+  transform: translateY(-1px);
+}
+
+.settings-menu-item__icon {
+  display: grid;
+  min-width: 2.45rem;
+  place-items: center;
+}
+
+.settings-menu-item__copy {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.settings-menu-item__title {
+  color: var(--theme-heading);
+  font-size: 0.88rem;
+  font-weight: 950;
+}
+
+.settings-menu-item__value {
+  color: var(--theme-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.settings-menu-item__arrow {
+  height: 1.05rem;
+  width: 1.05rem;
+  color: var(--theme-accent-soft);
+  opacity: 0.86;
+}
+
 .theme-panel__section {
   display: grid;
   gap: 0.55rem;
@@ -830,9 +915,10 @@ body {
   border-radius: 9999px;
   background: var(--theme-glow-soft);
   color: var(--theme-accent-soft);
-  font-size: 0.7rem;
+  font-size: 1.02rem;
   font-weight: 950;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
+  line-height: 1;
 }
 
 .theme-option__copy {
@@ -1016,7 +1102,9 @@ body {
   .read-story-button,
   .theme-gear-button,
   .footer-icon-button,
-  .theme-option {
+  .theme-option,
+  .settings-menu-item,
+  .theme-panel__back-button {
     transition: none !important;
   }
 }

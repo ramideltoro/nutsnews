@@ -41,6 +41,7 @@ const themes = [
 ] as const;
 
 type ThemeId = (typeof themes)[number]["id"];
+type SettingsPanel = "menu" | "theme" | "language";
 
 const browserThemeColors: Record<ThemeId, string> = {
   amber: "#0a0a0a",
@@ -113,6 +114,40 @@ function GearIcon({ className = "" }: { className?: string }) {
   );
 }
 
+function ArrowIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+    >
+      <path d="m7.5 4.5 5 5.5-5 5.5" />
+    </svg>
+  );
+}
+
+function BackIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+    >
+      <path d="m12.5 4.5-5 5.5 5 5.5" />
+    </svg>
+  );
+}
+
 export function ThemeSwitcher() {
   const [selectedTheme, setSelectedTheme] = useState<ThemeId>(() => {
     if (typeof window === "undefined") {
@@ -124,6 +159,7 @@ export function ThemeSwitcher() {
   });
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(() => getStoredLanguage());
   const [isOpen, setIsOpen] = useState(false);
+  const [activePanel, setActivePanel] = useState<SettingsPanel>("menu");
   const panelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -139,6 +175,7 @@ export function ThemeSwitcher() {
     const handlePointerDown = (event: PointerEvent) => {
       if (!panelRef.current?.contains(event.target as Node)) {
         setIsOpen(false);
+        setActivePanel("menu");
       }
     };
 
@@ -154,6 +191,12 @@ export function ThemeSwitcher() {
     [selectedTheme],
   );
 
+  const activeLanguage = useMemo(
+    () =>
+      SUPPORTED_LANGUAGES.find((language) => language.code === selectedLanguage) ??
+      SUPPORTED_LANGUAGES[0],
+    [selectedLanguage],
+  );
   const activeLanguageLabel = getLanguageLabel(selectedLanguage);
 
   function handleThemeSelect(themeId: ThemeId) {
@@ -165,48 +208,52 @@ export function ThemeSwitcher() {
     applyLanguage(languageCode);
   }
 
+  function handleToggleSettings() {
+    setIsOpen((current) => {
+      const nextIsOpen = !current;
+
+      if (!nextIsOpen) {
+        setActivePanel("menu");
+      }
+
+      return nextIsOpen;
+    });
+  }
+
   return (
     <div ref={panelRef} className="theme-switcher-shell">
       <button
         type="button"
         className="theme-gear-button"
-        aria-label="Open NutsNews theme settings"
+        aria-label="Open NutsNews settings"
         aria-expanded={isOpen}
-        onClick={() => setIsOpen((current) => !current)}
+        onClick={handleToggleSettings}
       >
         <span className="theme-gear-button__halo" />
         <GearIcon className="theme-gear-button__icon" />
       </button>
 
       {isOpen ? (
-        <section className="theme-panel" aria-label="Theme settings">
-          <div className="theme-panel__header">
-            <div>
-              <p className="theme-panel__eyebrow">Settings</p>
-              <h2 className="theme-panel__title">Theme</h2>
-            </div>
-            <p className="theme-panel__active">{activeTheme.name}</p>
-          </div>
+        <section className="theme-panel" aria-label="NutsNews settings">
+          {activePanel === "menu" ? (
+            <>
+              <div className="theme-panel__header">
+                <div>
+                  <p className="theme-panel__eyebrow">Settings</p>
+                  <h2 className="theme-panel__title">Customize</h2>
+                </div>
+                <p className="theme-panel__active">NutsNews</p>
+              </div>
 
-          <div className="theme-panel__section">
-            <div className="theme-panel__section-header">
-              <h3 className="theme-panel__section-title">Theme</h3>
-            </div>
-
-            <div className="theme-panel__options">
-              {themes.map((theme) => {
-                const isSelected = theme.id === selectedTheme;
-
-                return (
-                  <button
-                    key={theme.id}
-                    type="button"
-                    className={`theme-option ${isSelected ? "theme-option--active" : ""}`}
-                    aria-pressed={isSelected}
-                    onClick={() => handleThemeSelect(theme.id)}
-                  >
-                    <span className="theme-option__swatches" aria-hidden="true">
-                      {theme.swatches.map((swatch) => (
+              <div className="settings-menu-list">
+                <button
+                  type="button"
+                  className="settings-menu-item"
+                  onClick={() => setActivePanel("theme")}
+                >
+                  <span className="settings-menu-item__icon" aria-hidden="true">
+                    <span className="theme-option__swatches">
+                      {activeTheme.swatches.map((swatch) => (
                         <span
                           key={swatch}
                           className="theme-option__swatch"
@@ -214,56 +261,135 @@ export function ThemeSwitcher() {
                         />
                       ))}
                     </span>
-                    <span className="theme-option__copy">
-                      <span className="theme-option__name">{theme.name}</span>
-                      <span className="theme-option__description">
-                        {theme.description}
+                  </span>
+                  <span className="settings-menu-item__copy">
+                    <span className="settings-menu-item__title">Theme</span>
+                    <span className="settings-menu-item__value">{activeTheme.name}</span>
+                  </span>
+                  <ArrowIcon className="settings-menu-item__arrow" />
+                </button>
+
+                <button
+                  type="button"
+                  className="settings-menu-item"
+                  onClick={() => setActivePanel("language")}
+                >
+                  <span className="language-option__badge" aria-hidden="true">
+                    {activeLanguage.flag}
+                  </span>
+                  <span className="settings-menu-item__copy">
+                    <span className="settings-menu-item__title">Language</span>
+                    <span className="settings-menu-item__value">{activeLanguageLabel}</span>
+                  </span>
+                  <ArrowIcon className="settings-menu-item__arrow" />
+                </button>
+              </div>
+            </>
+          ) : null}
+
+          {activePanel === "theme" ? (
+            <>
+              <div className="theme-panel__header theme-panel__header--with-back">
+                <button
+                  type="button"
+                  className="theme-panel__back-button"
+                  aria-label="Back to settings menu"
+                  onClick={() => setActivePanel("menu")}
+                >
+                  <BackIcon className="theme-panel__back-icon" />
+                </button>
+                <div>
+                  <p className="theme-panel__eyebrow">Settings</p>
+                  <h2 className="theme-panel__title">Theme</h2>
+                </div>
+                <p className="theme-panel__active">{activeTheme.name}</p>
+              </div>
+
+              <div className="theme-panel__options">
+                {themes.map((theme) => {
+                  const isSelected = theme.id === selectedTheme;
+
+                  return (
+                    <button
+                      key={theme.id}
+                      type="button"
+                      className={`theme-option ${isSelected ? "theme-option--active" : ""}`}
+                      aria-pressed={isSelected}
+                      onClick={() => handleThemeSelect(theme.id)}
+                    >
+                      <span className="theme-option__swatches" aria-hidden="true">
+                        {theme.swatches.map((swatch) => (
+                          <span
+                            key={swatch}
+                            className="theme-option__swatch"
+                            style={{ backgroundColor: swatch }}
+                          />
+                        ))}
                       </span>
-                    </span>
-                    <span className="theme-option__check" aria-hidden="true">
-                      {isSelected ? "✓" : ""}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="theme-panel__section">
-            <div className="theme-panel__section-header">
-              <h3 className="theme-panel__section-title">Language</h3>
-              <p className="theme-panel__section-active">{activeLanguageLabel}</p>
-            </div>
-
-            <div className="theme-panel__options">
-              {SUPPORTED_LANGUAGES.map((language) => {
-                const isSelected = language.code === selectedLanguage;
-
-                return (
-                  <button
-                    key={language.code}
-                    type="button"
-                    className={`theme-option ${isSelected ? "theme-option--active" : ""}`}
-                    aria-pressed={isSelected}
-                    onClick={() => handleLanguageSelect(language.code)}
-                  >
-                    <span className="language-option__badge" aria-hidden="true">
-                      {language.code.toUpperCase()}
-                    </span>
-                    <span className="theme-option__copy">
-                      <span className="theme-option__name">{language.nativeLabel}</span>
-                      <span className="theme-option__description">
-                        {language.label}
+                      <span className="theme-option__copy">
+                        <span className="theme-option__name">{theme.name}</span>
+                        <span className="theme-option__description">
+                          {theme.description}
+                        </span>
                       </span>
-                    </span>
-                    <span className="theme-option__check" aria-hidden="true">
-                      {isSelected ? "✓" : ""}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+                      <span className="theme-option__check" aria-hidden="true">
+                        {isSelected ? "✓" : ""}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          ) : null}
+
+          {activePanel === "language" ? (
+            <>
+              <div className="theme-panel__header theme-panel__header--with-back">
+                <button
+                  type="button"
+                  className="theme-panel__back-button"
+                  aria-label="Back to settings menu"
+                  onClick={() => setActivePanel("menu")}
+                >
+                  <BackIcon className="theme-panel__back-icon" />
+                </button>
+                <div>
+                  <p className="theme-panel__eyebrow">Settings</p>
+                  <h2 className="theme-panel__title">Language</h2>
+                </div>
+                <p className="theme-panel__active">{activeLanguageLabel}</p>
+              </div>
+
+              <div className="theme-panel__options">
+                {SUPPORTED_LANGUAGES.map((language) => {
+                  const isSelected = language.code === selectedLanguage;
+
+                  return (
+                    <button
+                      key={language.code}
+                      type="button"
+                      className={`theme-option ${isSelected ? "theme-option--active" : ""}`}
+                      aria-pressed={isSelected}
+                      onClick={() => handleLanguageSelect(language.code)}
+                    >
+                      <span className="language-option__badge" aria-hidden="true">
+                        {language.flag}
+                      </span>
+                      <span className="theme-option__copy">
+                        <span className="theme-option__name">{language.nativeLabel}</span>
+                        <span className="theme-option__description">
+                          {language.label}
+                        </span>
+                      </span>
+                      <span className="theme-option__check" aria-hidden="true">
+                        {isSelected ? "✓" : ""}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          ) : null}
         </section>
       ) : null}
     </div>

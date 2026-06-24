@@ -5,11 +5,13 @@ export const SUPPORTED_LANGUAGES = [
     code: "en",
     label: "English",
     nativeLabel: "English",
+    flag: "🇺🇸",
   },
   {
     code: "fr",
     label: "French",
     nativeLabel: "Français",
+    flag: "🇫🇷",
   },
 ] as const;
 
