@@ -14,7 +14,7 @@ The project is designed to be simple to use, inexpensive to operate, easy to mai
 | ----------------------------- | ------------------------------------------------------------------------------------------------ |
 | Product                       | Mobile-first positive news feed                                                                  |
 | Mission                       | Give readers a calmer alternative to stressful news                                              |
-| Content model                 | RSS discovery, AI-assisted filtering, short summaries, source links                              |
+| Content model                 | RSS discovery, AI assisted filtering, short summaries, source links                              |
 | Frontend                      | Next.js website hosted on Vercel                                                                 |
 | Automation                    | Cloudflare Workers process RSS feeds                                                             |
 | Worker Sharding               | Multiple Worker shards split RSS workload                                                        |
@@ -1125,7 +1125,7 @@ NutsNews currently includes:
 
 * A public mobile-first website
 * RSS-based content discovery
-* AI-assisted article filtering
+* AI assisted article filtering
 * AI-generated short summaries
 * Supabase article storage
 * Cloudflare Worker automation
@@ -1229,7 +1229,7 @@ See the [LICENSE](LICENSE) file for details.
 
 NutsNews is more than a positive-news website.
 
-It is a low-cost, automated, observable, CDN-backed, AI-assisted publishing platform.
+It is a low-cost, automated, observable, CDN-backed, AI assisted publishing platform.
 
 It combines a calm reader experience with a practical cloud architecture:
 

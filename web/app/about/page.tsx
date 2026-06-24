@@ -46,7 +46,7 @@ const promises = [
 const builtFeatures = [
   "A mobile first NutsNews website with a calm amber visual identity",
   "Publisher RSS ingestion that discovers fresh story candidates automatically",
-  "AI-assisted filtering for uplifting, non-stressful stories",
+  "AI assisted filtering for uplifting, non-stressful stories",
   "Short, original summaries that help readers decide what to open",
   "Article categories for browsing by mood and theme",
   "Thumbnail-first story cards with source and date context",
