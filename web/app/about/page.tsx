@@ -55,7 +55,7 @@ const builtFeatures = [
   "Admin dashboards for reviewing operations, AI usage, feeds, and system health",
   "Cloudflare, Vercel, and Supabase infrastructure for speed, scale, and low operating cost",
   "Better Stack and Sentry observability so issues are easier to detect and fix",
-  "A native iOS companion app built around the same positive-news experience",
+  "A native iOS companion app built around the same positive news experience",
 ];
 
 function DiscoverIcon({ className = "" }: { className?: string }) {
