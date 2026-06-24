@@ -38,6 +38,18 @@ const themes = [
     description: "Green cyber yellow glow.",
     swatches: ["#1a211b", "#2c362f", "#facc15"],
   },
+  {
+    id: "sakura",
+    name: "Sakura",
+    description: "Cherry pink matcha calm.",
+    swatches: ["#fde2e7", "#fff7ed", "#7aa95c"],
+  },
+  {
+    id: "san-juan",
+    name: "San Juan",
+    description: "Pastel streets tropical glow.",
+    swatches: ["#f6c453", "#e76f51", "#2a9df4", "#2f9e44"],
+  },
 ] as const;
 
 type ThemeId = (typeof themes)[number]["id"];
@@ -48,6 +60,8 @@ const browserThemeColors: Record<ThemeId, string> = {
   "modern-saas": "#121212",
   "creative-premium": "#0f172a",
   "moody-cyberpunk": "#1a211b",
+  sakura: "#fde2e7",
+  "san-juan": "#ffe0a3",
 };
 
 function isThemeId(value: string | null): value is ThemeId {
