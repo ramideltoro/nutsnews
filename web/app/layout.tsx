@@ -3,7 +3,6 @@ import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AppVersionGuard } from "./components/AppVersionGuard";
-import { ThemeSwitcher } from "./components/ThemeSwitcher";
 
 const siteUrl = "https://www.nutsnews.com";
 
@@ -148,8 +147,6 @@ export default function RootLayout({
         ) : null}
 
         <AppVersionGuard version={appVersion} />
-        <ThemeSwitcher />
-
         {children}
       </body>
     </html>

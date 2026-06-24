@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 const THEME_STORAGE_KEY = "nutsnews.web.theme";
@@ -41,25 +40,6 @@ function isThemeId(value: string | null): value is ThemeId {
 function applyTheme(themeId: ThemeId) {
   document.documentElement.dataset.nutsnewsTheme = themeId;
   document.documentElement.style.colorScheme = "dark";
-}
-
-
-function HomeIcon({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-    >
-      <path d="m3 10.5 9-7 9 7" />
-      <path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5" />
-    </svg>
-  );
 }
 
 function GearIcon({ className = "" }: { className?: string }) {
@@ -122,15 +102,6 @@ export function ThemeSwitcher() {
 
   return (
     <div ref={panelRef} className="theme-switcher-shell">
-      <Link
-        href="/"
-        className="theme-home-button"
-        aria-label="Go to the NutsNews home page"
-      >
-        <span className="theme-home-button__halo" />
-        <HomeIcon className="theme-home-button__icon" />
-      </Link>
-
       <button
         type="button"
         className="theme-gear-button"
