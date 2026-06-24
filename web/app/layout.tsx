@@ -13,6 +13,27 @@ const appVersion =
   process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ??
   "development";
 
+const themeInitScript = `
+(function () {
+  try {
+    var storageKey = "nutsnews.web.theme";
+    var allowedThemes = {
+      amber: true,
+      "modern-saas": true,
+      "creative-premium": true,
+      "moody-cyberpunk": true
+    };
+    var storedTheme = window.localStorage.getItem(storageKey);
+    var theme = allowedThemes[storedTheme] ? storedTheme : "amber";
+    var root = document.documentElement;
+    root.setAttribute("data-nutsnews-theme", theme);
+    root.style.colorScheme = "dark";
+  } catch (_) {
+    document.documentElement.setAttribute("data-nutsnews-theme", "amber");
+    document.documentElement.style.colorScheme = "dark";
+  }
+})();
+`;
 
 const gaId =
   process.env.NODE_ENV === "production"
@@ -100,10 +121,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" data-nutsnews-theme="amber" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} bg-neutral-950 text-neutral-50 antialiased`}
       >
+        <script
+          id="nutsnews-theme-init"
+          dangerouslySetInnerHTML={{ __html: themeInitScript }}
+        />
+
         {gaId ? (
           <>
             <Script

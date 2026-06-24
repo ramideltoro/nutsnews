@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const COPYRIGHT_YEAR = 2026;
 
 export function SiteFooter() {
@@ -5,15 +7,15 @@ export function SiteFooter() {
     <footer className="site-footer-modern">
       <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-1.5">
         <nav aria-label="Footer navigation" className="site-footer-modern__nav">
-          <a href="/about" className="site-footer-modern__link">
+          <Link href="/about" className="site-footer-modern__link">
             About
-          </a>
-          <a href="/contact" className="site-footer-modern__link">
+          </Link>
+          <Link href="/contact" className="site-footer-modern__link">
             Contact
-          </a>
-          <a href="/privacy" className="site-footer-modern__link">
+          </Link>
+          <Link href="/privacy" className="site-footer-modern__link">
             Privacy
-          </a>
+          </Link>
         </nav>
 
         <p className="whitespace-nowrap text-center text-[9px] leading-3 text-[var(--theme-muted-strong)]">

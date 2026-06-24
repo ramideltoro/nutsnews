@@ -217,7 +217,7 @@ function SectionHeading({
 
 export default function AboutPage() {
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.16),_transparent_34%),linear-gradient(180deg,_#0a0a0a_0%,_#17120a_45%,_#0a0a0a_100%)] pb-28 text-neutral-50">
+    <main className="public-themed-page modern-home-shell min-h-screen overflow-hidden pb-28 text-[var(--theme-text)]">
       <section className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
         <section className="overflow-hidden rounded-[2rem] border border-amber-300/15 bg-[radial-gradient(circle_at_top_right,_rgba(245,158,11,0.24),_transparent_38%),linear-gradient(135deg,_#171717,_#0a0a0a_58%,_#451a03)] p-5 shadow-2xl shadow-black/40 ring-1 ring-amber-300/5 sm:p-8">
           <div className="rounded-[1.5rem] border border-amber-300/15 bg-black/30 p-5 shadow-inner shadow-amber-950/10 sm:p-7">
