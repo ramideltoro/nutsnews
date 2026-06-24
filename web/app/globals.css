@@ -654,8 +654,12 @@ body {
   right: 1rem;
   top: 1rem;
   z-index: 80;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
 }
 
+.theme-home-button,
 .theme-gear-button {
   position: relative;
   display: grid;
@@ -672,12 +676,18 @@ body {
   transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
 
+.theme-home-button:hover,
 .theme-gear-button:hover {
   border-color: var(--theme-border-strong);
   box-shadow: 0 22px 52px rgba(0, 0, 0, 0.44), 0 0 42px var(--theme-glow-soft);
+  transform: translateY(-1px);
+}
+
+.theme-gear-button:hover {
   transform: translateY(-1px) rotate(10deg);
 }
 
+.theme-home-button__halo,
 .theme-gear-button__halo {
   position: absolute;
   inset: -45%;
@@ -686,6 +696,7 @@ body {
   animation: spin-slow 9s linear infinite;
 }
 
+.theme-home-button__icon,
 .theme-gear-button__icon {
   position: relative;
   z-index: 1;
@@ -901,6 +912,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .floating-orb,
   .hero-modern__shine,
+  .theme-home-button__halo,
   .theme-gear-button__halo,
   .loading-pill__dot,
   .hero-tagline::before,
@@ -911,6 +923,7 @@ body {
   .article-card-modern,
   .hero-modern,
   .read-story-button,
+  .theme-home-button,
   .theme-gear-button,
   .theme-option {
     transition: none !important;
