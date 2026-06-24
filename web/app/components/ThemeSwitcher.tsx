@@ -33,13 +33,36 @@ const themes = [
 
 type ThemeId = (typeof themes)[number]["id"];
 
+const browserThemeColors: Record<ThemeId, string> = {
+  amber: "#0a0a0a",
+  "modern-saas": "#121212",
+  "creative-premium": "#0f172a",
+  "moody-cyberpunk": "#1a211b",
+};
+
 function isThemeId(value: string | null): value is ThemeId {
   return themes.some((theme) => theme.id === value);
+}
+
+function updateBrowserThemeColor(themeId: ThemeId) {
+  const color = browserThemeColors[themeId];
+  let themeColorMeta = document.querySelector<HTMLMetaElement>(
+    'meta[name="theme-color"]',
+  );
+
+  if (!themeColorMeta) {
+    themeColorMeta = document.createElement("meta");
+    themeColorMeta.name = "theme-color";
+    document.head.appendChild(themeColorMeta);
+  }
+
+  themeColorMeta.content = color;
 }
 
 function applyTheme(themeId: ThemeId) {
   document.documentElement.dataset.nutsnewsTheme = themeId;
   document.documentElement.style.colorScheme = "dark";
+  updateBrowserThemeColor(themeId);
 }
 
 function GearIcon({ className = "" }: { className?: string }) {

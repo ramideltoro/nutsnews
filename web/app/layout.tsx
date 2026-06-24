@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -14,6 +14,26 @@ const appVersion =
 
 const themeInitScript = `
 (function () {
+  var browserThemeColors = {
+    amber: "#0a0a0a",
+    "modern-saas": "#121212",
+    "creative-premium": "#0f172a",
+    "moody-cyberpunk": "#1a211b"
+  };
+
+  function updateBrowserThemeColor(theme) {
+    var color = browserThemeColors[theme] || browserThemeColors.amber;
+    var themeColorMeta = document.querySelector('meta[name="theme-color"]');
+
+    if (!themeColorMeta) {
+      themeColorMeta = document.createElement("meta");
+      themeColorMeta.setAttribute("name", "theme-color");
+      document.head.appendChild(themeColorMeta);
+    }
+
+    themeColorMeta.setAttribute("content", color);
+  }
+
   try {
     var storageKey = "nutsnews.web.theme";
     var allowedThemes = {
@@ -27,9 +47,11 @@ const themeInitScript = `
     var root = document.documentElement;
     root.setAttribute("data-nutsnews-theme", theme);
     root.style.colorScheme = "dark";
+    updateBrowserThemeColor(theme);
   } catch (_) {
     document.documentElement.setAttribute("data-nutsnews-theme", "amber");
     document.documentElement.style.colorScheme = "dark";
+    updateBrowserThemeColor("amber");
   }
 })();
 `;
@@ -48,6 +70,11 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
+
+export const viewport: Viewport = {
+  colorScheme: "dark",
+  themeColor: "#0a0a0a",
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
