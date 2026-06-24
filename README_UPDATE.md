@@ -1,29 +1,52 @@
-# NutsNews Shorter Footer Update
+# Grafana Backup Monitoring Documentation Update
 
-This update makes the fixed footer shorter while keeping the same layout:
-
-- Footer links centered on the first row.
-- One-line copyright centered underneath.
-
-Updated file:
-
-- `web/app/components/SiteFooter.tsx`
+This update documents the Grafana Cloud / PromQL backup-monitoring work for the NutsNews home server.
 
 ## What changed
 
-- Reduced footer vertical padding from `py-3` to `py-2`.
-- Reduced row gap from `gap-2` to `gap-1`.
-- Reduced nav pill padding from `p-1` to `p-0.5`.
-- Reduced footer link vertical padding from `py-1` to `py-0.5`.
-- Reduced copyright text from `text-[10px] leading-4` to `text-[9px] leading-3`.
+Updated documentation files:
+
+- `docs/GRAFANA_BACKUP_MONITORING.md`
+- `docs/OBSERVABILITY.md`
+- `docs/HOME_SERVER_DASHBOARD.md`
+- `docs/README.md`
+- `README.md`
+
+## New documentation added
+
+A new guide was added at:
+
+```text
+docs/GRAFANA_BACKUP_MONITORING.md
+```
+
+It covers:
+
+- Grafana Cloud Explore setup.
+- Prometheus data source selection.
+- How to switch to PromQL Code mode.
+- Confirmed backup metric query.
+- Backup dashboard panel recommendations.
+- PromQL for last backup success, failed state, successful state, backup age, backup count, and next backup time.
+- Alert ideas for failed backups, stale backups, and no available backups.
+- Troubleshooting when metrics do not appear.
+- Security notes about what should not be exposed in Grafana screenshots or panels.
+
+## Confirmed metric documented
+
+```promql
+home_server_backup_last_success{instance="chingadera", job="integrations/unix"}
+```
+
+Confirmed meaning:
+
+```text
+1 = last backup succeeded
+0 = last backup failed
+```
 
 ## Validation performed
 
-From `web/`:
+Documentation-only update. No application source code, package files, or runtime behavior changed.
 
-```bash
-npx eslint app/components/SiteFooter.tsx
-npx tsc --noEmit
-```
-
-Both commands completed successfully.
+Checked changed markdown files were written into the repo and included in the bundle.
