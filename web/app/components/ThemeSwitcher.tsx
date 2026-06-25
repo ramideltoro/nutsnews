@@ -55,6 +55,76 @@ const themes = [
 type ThemeId = (typeof themes)[number]["id"];
 type SettingsPanel = "menu" | "theme" | "language";
 
+const settingsCopyByLanguage: Record<
+  LanguageCode,
+  {
+    openSettings: string;
+    settingsLabel: string;
+    settings: string;
+    customize: string;
+    theme: string;
+    language: string;
+    backToSettings: string;
+    selectedMark: string;
+    themeDescriptions: Record<ThemeId, string>;
+  }
+> = {
+  en: {
+    openSettings: "Open NutsNews settings",
+    settingsLabel: "NutsNews settings",
+    settings: "Settings",
+    customize: "Customize",
+    theme: "Theme",
+    language: "Language",
+    backToSettings: "Back to settings menu",
+    selectedMark: "Selected",
+    themeDescriptions: {
+      amber: "Classic NutsNews amber glow.",
+      "modern-saas": "Sleek dark blue polish.",
+      "creative-premium": "Navy purple premium glow.",
+      "moody-cyberpunk": "Green cyber yellow glow.",
+      sakura: "Cherry pink matcha calm.",
+      "san-juan": "Pastel streets tropical glow.",
+    },
+  },
+  fr: {
+    openSettings: "Ouvrir les paramètres NutsNews",
+    settingsLabel: "Paramètres NutsNews",
+    settings: "Paramètres",
+    customize: "Personnaliser",
+    theme: "Thème",
+    language: "Langue",
+    backToSettings: "Retour au menu des paramètres",
+    selectedMark: "Sélectionné",
+    themeDescriptions: {
+      amber: "Lueur ambrée classique de NutsNews.",
+      "modern-saas": "Finition bleu foncé élégante.",
+      "creative-premium": "Éclat premium bleu nuit et violet.",
+      "moody-cyberpunk": "Vert profond avec éclat jaune cyber.",
+      sakura: "Calme rose cerisier et matcha.",
+      "san-juan": "Rues pastel et éclat tropical.",
+    },
+  },
+  ja: {
+    openSettings: "NutsNewsの設定を開く",
+    settingsLabel: "NutsNewsの設定",
+    settings: "設定",
+    customize: "カスタマイズ",
+    theme: "テーマ",
+    language: "言語",
+    backToSettings: "設定メニューに戻る",
+    selectedMark: "選択中",
+    themeDescriptions: {
+      amber: "NutsNews定番のアンバーの輝き。",
+      "modern-saas": "洗練されたダークブルーの雰囲気。",
+      "creative-premium": "ネイビーと紫の上質な輝き。",
+      "moody-cyberpunk": "グリーンにサイバーイエローの光。",
+      sakura: "桜色と抹茶の落ち着き。",
+      "san-juan": "パステルの街並みと南国の輝き。",
+    },
+  },
+};
+
 const browserThemeColors: Record<ThemeId, string> = {
   amber: "#0a0a0a",
   "modern-saas": "#121212",
@@ -171,7 +241,9 @@ export function ThemeSwitcher() {
     const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
     return isThemeId(storedTheme) ? storedTheme : "amber";
   });
-  const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(() => getStoredLanguage());
+  const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(() =>
+    getStoredLanguage(),
+  );
   const [isOpen, setIsOpen] = useState(false);
   const [activePanel, setActivePanel] = useState<SettingsPanel>("menu");
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -207,11 +279,13 @@ export function ThemeSwitcher() {
 
   const activeLanguage = useMemo(
     () =>
-      SUPPORTED_LANGUAGES.find((language) => language.code === selectedLanguage) ??
-      SUPPORTED_LANGUAGES[0],
+      SUPPORTED_LANGUAGES.find(
+        (language) => language.code === selectedLanguage,
+      ) ?? SUPPORTED_LANGUAGES[0],
     [selectedLanguage],
   );
   const activeLanguageLabel = getLanguageLabel(selectedLanguage);
+  const copy = settingsCopyByLanguage[selectedLanguage];
 
   function handleThemeSelect(themeId: ThemeId) {
     setSelectedTheme(themeId);
@@ -239,7 +313,7 @@ export function ThemeSwitcher() {
       <button
         type="button"
         className="theme-gear-button"
-        aria-label="Open NutsNews settings"
+        aria-label={copy.openSettings}
         aria-expanded={isOpen}
         onClick={handleToggleSettings}
       >
@@ -248,13 +322,13 @@ export function ThemeSwitcher() {
       </button>
 
       {isOpen ? (
-        <section className="theme-panel" aria-label="NutsNews settings">
+        <section className="theme-panel" aria-label={copy.settingsLabel}>
           {activePanel === "menu" ? (
             <>
               <div className="theme-panel__header">
                 <div>
-                  <p className="theme-panel__eyebrow">Settings</p>
-                  <h2 className="theme-panel__title">Customize</h2>
+                  <p className="theme-panel__eyebrow">{copy.settings}</p>
+                  <h2 className="theme-panel__title">{copy.customize}</h2>
                 </div>
                 <p className="theme-panel__active">NutsNews</p>
               </div>
@@ -277,8 +351,12 @@ export function ThemeSwitcher() {
                     </span>
                   </span>
                   <span className="settings-menu-item__copy">
-                    <span className="settings-menu-item__title">Theme</span>
-                    <span className="settings-menu-item__value">{activeTheme.name}</span>
+                    <span className="settings-menu-item__title">
+                      {copy.theme}
+                    </span>
+                    <span className="settings-menu-item__value">
+                      {activeTheme.name}
+                    </span>
                   </span>
                   <ArrowIcon className="settings-menu-item__arrow" />
                 </button>
@@ -292,8 +370,12 @@ export function ThemeSwitcher() {
                     {activeLanguage.flag}
                   </span>
                   <span className="settings-menu-item__copy">
-                    <span className="settings-menu-item__title">Language</span>
-                    <span className="settings-menu-item__value">{activeLanguageLabel}</span>
+                    <span className="settings-menu-item__title">
+                      {copy.language}
+                    </span>
+                    <span className="settings-menu-item__value">
+                      {activeLanguageLabel}
+                    </span>
                   </span>
                   <ArrowIcon className="settings-menu-item__arrow" />
                 </button>
@@ -307,14 +389,14 @@ export function ThemeSwitcher() {
                 <button
                   type="button"
                   className="theme-panel__back-button"
-                  aria-label="Back to settings menu"
+                  aria-label={copy.backToSettings}
                   onClick={() => setActivePanel("menu")}
                 >
                   <BackIcon className="theme-panel__back-icon" />
                 </button>
                 <div>
-                  <p className="theme-panel__eyebrow">Settings</p>
-                  <h2 className="theme-panel__title">Theme</h2>
+                  <p className="theme-panel__eyebrow">{copy.settings}</p>
+                  <h2 className="theme-panel__title">{copy.theme}</h2>
                 </div>
                 <p className="theme-panel__active">{activeTheme.name}</p>
               </div>
@@ -331,7 +413,10 @@ export function ThemeSwitcher() {
                       aria-pressed={isSelected}
                       onClick={() => handleThemeSelect(theme.id)}
                     >
-                      <span className="theme-option__swatches" aria-hidden="true">
+                      <span
+                        className="theme-option__swatches"
+                        aria-hidden="true"
+                      >
                         {theme.swatches.map((swatch) => (
                           <span
                             key={swatch}
@@ -343,7 +428,7 @@ export function ThemeSwitcher() {
                       <span className="theme-option__copy">
                         <span className="theme-option__name">{theme.name}</span>
                         <span className="theme-option__description">
-                          {theme.description}
+                          {copy.themeDescriptions[theme.id]}
                         </span>
                       </span>
                       <span className="theme-option__check" aria-hidden="true">
@@ -362,14 +447,14 @@ export function ThemeSwitcher() {
                 <button
                   type="button"
                   className="theme-panel__back-button"
-                  aria-label="Back to settings menu"
+                  aria-label={copy.backToSettings}
                   onClick={() => setActivePanel("menu")}
                 >
                   <BackIcon className="theme-panel__back-icon" />
                 </button>
                 <div>
-                  <p className="theme-panel__eyebrow">Settings</p>
-                  <h2 className="theme-panel__title">Language</h2>
+                  <p className="theme-panel__eyebrow">{copy.settings}</p>
+                  <h2 className="theme-panel__title">{copy.language}</h2>
                 </div>
                 <p className="theme-panel__active">{activeLanguageLabel}</p>
               </div>
@@ -386,11 +471,16 @@ export function ThemeSwitcher() {
                       aria-pressed={isSelected}
                       onClick={() => handleLanguageSelect(language.code)}
                     >
-                      <span className="language-option__badge" aria-hidden="true">
+                      <span
+                        className="language-option__badge"
+                        aria-hidden="true"
+                      >
                         {language.flag}
                       </span>
                       <span className="theme-option__copy">
-                        <span className="theme-option__name">{language.nativeLabel}</span>
+                        <span className="theme-option__name">
+                          {language.nativeLabel}
+                        </span>
                         <span className="theme-option__description">
                           {language.label}
                         </span>

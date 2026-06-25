@@ -1,8 +1,53 @@
+"use client";
+
 import Link from "next/link";
 
+import { type LanguageCode } from "@/lib/languages";
 import { ThemeSwitcher } from "./ThemeSwitcher";
+import { useSelectedLanguage } from "./useSelectedLanguage";
 
 const COPYRIGHT_YEAR = 2026;
+
+const footerCopyByLanguage: Record<
+  LanguageCode,
+  {
+    shortcuts: string;
+    homeAria: string;
+    footerNav: string;
+    about: string;
+    contact: string;
+    privacy: string;
+    rights: string;
+  }
+> = {
+  en: {
+    shortcuts: "Site shortcuts",
+    homeAria: "Go to NutsNews home",
+    footerNav: "Footer navigation",
+    about: "About",
+    contact: "Contact",
+    privacy: "Privacy",
+    rights: "All Rights Reserved.",
+  },
+  fr: {
+    shortcuts: "Raccourcis du site",
+    homeAria: "Aller à l’accueil de NutsNews",
+    footerNav: "Navigation du pied de page",
+    about: "À propos",
+    contact: "Contact",
+    privacy: "Confidentialité",
+    rights: "Tous droits réservés.",
+  },
+  ja: {
+    shortcuts: "サイトのショートカット",
+    homeAria: "NutsNewsのホームへ移動",
+    footerNav: "フッターナビゲーション",
+    about: "概要",
+    contact: "お問い合わせ",
+    privacy: "プライバシー",
+    rights: "All Rights Reserved.",
+  },
+};
 
 function HomeIcon({ className = "" }: { className?: string }) {
   return (
@@ -24,12 +69,22 @@ function HomeIcon({ className = "" }: { className?: string }) {
 }
 
 export function SiteFooter() {
+  const selectedLanguage = useSelectedLanguage();
+  const copy = footerCopyByLanguage[selectedLanguage];
+
   return (
     <footer className="site-footer-modern">
       <div className="site-footer-modern__inner">
         <div className="site-footer-modern__top-row">
-          <div className="site-footer-modern__controls" aria-label="Site shortcuts">
-            <Link href="/" className="footer-icon-button" aria-label="Go to NutsNews home">
+          <div
+            className="site-footer-modern__controls"
+            aria-label={copy.shortcuts}
+          >
+            <Link
+              href="/"
+              className="footer-icon-button"
+              aria-label={copy.homeAria}
+            >
               <span className="footer-icon-button__halo" />
               <HomeIcon className="footer-icon-button__icon" />
             </Link>
@@ -37,15 +92,15 @@ export function SiteFooter() {
             <ThemeSwitcher />
           </div>
 
-          <nav aria-label="Footer navigation" className="site-footer-modern__nav">
+          <nav aria-label={copy.footerNav} className="site-footer-modern__nav">
             <Link href="/about" className="site-footer-modern__link">
-              About
+              {copy.about}
             </Link>
             <Link href="/contact" className="site-footer-modern__link">
-              Contact
+              {copy.contact}
             </Link>
             <Link href="/privacy" className="site-footer-modern__link">
-              Privacy
+              {copy.privacy}
             </Link>
           </nav>
         </div>
@@ -60,7 +115,7 @@ export function SiteFooter() {
           >
             Rami Del Toro
           </a>{" "}
-          · All Rights Reserved.
+          · {copy.rights}
         </p>
       </div>
     </footer>
