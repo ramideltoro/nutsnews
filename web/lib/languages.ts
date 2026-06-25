@@ -13,6 +13,12 @@ export const SUPPORTED_LANGUAGES = [
     nativeLabel: "Français",
     flag: "🇫🇷",
   },
+  {
+    code: "ja",
+    label: "Japanese",
+    nativeLabel: "日本語",
+    flag: "🇯🇵",
+  },
 ] as const;
 
 export type LanguageCode = (typeof SUPPORTED_LANGUAGES)[number]["code"];

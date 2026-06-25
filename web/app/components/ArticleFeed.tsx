@@ -49,6 +49,14 @@ const copyByLanguage: Record<LanguageCode, {
     loadError: "Impossible de charger plus d’histoires.",
     tryAgain: "Réessayer",
   },
+  ja: {
+    recently: "最近",
+    loadingMore: "さらにストーリーを読み込み中",
+    readFullStory: "元の記事を読む",
+    emptyFeed: "前向きなストーリーはまだありません。しばらくしてからご確認ください。",
+    loadError: "ストーリーを読み込めませんでした。",
+    tryAgain: "もう一度試す",
+  },
 };
 
 const categoryLabelsFr: Record<string, string> = {
@@ -64,6 +72,33 @@ const categoryLabelsFr: Record<string, string> = {
   Travel: "Voyage",
   Uplifting: "Positif",
   Wellness: "Bien-être",
+};
+
+const categoryLabelsJa: Record<string, string> = {
+  Achievement: "達成",
+  Animals: "動物",
+  Community: "コミュニティ",
+  Creativity: "創造性",
+  Culture: "文化",
+  Lifestyle: "ライフスタイル",
+  Nature: "自然",
+  Science: "科学",
+  Space: "宇宙",
+  Travel: "旅",
+  Uplifting: "前向き",
+  Wellness: "健康",
+};
+
+const dateLocaleByLanguage: Record<LanguageCode, string> = {
+  en: "en-US",
+  fr: "fr-FR",
+  ja: "ja-JP",
+};
+
+const fallbackCategoryByLanguage: Record<LanguageCode, string> = {
+  en: "Uplifting",
+  fr: "Positif",
+  ja: "前向き",
 };
 
 function getStoredLanguage(): LanguageCode {
@@ -88,7 +123,7 @@ function formatSiteDate(dateValue: string | null, languageCode: LanguageCode) {
     return copyByLanguage[languageCode].recently;
   }
 
-  return new Intl.DateTimeFormat(languageCode === "fr" ? "fr-FR" : "en-US", {
+  return new Intl.DateTimeFormat(dateLocaleByLanguage[languageCode], {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -110,15 +145,19 @@ function formatSourceLabel(source: string | null) {
 }
 
 function translateCategoryBadge(category: string, languageCode: LanguageCode) {
-  if (languageCode !== "fr") {
-    return category;
+  if (languageCode === "fr") {
+    return categoryLabelsFr[category] ?? category;
   }
 
-  return categoryLabelsFr[category] ?? category;
+  if (languageCode === "ja") {
+    return categoryLabelsJa[category] ?? category;
+  }
+
+  return category;
 }
 
 function getCategoryBadges(category: string | null, languageCode: LanguageCode) {
-  const fallback = [languageCode === "fr" ? "Positif" : "Uplifting"];
+  const fallback = [fallbackCategoryByLanguage[languageCode]];
 
   if (!category) {
     return fallback;

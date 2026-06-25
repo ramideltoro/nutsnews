@@ -20,6 +20,11 @@ const taglineCopy: Record<LanguageCode, { soft: string; accent: string; ariaLabe
     accent: "simplifiées",
     ariaLabel: "Actualités positives, simplifiées",
   },
+  ja: {
+    soft: "ポジティブなニュース、",
+    accent: "シンプルに",
+    ariaLabel: "ポジティブなニュース、シンプルに",
+  },
 };
 
 function getStoredLanguage(): LanguageCode {

@@ -50,7 +50,7 @@ const themeInitScript = `
     updateBrowserThemeColor(theme);
 
     var languageStorageKey = "nutsnews.web.language";
-    var allowedLanguages = { en: true, fr: true };
+    var allowedLanguages = { en: true, fr: true, ja: true };
     var storedLanguage = window.localStorage.getItem(languageStorageKey);
     var language = allowedLanguages[storedLanguage] ? storedLanguage : "en";
     root.setAttribute("lang", language);
