@@ -21,14 +21,26 @@ const themes = [
     swatches: ["#0a0a0a", "#1f1308", "#facc15"],
   },
   {
+    id: "sakura",
+    name: "Sakura",
+    description: "Cherry pink matcha calm.",
+    swatches: ["#fde2e7", "#fff7ed", "#7aa95c"],
+  },
+  {
     id: "modern-saas",
-    name: "The Modern SaaS",
+    name: "SaaS",
     description: "Sleek dark blue polish.",
     swatches: ["#121212", "#1e1e1e", "#3b82f6"],
   },
   {
+    id: "san-juan",
+    name: "Foxy",
+    description: "Pastel streets tropical glow.",
+    swatches: ["#f6c453", "#e76f51", "#2a9df4", "#2f9e44"],
+  },
+  {
     id: "creative-premium",
-    name: "The Creative Premium",
+    name: "Friday",
     description: "Navy purple premium glow.",
     swatches: ["#0f172a", "#1e293b", "#7c3aed"],
   },
@@ -37,18 +49,6 @@ const themes = [
     name: "Bambi",
     description: "Green cyber yellow glow.",
     swatches: ["#1a211b", "#2c362f", "#facc15"],
-  },
-  {
-    id: "sakura",
-    name: "Sakura",
-    description: "Cherry pink matcha calm.",
-    swatches: ["#fde2e7", "#fff7ed", "#7aa95c"],
-  },
-  {
-    id: "san-juan",
-    name: "San Juan",
-    description: "Pastel streets tropical glow.",
-    swatches: ["#f6c453", "#e76f51", "#2a9df4", "#2f9e44"],
   },
 ] as const;
 
