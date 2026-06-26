@@ -7,6 +7,7 @@ import {
 } from "@/lib/languages";
 
 export const PAGE_SIZE = 5;
+export const SEARCH_PAGE_SIZE = 20;
 export const SITE_URL = "https://www.nutsnews.com";
 export const PUBLIC_FEED_SNAPSHOT_TABLE = "public_feed_snapshot";
 
@@ -27,6 +28,15 @@ export type Article = {
 };
 
 export type PublishedArticleDataSource = "public_feed_snapshot" | "articles_fallback";
+
+export type SearchArticlesResult = {
+  articles: Article[];
+  nextPage: number | null;
+  query: string;
+  page: number;
+  pageSize: number;
+  languageCode: LanguageCode;
+};
 
 const ARTICLE_SELECT =
   "id, source, title, original_url, image_url, published_at, published_on_site_at, ai_summary, category, positivity_score";
@@ -379,6 +389,56 @@ export async function getPublishedArticlesByCursor(
   // cached homepage payloads. Use the canonical articles table here so it does
   // not depend on the current state or ordering of the materialized snapshot.
   return getPublishedArticlesByCursorFromSourceTable(decodedCursor, category, languageCode);
+}
+
+
+export async function searchPublishedArticles(
+  searchQuery: string,
+  page = 0,
+  pageSize = SEARCH_PAGE_SIZE,
+  requestedLanguageCode?: string | null,
+): Promise<SearchArticlesResult> {
+  const query = searchQuery.trim().replace(/\s+/g, " ").slice(0, 80);
+  const safePage = Number.isFinite(page) && page >= 0 ? Math.floor(page) : 0;
+  const safePageSize = Number.isFinite(pageSize)
+    ? Math.min(Math.max(Math.floor(pageSize), 1), 50)
+    : SEARCH_PAGE_SIZE;
+  const languageCode = normalizeLanguageCode(requestedLanguageCode);
+
+  if (query.length < 2) {
+    return {
+      articles: [],
+      nextPage: null,
+      query,
+      page: safePage,
+      pageSize: safePageSize,
+      languageCode,
+    };
+  }
+
+  const { data, error } = await supabase.rpc("search_articles", {
+    search_query: query,
+    page_size: safePageSize + 1,
+    page_offset: safePage * safePageSize,
+  });
+
+  if (error) {
+    console.error("Failed to search published articles:", error);
+    throw error;
+  }
+
+  const rows = (data ?? []) as Article[];
+  const baseArticles = rows.slice(0, safePageSize);
+  const articles = await applyArticleSummaries(baseArticles, languageCode);
+
+  return {
+    articles,
+    nextPage: rows.length > safePageSize ? safePage + 1 : null,
+    query,
+    page: safePage,
+    pageSize: safePageSize,
+    languageCode,
+  };
 }
 
 export async function getPublishedCategories(limit = 1000) {
