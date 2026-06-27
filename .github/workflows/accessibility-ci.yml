@@ -1,0 +1,58 @@
+name: Accessibility CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  axe-playwright:
+    name: axe via Playwright
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: web
+
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_APP_ENV: ci
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build NutsNews
+        run: npm run build
+
+      - name: Run axe accessibility checks
+        run: npm run test:accessibility
+
+      - name: Upload Playwright accessibility report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: accessibility-playwright-report
+          path: |
+            web/playwright-report
+            web/test-results
+          if-no-files-found: ignore
