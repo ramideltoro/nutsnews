@@ -1,0 +1,346 @@
+{
+  "generatedAt": "2026-06-27T18:57:09.981Z",
+  "pageCount": 68,
+  "pages": [
+    {
+      "title": "NutsNews Cloudflare Turnstile Update",
+      "source": "NUTSNEWS_TURNSTILE_UPDATE_README.md",
+      "wikiFile": "NutsNews-Cloudflare-Turnstile-Update.md"
+    },
+    {
+      "title": "NutsNews",
+      "source": "README.md",
+      "wikiFile": "Project-README.md"
+    },
+    {
+      "title": "Admin Article Review Dashboard",
+      "source": "docs/ADMIN_ARTICLE_REVIEWS.md",
+      "wikiFile": "Admin-Article-Review-Dashboard.md"
+    },
+    {
+      "title": "Responsive Admin Dashboards",
+      "source": "docs/ADMIN_RESPONSIVE_DASHBOARDS.md",
+      "wikiFile": "Responsive-Admin-Dashboards.md"
+    },
+    {
+      "title": "Architecture",
+      "source": "docs/ARCHITECTURE.md",
+      "wikiFile": "Architecture.md"
+    },
+    {
+      "title": "axe Accessibility CI with Playwright",
+      "source": "docs/AXE_PLAYWRIGHT_ACCESSIBILITY_CI.md",
+      "wikiFile": "axe-Accessibility-CI-with-Playwright.md"
+    },
+    {
+      "title": "Cloudflare KV Worker State for NutsNews",
+      "source": "docs/CLOUDFLARE_KV_WORKER_STATE.md",
+      "wikiFile": "Cloudflare-KV-Worker-State-for-NutsNews.md"
+    },
+    {
+      "title": "Cloudflare Turnstile Contact Form Protection",
+      "source": "docs/CLOUDFLARE_TURNSTILE_CONTACT_FORM.md",
+      "wikiFile": "Cloudflare-Turnstile-Contact-Form-Protection.md"
+    },
+    {
+      "title": "CodeQL Security Scan",
+      "source": "docs/CODEQL_SECURITY_SCAN.md",
+      "wikiFile": "CodeQL-Security-Scan.md"
+    },
+    {
+      "title": "Controller and Shard Operations",
+      "source": "docs/CONTROLLER_AND_SHARDS.md",
+      "wikiFile": "Controller-and-Shard-Operations.md"
+    },
+    {
+      "title": "Dependency Update Routine",
+      "source": "docs/DEPENDENCY_UPDATES.md",
+      "wikiFile": "Dependency-Update-Routine.md"
+    },
+    {
+      "title": "Deployment Checklist",
+      "source": "docs/DEPLOYMENT_CHECKLIST.md",
+      "wikiFile": "Deployment-Checklist.md"
+    },
+    {
+      "title": "Full archive search",
+      "source": "docs/FULL_ARCHIVE_SEARCH.md",
+      "wikiFile": "Full-archive-search.md"
+    },
+    {
+      "title": "GitHub Wiki Automation",
+      "source": "docs/GITHUB_WIKI_AUTOMATION.md",
+      "wikiFile": "GitHub-Wiki-Automation.md"
+    },
+    {
+      "title": "Grafana Cloud Backup Monitoring",
+      "source": "docs/GRAFANA_BACKUP_MONITORING.md",
+      "wikiFile": "Grafana-Cloud-Backup-Monitoring.md"
+    },
+    {
+      "title": "Home Server Admin Dashboard",
+      "source": "docs/HOME_SERVER_DASHBOARD.md",
+      "wikiFile": "Home-Server-Admin-Dashboard.md"
+    },
+    {
+      "title": "Home Server Local AI Provider",
+      "source": "docs/HOME_SERVER_LOCAL_AI.md",
+      "wikiFile": "Home-Server-Local-AI-Provider.md"
+    },
+    {
+      "title": "Image Delivery",
+      "source": "docs/IMAGE_DELIVERY.md",
+      "wikiFile": "Image-Delivery.md"
+    },
+    {
+      "title": "Google Lighthouse CI Onboarding",
+      "source": "docs/LIGHTHOUSE_CI_ONBOARDING.md",
+      "wikiFile": "Google-Lighthouse-CI-Onboarding.md"
+    },
+    {
+      "title": "Multi-language summaries",
+      "source": "docs/MULTI_LANGUAGE_SUMMARIES.md",
+      "wikiFile": "Multi-language-summaries.md"
+    },
+    {
+      "title": "NutsNews Cache Safety Update",
+      "source": "docs/NUTSNEWS_CACHE_SAFETY_UPDATE.md",
+      "wikiFile": "NutsNews-Cache-Safety-Update.md"
+    },
+    {
+      "title": "NutsNews Supabase Backup Automation",
+      "source": "docs/NUTSNEWS_DB_BACKUPS.md",
+      "wikiFile": "NutsNews-Supabase-Backup-Automation.md"
+    },
+    {
+      "title": "NutsNews Feed Visibility Fade Fix",
+      "source": "docs/NUTSNEWS_FEED_VISIBILITY_FADE_FIX.md",
+      "wikiFile": "NutsNews-Feed-Visibility-Fade-Fix.md"
+    },
+    {
+      "title": "NutsNews Home Button Update",
+      "source": "docs/NUTSNEWS_HOME_BUTTON_UPDATE.md",
+      "wikiFile": "NutsNews-Home-Button-Update.md"
+    },
+    {
+      "title": "NutsNews Page Fade Appear Update",
+      "source": "docs/NUTSNEWS_PAGE_FADE_APPEAR_UPDATE.md",
+      "wikiFile": "NutsNews-Page-Fade-Appear-Update.md"
+    },
+    {
+      "title": "NutsNews Public Pages Theme Consistency",
+      "source": "docs/NUTSNEWS_PUBLIC_PAGES_THEME_CONSISTENCY.md",
+      "wikiFile": "NutsNews-Public-Pages-Theme-Consistency.md"
+    },
+    {
+      "title": "NutsNews Public Page Translation Update",
+      "source": "docs/NUTSNEWS_PUBLIC_PAGE_TRANSLATIONS.md",
+      "wikiFile": "NutsNews-Public-Page-Translation-Update.md"
+    },
+    {
+      "title": "NutsNews Web Modern Theme UI Update",
+      "source": "docs/NUTSNEWS_WEB_MODERN_THEME_UI_UPDATE.md",
+      "wikiFile": "NutsNews-Web-Modern-Theme-UI-Update.md"
+    },
+    {
+      "title": "Observability",
+      "source": "docs/OBSERVABILITY.md",
+      "wikiFile": "Observability.md"
+    },
+    {
+      "title": "Operations",
+      "source": "docs/OPERATIONS.md",
+      "wikiFile": "Operations.md"
+    },
+    {
+      "title": "Oracle Local AI Provider",
+      "source": "docs/ORACLE_LOCAL_AI.md",
+      "wikiFile": "Oracle-Local-AI-Provider.md"
+    },
+    {
+      "title": "PageSpeed Insights for NutsNews",
+      "source": "docs/PAGESPEED_INSIGHTS.md",
+      "wikiFile": "PageSpeed-Insights-for-NutsNews.md"
+    },
+    {
+      "title": "Performance and Resiliency",
+      "source": "docs/PERFORMANCE_AND_RESILIENCY.md",
+      "wikiFile": "Performance-and-Resiliency.md"
+    },
+    {
+      "title": "Project Overview",
+      "source": "docs/PROJECT.md",
+      "wikiFile": "Project-Overview.md"
+    },
+    {
+      "title": "Public Feed Snapshot",
+      "source": "docs/PUBLIC_FEED_SNAPSHOT.md",
+      "wikiFile": "Public-Feed-Snapshot.md"
+    },
+    {
+      "title": "NutsNews Documentation",
+      "source": "docs/README.md",
+      "wikiFile": "NutsNews-Documentation.md"
+    },
+    {
+      "title": "RSS Source Quality Scoring",
+      "source": "docs/RSS_SOURCE_QUALITY.md",
+      "wikiFile": "RSS-Source-Quality-Scoring.md"
+    },
+    {
+      "title": "NutsNews SEO Structured Data Audit",
+      "source": "docs/SEO_STRUCTURED_DATA_AUDIT.md",
+      "wikiFile": "NutsNews-SEO-Structured-Data-Audit.md"
+    },
+    {
+      "title": "Snyk Security Scan",
+      "source": "docs/SNYK_SECURITY_SCAN.md",
+      "wikiFile": "Snyk-Security-Scan.md"
+    },
+    {
+      "title": "Supabase Restore Procedure",
+      "source": "docs/SUPABASE_RESTORE.md",
+      "wikiFile": "Supabase-Restore-Procedure.md"
+    },
+    {
+      "title": "Troubleshooting Guide",
+      "source": "docs/TROUBLESHOOTING.md",
+      "wikiFile": "Troubleshooting-Guide.md"
+    },
+    {
+      "title": "UptimeRobot Onboarding",
+      "source": "docs/UPTIMEROBOT_ONBOARDING.md",
+      "wikiFile": "UptimeRobot-Onboarding.md"
+    },
+    {
+      "title": "NutsNews App Store Privacy Policy Update",
+      "source": "docs/archive/NUTSNEWS_APP_STORE_PRIVACY_POLICY_UPDATE_README.md",
+      "wikiFile": "NutsNews-App-Store-Privacy-Policy-Update.md"
+    },
+    {
+      "title": "NutsNews Privacy Policy Update",
+      "source": "docs/archive/NUTSNEWS_PRIVACY_POLICY_UPDATE_README.md",
+      "wikiFile": "NutsNews-Privacy-Policy-Update.md"
+    },
+    {
+      "title": "NutsNews Production Infinite Scroll Fix",
+      "source": "docs/archive/NUTSNEWS_PRODUCTION_INFINITE_SCROLL_FIX_README.md",
+      "wikiFile": "NutsNews-Production-Infinite-Scroll-Fix.md"
+    },
+    {
+      "title": "Update: axe Playwright Accessibility CI",
+      "source": "docs/updates/README_AXE_PLAYWRIGHT_ACCESSIBILITY_CI_UPDATE.md",
+      "wikiFile": "Update-axe-Playwright-Accessibility-CI.md"
+    },
+    {
+      "title": "NutsNews Footer Search Menu Patch",
+      "source": "docs/updates/README_FOOTER_SEARCH_MENU_PATCH.md",
+      "wikiFile": "NutsNews-Footer-Search-Menu-Patch.md"
+    },
+    {
+      "title": "NutsNews Footer Search Thumbnail Patch",
+      "source": "docs/updates/README_FOOTER_SEARCH_THUMBNAIL_PATCH.md",
+      "wikiFile": "NutsNews-Footer-Search-Thumbnail-Patch.md"
+    },
+    {
+      "title": "NutsNews full archive home search update",
+      "source": "docs/updates/README_FULL_ARCHIVE_HOME_SEARCH_UPDATE.md",
+      "wikiFile": "NutsNews-full-archive-home-search-update.md"
+    },
+    {
+      "title": "Full Archive Search Update",
+      "source": "docs/updates/README_FULL_ARCHIVE_SEARCH_UPDATE.md",
+      "wikiFile": "Full-Archive-Search-Update.md"
+    },
+    {
+      "title": "NutsNews Home Search Box Layout Patch",
+      "source": "docs/updates/README_HOME_SEARCH_BOX_LAYOUT_PATCH.md",
+      "wikiFile": "NutsNews-Home-Search-Box-Layout-Patch.md"
+    },
+    {
+      "title": "Lighthouse CI Documentation Update",
+      "source": "docs/updates/README_LIGHTHOUSE_CI_ONBOARDING_UPDATE.md",
+      "wikiFile": "Lighthouse-CI-Documentation-Update.md"
+    },
+    {
+      "title": "NutsNews local-first AI fallback update",
+      "source": "docs/updates/README_LOCAL_FIRST_AI_FALLBACK_UPDATE.md",
+      "wikiFile": "NutsNews-local-first-AI-fallback-update.md"
+    },
+    {
+      "title": "NutsNews home-server translation fallback update",
+      "source": "docs/updates/README_LOCAL_TRANSLATION_FALLBACK_UPDATE.md",
+      "wikiFile": "NutsNews-home-server-translation-fallback-update.md"
+    },
+    {
+      "title": "NutsNews3 translation diagnostics query hotfix",
+      "source": "docs/updates/README_NUTSNEWS3_TRANSLATION_QUERY_HOTFIX.md",
+      "wikiFile": "NutsNews3-translation-diagnostics-query-hotfix.md"
+    },
+    {
+      "title": "NutsNews3 Translation Diagnostics Update",
+      "source": "docs/updates/README_NUTSNEWS3_TRANSLATION_UPDATE.md",
+      "wikiFile": "NutsNews3-Translation-Diagnostics-Update.md"
+    },
+    {
+      "title": "NutsNews Qwen Summary Length Update",
+      "source": "docs/updates/README_QWEN_SUMMARY_240_300_UPDATE.md",
+      "wikiFile": "NutsNews-Qwen-Summary-Length-Update.md"
+    },
+    {
+      "title": "NutsNews Settings Language Polish Update",
+      "source": "docs/updates/README_SETTINGS_LANGUAGE_POLISH_UPDATE.md",
+      "wikiFile": "NutsNews-Settings-Language-Polish-Update.md"
+    },
+    {
+      "title": "NutsNews Settings Menu Update",
+      "source": "docs/updates/README_SETTINGS_MENU_UPDATE.md",
+      "wikiFile": "NutsNews-Settings-Menu-Update.md"
+    },
+    {
+      "title": "NutsNews Translation All-in-One Update",
+      "source": "docs/updates/README_TRANSLATION_ALL_IN_ONE_UPDATE.md",
+      "wikiFile": "NutsNews-Translation-All-in-One-Update.md"
+    },
+    {
+      "title": "NutsNews Translation Diagnostics Update",
+      "source": "docs/updates/README_TRANSLATION_DIAGNOSTICS_UPDATE.md",
+      "wikiFile": "NutsNews-Translation-Diagnostics-Update.md"
+    },
+    {
+      "title": "NutsNews Translation Recovery Guard Update",
+      "source": "docs/updates/README_TRANSLATION_RECOVERY_GUARD_UPDATE.md",
+      "wikiFile": "NutsNews-Translation-Recovery-Guard-Update.md"
+    },
+    {
+      "title": "NutsNews Local AI Summary Length Update",
+      "source": "docs/updates/README_UPDATE.md",
+      "wikiFile": "NutsNews-Local-AI-Summary-Length-Update.md"
+    },
+    {
+      "title": "UptimeRobot Documentation Update",
+      "source": "docs/updates/README_UPTIMEROBOT_ONBOARDING_UPDATE.md",
+      "wikiFile": "UptimeRobot-Documentation-Update.md"
+    },
+    {
+      "title": "NutsNews iOS PWA Project Audit",
+      "source": "reports/ios-pwa-project-4-audit.md",
+      "wikiFile": "NutsNews-iOS-PWA-Project-Audit.md"
+    },
+    {
+      "title": "NutsNews",
+      "source": "web/README.md",
+      "wikiFile": "NutsNews.md"
+    },
+    {
+      "title": "NutsNews SEO Structured Data Audit",
+      "source": "web/reports/seo/seo-structured-data-audit.md",
+      "wikiFile": "NutsNews-SEO-Structured-Data-Audit-2.md"
+    },
+    {
+      "title": "NutsNews Worker Upstash Redis Update",
+      "source": "worker/UPSTASH_REDIS_WORKER_UPDATE_README.md",
+      "wikiFile": "NutsNews-Worker-Upstash-Redis-Update.md"
+    }
+  ]
+}
