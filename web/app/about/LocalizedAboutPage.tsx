@@ -227,7 +227,7 @@ const aboutCopyByLanguage: Record<LanguageCode, AboutCopy> = {
     valuesEyebrow: "Built with intention",
     valuesTitle: "The product values",
     valuesDescription:
-      "Every technical decision supports the same reader experience: faster access to better-feeling stories, fewer distractions, and a site that can grow without becoming complicated to use.",
+      "Every technical decision supports the same reader experience: faster access to better feeling stories, fewer distractions, and a site that can grow without becoming complicated to use.",
     principles: [
       {
         title: "Calm technology",
