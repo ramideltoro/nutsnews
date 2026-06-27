@@ -116,46 +116,10 @@ const copyByLanguage: Record<
   },
 };
 
-const categoryLabelsFr: Record<string, string> = {
-  Achievement: "Réussite",
-  Animals: "Animaux",
-  Community: "Communauté",
-  Creativity: "Créativité",
-  Culture: "Culture",
-  Lifestyle: "Art de vivre",
-  Nature: "Nature",
-  Science: "Science",
-  Space: "Espace",
-  Travel: "Voyage",
-  Uplifting: "Positif",
-  Wellness: "Bien-être",
-};
-
-const categoryLabelsJa: Record<string, string> = {
-  Achievement: "達成",
-  Animals: "動物",
-  Community: "コミュニティ",
-  Creativity: "創造性",
-  Culture: "文化",
-  Lifestyle: "ライフスタイル",
-  Nature: "自然",
-  Science: "科学",
-  Space: "宇宙",
-  Travel: "旅",
-  Uplifting: "前向き",
-  Wellness: "健康",
-};
-
 const dateLocaleByLanguage: Record<LanguageCode, string> = {
   en: "en-US",
   fr: "fr-FR",
   ja: "ja-JP",
-};
-
-const fallbackCategoryByLanguage: Record<LanguageCode, string> = {
-  en: "Uplifting",
-  fr: "Positif",
-  ja: "前向き",
 };
 
 function getStoredLanguage(): LanguageCode {
@@ -201,37 +165,6 @@ function formatSourceLabel(source: string | null) {
   return cleanedSource || "NutsNews";
 }
 
-function translateCategoryBadge(category: string, languageCode: LanguageCode) {
-  if (languageCode === "fr") {
-    return categoryLabelsFr[category] ?? category;
-  }
-
-  if (languageCode === "ja") {
-    return categoryLabelsJa[category] ?? category;
-  }
-
-  return category;
-}
-
-function getCategoryBadges(
-  category: string | null,
-  languageCode: LanguageCode,
-) {
-  const fallback = [fallbackCategoryByLanguage[languageCode]];
-
-  if (!category) {
-    return fallback;
-  }
-
-  const badges = category
-    .split(/[|,;/]+/)
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .map((item) => translateCategoryBadge(item, languageCode));
-
-  return badges.length > 0 ? badges : fallback;
-}
-
 function LoadingIndicator({ label }: { label: string }) {
   return (
     <div className="flex items-center justify-center py-7" aria-live="polite">
@@ -252,7 +185,6 @@ function ArticleCard({
   index: number;
   languageCode: LanguageCode;
 }) {
-  const categoryBadges = getCategoryBadges(article.category, languageCode);
   const cardRef = useRef<HTMLElement | null>(null);
   const [isVisible, setIsVisible] = useState(false);
 
@@ -307,18 +239,6 @@ function ArticleCard({
       </div>
 
       <div className="article-card-modern__body space-y-4 p-5 sm:p-6">
-        <div className="flex flex-wrap gap-2">
-          {categoryBadges.map((category, index) => (
-            <span
-              key={`${article.id}-${category}-${index}`}
-              className="category-badge"
-            >
-              <span aria-hidden="true" className="category-badge__dot" />
-              {category}
-            </span>
-          ))}
-        </div>
-
         <h2 className="article-card-modern__title text-2xl font-black leading-tight tracking-[-0.04em] sm:text-[1.7rem]">
           {article.title}
         </h2>

@@ -602,30 +602,6 @@ body {
   z-index: 1;
 }
 
-.category-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  border: 1px solid var(--theme-border);
-  border-radius: 9999px;
-  background: linear-gradient(90deg, var(--theme-glow-soft), rgba(255, 255, 255, 0.045));
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.09);
-  color: var(--theme-accent-soft);
-  font-size: 0.625rem;
-  font-weight: 950;
-  letter-spacing: 0.12em;
-  padding: 0.42rem 0.72rem;
-  text-transform: uppercase;
-}
-
-.category-badge__dot {
-  height: 0.38rem;
-  width: 0.38rem;
-  border-radius: 9999px;
-  background: var(--theme-accent);
-  box-shadow: 0 0 14px var(--theme-glow);
-}
-
 .article-card-modern__title {
   color: var(--theme-heading);
   text-shadow: 0 0 26px rgba(0, 0, 0, 0.45);
@@ -1375,18 +1351,6 @@ body {
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.72), 0 0 18px rgba(122, 169, 92, 0.18);
 }
 
-:root[data-nutsnews-theme="sakura"] .category-badge {
-  border-color: rgba(79, 127, 53, 0.34);
-  background: linear-gradient(90deg, rgba(122, 169, 92, 0.20), rgba(255, 255, 255, 0.72));
-  box-shadow: 0 8px 20px rgba(127, 45, 69, 0.11), inset 0 1px 0 rgba(255, 255, 255, 0.74);
-  color: #315722;
-}
-
-:root[data-nutsnews-theme="sakura"] .category-badge__dot {
-  background: #4f7f35;
-  box-shadow: 0 0 12px rgba(79, 127, 53, 0.36);
-}
-
 :root[data-nutsnews-theme="sakura"] .theme-panel__active,
 :root[data-nutsnews-theme="sakura"] .theme-panel__section-active,
 :root[data-nutsnews-theme="sakura"] .theme-panel__back-button,
@@ -1462,18 +1426,6 @@ body {
 :root[data-nutsnews-theme="san-juan"] .hero-tagline__word--accent {
   color: #005f73;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.76), 0 0 16px rgba(42, 157, 244, 0.18);
-}
-
-:root[data-nutsnews-theme="san-juan"] .category-badge {
-  border-color: rgba(0, 119, 182, 0.34);
-  background: linear-gradient(90deg, rgba(42, 157, 244, 0.17), rgba(255, 255, 255, 0.72));
-  box-shadow: 0 8px 20px rgba(120, 69, 36, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.74);
-  color: #005f73;
-}
-
-:root[data-nutsnews-theme="san-juan"] .category-badge__dot {
-  background: #e76f51;
-  box-shadow: 0 0 12px rgba(231, 111, 81, 0.34);
 }
 
 :root[data-nutsnews-theme="san-juan"] .theme-panel__active,
