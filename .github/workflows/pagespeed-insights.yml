@@ -1,0 +1,55 @@
+name: PageSpeed Insights
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Public URL to audit
+        required: false
+        default: https://www.nutsnews.com/
+      strategy:
+        description: mobile, desktop, or both
+        required: false
+        default: both
+
+jobs:
+  pagespeed:
+    name: PageSpeed Insights production audit
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: web
+
+    env:
+      PAGESPEED_URL: ${{ inputs.url }}
+      PAGESPEED_STRATEGY: ${{ inputs.strategy }}
+      PAGESPEED_INSIGHTS_API_KEY: ${{ secrets.PAGESPEED_INSIGHTS_API_KEY }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run PageSpeed Insights
+        run: node scripts/pagespeed-insights.mjs --url "$PAGESPEED_URL" --strategy "$PAGESPEED_STRATEGY"
+
+      - name: Upload PageSpeed reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: pagespeed-insights-report
+          path: web/reports/pagespeed
+          if-no-files-found: ignore

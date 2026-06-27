@@ -16,6 +16,12 @@ const STATIC_ASSET_CACHE_CONTROL =
 
 const NO_STORE_CACHE_CONTROL = "no-store, max-age=0";
 
+const shouldUploadSentrySourceMaps =
+  (process.env.VERCEL === "1" || process.env.SENTRY_ENABLE_SOURCE_MAP_UPLOAD === "1") &&
+  Boolean(process.env.SENTRY_AUTH_TOKEN) &&
+  Boolean(process.env.SENTRY_ORG) &&
+  Boolean(process.env.SENTRY_PROJECT);
+
 function publicCacheHeaders(policy: string, cacheControl = PUBLIC_PAGE_CACHE_CONTROL) {
   return [
     {
@@ -236,14 +242,14 @@ const nextConfig: NextConfig = {
 };
 
 export default withSentryConfig(nextConfig, {
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
-  authToken: process.env.SENTRY_AUTH_TOKEN,
+  org: shouldUploadSentrySourceMaps ? process.env.SENTRY_ORG : undefined,
+  project: shouldUploadSentrySourceMaps ? process.env.SENTRY_PROJECT : undefined,
+  authToken: shouldUploadSentrySourceMaps ? process.env.SENTRY_AUTH_TOKEN : undefined,
   widenClientFileUpload: true,
   tunnelRoute: "/monitoring",
   telemetry: false,
   sourcemaps: {
-    disable: !process.env.SENTRY_AUTH_TOKEN,
+    disable: !shouldUploadSentrySourceMaps,
     deleteSourcemapsAfterUpload: true,
   },
 });

@@ -217,11 +217,6 @@ function SearchMenu({
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitAnimating, setIsSubmitAnimating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   useEffect(() => {
     if (!isOpen) {
@@ -357,7 +352,7 @@ function SearchMenu({
     setIsLoading(false);
   }
 
-  if (!isOpen || !isMounted) {
+  if (!isOpen || typeof document === "undefined") {
     return null;
   }
 

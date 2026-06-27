@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:accessibility": "playwright test --config=playwright.config.ts"
+    "test:accessibility": "playwright test --config=playwright.config.ts",
+    "audit:pagespeed": "node scripts/pagespeed-insights.mjs --strategy=both",
+    "audit:pagespeed:mobile": "node scripts/pagespeed-insights.mjs --strategy=mobile",
+    "audit:pagespeed:desktop": "node scripts/pagespeed-insights.mjs --strategy=desktop"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.59.0",
