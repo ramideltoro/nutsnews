@@ -1,0 +1,42 @@
+name: Image Coverage Report
+
+on:
+  schedule:
+    - cron: "9 9 * * *"
+  workflow_dispatch:
+    inputs:
+      article_limit:
+        description: Number of recent published articles to check
+        required: false
+        default: "300"
+
+permissions:
+  contents: read
+
+jobs:
+  image-coverage:
+    name: Check article image coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      IMAGE_COVERAGE_LIMIT: ${{ github.event.inputs.article_limit || '300' }}
+      CHECK_IMAGE_HEADS: "0"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Build image coverage report
+        run: node scripts/image_coverage_report.mjs
+      - name: Upload image coverage report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: image-coverage-report
+          path: reports/image-coverage
+          retention-days: 30
+          if-no-files-found: ignore
