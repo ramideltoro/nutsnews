@@ -1,0 +1,45 @@
+name: Sitemap and Robots Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/app/sitemap.ts"
+      - "web/app/robots.ts"
+      - "scripts/check_sitemap_robots.mjs"
+      - ".github/workflows/sitemap-robots-check.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "web/app/sitemap.ts"
+      - "web/app/robots.ts"
+      - "scripts/check_sitemap_robots.mjs"
+      - ".github/workflows/sitemap-robots-check.yml"
+  schedule:
+    - cron: "42 12 * * *"
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Base URL to check
+        required: false
+        default: https://www.nutsnews.com
+
+permissions:
+  contents: read
+
+jobs:
+  sitemap-robots:
+    name: Check sitemap.xml and robots.txt
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NUTSNEWS_BASE_URL: ${{ github.event.inputs.base_url || 'https://www.nutsnews.com' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Check sitemap and robots
+        run: node scripts/check_sitemap_robots.mjs

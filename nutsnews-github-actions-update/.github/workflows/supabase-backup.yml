@@ -1,0 +1,37 @@
+name: Supabase Backup
+
+on:
+  schedule:
+    - cron: "11 8 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    name: Export Supabase REST backup artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      BACKUP_TABLES: articles,article_summaries,rss_feeds,worker_runs,article_ai_reviews,ai_usage_runs
+      BACKUP_LIMIT_PER_TABLE: "5000"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Create Supabase backup artifact
+        run: node scripts/supabase_backup.mjs
+      - name: Upload backup artifact
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: supabase-rest-backup
+          path: backups/supabase
+          retention-days: 14
+          if-no-files-found: ignore

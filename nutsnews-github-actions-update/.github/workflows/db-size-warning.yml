@@ -1,0 +1,37 @@
+name: Database Growth Warning
+
+on:
+  schedule:
+    - cron: "25 8 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  db-growth:
+    name: Check Supabase table growth
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      ARTICLE_WARNING_COUNT: "50000"
+      ARTICLE_SUMMARY_WARNING_COUNT: "150000"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Check DB growth
+        run: node scripts/db_size_warning.mjs
+      - name: Upload DB growth report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: db-growth-report
+          path: reports/db-growth
+          retention-days: 30
+          if-no-files-found: ignore
