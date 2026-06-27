@@ -1,0 +1,69 @@
+name: Snyk Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly dependency/security scan on Wednesdays at 11:22 UTC.
+    - cron: "22 11 * * 3"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  snyk-open-source:
+    name: Snyk Open Source (${{ matrix.project.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        project:
+          - name: web
+            path: web
+          - name: worker
+            path: worker
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ matrix.project.path }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.project.path }}
+        run: npm ci
+
+      - name: Setup Snyk CLI
+        uses: snyk/actions/setup@master
+
+      - name: Snyk test dependencies
+        working-directory: ${{ matrix.project.path }}
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          snyk test \
+            --file=package.json \
+            --package-manager=npm \
+            --severity-threshold=high \
+            --project-name=nutsnews-${{ matrix.project.name }}
+
+      - name: Upload project snapshot to Snyk dashboard
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: ${{ matrix.project.path }}
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          snyk monitor \
+            --file=package.json \
+            --package-manager=npm \
+            --project-name=nutsnews-${{ matrix.project.name }}
