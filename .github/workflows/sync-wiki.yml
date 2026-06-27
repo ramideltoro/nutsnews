@@ -1,0 +1,76 @@
+name: Sync GitHub Wiki
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - README.md
+      - docs/**
+      - reports/**/*.md
+      - web/**/*.md
+      - worker/**/*.md
+      - controller/**/*.md
+      - local-ai-service/**/*.md
+      - scripts/build_github_wiki.mjs
+      - .github/workflows/sync-wiki.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: github-wiki-sync
+  cancel-in-progress: false
+
+jobs:
+  sync-wiki:
+    name: Build and publish wiki
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Build wiki pages
+        run: node scripts/build_github_wiki.mjs
+
+      - name: Publish generated wiki
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          WIKI_REMOTE: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.wiki.git
+        run: |
+          set -euo pipefail
+
+          rm -rf /tmp/nutsnews-wiki
+
+          if git clone "$WIKI_REMOTE" /tmp/nutsnews-wiki; then
+            echo "Cloned existing wiki repository."
+          else
+            echo "Could not clone the wiki repository. Creating a new local wiki checkout."
+            echo "If the push fails, enable Wikis in GitHub repository settings and rerun this workflow."
+            mkdir -p /tmp/nutsnews-wiki
+            git -C /tmp/nutsnews-wiki init
+            git -C /tmp/nutsnews-wiki remote add origin "$WIKI_REMOTE"
+            git -C /tmp/nutsnews-wiki checkout -B master
+          fi
+
+          find /tmp/nutsnews-wiki -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -R .wiki-build/. /tmp/nutsnews-wiki/
+
+          git -C /tmp/nutsnews-wiki config user.name "github-actions[bot]"
+          git -C /tmp/nutsnews-wiki config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C /tmp/nutsnews-wiki add -A
+
+          if git -C /tmp/nutsnews-wiki diff --cached --quiet; then
+            echo "Wiki is already up to date."
+            exit 0
+          fi
+
+          git -C /tmp/nutsnews-wiki commit -m "Sync NutsNews documentation wiki"
+          git -C /tmp/nutsnews-wiki push origin HEAD:master
