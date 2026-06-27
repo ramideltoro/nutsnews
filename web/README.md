@@ -298,6 +298,20 @@ That means a shard is marked stale only after it has not saved a run for about 3
 
 This avoids incorrectly marking healthy shards as stale just because the controller has not reached them again yet.
 
+
+## Contact Form Spam Protection
+
+The public contact form is protected with Cloudflare Turnstile. The browser renders the Turnstile widget and sends a short-lived token to `/api/contact`. The API route verifies that token with Cloudflare Siteverify before sending the Resend email.
+
+Required web environment variables:
+
+```env
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=your_cloudflare_turnstile_site_key
+TURNSTILE_SECRET_KEY=your_cloudflare_turnstile_secret_key
+```
+
+See `docs/CLOUDFLARE_TURNSTILE_CONTACT_FORM.md` for setup, local testing, and troubleshooting.
+
 ### Current limitation
 
 The current shard dashboard can detect stale, missing, no-feed, slow, and warning shards from saved Worker telemetry.

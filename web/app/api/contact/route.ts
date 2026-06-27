@@ -7,6 +7,8 @@ const DEFAULT_TO_EMAIL = "rami.deltoro@gmail.com";
 const DEFAULT_FROM_EMAIL = "NutsNews Contact <onboarding@resend.dev>";
 const MAX_MESSAGE_LENGTH = 4000;
 const MIN_MESSAGE_LENGTH = 10;
+const TURNSTILE_VERIFY_URL =
+  "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -19,6 +21,49 @@ function escapeHtml(value: string) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+async function verifyTurnstileToken({
+  token,
+  secret,
+  remoteIp,
+}: {
+  token: string;
+  secret: string;
+  remoteIp: string;
+}) {
+  const formData = new FormData();
+  formData.append("secret", secret);
+  formData.append("response", token);
+
+  if (remoteIp && remoteIp !== "Unknown") {
+    formData.append("remoteip", remoteIp);
+  }
+
+  const response = await fetch(TURNSTILE_VERIFY_URL, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    console.error("NutsNews Turnstile verification request failed", {
+      status: response.status,
+    });
+    return false;
+  }
+
+  const result = (await response.json().catch(() => null)) as
+    | { success?: boolean; "error-codes"?: string[] }
+    | null;
+
+  if (!result?.success) {
+    console.warn("NutsNews Turnstile verification rejected", {
+      errorCodes: result?.["error-codes"] ?? [],
+    });
+    return false;
+  }
+
+  return true;
 }
 
 function getRequestIp(request: NextRequest) {
@@ -51,11 +96,14 @@ export async function POST(request: NextRequest) {
     email?: unknown;
     message?: unknown;
     website?: unknown;
+    turnstileToken?: unknown;
   };
 
   const email = typeof form.email === "string" ? form.email.trim() : "";
   const message = typeof form.message === "string" ? form.message.trim() : "";
   const website = typeof form.website === "string" ? form.website.trim() : "";
+  const turnstileToken =
+    typeof form.turnstileToken === "string" ? form.turnstileToken.trim() : "";
 
   if (website) {
     return NextResponse.json({ ok: true });
@@ -81,6 +129,39 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const requestIp = getRequestIp(request);
+  const turnstileSecretKey = process.env.TURNSTILE_SECRET_KEY?.trim();
+
+  if (!turnstileSecretKey) {
+    return NextResponse.json(
+      {
+        error:
+          "The contact form anti-spam check is not configured yet. Please try again later.",
+      },
+      { status: 503 },
+    );
+  }
+
+  if (!turnstileToken) {
+    return NextResponse.json(
+      { error: "Please complete the anti-spam check before sending." },
+      { status: 400 },
+    );
+  }
+
+  const isTurnstileValid = await verifyTurnstileToken({
+    token: turnstileToken,
+    secret: turnstileSecretKey,
+    remoteIp: requestIp,
+  });
+
+  if (!isTurnstileValid) {
+    return NextResponse.json(
+      { error: "The anti-spam check failed. Please try again." },
+      { status: 400 },
+    );
+  }
+
   const resendApiKey = process.env.RESEND_API_KEY?.trim();
 
   if (!resendApiKey) {
@@ -95,7 +176,6 @@ export async function POST(request: NextRequest) {
 
   const toEmail = process.env.CONTACT_TO_EMAIL?.trim() || DEFAULT_TO_EMAIL;
   const fromEmail = process.env.CONTACT_FROM_EMAIL?.trim() || DEFAULT_FROM_EMAIL;
-  const requestIp = getRequestIp(request);
   const userAgent = request.headers.get("user-agent") ?? "Unknown";
   const submittedAt = new Date().toISOString();
 

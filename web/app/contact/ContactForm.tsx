@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import Script from "next/script";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
 import { type LanguageCode } from "@/lib/languages";
 import { useSelectedLanguage } from "../components/useSelectedLanguage";
@@ -10,6 +11,30 @@ type FormStatus =
   | { type: "sending" }
   | { type: "success"; message: string }
   | { type: "error"; message: string };
+
+type TurnstileApi = {
+  render: (
+    container: HTMLElement,
+    options: {
+      sitekey: string;
+      theme?: "auto" | "light" | "dark";
+      callback?: (token: string) => void;
+      "expired-callback"?: () => void;
+      "error-callback"?: () => void;
+    },
+  ) => string;
+  reset: (widgetId?: string) => void;
+  remove?: (widgetId: string) => void;
+};
+
+declare global {
+  interface Window {
+    turnstile?: TurnstileApi;
+  }
+}
+
+const turnstileSiteKey =
+  process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "";
 
 const formCopyByLanguage: Record<
   LanguageCode,
@@ -25,6 +50,9 @@ const formCopyByLanguage: Record<
     genericError: string;
     connectionError: string;
     success: string;
+    turnstileRequired: string;
+    turnstileUnavailable: string;
+    turnstileHelp: string;
   }
 > = {
   en: {
@@ -42,6 +70,10 @@ const formCopyByLanguage: Record<
     connectionError:
       "Your message could not be sent. Please check your connection.",
     success: "Thanks. Your message was sent to NutsNews.",
+    turnstileRequired: "Please complete the quick anti-spam check before sending.",
+    turnstileUnavailable:
+      "The anti-spam check is not configured yet. Please try again later.",
+    turnstileHelp: "",
   },
   fr: {
     hiddenWebsite: "Site web",
@@ -58,6 +90,11 @@ const formCopyByLanguage: Record<
     connectionError:
       "Votre message n’a pas pu être envoyé. Veuillez vérifier votre connexion.",
     success: "Merci. Votre message a été envoyé à NutsNews.",
+    turnstileRequired:
+      "Veuillez compléter la vérification anti-spam rapide avant l’envoi.",
+    turnstileUnavailable:
+      "La vérification anti-spam n’est pas encore configurée. Veuillez réessayer plus tard.",
+    turnstileHelp: "Protégé par Cloudflare Turnstile.",
   },
   ja: {
     hiddenWebsite: "ウェブサイト",
@@ -74,8 +111,85 @@ const formCopyByLanguage: Record<
     connectionError:
       "メッセージを送信できませんでした。接続を確認してください。",
     success: "ありがとうございます。メッセージはNutsNewsに送信されました。",
+    turnstileRequired: "送信前に簡単なスパム対策チェックを完了してください。",
+    turnstileUnavailable:
+      "スパム対策チェックはまだ設定されていません。後でもう一度お試しください。",
+    turnstileHelp: "Cloudflare Turnstileで保護されています。",
   },
 };
+
+
+function TurnstileWidget({
+  copy,
+  resetSignal,
+  onTokenChange,
+}: {
+  copy: (typeof formCopyByLanguage)[LanguageCode];
+  resetSignal: number;
+  onTokenChange: (token: string) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const widgetIdRef = useRef<string | null>(null);
+  const [scriptReady, setScriptReady] = useState(false);
+
+  useEffect(() => {
+    if (!turnstileSiteKey || !scriptReady || !containerRef.current) {
+      return;
+    }
+
+    if (widgetIdRef.current) {
+      return;
+    }
+
+    widgetIdRef.current =
+      window.turnstile?.render(containerRef.current, {
+        sitekey: turnstileSiteKey,
+        theme: "dark",
+        callback: (token: string) => onTokenChange(token),
+        "expired-callback": () => onTokenChange(""),
+        "error-callback": () => onTokenChange(""),
+      }) ?? null;
+  }, [onTokenChange, scriptReady]);
+
+  useEffect(() => {
+    if (!widgetIdRef.current) {
+      return;
+    }
+
+    window.turnstile?.reset(widgetIdRef.current);
+    onTokenChange("");
+  }, [onTokenChange, resetSignal]);
+
+  useEffect(() => {
+    return () => {
+      if (widgetIdRef.current && window.turnstile?.remove) {
+        window.turnstile.remove(widgetIdRef.current);
+      }
+    };
+  }, []);
+
+  if (!turnstileSiteKey) {
+    return (
+      <p className="mt-4 rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-200">
+        {copy.turnstileUnavailable}
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-4">
+      <Script
+        src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+        strategy="afterInteractive"
+        onLoad={() => setScriptReady(true)}
+      />
+      <div ref={containerRef} />
+      <p className="mt-2 text-xs leading-5 text-neutral-500">
+        {copy.turnstileHelp}
+      </p>
+    </div>
+  );
+}
 
 export function ContactForm() {
   const selectedLanguage = useSelectedLanguage();
@@ -84,9 +198,21 @@ export function ContactForm() {
   const [message, setMessage] = useState("");
   const [website, setWebsite] = useState("");
   const [status, setStatus] = useState<FormStatus>({ type: "idle" });
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!turnstileSiteKey) {
+      setStatus({ type: "error", message: copy.turnstileUnavailable });
+      return;
+    }
+
+    if (!turnstileToken) {
+      setStatus({ type: "error", message: copy.turnstileRequired });
+      return;
+    }
+
     setStatus({ type: "sending" });
 
     try {
@@ -95,7 +221,7 @@ export function ContactForm() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, message, website }),
+        body: JSON.stringify({ email, message, website, turnstileToken }),
       });
 
       const result = (await response.json().catch(() => ({}))) as {
@@ -107,12 +233,14 @@ export function ContactForm() {
           type: "error",
           message: result.error ?? copy.genericError,
         });
+        setTurnstileResetSignal((value) => value + 1);
         return;
       }
 
       setEmail("");
       setMessage("");
       setWebsite("");
+      setTurnstileResetSignal((value) => value + 1);
       setStatus({
         type: "success",
         message: copy.success,
@@ -122,6 +250,7 @@ export function ContactForm() {
         type: "error",
         message: copy.connectionError,
       });
+      setTurnstileResetSignal((value) => value + 1);
     }
   }
 
@@ -180,6 +309,12 @@ export function ContactForm() {
         onChange={(event) => setMessage(event.target.value)}
         placeholder={copy.messagePlaceholder}
         className="mt-2 w-full resize-none rounded-2xl border border-amber-300/15 bg-neutral-950/80 px-4 py-3 text-sm leading-7 text-neutral-100 outline-none ring-0 transition placeholder:text-neutral-600 focus:border-amber-300/60 focus:bg-neutral-950 focus:shadow-[0_0_0_4px_rgba(245,158,11,0.12)]"
+      />
+
+      <TurnstileWidget
+        copy={copy}
+        resetSignal={turnstileResetSignal}
+        onTokenChange={setTurnstileToken}
       />
 
       <div className="mt-4 flex items-center justify-between gap-3">
