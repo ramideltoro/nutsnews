@@ -10,7 +10,8 @@
     "test:accessibility": "playwright test --config=playwright.config.ts",
     "audit:pagespeed": "node scripts/pagespeed-insights.mjs --strategy=both",
     "audit:pagespeed:mobile": "node scripts/pagespeed-insights.mjs --strategy=mobile",
-    "audit:pagespeed:desktop": "node scripts/pagespeed-insights.mjs --strategy=desktop"
+    "audit:pagespeed:desktop": "node scripts/pagespeed-insights.mjs --strategy=desktop",
+    "audit:seo": "node scripts/seo-structured-data-audit.mjs"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.59.0",

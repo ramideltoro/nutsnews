@@ -1,0 +1,134 @@
+{
+  "baseUrl": "https://www.nutsnews.com",
+  "generatedAt": "2026-06-27T18:04:27.512Z",
+  "failOnWarnings": false,
+  "totals": {
+    "pages": 6,
+    "errors": 4,
+    "warnings": 6
+  },
+  "results": [
+    {
+      "pageType": "home",
+      "url": "https://www.nutsnews.com",
+      "status": "pass",
+      "errors": [],
+      "warnings": [
+        "Homepage JSON-LD has no Article items. This is okay if the page intentionally has only website-level schema."
+      ],
+      "summary": {
+        "title": "NutsNews | Positive News Curated by AI",
+        "descriptionLength": 143,
+        "canonical": "https://www.nutsnews.com",
+        "ogImage": "https://www.nutsnews.com/opengraph-image?0c98142fa5bd5a85",
+        "twitterImage": "https://www.nutsnews.com/opengraph-image",
+        "jsonLdBlockCount": 1,
+        "jsonLdTypes": [
+          "collectionpage"
+        ]
+      }
+    },
+    {
+      "pageType": "article",
+      "url": "https://www.nutsnews.com/articles/61e534b4-29fd-4883-bc7c-2ab19338be8f",
+      "status": "pass",
+      "errors": [],
+      "warnings": [
+        "Meta description is long (228 chars)."
+      ],
+      "summary": {
+        "title": "Conan O’Brien says he always flies commercial, for a surprisingly human reason | NutsNews",
+        "descriptionLength": 228,
+        "canonical": "https://www.nutsnews.com/articles/61e534b4-29fd-4883-bc7c-2ab19338be8f",
+        "ogImage": "https://www.nutsnews.com/articles/61e534b4-29fd-4883-bc7c-2ab19338be8f/opengraph-image",
+        "twitterImage": "https://www.nutsnews.com/articles/61e534b4-29fd-4883-bc7c-2ab19338be8f/opengraph-image",
+        "jsonLdBlockCount": 1,
+        "jsonLdTypes": [
+          "article"
+        ]
+      }
+    },
+    {
+      "pageType": "article",
+      "url": "https://www.nutsnews.com/articles/1f7a2279-2405-4cb4-9cab-0b2160bbc42d",
+      "status": "pass",
+      "errors": [],
+      "warnings": [
+        "Meta description is long (250 chars)."
+      ],
+      "summary": {
+        "title": "Drones are Saving Hundreds of Fawns From Mower Deaths in Germany (WATCH) | NutsNews",
+        "descriptionLength": 250,
+        "canonical": "https://www.nutsnews.com/articles/1f7a2279-2405-4cb4-9cab-0b2160bbc42d",
+        "ogImage": "https://www.nutsnews.com/articles/1f7a2279-2405-4cb4-9cab-0b2160bbc42d/opengraph-image",
+        "twitterImage": "https://www.nutsnews.com/articles/1f7a2279-2405-4cb4-9cab-0b2160bbc42d/opengraph-image",
+        "jsonLdBlockCount": 1,
+        "jsonLdTypes": [
+          "article"
+        ]
+      }
+    },
+    {
+      "pageType": "article",
+      "url": "https://www.nutsnews.com/articles/7377ae54-3fb2-45f2-8e7b-fda84307ce33",
+      "status": "pass",
+      "errors": [],
+      "warnings": [
+        "Meta description is long (225 chars)."
+      ],
+      "summary": {
+        "title": "The McDonald’s Filet-O-Fish was born from Catholic Church law | NutsNews",
+        "descriptionLength": 225,
+        "canonical": "https://www.nutsnews.com/articles/7377ae54-3fb2-45f2-8e7b-fda84307ce33",
+        "ogImage": "https://www.nutsnews.com/articles/7377ae54-3fb2-45f2-8e7b-fda84307ce33/opengraph-image",
+        "twitterImage": "https://www.nutsnews.com/articles/7377ae54-3fb2-45f2-8e7b-fda84307ce33/opengraph-image",
+        "jsonLdBlockCount": 1,
+        "jsonLdTypes": [
+          "article"
+        ]
+      }
+    },
+    {
+      "pageType": "extra",
+      "url": "https://www.nutsnews.com/privacy",
+      "status": "fail",
+      "errors": [
+        "Missing og:image.",
+        "Missing application/ld+json structured data."
+      ],
+      "warnings": [
+        "Missing twitter:image."
+      ],
+      "summary": {
+        "title": "Privacy Policy | NutsNews",
+        "descriptionLength": 164,
+        "canonical": "https://www.nutsnews.com/privacy",
+        "ogImage": "",
+        "twitterImage": "",
+        "jsonLdBlockCount": 0,
+        "jsonLdTypes": []
+      }
+    },
+    {
+      "pageType": "extra",
+      "url": "https://www.nutsnews.com/contact",
+      "status": "fail",
+      "errors": [
+        "Missing og:image.",
+        "Missing application/ld+json structured data."
+      ],
+      "warnings": [
+        "Missing twitter:image."
+      ],
+      "summary": {
+        "title": "Contact | NutsNews",
+        "descriptionLength": 71,
+        "canonical": "https://www.nutsnews.com/contact",
+        "ogImage": "",
+        "twitterImage": "",
+        "jsonLdBlockCount": 0,
+        "jsonLdTypes": []
+      }
+    }
+  ]
+}

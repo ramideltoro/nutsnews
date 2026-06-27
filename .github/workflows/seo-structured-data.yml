@@ -1,0 +1,65 @@
+name: SEO Structured Data Audit
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Public URL to audit
+        required: false
+        default: https://www.nutsnews.com
+      article_limit:
+        description: Number of sitemap article URLs to audit
+        required: false
+        default: '3'
+      extra_paths:
+        description: Optional comma-separated extra paths, for example /privacy,/contact
+        required: false
+        default: ''
+  schedule:
+    - cron: '30 10 * * *'
+
+jobs:
+  seo-structured-data:
+    name: SEO structured data production audit
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: web
+
+    env:
+      SEO_AUDIT_BASE_URL: ${{ github.event.inputs.base_url || 'https://www.nutsnews.com' }}
+      SEO_AUDIT_ARTICLE_LIMIT: ${{ github.event.inputs.article_limit || '3' }}
+      SEO_AUDIT_EXTRA_PATHS: ${{ github.event.inputs.extra_paths || '' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run SEO structured data audit
+        run: npm run audit:seo
+
+      - name: Upload SEO audit report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: seo-structured-data-audit-report
+          path: web/reports/seo
+          if-no-files-found: ignore
