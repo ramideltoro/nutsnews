@@ -1,0 +1,20 @@
+name: NutsNews CodeQL Config
+
+queries:
+  - uses: security-extended
+
+paths:
+  - web
+  - worker
+  - .github/workflows
+
+paths-ignore:
+  - "**/node_modules/**"
+  - "**/.next/**"
+  - "**/dist/**"
+  - "**/build/**"
+  - "**/coverage/**"
+  - "**/reports/**"
+  - "**/*.map"
+  - "**/*.min.js"
+  - "worker/generated-wrangler/**"
