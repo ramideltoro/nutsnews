@@ -176,6 +176,14 @@ export default async function AdminPage() {
             />
 
             <DashboardCard
+              eyebrow="Free Tiers"
+              title="Guardrails"
+              description="Forecast database growth, AI spend, Worker invocations, email sends, Redis/KV usage, egress, and API pressure before free-tier limits are hit."
+              href="/admin/guardrails"
+              status="Live"
+            />
+
+            <DashboardCard
               eyebrow="Home AI"
               title="Local AI"
               description="Monitor the home-server Ollama model, qwen/local AI article decisions, fallback OpenAI calls, review latency, and model-level quality signals."

@@ -1,0 +1,53 @@
+name: Web Offline E2E Regression
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    paths:
+      - "web/**"
+      - "scripts/web_offline_e2e_regression.mjs"
+      - ".github/workflows/web-offline-e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  web-offline-e2e:
+    name: Mocked public web flow
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+
+      - name: TypeScript check
+        working-directory: web
+        run: npx tsc --noEmit
+
+      - name: Lint
+        working-directory: web
+        run: npm run lint
+
+      - name: Run fully offline web E2E regression
+        working-directory: web
+        run: npm run test:e2e:offline

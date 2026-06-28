@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { recordQuotaUsageEvent } from "@/lib/quotaUsage";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -8,7 +10,10 @@ const DEFAULT_FROM_EMAIL = "NutsNews Contact <onboarding@resend.dev>";
 const MAX_MESSAGE_LENGTH = 4000;
 const MIN_MESSAGE_LENGTH = 10;
 const TURNSTILE_VERIFY_URL =
+  process.env.TURNSTILE_VERIFY_URL?.trim() ||
   "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+const RESEND_EMAILS_URL =
+  process.env.RESEND_EMAILS_URL?.trim() || "https://api.resend.com/emails";
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -205,7 +210,7 @@ export async function POST(request: NextRequest) {
   `;
 
   try {
-    const resendResponse = await fetch("https://api.resend.com/emails", {
+    const resendResponse = await fetch(RESEND_EMAILS_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${resendApiKey}`,
@@ -233,6 +238,14 @@ export async function POST(request: NextRequest) {
         { status: 502 },
       );
     }
+
+    await recordQuotaUsageEvent({
+      eventType: "email_send",
+      eventSource: "contact_form",
+      provider: "resend",
+      quantity: 1,
+      metadata: { toEmail, fromEmail },
+    });
 
     return NextResponse.json({ ok: true });
   } catch (error) {
