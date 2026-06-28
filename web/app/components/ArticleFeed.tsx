@@ -295,10 +295,12 @@ export function ArticleFeed({
       page,
       cursor,
       languageCode,
+      forceFresh = false,
     }: {
       page: number | null;
       cursor: string | null;
       languageCode: LanguageCode;
+      forceFresh?: boolean;
     }) => {
       const query = new URLSearchParams();
 
@@ -312,9 +314,20 @@ export function ArticleFeed({
         query.set("lang", languageCode);
       }
 
+      if (forceFresh) {
+        query.set("_", String(Date.now()));
+      }
+
       const response = await fetch(`/api/articles?${query.toString()}`, {
+        cache: forceFresh ? "no-store" : "default",
         headers: {
           Accept: "application/json",
+          ...(forceFresh
+            ? {
+                "Cache-Control": "no-cache",
+                Pragma: "no-cache",
+              }
+            : {}),
         },
       });
 
@@ -334,7 +347,10 @@ export function ArticleFeed({
   );
 
   const loadFirstPageForLanguage = useCallback(
-    async (languageCode: LanguageCode) => {
+    async (
+      languageCode: LanguageCode,
+      options: { forceFresh?: boolean } = {},
+    ) => {
       isReloadingLanguageRef.current = true;
       setIsLoading(true);
       setLoadError(null);
@@ -344,6 +360,7 @@ export function ArticleFeed({
           page: 0,
           cursor: null,
           languageCode,
+          forceFresh: options.forceFresh,
         });
 
         setArticles(data.articles);
@@ -368,12 +385,10 @@ export function ArticleFeed({
     const storedLanguage = getStoredLanguage();
     document.documentElement.lang = storedLanguage;
 
-    if (storedLanguage !== DEFAULT_LANGUAGE_CODE) {
-      window.setTimeout(() => {
-        setSelectedLanguage(storedLanguage);
-        void loadFirstPageForLanguage(storedLanguage);
-      }, 0);
-    }
+    const initialRefreshTimer = window.setTimeout(() => {
+      setSelectedLanguage(storedLanguage);
+      void loadFirstPageForLanguage(storedLanguage, { forceFresh: true });
+    }, 0);
 
     const handleLanguageChange = (event: Event) => {
       const nextLanguage = (event as CustomEvent<{ languageCode?: string }>)
@@ -389,8 +404,10 @@ export function ArticleFeed({
 
     window.addEventListener(LANGUAGE_CHANGE_EVENT, handleLanguageChange);
 
-    return () =>
+    return () => {
+      window.clearTimeout(initialRefreshTimer);
       window.removeEventListener(LANGUAGE_CHANGE_EVENT, handleLanguageChange);
+    };
   }, [loadFirstPageForLanguage]);
 
   const loadMoreArticles = useCallback(async () => {

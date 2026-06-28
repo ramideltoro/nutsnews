@@ -1,13 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  DEFAULT_LANGUAGE_CODE,
-  LANGUAGE_CHANGE_EVENT,
-  LANGUAGE_STORAGE_KEY,
-  type LanguageCode,
-  normalizeLanguageCode,
-} from "@/lib/languages";
+import type { LanguageCode } from "@/lib/languages";
+import { useSelectedLanguage } from "./useSelectedLanguage";
 
 const taglineCopy: Record<LanguageCode, { soft: string; accent: string; ariaLabel: string }> = {
   en: {
@@ -27,38 +21,8 @@ const taglineCopy: Record<LanguageCode, { soft: string; accent: string; ariaLabe
   },
 };
 
-function getStoredLanguage(): LanguageCode {
-  if (typeof window === "undefined") {
-    return DEFAULT_LANGUAGE_CODE;
-  }
-
-  return normalizeLanguageCode(window.localStorage.getItem(LANGUAGE_STORAGE_KEY));
-}
-
 export function HeroTagline() {
-  const [languageCode, setLanguageCode] = useState<LanguageCode>(() => getStoredLanguage());
-
-  useEffect(() => {
-    const handleLanguageChange = (event: Event) => {
-      const customEvent = event as CustomEvent<{ languageCode?: string }>;
-      setLanguageCode(normalizeLanguageCode(customEvent.detail?.languageCode));
-    };
-
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === LANGUAGE_STORAGE_KEY) {
-        setLanguageCode(normalizeLanguageCode(event.newValue));
-      }
-    };
-
-    window.addEventListener(LANGUAGE_CHANGE_EVENT, handleLanguageChange);
-    window.addEventListener("storage", handleStorageChange);
-
-    return () => {
-      window.removeEventListener(LANGUAGE_CHANGE_EVENT, handleLanguageChange);
-      window.removeEventListener("storage", handleStorageChange);
-    };
-  }, []);
-
+  const languageCode = useSelectedLanguage();
   const copy = taglineCopy[languageCode] ?? taglineCopy.en;
 
   return (
