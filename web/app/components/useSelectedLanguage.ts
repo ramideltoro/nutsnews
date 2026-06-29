@@ -7,6 +7,7 @@ import {
   LANGUAGE_STORAGE_KEY,
   type LanguageCode,
   isSupportedLanguageCode,
+  normalizeLanguageCode,
 } from "@/lib/languages";
 
 function readStoredLanguage(): LanguageCode {
@@ -14,10 +15,7 @@ function readStoredLanguage(): LanguageCode {
     return DEFAULT_LANGUAGE_CODE;
   }
 
-  const storedLanguage = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
-  return isSupportedLanguageCode(storedLanguage)
-    ? storedLanguage
-    : DEFAULT_LANGUAGE_CODE;
+  return normalizeLanguageCode(window.localStorage.getItem(LANGUAGE_STORAGE_KEY));
 }
 
 export function useSelectedLanguage() {
@@ -39,7 +37,10 @@ export function useSelectedLanguage() {
 
       if (isSupportedLanguageCode(nextLanguage)) {
         applyLanguage(nextLanguage);
+        return;
       }
+
+      applyLanguage(normalizeLanguageCode(nextLanguage));
     };
 
     const handleStorageChange = (event: StorageEvent) => {
@@ -47,11 +48,7 @@ export function useSelectedLanguage() {
         return;
       }
 
-      applyLanguage(
-        isSupportedLanguageCode(event.newValue)
-          ? event.newValue
-          : DEFAULT_LANGUAGE_CODE,
-      );
+      applyLanguage(normalizeLanguageCode(event.newValue));
     };
 
     window.addEventListener(LANGUAGE_CHANGE_EVENT, handleLanguageChange);

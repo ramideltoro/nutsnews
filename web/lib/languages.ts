@@ -19,6 +19,24 @@ export const SUPPORTED_LANGUAGES = [
     nativeLabel: "日本語",
     flag: "🇯🇵",
   },
+  {
+    code: "de-CH",
+    label: "Swiss German",
+    nativeLabel: "Deutsch (Schweiz)",
+    flag: "🇨🇭",
+  },
+  {
+    code: "de",
+    label: "German",
+    nativeLabel: "Deutsch",
+    flag: "🇩🇪",
+  },
+  {
+    code: "el",
+    label: "Greek",
+    nativeLabel: "Ελληνικά",
+    flag: "🇬🇷",
+  },
 ] as const;
 
 export type LanguageCode = (typeof SUPPORTED_LANGUAGES)[number]["code"];
@@ -29,12 +47,31 @@ const supportedLanguageCodes = new Set<string>(
   SUPPORTED_LANGUAGES.map((language) => language.code),
 );
 
+export function normalizeLanguageCodeValue(value: string | null | undefined) {
+  const normalizedValue = value?.trim();
+
+  if (!normalizedValue) {
+    return "";
+  }
+
+  const lowerValue = normalizedValue.toLowerCase();
+
+  if (lowerValue === "de-ch" || lowerValue === "de_ch" || lowerValue === "ch") {
+    return "de-CH";
+  }
+
+  return lowerValue;
+}
+
 export function isSupportedLanguageCode(value: string | null | undefined): value is LanguageCode {
   return Boolean(value && supportedLanguageCodes.has(value));
 }
 
 export function normalizeLanguageCode(value: string | null | undefined): LanguageCode {
-  return isSupportedLanguageCode(value) ? value : DEFAULT_LANGUAGE_CODE;
+  const normalizedValue = normalizeLanguageCodeValue(value);
+  return isSupportedLanguageCode(normalizedValue)
+    ? normalizedValue
+    : DEFAULT_LANGUAGE_CODE;
 }
 
 export function getLanguageLabel(languageCode: LanguageCode) {

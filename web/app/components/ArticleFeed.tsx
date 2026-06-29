@@ -114,12 +114,85 @@ const copyByLanguage: Record<
     noSearchResultsBody: (query) =>
       `「${query}」に一致する公開済みストーリーはありません。動物、科学、コミュニティ、旅行、健康など広い言葉を試してください。`,
   },
+
+  "de-CH": {
+    recently: "Kürzlich",
+    loadingMore: "Weitere Geschichten werden geladen",
+    readFullStory: "Ganze Geschichte lesen",
+    emptyFeed:
+      "Im Moment sind keine positiven Geschichten verfügbar. Schau bald wieder vorbei.",
+    loadError: "Weitere Geschichten konnten nicht geladen werden.",
+    tryAgain: "Erneut versuchen",
+    searchLabel: "Ganz NutsNews durchsuchen",
+    searchPlaceholder: "Tiere, Wissenschaft, Gemeinschaft, Wohlbefinden...",
+    searchButton: "Suchen",
+    searchLoading: "Das ganze Archiv wird durchsucht",
+    searchLoadError: "Das Archiv konnte nicht durchsucht werden.",
+    clearSearch: "Suche löschen",
+    loadMoreResults: "Mehr Ergebnisse laden",
+    searchHint:
+      "Durchsuche das ganze NutsNews-Archiv, nicht nur die hier geladenen Geschichten.",
+    searchResultsLabel: (count, query) =>
+      `${count} Ergebnis${count === 1 ? "" : "se"} für „${query}“`,
+    noSearchResultsTitle: "Noch keine passenden Geschichten",
+    noSearchResultsBody: (query) =>
+      `Keine veröffentlichte NutsNews-Geschichte passt zu „${query}“. Versuch ein breiteres Wort wie Tiere, Wissenschaft, Gemeinschaft, Reisen oder Wohlbefinden.`,
+  },
+  de: {
+    recently: "Kürzlich",
+    loadingMore: "Weitere Geschichten werden geladen",
+    readFullStory: "Ganze Geschichte lesen",
+    emptyFeed:
+      "Im Moment sind keine positiven Geschichten verfügbar. Schau bald wieder vorbei.",
+    loadError: "Weitere Geschichten konnten nicht geladen werden.",
+    tryAgain: "Erneut versuchen",
+    searchLabel: "Ganz NutsNews durchsuchen",
+    searchPlaceholder: "Tiere, Wissenschaft, Gemeinschaft, Wohlbefinden...",
+    searchButton: "Suchen",
+    searchLoading: "Das ganze Archiv wird durchsucht",
+    searchLoadError: "Das Archiv konnte nicht durchsucht werden.",
+    clearSearch: "Suche löschen",
+    loadMoreResults: "Mehr Ergebnisse laden",
+    searchHint:
+      "Durchsuche das ganze NutsNews-Archiv, nicht nur die hier geladenen Geschichten.",
+    searchResultsLabel: (count, query) =>
+      `${count} Ergebnis${count === 1 ? "" : "se"} für „${query}“`,
+    noSearchResultsTitle: "Noch keine passenden Geschichten",
+    noSearchResultsBody: (query) =>
+      `Keine veröffentlichte NutsNews-Geschichte passt zu „${query}“. Versuch ein breiteres Wort wie Tiere, Wissenschaft, Gemeinschaft, Reisen oder Wohlbefinden.`,
+  },
+  el: {
+    recently: "Πρόσφατα",
+    loadingMore: "Φόρτωση περισσότερων ιστοριών",
+    readFullStory: "Διαβάστε ολόκληρη την ιστορία",
+    emptyFeed:
+      "Δεν υπάρχουν ακόμα θετικές ιστορίες. Ελέγξτε ξανά σύντομα.",
+    loadError: "Δεν ήταν δυνατή η φόρτωση περισσότερων ιστοριών.",
+    tryAgain: "Δοκιμάστε ξανά",
+    searchLabel: "Αναζήτηση σε όλο το NutsNews",
+    searchPlaceholder: "Ζώα, επιστήμη, κοινότητα, ευεξία...",
+    searchButton: "Αναζήτηση",
+    searchLoading: "Αναζήτηση σε όλο το αρχείο",
+    searchLoadError: "Δεν ήταν δυνατή η αναζήτηση στο αρχείο.",
+    clearSearch: "Καθαρισμός αναζήτησης",
+    loadMoreResults: "Φόρτωση περισσότερων αποτελεσμάτων",
+    searchHint:
+      "Αναζητήστε σε όλο το αρχείο του NutsNews, όχι μόνο στις ιστορίες που έχουν φορτωθεί εδώ.",
+    searchResultsLabel: (count, query) =>
+      `${count} αποτέλεσμα${count === 1 ? "" : "τα"} για «${query}»`,
+    noSearchResultsTitle: "Δεν βρέθηκαν ακόμα ιστορίες",
+    noSearchResultsBody: (query) =>
+      `Καμία δημοσιευμένη ιστορία του NutsNews δεν ταίριαξε με «${query}». Δοκιμάστε μια πιο γενική λέξη όπως ζώα, επιστήμη, κοινότητα, ταξίδια ή ευεξία.`,
+  },
 };
 
 const dateLocaleByLanguage: Record<LanguageCode, string> = {
   en: "en-US",
   fr: "fr-FR",
   ja: "ja-JP",
+  "de-CH": "de-CH",
+  de: "de-DE",
+  el: "el-GR",
 };
 
 function getStoredLanguage(): LanguageCode {

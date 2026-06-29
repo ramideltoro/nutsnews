@@ -12,7 +12,7 @@ on:
       language_codes:
         description: Comma-separated languages to check
         required: false
-        default: fr,ja
+        default: fr,ja,de-CH,de,el
 
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.NEXT_PUBLIC_SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      LANGUAGE_CODES: ${{ github.event.inputs.language_codes || 'fr,ja' }}
+      LANGUAGE_CODES: ${{ github.event.inputs.language_codes || 'fr,ja,de-CH,de,el' }}
       AUDIT_LIMIT: ${{ github.event.inputs.audit_limit || '100' }}
       AUDIT_SOURCE: public_feed_snapshot
     steps:

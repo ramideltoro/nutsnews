@@ -29,7 +29,265 @@ type PrivacyCopy = {
   returnButton: string;
 };
 
+
+const germanPrivacyCopy: PrivacyCopy = {
+  eyebrow: "Datenschutzrichtlinie",
+  title: "NutsNews Datenschutzrichtlinie",
+  lastUpdatedLabel: "Zuletzt aktualisiert",
+  lastUpdated: "19. Juni 2026",
+  intro:
+    "NutsNews ist bewusst einfach und datenschutzfreundlich gebaut: Es ist kein Konto erforderlich, App-Einstellungen werden lokal gespeichert, und die App zeigt positive Zusammenfassungen mit Links zurück zu den Originalverlagen.",
+  highlightsEyebrow: "Datenschutz auf einen Blick",
+  highlightsTitle: "Klar gestaltet",
+  highlights: [
+    "Zum Lesen von NutsNews ist kein Konto erforderlich.",
+    "Die iOS-App fragt nicht nach Name, E-Mail-Adresse, Telefonnummer, Passwort oder Zahlungsinformationen.",
+    "Die iOS-App nutzt keine Berechtigungen für Standort, Kamera, Mikrofon, Fotos, Kontakte oder Gesundheitsdaten.",
+    "Die iOS-App enthält keine Werbe-SDKs und keine Funktionen für appübergreifendes Tracking.",
+    "Geliktete Geschichten, Designauswahl und Haptik-Einstellungen werden lokal auf dem Gerät gespeichert.",
+    "Zwischengespeicherte Artikelantworten verbessern die Geschwindigkeit und reduzieren unnötige Netzwerkanfragen.",
+    "Jede Geschichte verweist auf den Originalverlag, statt den vollständigen Artikel erneut zu veröffentlichen.",
+  ],
+  sections: [
+    {
+      id: "overview",
+      title: "Überblick",
+      body: [
+        "NutsNews ist ein Reader für positive Nachrichten, der kurze aufbauende Zusammenfassungen zeigt und Leser zu den Originalseiten der Verlage zurückführt.",
+        "Diese Richtlinie erklärt, wie NutsNews Informationen in der iOS-App und auf der NutsNews-Website behandelt.",
+      ],
+    },
+    {
+      id: "ios-app-does-not-request",
+      title: "Informationen, die die iOS-App nicht anfordert",
+      body: [
+        "Die NutsNews iOS-App erfordert keine Registrierung. Leser können die App öffnen und Geschichten lesen, ohne Name, E-Mail-Adresse, Telefonnummer, Passwort oder Zahlungsinformationen anzugeben.",
+        "Die iOS-App verlangt keinen Zugriff auf Standort, Kontakte, Fotos, Kamera, Mikrofon, Kalender, Erinnerungen, Gesundheitsdaten, Bluetooth oder Geräte im lokalen Netzwerk.",
+        "Die iOS-App enthält keine Werbefunktionen, keine Anfrage nach einer Werbe-ID und keine Aufforderung zu appübergreifendem Tracking.",
+      ],
+    },
+    {
+      id: "local-storage",
+      title: "Lokale Speicherung auf dem Gerät",
+      body: [
+        "Die iOS-App speichert bestimmte Einstellungen lokal auf dem Gerät des Lesers. Dazu gehören ausgewähltes Design, Haptik-Einstellung und Kennungen gelikteter Geschichten.",
+        "Geliktete Geschichten werden lokal gespeichert, damit dieselbe Geschichte im Home-Feed und auf der Story-Seite als gelikt erscheint. Diese Information wird nicht an ein NutsNews-Konto gesendet, weil die App keine Konten verlangt.",
+        "Leser können ein Like entfernen, indem sie den Like-Button erneut antippen. Lokale App-Daten können auch entfernt werden, indem die App vom Gerät gelöscht wird.",
+      ],
+    },
+    {
+      id: "article-feed-caching",
+      title: "Caching des Artikel-Feeds",
+      body: [
+        "Damit die App schneller ist und unnötige Netzwerkanfragen reduziert werden, kann die iOS-App aktuelle Artikel-Feed-Antworten für begrenzte Zeit auf dem Gerät zwischenspeichern.",
+        "Der Cache kann Artikeltitel, Zusammenfassungen, Quellennamen, Veröffentlichungsdaten, Kategoriebezeichnungen, Thumbnail-URLs und Original-Publisher-URLs enthalten. Diese Daten dienen Performance und Zuverlässigkeit, nicht der persönlichen Identifizierung von Lesern.",
+        "Pull-to-refresh kann frische Geschichten anfordern, und iOS kann Cache-Dateien im Rahmen der normalen Speicherverwaltung löschen.",
+      ],
+    },
+    {
+      id: "network-requests",
+      title: "Netzwerkanfragen und Serverlogs",
+      body: [
+        "Wenn die App den Feed lädt, fordert sie Artikeldaten über HTTPS von der NutsNews-Website-API an. Wie bei den meisten Internetdiensten kann diese Anfrage technische Standardinformationen enthalten, etwa IP-Adresse, User-Agent, Anfragezeit, angeforderte URL, Antwortstatus und Performance-Timing.",
+        "NutsNews kann übliche Hosting-, Sicherheits-, Logging- und Monitoring-Werkzeuge nutzen, um App und Website zuverlässig zu halten, Missbrauch zu verhindern, Fehler zu verstehen und die Performance zu verbessern.",
+        "NutsNews nutzt diese technischen Informationen nicht, um Leser über Apps oder Websites anderer Unternehmen hinweg zu verfolgen, und NutsNews verkauft keine personenbezogenen Informationen.",
+      ],
+    },
+    {
+      id: "analytics-diagnostics",
+      title: "Website-Analyse und Diagnostik",
+      body: [
+        "Die NutsNews-Website kann Analyse- und Diagnosetools nutzen, um Traffic, Zuverlässigkeit und Fehler zu verstehen. Diese Tools helfen, die Website zu verbessern und den Dienst funktionsfähig zu halten.",
+        "Die iOS-App ist eine separate native App-Erfahrung. Die aktuelle iOS-App enthält keine Werbe-SDKs, Konto-Login-SDKs oder Social-Login-SDKs Dritter.",
+      ],
+    },
+    {
+      id: "publisher-links",
+      title: "Links zu Originalverlagen",
+      body: [
+        "NutsNews verlinkt auf Websites der Originalverlage. Wenn ein Leser eine Originalgeschichte öffnet, kann die Website dieses Verlags Informationen nach der eigenen Datenschutzrichtlinie und Praxis sammeln.",
+        "NutsNews ist nicht verantwortlich für Datenschutzpraktiken von Drittanbieter-Verlagsseiten, Werbenetzwerken, Analysewerkzeugen oder eingebetteten Inhalten, die dort erscheinen können.",
+      ],
+    },
+    {
+      id: "ai-summaries",
+      title: "Artikelinhalte und KI-Zusammenfassungen",
+      body: [
+        "NutsNews nutzt Artikelmetadaten aus RSS-Feeds und Publisher-Seiten, um positive Geschichten zu erkennen und kurze Zusammenfassungen zu erstellen.",
+        "NutsNews veröffentlicht keine urheberrechtlich geschützten vollständigen Artikel erneut. Der Dienst speichert und zeigt Artikelmetadaten, kurze Zusammenfassungen, Quelleninformationen, Thumbnails, Kategorien und Links zurück zu Originalseiten.",
+      ],
+    },
+    {
+      id: "children",
+      title: "Datenschutz von Kindern",
+      body: [
+        "NutsNews ist ein Newsreader für ein allgemeines Publikum. App und Website fordern wissentlich keine personenbezogenen Informationen von Kindern an.",
+        "Wenn du glaubst, dass ein Kind personenbezogene Informationen an NutsNews übermittelt hat, kontaktiere uns bitte, damit wir die Sache prüfen und behandeln können.",
+      ],
+    },
+    {
+      id: "choices",
+      title: "Deine Wahlmöglichkeiten",
+      body: [
+        "Du kannst NutsNews ohne Konto verwenden. Du kannst Likes durch erneutes Tippen entfernen, lokale Einstellungen in den Einstellungen ändern und die App löschen, um lokale App-Daten vom Gerät zu entfernen.",
+        "Du kannst selbst entscheiden, ob du Originalverlagslinks öffnest. Publisher-Websites sind von NutsNews getrennt und können eigene Datenschutzkontrollen haben.",
+      ],
+    },
+    {
+      id: "changes",
+      title: "Änderungen an dieser Richtlinie",
+      body: [
+        "Diese Datenschutzrichtlinie kann aktualisiert werden, wenn NutsNews sich verändert. Die neueste Version wird mit aktualisiertem Datum auf dieser Seite veröffentlicht.",
+      ],
+    },
+    {
+      id: "contact",
+      title: "Kontakt",
+      body: [
+        "Für Fragen zu dieser Datenschutzrichtlinie, Datenschutzhilfe oder allgemeines Feedback zu NutsNews nutze bitte die Kontaktseite.",
+      ],
+    },
+  ],
+  contactButton: "Kontaktseite öffnen",
+  contactAria:
+    "Die NutsNews-Kontaktseite öffnen, um eine Datenschutzfrage oder Feedback zu senden",
+  returnTitle: "Zurück zu NutsNews",
+  returnBody:
+    "Lies weiter die neuesten positiven Geschichten im NutsNews-Home-Feed.",
+  returnButton: "Zurück zur Startseite",
+};
+
+const greekPrivacyCopy: PrivacyCopy = {
+  eyebrow: "Πολιτική απορρήτου",
+  title: "Πολιτική απορρήτου NutsNews",
+  lastUpdatedLabel: "Τελευταία ενημέρωση",
+  lastUpdated: "19 Ιουνίου 2026",
+  intro:
+    "Το NutsNews είναι φτιαγμένο ώστε να είναι απλό και προσεκτικό με το απόρρητο: δεν απαιτείται λογαριασμός, οι προτιμήσεις της εφαρμογής αποθηκεύονται τοπικά και η εφαρμογή εστιάζει σε θετικές περιλήψεις ιστοριών με συνδέσμους προς τους αρχικούς εκδότες.",
+  highlightsEyebrow: "Σημεία απορρήτου",
+  highlightsTitle: "Καθαρό από τον σχεδιασμό",
+  highlights: [
+    "Δεν απαιτείται λογαριασμός για να περιηγηθείτε στο NutsNews.",
+    "Η iOS εφαρμογή δεν ζητά όνομα, email, αριθμό τηλεφώνου, κωδικό ή στοιχεία πληρωμής.",
+    "Η iOS εφαρμογή δεν χρησιμοποιεί άδειες για τοποθεσία, κάμερα, μικρόφωνο, φωτογραφίες, επαφές ή δεδομένα υγείας.",
+    "Η iOS εφαρμογή δεν περιλαμβάνει διαφημιστικά SDK ή λειτουργίες cross-app tracking.",
+    "Οι αγαπημένες ιστορίες, οι επιλογές θέματος και οι προτιμήσεις haptics αποθηκεύονται τοπικά στη συσκευή.",
+    "Οι cached απαντήσεις άρθρων βελτιώνουν την ταχύτητα και μειώνουν τις περιττές δικτυακές αιτήσεις.",
+    "Κάθε ιστορία συνδέει πίσω στον αρχικό εκδότη αντί να αναδημοσιεύει ολόκληρο το άρθρο.",
+  ],
+  sections: [
+    {
+      id: "overview",
+      title: "Επισκόπηση",
+      body: [
+        "Το NutsNews είναι ένας reader θετικών ειδήσεων που εμφανίζει σύντομες ενθαρρυντικές περιλήψεις και στέλνει τους αναγνώστες πίσω στους αρχικούς ιστότοπους των εκδοτών.",
+        "Αυτή η πολιτική εξηγεί πώς το NutsNews χειρίζεται πληροφορίες στην iOS εφαρμογή και στον ιστότοπο NutsNews.",
+      ],
+    },
+    {
+      id: "ios-app-does-not-request",
+      title: "Πληροφορίες που δεν ζητά η iOS εφαρμογή",
+      body: [
+        "Η iOS εφαρμογή NutsNews δεν απαιτεί εγγραφή λογαριασμού. Οι αναγνώστες μπορούν να ανοίξουν την εφαρμογή και να περιηγηθούν χωρίς να δώσουν όνομα, email, τηλέφωνο, κωδικό ή στοιχεία πληρωμής.",
+        "Η iOS εφαρμογή δεν ζητά πρόσβαση σε τοποθεσία, επαφές, φωτογραφίες, κάμερα, μικρόφωνο, ημερολόγια, υπενθυμίσεις, δεδομένα υγείας, Bluetooth ή συσκευές τοπικού δικτύου.",
+        "Η iOS εφαρμογή δεν περιλαμβάνει διαφημιστικές λειτουργίες, αίτημα advertising identifier ή προτροπή cross-app tracking.",
+      ],
+    },
+    {
+      id: "local-storage",
+      title: "Τοπική αποθήκευση στη συσκευή",
+      body: [
+        "Η iOS εφαρμογή αποθηκεύει ορισμένες προτιμήσεις τοπικά στη συσκευή του αναγνώστη, όπως το επιλεγμένο θέμα, την προτίμηση haptics και τα αναγνωριστικά των αγαπημένων ιστοριών.",
+        "Οι αγαπημένες ιστορίες αποθηκεύονται τοπικά ώστε η ίδια ιστορία να εμφανίζεται ως αγαπημένη στη ροή και στη σελίδα ιστορίας. Αυτή η πληροφορία δεν αποστέλλεται σε λογαριασμό NutsNews, επειδή η εφαρμογή δεν απαιτεί λογαριασμούς.",
+        "Οι αναγνώστες μπορούν να αφαιρέσουν ένα like πατώντας ξανά το κουμπί. Μπορούν επίσης να αφαιρέσουν τα τοπικά δεδομένα διαγράφοντας την εφαρμογή από τη συσκευή.",
+      ],
+    },
+    {
+      id: "article-feed-caching",
+      title: "Caching ροής άρθρων",
+      body: [
+        "Για μεγαλύτερη ταχύτητα και λιγότερες περιττές δικτυακές αιτήσεις, η iOS εφαρμογή μπορεί να αποθηκεύει προσωρινά πρόσφατες απαντήσεις της ροής άρθρων στη συσκευή για περιορισμένο χρόνο.",
+        "Το cache μπορεί να περιλαμβάνει τίτλους, περιλήψεις, ονόματα πηγών, ημερομηνίες δημοσίευσης, ετικέτες κατηγοριών, thumbnail URLs και αρχικά publisher URLs. Αυτά τα δεδομένα χρησιμοποιούνται για απόδοση και αξιοπιστία, όχι για προσωπική ταυτοποίηση αναγνωστών.",
+        "Το pull-to-refresh μπορεί να ζητήσει νέες ιστορίες, και το iOS μπορεί να καθαρίσει cached αρχεία στο πλαίσιο της κανονικής διαχείρισης αποθήκευσης.",
+      ],
+    },
+    {
+      id: "network-requests",
+      title: "Δικτυακές αιτήσεις και server logs",
+      body: [
+        "Όταν η εφαρμογή φορτώνει τη ροή, ζητά δεδομένα άρθρων από το NutsNews website API μέσω HTTPS. Όπως οι περισσότερες διαδικτυακές υπηρεσίες, αυτή η αίτηση μπορεί να περιλαμβάνει τυπικές τεχνικές πληροφορίες όπως IP address, user agent, ώρα αιτήματος, ζητούμενο URL, status απόκρισης και χρόνους απόδοσης.",
+        "Το NutsNews μπορεί να χρησιμοποιεί συνηθισμένα εργαλεία hosting, ασφάλειας, logging και monitoring για αξιοπιστία, πρόληψη κατάχρησης, κατανόηση σφαλμάτων και βελτίωση απόδοσης.",
+        "Το NutsNews δεν χρησιμοποιεί αυτές τις τεχνικές πληροφορίες για να παρακολουθεί αναγνώστες σε apps ή websites άλλων εταιρειών και δεν πουλά προσωπικές πληροφορίες.",
+      ],
+    },
+    {
+      id: "analytics-diagnostics",
+      title: "Analytics και diagnostics ιστότοπου",
+      body: [
+        "Ο ιστότοπος NutsNews μπορεί να χρησιμοποιεί εργαλεία analytics και diagnostics για να κατανοεί την επισκεψιμότητα, την αξιοπιστία και τα σφάλματα. Αυτά τα εργαλεία βοηθούν στη βελτίωση του site και στη σωστή λειτουργία της υπηρεσίας.",
+        "Η iOS εφαρμογή είναι ξεχωριστή native εμπειρία. Η τρέχουσα iOS εφαρμογή δεν περιλαμβάνει διαφημιστικά SDK, account login SDKs ή third-party social login SDKs.",
+      ],
+    },
+    {
+      id: "publisher-links",
+      title: "Σύνδεσμοι προς αρχικούς εκδότες",
+      body: [
+        "Το NutsNews συνδέει σε αρχικούς ιστότοπους εκδοτών. Όταν ένας αναγνώστης ανοίγει μια αρχική ιστορία, ο ιστότοπος του εκδότη μπορεί να συλλέγει πληροφορίες σύμφωνα με τη δική του πολιτική απορρήτου και πρακτικές.",
+        "Το NutsNews δεν είναι υπεύθυνο για πρακτικές απορρήτου τρίτων εκδοτών, διαφημιστικών δικτύων, analytics tools ή ενσωματωμένου περιεχομένου που μπορεί να εμφανίζεται σε αυτούς τους ιστότοπους.",
+      ],
+    },
+    {
+      id: "ai-summaries",
+      title: "Περιεχόμενο άρθρων και περιλήψεις AI",
+      body: [
+        "Το NutsNews χρησιμοποιεί μεταδεδομένα άρθρων από RSS feeds και σελίδες εκδοτών για να εντοπίζει θετικές ιστορίες και να δημιουργεί σύντομες περιλήψεις.",
+        "Το NutsNews δεν αναδημοσιεύει ολόκληρα copyrighted άρθρα. Η υπηρεσία αποθηκεύει και εμφανίζει μεταδεδομένα άρθρων, σύντομες περιλήψεις, πληροφορίες πηγής, thumbnails, κατηγορίες και links πίσω στις αρχικές σελίδες των εκδοτών.",
+      ],
+    },
+    {
+      id: "children",
+      title: "Απόρρητο παιδιών",
+      body: [
+        "Το NutsNews είναι news reader για γενικό κοινό. Η εφαρμογή και ο ιστότοπος δεν ζητούν εν γνώσει τους προσωπικές πληροφορίες από παιδιά.",
+        "Αν πιστεύετε ότι ένα παιδί έδωσε προσωπικές πληροφορίες στο NutsNews, επικοινωνήστε μαζί μας ώστε να το εξετάσουμε και να το αντιμετωπίσουμε.",
+      ],
+    },
+    {
+      id: "choices",
+      title: "Οι επιλογές σας",
+      body: [
+        "Μπορείτε να χρησιμοποιήσετε το NutsNews χωρίς λογαριασμό. Μπορείτε να αφαιρέσετε likes πατώντας ξανά το κουμπί, να αλλάξετε τοπικές προτιμήσεις στις Ρυθμίσεις και να διαγράψετε την εφαρμογή για να αφαιρέσετε τοπικά δεδομένα από τη συσκευή.",
+        "Μπορείτε να επιλέξετε αν θα ανοίγετε links αρχικών εκδοτών. Οι ιστότοποι εκδοτών είναι ξεχωριστοί από το NutsNews και μπορεί να έχουν δικούς τους ελέγχους απορρήτου.",
+      ],
+    },
+    {
+      id: "changes",
+      title: "Αλλαγές σε αυτή την πολιτική",
+      body: [
+        "Αυτή η πολιτική απορρήτου μπορεί να ενημερώνεται καθώς αλλάζει το NutsNews. Η πιο πρόσφατη έκδοση θα δημοσιεύεται σε αυτή τη σελίδα με ενημερωμένη ημερομηνία.",
+      ],
+    },
+    {
+      id: "contact",
+      title: "Επικοινωνία",
+      body: [
+        "Για ερωτήσεις σχετικά με αυτή την πολιτική απορρήτου, βοήθεια απορρήτου ή γενικά σχόλια για το NutsNews, χρησιμοποιήστε τη σελίδα επικοινωνίας.",
+      ],
+    },
+  ],
+  contactButton: "Άνοιγμα σελίδας επικοινωνίας",
+  contactAria:
+    "Άνοιγμα της σελίδας επικοινωνίας NutsNews για αποστολή ερώτησης απορρήτου ή σχολίων",
+  returnTitle: "Επιστροφή στο NutsNews",
+  returnBody:
+    "Συνεχίστε να διαβάζετε τις πιο πρόσφατες θετικές ιστορίες στη ροή της αρχικής σελίδας του NutsNews.",
+  returnButton: "Πίσω στην αρχική",
+};
+
 const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
+  "de-CH": germanPrivacyCopy,
+  de: germanPrivacyCopy,
+  el: greekPrivacyCopy,
   en: {
     eyebrow: "Privacy Policy",
     title: "NutsNews Privacy Policy",

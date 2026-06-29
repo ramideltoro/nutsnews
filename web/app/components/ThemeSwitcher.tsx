@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   DEFAULT_LANGUAGE_CODE,
   LANGUAGE_CHANGE_EVENT,
@@ -123,6 +123,61 @@ const settingsCopyByLanguage: Record<
       "san-juan": "パステルの街並みと南国の輝き。",
     },
   },
+
+  "de-CH": {
+    openSettings: "NutsNews-Einstellungen öffnen",
+    settingsLabel: "NutsNews-Einstellungen",
+    settings: "Einstellungen",
+    customize: "Anpassen",
+    theme: "Design",
+    language: "Sprache",
+    backToSettings: "Zurück zum Einstellungsmenü",
+    selectedMark: "Ausgewählt",
+    themeDescriptions: {
+      amber: "Klassischer NutsNews-Amberglanz.",
+      "modern-saas": "Eleganter dunkelblauer Look.",
+      "creative-premium": "Premium-Glanz in Navy und Violett.",
+      "moody-cyberpunk": "Grün mit Cyber-Gelb.",
+      sakura: "Kirschrosa und Matcha-Ruhe.",
+      "san-juan": "Pastellstrassen mit tropischem Glanz.",
+    },
+  },
+  de: {
+    openSettings: "NutsNews-Einstellungen öffnen",
+    settingsLabel: "NutsNews-Einstellungen",
+    settings: "Einstellungen",
+    customize: "Anpassen",
+    theme: "Design",
+    language: "Sprache",
+    backToSettings: "Zurück zum Einstellungsmenü",
+    selectedMark: "Ausgewählt",
+    themeDescriptions: {
+      amber: "Klassischer NutsNews-Amberglanz.",
+      "modern-saas": "Eleganter dunkelblauer Look.",
+      "creative-premium": "Premium-Glanz in Navy und Violett.",
+      "moody-cyberpunk": "Grün mit Cyber-Gelb.",
+      sakura: "Kirschrosa und Matcha-Ruhe.",
+      "san-juan": "Pastellstraßen mit tropischem Glanz.",
+    },
+  },
+  el: {
+    openSettings: "Άνοιγμα ρυθμίσεων NutsNews",
+    settingsLabel: "Ρυθμίσεις NutsNews",
+    settings: "Ρυθμίσεις",
+    customize: "Προσαρμογή",
+    theme: "Θέμα",
+    language: "Γλώσσα",
+    backToSettings: "Πίσω στο μενού ρυθμίσεων",
+    selectedMark: "Επιλεγμένο",
+    themeDescriptions: {
+      amber: "Η κλασική κεχριμπαρένια λάμψη του NutsNews.",
+      "modern-saas": "Κομψή σκούρα μπλε εμφάνιση.",
+      "creative-premium": "Premium λάμψη σε navy και μοβ.",
+      "moody-cyberpunk": "Πράσινο με cyber κίτρινη λάμψη.",
+      sakura: "Ηρεμία με ροζ κερασιάς και matcha.",
+      "san-juan": "Παστέλ δρόμοι με τροπική λάμψη.",
+    },
+  },
 };
 
 const browserThemeColors: Record<ThemeId, string> = {
@@ -168,6 +223,31 @@ function getStoredLanguage(): LanguageCode {
   return isSupportedLanguageCode(storedLanguage)
     ? storedLanguage
     : DEFAULT_LANGUAGE_CODE;
+}
+
+function subscribeToLanguageChanges(onStoreChange: () => void) {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  const handleLanguageChange = () => onStoreChange();
+  const handleStorageChange = (event: StorageEvent) => {
+    if (event.key === LANGUAGE_STORAGE_KEY) {
+      onStoreChange();
+    }
+  };
+
+  window.addEventListener(LANGUAGE_CHANGE_EVENT, handleLanguageChange);
+  window.addEventListener("storage", handleStorageChange);
+
+  return () => {
+    window.removeEventListener(LANGUAGE_CHANGE_EVENT, handleLanguageChange);
+    window.removeEventListener("storage", handleStorageChange);
+  };
+}
+
+function getServerLanguageSnapshot(): LanguageCode {
+  return DEFAULT_LANGUAGE_CODE;
 }
 
 function applyLanguage(languageCode: LanguageCode) {
@@ -241,8 +321,10 @@ export function ThemeSwitcher() {
     const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
     return isThemeId(storedTheme) ? storedTheme : "amber";
   });
-  const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(() =>
-    getStoredLanguage(),
+  const selectedLanguage = useSyncExternalStore(
+    subscribeToLanguageChanges,
+    getStoredLanguage,
+    getServerLanguageSnapshot,
   );
   const [isOpen, setIsOpen] = useState(false);
   const [activePanel, setActivePanel] = useState<SettingsPanel>("menu");
@@ -292,7 +374,6 @@ export function ThemeSwitcher() {
   }
 
   function handleLanguageSelect(languageCode: LanguageCode) {
-    setSelectedLanguage(languageCode);
     applyLanguage(languageCode);
   }
 

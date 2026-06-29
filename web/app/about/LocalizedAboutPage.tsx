@@ -128,7 +128,267 @@ function ExternalStoryIcon({ className = "" }: { className?: string }) {
   );
 }
 
+
+const germanAboutCopy: AboutCopy = {
+  heroEyebrow: "Über NutsNews",
+  heroTitle: "Eine ruhigere Art, mit dem Guten in der Welt verbunden zu bleiben.",
+  heroBody:
+    "NutsNews gibt es, weil sich das Internet oft schwer anfühlt. Die Welt ist voller Freundlichkeit, Fortschritt, Kreativität, Mut, Entdeckungen und Menschen, die Bemerkenswertes tun. Diese Geschichten gehen leicht unter. NutsNews holt sie an einen einfachen Ort.",
+  readStories: "Heutige Geschichten lesen",
+  contact: "NutsNews kontaktieren",
+  whyEyebrow: "Warum es das gibt",
+  whyTitle: "Gute Nachrichten sollten leichter zu finden sein",
+  whyDescription:
+    "NutsNews ist für Leser gemacht, die mit der Welt verbunden bleiben möchten, ohne von ihr überwältigt zu werden. Das Ziel ist ein täglicher Feed, der optimistisch, nützlich und respektvoll mit deiner Aufmerksamkeit umgeht.",
+  promises: [
+    {
+      title: "Positiv gestaltet",
+      description:
+        "NutsNews sucht Geschichten, die ermutigen: Erfolge in Gemeinschaften, inspirierende Menschen, hilfreiche Wissenschaft, Wohlbefinden, Tiere, Reisen, Kultur und kleine Fortschritte.",
+    },
+    {
+      title: "Bewusst einfach",
+      description:
+        "Die Erfahrung dreht sich um einen klaren Feed, kurze Zusammenfassungen, nützliche Kategorien und einen deutlichen Weg zurück zum Originalverlag.",
+    },
+    {
+      title: "Respektvoll mit Aufmerksamkeit",
+      description:
+        "Das Ziel ist nicht endloses Doomscrolling. Das Ziel ist, schnell etwas Gutes zu finden, sich etwas besser zu fühlen und den Tag weiterzugehen.",
+    },
+  ],
+  nameEyebrow: "Der Name",
+  nameTitle: "Warum es NutsNews heisst",
+  nameDescription:
+    "Der Name entstand aus derselben Suche, die das Produkt geprägt hat: etwas Positives, Einprägsames und passend für eine .com-Adresse zu finden.",
+  nameStory: [
+    "Die erste Idee war die offensichtlichste: GoodNews.com. Sie sagte genau, was die Seite sein sollte. Aber die Domain war bereits vergeben, genauso wie die einfachen Varianten rund um gute Nachrichten. Das Projekt brauchte einen Namen, der eigenständig, besonders und trotzdem klassisch wirkt.",
+    "Bei dieser Suche führte der Weg von Domain-Checks zum Thesaurus. Beim Blick auf Synonyme für “good” fiel ein Wort sofort auf: “nuts”. Im Poker bedeutet the nuts die bestmögliche Hand. Diese Bedeutung machte den Namen nicht zu einem Kompromiss, sondern genau richtig.",
+    "NutsNews wurde mehr als ein spielerischer Titel. Es wurde ein Versprechen: ein Ort für die beste Art von Nachrichten, Geschichten, die man behalten, teilen und wiederfinden möchte. Der Name ist kurz, merkbar, etwas überraschend und mit der Idee verbunden, die guten Dinge zu finden.",
+  ],
+  habitEyebrow: "Was es erreichen soll",
+  habitTitle: "Den Newsfeed zu einer besseren Gewohnheit machen",
+  habitDescription:
+    "Das Projekt tut nicht so, als gäbe es keine schweren Dinge. Es schafft Platz für die andere Seite: Helfer, Macher, Durchbrüche, Erholungen, kleine Erfolge und die Erinnerung, dass Menschen überall Gutes tun.",
+  habitBody:
+    "Eine gute NutsNews-Geschichte sollte sich wie ein kleiner Reset anfühlen. Sie kann etwas lehren, eine interessante Person vorstellen, eine lösende Gemeinschaft zeigen oder einfach einen ruhigen Moment schenken. Der Feed ist bewusst fokussiert, gefiltert und leicht, damit positive Geschichten ohne lautes Internet-Suchen zugänglich werden.",
+  builtEyebrow: "Was gebaut wurde",
+  builtTitle: "Eine vollständige Plattform für positive Nachrichten, nicht nur eine Seite",
+  builtDescription:
+    "NutsNews ist zu einem funktionierenden Produkt gewachsen: öffentliche Website, automatisierte Artikel-Pipeline, Admin-Werkzeuge, Monitoring, mobile Erfahrung und Grundlage für eine native iOS-App.",
+  builtFeatures: [
+    "Eine mobile-first NutsNews-Website mit ruhiger Amber-Identität",
+    "RSS-Ingestion von Publishern, die automatisch neue Kandidaten entdeckt",
+    "KI-unterstützte Filterung für aufbauende, stressarme Geschichten",
+    "Kurze, originale Zusammenfassungen, die beim Auswählen helfen",
+    "Artikelkategorien zum Stöbern nach Stimmung und Thema",
+    "Story-Karten mit Bild, Quelle und Datum",
+    "Endloses Scrollen für einen leichten täglichen Feed",
+    "Kontakt- und Datenschutzseiten für eine vollständigere öffentliche Seite",
+    "Admin-Dashboards für Betrieb, KI-Nutzung, Feeds und Systemzustand",
+    "Cloudflare-, Vercel- und Supabase-Infrastruktur für Geschwindigkeit, Skalierung und niedrige Kosten",
+    "Better Stack und Sentry, damit Probleme leichter erkannt und behoben werden",
+    "Eine native iOS-App rund um dieselbe positive Nachrichtenerfahrung",
+  ],
+  workflowEyebrow: "So funktioniert es",
+  workflowTitle: "Eine sorgfältige Pipeline hinter einem einfachen Feed",
+  workflowDescription:
+    "Leser sehen eine ruhige Liste von Geschichten. Dahinter entdeckt ein System Artikel, filtert sie nach Ton und Passung, erstellt hilfreiche Zusammenfassungen und hält die Website mit praktischer Cloud-Infrastruktur am Laufen.",
+  workflow: [
+    {
+      step: "Entdecken",
+      title: "Frische Geschichten kommen aus Publisher-Feeds",
+      description:
+        "NutsNews beginnt mit RSS-Quellen echter Publisher und prüft laufend neue Artikel, die zur Stimmung der Seite passen könnten.",
+      Icon: DiscoverIcon,
+    },
+    {
+      step: "Filtern",
+      title: "KI hilft, die Stimmung des Feeds zu schützen",
+      description:
+        "Die Kurationsschicht lehnt stressige Themen ab und bevorzugt Geschichten, die konstruktiv, menschlich, nützlich, hoffnungsvoll oder einfach erfreulich sind.",
+      Icon: FilterIcon,
+    },
+    {
+      step: "Zusammenfassen",
+      title: "Leser bekommen zuerst die ruhige Version",
+      description:
+        "Angenommene Artikel erscheinen mit kurzen Zusammenfassungen, Metadaten und Kategorien, damit der Feed schnell, lesbar und leicht zu erkunden bleibt.",
+      Icon: SummaryIcon,
+    },
+    {
+      step: "Weiterleiten",
+      title: "Die Originalverlage bleiben das Ziel",
+      description:
+        "NutsNews ersetzt den Artikel nicht. Jede Geschichte führt zur Originalquelle zurück, damit Leser beim Publisher weiterlesen können, der sie veröffentlicht hat.",
+      Icon: ExternalStoryIcon,
+    },
+  ],
+  valuesEyebrow: "Mit Absicht gebaut",
+  valuesTitle: "Die Produktwerte",
+  valuesDescription:
+    "Jede technische Entscheidung unterstützt dieselbe Leserfahrung: schneller Zugang zu Geschichten, die gut tun, weniger Ablenkung und eine Website, die wachsen kann, ohne kompliziert zu werden.",
+  principles: [
+    {
+      title: "Ruhige Technologie",
+      description:
+        "Die Technik hinter NutsNews soll in den Hintergrund treten. Workers, Caching, Monitoring und Dashboards dienen einem einfachen Versprechen: Die Seite soll schnell, stabil und friedlich wirken.",
+    },
+    {
+      title: "Menschliche Kuration",
+      description:
+        "KI hilft, ersetzt aber keinen Geschmack. Das Produkt folgt einer klaren redaktionellen Richtung: weniger stressige Überschriften, mehr Geschichten, die ein Lächeln wert sind.",
+    },
+    {
+      title: "Schlank und resilient",
+      description:
+        "Die Plattform nutzt praktische Werkzeuge, die schrittweise wachsen können: Next.js für die Website, Cloudflare Workers für Automatisierung, Supabase für Speicherung, Vercel für Deployment und Observability für Zuverlässigkeit.",
+    },
+    {
+      title: "Platz zum Wachsen",
+      description:
+        "NutsNews entwickelt sich weiter. Die Grundlage unterstützt mehr Feeds, reichere Kategorien, bessere Dashboards, smartere Qualitätskontrollen und eine glattere Web- und Mobile-Erfahrung.",
+    },
+  ],
+  biggerEyebrow: "Die grössere Idee",
+  biggerTitle:
+    "NutsNews erinnert daran, dass positive Geschichten ebenfalls grossartiges Produktdesign verdienen.",
+  biggerBody:
+    "Die beste Version von NutsNews ist warm, nützlich, vertrauenswürdig und leicht wiederzufinden. Sie sollte sich anfühlen wie ein geöffnetes Fenster statt wie ein Sturm. Genau diese Geschichte will das Projekt erzählen: Technologie kann Medien sanfter, fokussierter und menschlicher machen.",
+};
+
+const greekAboutCopy: AboutCopy = {
+  heroEyebrow: "Σχετικά με το NutsNews",
+  heroTitle: "Ένας πιο ήρεμος τρόπος να παρακολουθείτε τα καλά που συμβαίνουν στον κόσμο.",
+  heroBody:
+    "Το NutsNews υπάρχει επειδή το διαδίκτυο μπορεί να μοιάζει βαρύ. Ο κόσμος είναι γεμάτος καλοσύνη, πρόοδο, δημιουργικότητα, θάρρος, ανακαλύψεις και καθημερινούς ανθρώπους που κάνουν αξιοσημείωτα πράγματα, όμως αυτές οι ιστορίες χάνονται εύκολα. Το NutsNews τις φέρνει μπροστά σε ένα απλό μέρος.",
+  readStories: "Διαβάστε τις σημερινές ιστορίες",
+  contact: "Επικοινωνία με το NutsNews",
+  whyEyebrow: "Γιατί υπάρχει",
+  whyTitle: "Οι καλές ειδήσεις πρέπει να βρίσκονται πιο εύκολα",
+  whyDescription:
+    "Το NutsNews είναι φτιαγμένο για αναγνώστες που θέλουν να μένουν συνδεδεμένοι με τον κόσμο χωρίς να κατακλύζονται από αυτόν. Η αποστολή είναι μια καθημερινή ροή που νιώθει αισιόδοξη, χρήσιμη και σέβεται την προσοχή σας.",
+  promises: [
+    {
+      title: "Θετικό από τον σχεδιασμό",
+      description:
+        "Το NutsNews αναζητά ιστορίες που ενθαρρύνουν: επιτυχίες κοινοτήτων, εμπνευσμένους ανθρώπους, χρήσιμη επιστήμη, ευεξία, ζώα, ταξίδια, πολιτισμό και μικρές στιγμές προόδου.",
+    },
+    {
+      title: "Απλό με πρόθεση",
+      description:
+        "Η εμπειρία βασίζεται σε μια καθαρή ροή, σύντομες περιλήψεις, χρήσιμες κατηγορίες και σαφή επιστροφή στον αρχικό εκδότη.",
+    },
+    {
+      title: "Σέβεται την προσοχή",
+      description:
+        "Ο στόχος δεν είναι να κρατά τους αναγνώστες σε ατελείωτο doomscrolling. Ο στόχος είναι να βρίσκετε κάτι καλό, να νιώθετε λίγο καλύτερα και να συνεχίζετε τη μέρα σας.",
+    },
+  ],
+  nameEyebrow: "Το όνομα",
+  nameTitle: "Γιατί ονομάζεται NutsNews",
+  nameDescription:
+    "Το όνομα ήρθε από την ίδια αναζήτηση που διαμόρφωσε το προϊόν: μια αναζήτηση για κάτι θετικό, αξέχαστο και άξιο για μια .com διεύθυνση.",
+  nameStory: [
+    "Η πρώτη ιδέα ήταν η πιο προφανής: GoodNews.com. Έλεγε ακριβώς τι ήθελε να είναι ο ιστότοπος. Όμως το domain ήταν ήδη πιασμένο, όπως και οι καθαρές παραλλαγές γύρω από τις καλές ειδήσεις. Το project χρειαζόταν ένα όνομα που να στέκεται μόνο του.",
+    "Στην πορεία, η αναζήτηση πέρασε από τα domain checkers στον θησαυρό λέξεων. Κοιτώντας συνώνυμα του “good”, μια λέξη ξεχώρισε: “nuts”. Στο πόκερ, the nuts σημαίνει το καλύτερο δυνατό φύλλο. Αυτή η έννοια έκανε το όνομα να μοιάζει όχι με συμβιβασμό, αλλά με τέλεια επιλογή.",
+    "Το NutsNews έγινε κάτι περισσότερο από ένας παιχνιδιάρικος τίτλος. Έγινε δήλωση πρόθεσης: ένας χώρος για το καλύτερο είδος ειδήσεων, ιστορίες που αξίζει να κρατήσετε, να μοιραστείτε και να ξαναβρείτε.",
+  ],
+  habitEyebrow: "Τι προσπαθεί να κάνει",
+  habitTitle: "Να μετατρέψει τη ροή ειδήσεων σε καλύτερη συνήθεια",
+  habitDescription:
+    "Το project δεν προσποιείται ότι τα δύσκολα πράγματα δεν υπάρχουν. Προσπαθεί να κάνει χώρο και για την άλλη πλευρά: τους βοηθούς, τους δημιουργούς, τις ανακαλύψεις, τις ανακάμψεις, τις μικρές νίκες και τις υπενθυμίσεις ότι οι άνθρωποι συνεχίζουν να κάνουν καλό έργο παντού.",
+  habitBody:
+    "Μια καλή ιστορία του NutsNews πρέπει να μοιάζει με μικρή επαναφορά. Μπορεί να σας μάθει κάτι, να σας γνωρίσει έναν άνθρωπο που αξίζει, να δείξει μια κοινότητα που λύνει πρόβλημα ή απλώς να προσφέρει ανακούφιση. Η ροή είναι εστιασμένη, φιλτραρισμένη και ελαφριά.",
+  builtEyebrow: "Τι έχει χτιστεί",
+  builtTitle: "Μια πλήρης πλατφόρμα θετικών ειδήσεων, όχι απλώς μια σελίδα",
+  builtDescription:
+    "Το NutsNews έχει εξελιχθεί σε λειτουργικό προϊόν με δημόσιο ιστότοπο, αυτοματοποιημένη ροή άρθρων, εργαλεία διαχείρισης, παρακολούθηση, mobile εμπειρία και βάση για native iOS εφαρμογή.",
+  builtFeatures: [
+    "Mobile-first ιστότοπος NutsNews με ήρεμη amber οπτική ταυτότητα",
+    "RSS ingestion από εκδότες που ανακαλύπτει αυτόματα νέες υποψήφιες ιστορίες",
+    "Φιλτράρισμα με βοήθεια AI για θετικές, χαμηλού στρες ιστορίες",
+    "Σύντομες, πρωτότυπες περιλήψεις που βοηθούν τους αναγνώστες να επιλέξουν",
+    "Κατηγορίες άρθρων για περιήγηση ανά διάθεση και θέμα",
+    "Κάρτες ιστοριών με εικόνα, πηγή και ημερομηνία",
+    "Ατελείωτη κύλιση για ελαφριά καθημερινή εμπειρία",
+    "Σελίδες επικοινωνίας και απορρήτου για πιο ολοκληρωμένο δημόσιο site",
+    "Admin dashboards για λειτουργίες, χρήση AI, feeds και υγεία συστήματος",
+    "Cloudflare, Vercel και Supabase για ταχύτητα, κλιμάκωση και χαμηλό κόστος",
+    "Better Stack και Sentry ώστε τα προβλήματα να εντοπίζονται και να διορθώνονται ευκολότερα",
+    "Native iOS εφαρμογή γύρω από την ίδια εμπειρία θετικών ειδήσεων",
+  ],
+  workflowEyebrow: "Πώς λειτουργεί",
+  workflowTitle: "Μια προσεκτική pipeline πίσω από μια απλή ροή",
+  workflowDescription:
+    "Οι αναγνώστες βλέπουν μια ήσυχη λίστα ιστοριών. Πίσω της, ένα σύστημα ανακαλύπτει άρθρα, τα φιλτράρει για τόνο και καταλληλότητα, δημιουργεί χρήσιμες περιλήψεις και κρατά τον ιστότοπο λειτουργικό με πρακτική cloud υποδομή.",
+  workflow: [
+    {
+      step: "Ανακάλυψη",
+      title: "Οι φρέσκες ιστορίες έρχονται από feeds εκδοτών",
+      description:
+        "Το NutsNews ξεκινά με RSS πηγές από πραγματικούς εκδότες και ελέγχει συνεχώς νέα άρθρα που μπορεί να ταιριάζουν στον τόνο του site.",
+      Icon: DiscoverIcon,
+    },
+    {
+      step: "Φίλτρο",
+      title: "Το AI βοηθά να προστατευτεί η διάθεση της ροής",
+      description:
+        "Το επίπεδο επιμέλειας απορρίπτει αγχωτικά θέματα και προτιμά ιστορίες που είναι εποικοδομητικές, ανθρώπινες, χρήσιμες, ελπιδοφόρες ή απλώς ευχάριστες.",
+      Icon: FilterIcon,
+    },
+    {
+      step: "Περίληψη",
+      title: "Οι αναγνώστες παίρνουν πρώτα την ήρεμη εκδοχή",
+      description:
+        "Τα αποδεκτά άρθρα παρουσιάζονται με σύντομες περιλήψεις, μεταδεδομένα και κατηγορίες, ώστε η ροή να μένει γρήγορη, ευανάγνωστη και εύκολη στην εξερεύνηση.",
+      Icon: SummaryIcon,
+    },
+    {
+      step: "Συνέχεια",
+      title: "Οι αρχικοί εκδότες παραμένουν ο προορισμός",
+      description:
+        "Το NutsNews δεν προσπαθεί να αντικαταστήσει το άρθρο. Κάθε ιστορία οδηγεί πίσω στην αρχική πηγή, ώστε οι αναγνώστες να συνεχίζουν στον εκδότη που την ανέφερε.",
+      Icon: ExternalStoryIcon,
+    },
+  ],
+  valuesEyebrow: "Χτισμένο με πρόθεση",
+  valuesTitle: "Οι αξίες του προϊόντος",
+  valuesDescription:
+    "Κάθε τεχνική απόφαση στηρίζει την ίδια εμπειρία: γρηγορότερη πρόσβαση σε ιστορίες που κάνουν καλό, λιγότερους περισπασμούς και ένα site που μπορεί να μεγαλώσει χωρίς να γίνει περίπλοκο.",
+  principles: [
+    {
+      title: "Ήρεμη τεχνολογία",
+      description:
+        "Η μηχανική πίσω από το NutsNews πρέπει να χάνεται στο παρασκήνιο. Workers, cache, monitoring και dashboards υπηρετούν μια απλή υπόσχεση: ο ιστότοπος να νιώθει γρήγορος, σταθερός και ήρεμος.",
+    },
+    {
+      title: "Ανθρώπινη επιμέλεια",
+      description:
+        "Το AI χρησιμοποιείται ως βοηθός, όχι ως αντικατάσταση γούστου. Το προϊόν έχει καθαρή εκδοτική κατεύθυνση: λιγότερο στρες, περισσότερες ιστορίες που αξίζουν ένα χαμόγελο.",
+    },
+    {
+      title: "Ελαφρύ και ανθεκτικό",
+      description:
+        "Η πλατφόρμα χτίστηκε με πρακτικά εργαλεία που μπορούν να κλιμακωθούν σταδιακά: Next.js, Cloudflare Workers, Supabase, Vercel και observability.",
+    },
+    {
+      title: "Χώρος για ανάπτυξη",
+      description:
+        "Το NutsNews συνεχίζει να εξελίσσεται. Η βάση υποστηρίζει περισσότερα feeds, πλουσιότερες κατηγορίες, καλύτερα dashboards, εξυπνότερους ελέγχους ποιότητας και ομαλότερη εμπειρία σε web και mobile.",
+    },
+  ],
+  biggerEyebrow: "Η μεγαλύτερη ιδέα",
+  biggerTitle:
+    "Το NutsNews υπενθυμίζει ότι και οι θετικές ιστορίες αξίζουν εξαιρετικό product design.",
+  biggerBody:
+    "Η καλύτερη εκδοχή του NutsNews είναι ζεστή, χρήσιμη, αξιόπιστη και εύκολη να επιστρέψεις σε αυτήν. Πρέπει να μοιάζει με άνοιγμα παραθύρου, όχι με είσοδο σε καταιγίδα. Αυτή είναι η ιστορία που προσπαθεί να πει το project: η τεχνολογία μπορεί να κάνει τα media πιο ήπια, πιο εστιασμένα και πιο ανθρώπινα.",
+};
+
 const aboutCopyByLanguage: Record<LanguageCode, AboutCopy> = {
+  "de-CH": germanAboutCopy,
+  de: germanAboutCopy,
+  el: greekAboutCopy,
   en: {
     heroEyebrow: "About NutsNews",
     heroTitle: "A calmer way to keep up with the good happening in the world.",

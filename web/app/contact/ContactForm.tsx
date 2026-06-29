@@ -116,6 +116,67 @@ const formCopyByLanguage: Record<
       "スパム対策チェックはまだ設定されていません。後でもう一度お試しください。",
     turnstileHelp: "Cloudflare Turnstileで保護されています。",
   },
+
+  "de-CH": {
+    hiddenWebsite: "Website",
+    emailLabel: "Deine E-Mail",
+    emailPlaceholder: "du@beispiel.ch",
+    messageLabel: "Nachricht",
+    messagePlaceholder: "Sag mir, was du über NutsNews teilen möchtest.",
+    privacyNote:
+      "Deine E-Mail wird nur verwendet, damit NutsNews auf diese Nachricht antworten kann.",
+    send: "Senden",
+    sending: "Wird gesendet...",
+    genericError:
+      "Deine Nachricht konnte nicht gesendet werden. Bitte versuch es gleich nochmals.",
+    connectionError:
+      "Deine Nachricht konnte nicht gesendet werden. Bitte prüfe deine Verbindung.",
+    success: "Danke. Deine Nachricht wurde an NutsNews gesendet.",
+    turnstileRequired: "Bitte schliesse die kurze Anti-Spam-Prüfung vor dem Senden ab.",
+    turnstileUnavailable:
+      "Die Anti-Spam-Prüfung ist noch nicht eingerichtet. Bitte versuch es später wieder.",
+    turnstileHelp: "Geschützt durch Cloudflare Turnstile.",
+  },
+  de: {
+    hiddenWebsite: "Website",
+    emailLabel: "Deine E-Mail",
+    emailPlaceholder: "du@beispiel.de",
+    messageLabel: "Nachricht",
+    messagePlaceholder: "Sag mir, was du über NutsNews teilen möchtest.",
+    privacyNote:
+      "Deine E-Mail wird nur verwendet, damit NutsNews auf diese Nachricht antworten kann.",
+    send: "Senden",
+    sending: "Wird gesendet...",
+    genericError:
+      "Deine Nachricht konnte nicht gesendet werden. Bitte versuche es gleich noch einmal.",
+    connectionError:
+      "Deine Nachricht konnte nicht gesendet werden. Bitte prüfe deine Verbindung.",
+    success: "Danke. Deine Nachricht wurde an NutsNews gesendet.",
+    turnstileRequired: "Bitte schließe die kurze Anti-Spam-Prüfung vor dem Senden ab.",
+    turnstileUnavailable:
+      "Die Anti-Spam-Prüfung ist noch nicht eingerichtet. Bitte versuche es später erneut.",
+    turnstileHelp: "Geschützt durch Cloudflare Turnstile.",
+  },
+  el: {
+    hiddenWebsite: "Ιστότοπος",
+    emailLabel: "Το email σας",
+    emailPlaceholder: "you@example.com",
+    messageLabel: "Μήνυμα",
+    messagePlaceholder: "Πείτε μου τι θέλετε να μοιραστείτε για το NutsNews.",
+    privacyNote:
+      "Το email σας χρησιμοποιείται μόνο ώστε το NutsNews να απαντήσει σε αυτό το μήνυμα.",
+    send: "Αποστολή",
+    sending: "Αποστολή...",
+    genericError:
+      "Δεν ήταν δυνατή η αποστολή του μηνύματός σας. Δοκιμάστε ξανά σε λίγο.",
+    connectionError:
+      "Δεν ήταν δυνατή η αποστολή του μηνύματός σας. Ελέγξτε τη σύνδεσή σας.",
+    success: "Ευχαριστούμε. Το μήνυμά σας στάλθηκε στο NutsNews.",
+    turnstileRequired: "Ολοκληρώστε τον σύντομο έλεγχο anti-spam πριν από την αποστολή.",
+    turnstileUnavailable:
+      "Ο έλεγχος anti-spam δεν έχει ρυθμιστεί ακόμα. Δοκιμάστε ξανά αργότερα.",
+    turnstileHelp: "Προστατεύεται από το Cloudflare Turnstile.",
+  },
 };
 
 

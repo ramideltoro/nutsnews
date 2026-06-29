@@ -19,6 +19,21 @@ const taglineCopy: Record<LanguageCode, { soft: string; accent: string; ariaLabe
     accent: "シンプルに",
     ariaLabel: "ポジティブなニュース、シンプルに",
   },
+  "de-CH": {
+    soft: "Positive Nachrichten,",
+    accent: "einfach erklärt",
+    ariaLabel: "Positive Nachrichten, einfach erklärt",
+  },
+  de: {
+    soft: "Positive Nachrichten,",
+    accent: "einfach erklärt",
+    ariaLabel: "Positive Nachrichten, einfach erklärt",
+  },
+  el: {
+    soft: "Θετικές ειδήσεις,",
+    accent: "απλά",
+    ariaLabel: "Θετικές ειδήσεις, απλά",
+  },
 };
 
 export function HeroTagline() {

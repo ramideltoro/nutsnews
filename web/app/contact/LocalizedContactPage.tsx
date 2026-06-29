@@ -48,6 +48,37 @@ const contactCopyByLanguage: Record<
       "メッセージを送っている間も、ポジティブなストーリーを続けて読めます。",
     backButton: "ホームに戻る",
   },
+
+  "de-CH": {
+    eyebrow: "NutsNews kontaktieren",
+    title: "Eine Nachricht senden",
+    intro:
+      "Teile Feedback, melde ein Problem auf der Website, schlage eine positive Quelle vor oder sende eine Notiz zu NutsNews. Die Nachricht geht direkt an den NutsNews-Posteingang.",
+    backTitle: "Zurück zum Feed",
+    backBody:
+      "Stöbere weiter in positiven Geschichten, während deine Nachricht unterwegs ist.",
+    backButton: "Zurück zur Startseite",
+  },
+  de: {
+    eyebrow: "NutsNews kontaktieren",
+    title: "Eine Nachricht senden",
+    intro:
+      "Teile Feedback, melde ein Problem auf der Website, schlage eine positive Quelle vor oder sende eine Notiz zu NutsNews. Die Nachricht geht direkt an den NutsNews-Posteingang.",
+    backTitle: "Zurück zum Feed",
+    backBody:
+      "Stöbere weiter in positiven Geschichten, während deine Nachricht unterwegs ist.",
+    backButton: "Zurück zur Startseite",
+  },
+  el: {
+    eyebrow: "Επικοινωνία με το NutsNews",
+    title: "Στείλτε ένα μήνυμα",
+    intro:
+      "Μοιραστείτε σχόλια, αναφέρετε ένα πρόβλημα στον ιστότοπο, προτείνετε μια θετική πηγή ή στείλτε ένα σημείωμα για το NutsNews. Το μήνυμα θα σταλεί απευθείας στα εισερχόμενα του NutsNews.",
+    backTitle: "Πίσω στη ροή",
+    backBody:
+      "Συνεχίστε να διαβάζετε θετικές ιστορίες όσο το μήνυμά σας είναι καθ’ οδόν.",
+    backButton: "Πίσω στην αρχική",
+  },
 };
 
 export function LocalizedContactPage() {
