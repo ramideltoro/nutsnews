@@ -2,40 +2,32 @@ import Image from "next/image";
 
 export const revalidate = 300;
 
-import { ArticleFeed, type ArticleCategorySection } from "./components/ArticleFeed";
-import { NewspaperPrimaryNav } from "./components/NewspaperPrimaryNav";
+import { ArticleFeed } from "./components/ArticleFeed";
+import { HeroTagline } from "./components/HeroTagline";
 import { SiteFooter } from "./components/SiteFooter";
-import {
-  getPublishedArticles,
-  getPublishedArticlesForSection,
-  SITE_URL,
-} from "@/lib/articles";
+import { getPublishedArticles, SITE_URL } from "@/lib/articles";
 
-const categorySections = [
-  { id: "community", label: "Community", query: "community" },
-  { id: "animals", label: "Animals", query: "animals" },
-  { id: "science", label: "Science", query: "science" },
-  { id: "wellness", label: "Wellness", query: "wellness" },
-  { id: "travel", label: "Travel", query: "travel" },
-  { id: "culture", label: "Culture", query: "culture" },
-  { id: "achievements", label: "Achievements", query: "achievement" },
-] satisfies {
-  id: ArticleCategorySection["id"];
-  label: string;
-  query: string;
-}[];
+const primarySections = [
+  "Top Stories",
+  "Community",
+  "Animals",
+  "Science",
+  "Wellness",
+  "Travel",
+  "Culture",
+  "Achievements",
+];
+
+const trendingSections = [
+  "Feel-good moments",
+  "Kindness",
+  "Nature",
+  "Breakthroughs",
+  "Creative lives",
+];
 
 export default async function Home() {
-  const [{ articles, nextPage, nextCursor }, initialCategorySections] =
-    await Promise.all([
-      getPublishedArticles(),
-      Promise.all(
-        categorySections.map(async (section) => ({
-          id: section.id,
-          articles: await getPublishedArticlesForSection(section.query),
-        })),
-      ),
-    ]);
+  const { articles, nextPage, nextCursor } = await getPublishedArticles();
 
   const homeJsonLd = {
     "@context": "https://schema.org",
@@ -68,7 +60,13 @@ export default async function Home() {
 
       <div className="newspaper-page-wrap">
         <header className="newspaper-site-header" aria-label="NutsNews header">
+          <div className="newspaper-eyebrow-bar">
+            <span>Good news for curious readers</span>
+            <span>Updated throughout the day</span>
+          </div>
+
           <div className="newspaper-masthead">
+            <div className="newspaper-masthead__rule" aria-hidden="true" />
             <h1 className="newspaper-logo" aria-label="NutsNews">
               <span>Nuts</span>
               <span className="newspaper-logo__mark">
@@ -83,17 +81,33 @@ export default async function Home() {
               </span>
               <span>News</span>
             </h1>
-            <p className="newspaper-tagline">Positive news, Simplified</p>
+            <div className="newspaper-masthead__tagline">
+              <HeroTagline />
+            </div>
           </div>
 
-          <NewspaperPrimaryNav />
+          <nav className="newspaper-primary-nav" aria-label="Primary sections">
+            {primarySections.map((section) => (
+              <a key={section} href="#top-stories">
+                {section}
+              </a>
+            ))}
+          </nav>
+
+          <div className="newspaper-trending-bar" aria-label="Trending topics">
+            <span>Trending</span>
+            {trendingSections.map((section) => (
+              <a key={section} href="#top-stories">
+                {section}
+              </a>
+            ))}
+          </div>
         </header>
 
         <ArticleFeed
           initialArticles={articles}
           initialNextPage={nextPage}
           initialNextCursor={nextCursor}
-          initialCategorySections={initialCategorySections}
         />
       </div>
 

@@ -3,7 +3,6 @@ import Image from "next/image";
 export const revalidate = 300;
 
 import { ArticleFeed, type ArticleCategorySection } from "./components/ArticleFeed";
-import { NewspaperPrimaryNav } from "./components/NewspaperPrimaryNav";
 import { SiteFooter } from "./components/SiteFooter";
 import {
   getPublishedArticles,
@@ -24,6 +23,22 @@ const categorySections = [
   label: string;
   query: string;
 }[];
+
+const primarySections = [
+  { label: "Top Stories", href: "#top-stories" },
+  ...categorySections.map((section) => ({
+    label: section.label,
+    href: `#${section.id}`,
+  })),
+];
+
+const trendingSections = [
+  { label: "Feel-good moments", href: "#top-stories" },
+  { label: "Kindness", href: "#community" },
+  { label: "Nature", href: "#animals" },
+  { label: "Breakthroughs", href: "#science" },
+  { label: "Creative lives", href: "#culture" },
+];
 
 export default async function Home() {
   const [{ articles, nextPage, nextCursor }, initialCategorySections] =
@@ -83,10 +98,24 @@ export default async function Home() {
               </span>
               <span>News</span>
             </h1>
-            <p className="newspaper-tagline">Positive news, Simplified</p>
           </div>
 
-          <NewspaperPrimaryNav />
+          <nav className="newspaper-primary-nav" aria-label="Primary sections">
+            {primarySections.map((section) => (
+              <a key={section.label} href={section.href}>
+                {section.label}
+              </a>
+            ))}
+          </nav>
+
+          <div className="newspaper-trending-bar" aria-label="Trending topics">
+            <span>Trending</span>
+            {trendingSections.map((section) => (
+              <a key={section.label} href={section.href}>
+                {section.label}
+              </a>
+            ))}
+          </div>
         </header>
 
         <ArticleFeed
