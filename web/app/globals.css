@@ -47,6 +47,10 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 @layer components {
   .admin-responsive-shell {
     min-width: 0;
@@ -1585,6 +1589,7 @@ body {
 }
 
 .newspaper-feed-shell {
+  scroll-margin-top: 5.25rem;
   padding-top: clamp(1.5rem, 3vw, 2.6rem);
 }
 
@@ -1650,7 +1655,10 @@ body {
 }
 
 .newspaper-category-chip {
+  display: inline-flex;
   flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--theme-border);
   border-radius: 9999px;
   background: transparent;
@@ -1660,6 +1668,7 @@ body {
   font-weight: 850;
   letter-spacing: 0.02em;
   padding: 0.46rem 0.78rem;
+  text-decoration: none;
   transition: background 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease;
 }
 
@@ -1846,6 +1855,7 @@ body {
 }
 
 .newspaper-more-section {
+  scroll-margin-top: 5.25rem;
   margin-top: clamp(2rem, 5vw, 4.5rem);
 }
 

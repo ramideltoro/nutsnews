@@ -11,10 +11,16 @@ import {
 } from "@/lib/languages";
 import { OptimizedArticleImage } from "./OptimizedArticleImage";
 
+export type ArticleCategorySection = {
+  id: Exclude<CategoryId, "all">;
+  articles: Article[];
+};
+
 type ArticleFeedProps = {
   initialArticles: Article[];
   initialNextPage: number | null;
   initialNextCursor: string | null;
+  initialCategorySections: ArticleCategorySection[];
 };
 
 type ArticlesResponse = {
@@ -36,6 +42,7 @@ type CategoryId =
 
 type CategoryNavItem = {
   id: CategoryId;
+  href: string;
   query: string | null;
 };
 
@@ -53,19 +60,20 @@ type FeedCopy = {
   latestBriefs: string;
   moreGoodNews: string;
   moreGoodNewsDeck: string;
+  categorySectionEyebrow: string;
   sourceLabel: string;
   categoryLabels: Record<CategoryId, string>;
 };
 
 const CATEGORY_NAV_ITEMS: CategoryNavItem[] = [
-  { id: "all", query: null },
-  { id: "community", query: "community" },
-  { id: "animals", query: "animals" },
-  { id: "science", query: "science" },
-  { id: "wellness", query: "wellness" },
-  { id: "travel", query: "travel" },
-  { id: "culture", query: "culture" },
-  { id: "achievements", query: "achievement" },
+  { id: "all", href: "#top-stories", query: null },
+  { id: "community", href: "#community", query: "community" },
+  { id: "animals", href: "#animals", query: "animals" },
+  { id: "science", href: "#science", query: "science" },
+  { id: "wellness", href: "#wellness", query: "wellness" },
+  { id: "travel", href: "#travel", query: "travel" },
+  { id: "culture", href: "#culture", query: "culture" },
+  { id: "achievements", href: "#achievements", query: "achievement" },
 ];
 
 const copyByLanguage: Record<LanguageCode, FeedCopy> = {
@@ -84,6 +92,7 @@ const copyByLanguage: Record<LanguageCode, FeedCopy> = {
     latestBriefs: "Latest briefs",
     moreGoodNews: "More Good News",
     moreGoodNewsDeck: "Keep reading from the full NutsNews feed.",
+    categorySectionEyebrow: "Section",
     sourceLabel: "Source",
     categoryLabels: {
       all: "All",
@@ -111,6 +120,7 @@ const copyByLanguage: Record<LanguageCode, FeedCopy> = {
     latestBriefs: "Dernières brèves",
     moreGoodNews: "Plus de bonnes nouvelles",
     moreGoodNewsDeck: "Continuez à lire le fil complet de NutsNews.",
+    categorySectionEyebrow: "Rubrique",
     sourceLabel: "Source",
     categoryLabels: {
       all: "Tout",
@@ -138,6 +148,7 @@ const copyByLanguage: Record<LanguageCode, FeedCopy> = {
     latestBriefs: "最新短報",
     moreGoodNews: "さらに良いニュース",
     moreGoodNewsDeck: "NutsNewsのフィードを続けて読む。",
+    categorySectionEyebrow: "セクション",
     sourceLabel: "出典",
     categoryLabels: {
       all: "すべて",
@@ -165,6 +176,7 @@ const copyByLanguage: Record<LanguageCode, FeedCopy> = {
     latestBriefs: "Kurzmeldungen",
     moreGoodNews: "Mehr gute Nachrichten",
     moreGoodNewsDeck: "Lies weiter im ganzen NutsNews-Feed.",
+    categorySectionEyebrow: "Rubrik",
     sourceLabel: "Quelle",
     categoryLabels: {
       all: "Alle",
@@ -192,6 +204,7 @@ const copyByLanguage: Record<LanguageCode, FeedCopy> = {
     latestBriefs: "Kurzmeldungen",
     moreGoodNews: "Mehr gute Nachrichten",
     moreGoodNewsDeck: "Lies weiter im gesamten NutsNews-Feed.",
+    categorySectionEyebrow: "Rubrik",
     sourceLabel: "Quelle",
     categoryLabels: {
       all: "Alle",
@@ -219,6 +232,7 @@ const copyByLanguage: Record<LanguageCode, FeedCopy> = {
     latestBriefs: "Τελευταία σύντομα",
     moreGoodNews: "Περισσότερα καλά νέα",
     moreGoodNewsDeck: "Συνεχίστε να διαβάζετε από όλη τη ροή του NutsNews.",
+    categorySectionEyebrow: "Ενότητα",
     sourceLabel: "Πηγή",
     categoryLabels: {
       all: "Όλα",
@@ -253,7 +267,7 @@ function getStoredLanguage(): LanguageCode {
     : DEFAULT_LANGUAGE_CODE;
 }
 
-function getCategoryQuery(categoryId: CategoryId) {
+function getCategoryQuery(categoryId: CategoryId = "all") {
   return CATEGORY_NAV_ITEMS.find((item) => item.id === categoryId)?.query ?? null;
 }
 
@@ -300,35 +314,16 @@ function LoadingIndicator({ label }: { label: string }) {
   );
 }
 
-function CategoryMenu({
-  copy,
-  selectedCategory,
-  onSelectCategory,
-}: {
-  copy: FeedCopy;
-  selectedCategory: CategoryId;
-  onSelectCategory: (categoryId: CategoryId) => void;
-}) {
+function CategoryMenu({ copy }: { copy: FeedCopy }) {
   return (
     <nav className="newspaper-category-menu" aria-label={copy.categoryMenu}>
       <span className="newspaper-category-menu__label">{copy.categoryMenu}</span>
       <div className="newspaper-category-menu__scroller" role="list">
-        {CATEGORY_NAV_ITEMS.map((item) => {
-          const isActive = selectedCategory === item.id;
-
-          return (
-            <button
-              key={item.id}
-              type="button"
-              className="newspaper-category-chip"
-              aria-pressed={isActive}
-              data-active={isActive ? "true" : "false"}
-              onClick={() => onSelectCategory(item.id)}
-            >
-              {copy.categoryLabels[item.id]}
-            </button>
-          );
-        })}
+        {CATEGORY_NAV_ITEMS.map((item) => (
+          <a key={item.id} className="newspaper-category-chip" href={item.href}>
+            {copy.categoryLabels[item.id]}
+          </a>
+        ))}
       </div>
     </nav>
   );
@@ -450,6 +445,7 @@ export function ArticleFeed({
   initialArticles,
   initialNextPage,
   initialNextCursor,
+  initialCategorySections,
 }: ArticleFeedProps) {
   const [articles, setArticles] = useState(initialArticles);
   const [nextPage, setNextPage] = useState(initialNextPage);
@@ -457,11 +453,10 @@ export function ArticleFeed({
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(
     DEFAULT_LANGUAGE_CODE,
   );
-  const [selectedCategory, setSelectedCategory] = useState<CategoryId>("all");
+  const [categorySections, setCategorySections] = useState(initialCategorySections);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const selectedCategoryRef = useRef<CategoryId>("all");
   const isReloadingFirstPageRef = useRef(false);
 
   const copy = copyByLanguage[selectedLanguage];
@@ -481,13 +476,13 @@ export function ArticleFeed({
       page,
       cursor,
       languageCode,
-      categoryId,
+      categoryId = "all",
       forceFresh = false,
     }: {
       page: number | null;
       cursor: string | null;
       languageCode: LanguageCode;
-      categoryId: CategoryId;
+      categoryId?: CategoryId;
       forceFresh?: boolean;
     }) => {
       const query = new URLSearchParams();
@@ -542,11 +537,11 @@ export function ArticleFeed({
   const loadFirstPage = useCallback(
     async ({
       languageCode,
-      categoryId,
+      categoryId = "all",
       forceFresh = false,
     }: {
       languageCode: LanguageCode;
-      categoryId: CategoryId;
+      categoryId?: CategoryId;
       forceFresh?: boolean;
     }) => {
       isReloadingFirstPageRef.current = true;
@@ -580,9 +575,38 @@ export function ArticleFeed({
     [fetchArticles],
   );
 
-  useEffect(() => {
-    selectedCategoryRef.current = selectedCategory;
-  }, [selectedCategory]);
+  const loadCategorySections = useCallback(
+    async ({
+      languageCode,
+      forceFresh = false,
+    }: {
+      languageCode: LanguageCode;
+      forceFresh?: boolean;
+    }) => {
+      const nextSections = await Promise.all(
+        CATEGORY_NAV_ITEMS.filter(
+          (item): item is CategoryNavItem & { id: ArticleCategorySection["id"]; query: string } =>
+            item.id !== "all" && typeof item.query === "string",
+        ).map(async (item) => {
+          const data = await fetchArticles({
+            page: 0,
+            cursor: null,
+            languageCode,
+            categoryId: item.id,
+            forceFresh,
+          });
+
+          return {
+            id: item.id,
+            articles: data.articles,
+          };
+        }),
+      );
+
+      setCategorySections(nextSections);
+    },
+    [fetchArticles],
+  );
 
   useEffect(() => {
     const storedLanguage = getStoredLanguage();
@@ -592,7 +616,10 @@ export function ArticleFeed({
       setSelectedLanguage(storedLanguage);
       void loadFirstPage({
         languageCode: storedLanguage,
-        categoryId: selectedCategoryRef.current,
+        forceFresh: true,
+      });
+      void loadCategorySections({
+        languageCode: storedLanguage,
         forceFresh: true,
       });
     }, 0);
@@ -608,7 +635,9 @@ export function ArticleFeed({
       setSelectedLanguage(nextLanguage);
       void loadFirstPage({
         languageCode: nextLanguage,
-        categoryId: selectedCategoryRef.current,
+      });
+      void loadCategorySections({
+        languageCode: nextLanguage,
       });
     };
 
@@ -618,24 +647,7 @@ export function ArticleFeed({
       window.clearTimeout(initialRefreshTimer);
       window.removeEventListener(LANGUAGE_CHANGE_EVENT, handleLanguageChange);
     };
-  }, [loadFirstPage]);
-
-  const handleSelectCategory = useCallback(
-    (categoryId: CategoryId) => {
-      if (categoryId === selectedCategoryRef.current) {
-        return;
-      }
-
-      selectedCategoryRef.current = categoryId;
-      setSelectedCategory(categoryId);
-      void loadFirstPage({
-        languageCode: selectedLanguage,
-        categoryId,
-        forceFresh: true,
-      });
-    },
-    [loadFirstPage, selectedLanguage],
-  );
+  }, [loadCategorySections, loadFirstPage]);
 
   const loadMoreArticles = useCallback(async () => {
     if (
@@ -654,7 +666,6 @@ export function ArticleFeed({
         page: nextPage,
         cursor: nextCursor,
         languageCode: selectedLanguage,
-        categoryId: selectedCategoryRef.current,
       });
 
       setArticles((currentArticles) => {
@@ -713,11 +724,7 @@ export function ArticleFeed({
         </div>
       </div>
 
-      <CategoryMenu
-        copy={copy}
-        selectedCategory={selectedCategory}
-        onSelectCategory={handleSelectCategory}
-      />
+      <CategoryMenu copy={copy} />
 
       {articles.length === 0 && !isLoading ? (
         <div className="empty-feed-card px-5 py-8 text-center">
@@ -787,6 +794,40 @@ export function ArticleFeed({
           </div>
         </section>
       ) : null}
+
+      {categorySections.map((section) => (
+        <section
+          key={section.id}
+          className="newspaper-more-section"
+          id={section.id}
+          aria-labelledby={`${section.id}-heading`}
+        >
+          <div className="newspaper-section-rule">
+            <div>
+              <p>{copy.categorySectionEyebrow}</p>
+              <h2 id={`${section.id}-heading`}>{copy.categoryLabels[section.id]}</h2>
+            </div>
+          </div>
+
+          {section.articles.length > 0 ? (
+            <div className="newspaper-more-grid">
+              {section.articles.map((article, index) => (
+                <ArticleCard
+                  key={article.id}
+                  article={article}
+                  index={index + 10}
+                  languageCode={selectedLanguage}
+                  variant="standard"
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="empty-feed-card mt-5 px-5 py-8 text-center">
+              <p className="text-sm font-semibold">{copy.emptyFeed}</p>
+            </div>
+          )}
+        </section>
+      ))}
 
       <div ref={sentinelRef} aria-hidden="true" className="h-8" />
 

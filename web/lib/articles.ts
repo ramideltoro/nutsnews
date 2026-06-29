@@ -8,6 +8,7 @@ import {
 
 export const PAGE_SIZE = 5;
 export const SEARCH_PAGE_SIZE = 20;
+export const CATEGORY_SECTION_SIZE = 8;
 export const SITE_URL = "https://www.nutsnews.com";
 export const PUBLIC_FEED_SNAPSHOT_TABLE = "public_feed_snapshot";
 
@@ -336,6 +337,50 @@ export async function getPublishedArticles(
   }
 
   return snapshotResult;
+}
+
+export async function getPublishedArticlesForSection(
+  category: string,
+  requestedLanguageCode?: string | null,
+  limit = CATEGORY_SECTION_SIZE,
+): Promise<Article[]> {
+  const selectedCategory = cleanCategory(category);
+  const languageCode = normalizeLanguageCode(requestedLanguageCode);
+  const safeLimit = Number.isFinite(limit)
+    ? Math.min(Math.max(Math.floor(limit), 1), 24)
+    : CATEGORY_SECTION_SIZE;
+
+  if (!selectedCategory) {
+    return [];
+  }
+
+  const { data: snapshotData, error: snapshotError } =
+    await basePublicFeedSnapshotQuery(selectedCategory)
+      .order("snapshot_rank", { ascending: true })
+      .limit(safeLimit);
+
+  if (!snapshotError && snapshotData && snapshotData.length > 0) {
+    return applyArticleSummaries(snapshotData as Article[], languageCode);
+  }
+
+  if (snapshotError) {
+    console.error(
+      "Failed to load category section articles from public feed snapshot. Falling back to articles table:",
+      snapshotError,
+    );
+  }
+
+  const { data, error } = await basePublishedArticleQuery(selectedCategory)
+    .order("published_on_site_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(safeLimit);
+
+  if (error) {
+    console.error("Failed to load category section articles from fallback articles table:", error);
+    return [];
+  }
+
+  return applyArticleSummaries((data ?? []) as Article[], languageCode);
 }
 
 async function getPublishedArticlesByCursorFromSourceTable(

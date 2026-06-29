@@ -2,31 +2,55 @@ import Image from "next/image";
 
 export const revalidate = 300;
 
-import { ArticleFeed } from "./components/ArticleFeed";
+import { ArticleFeed, type ArticleCategorySection } from "./components/ArticleFeed";
 import { SiteFooter } from "./components/SiteFooter";
-import { getPublishedArticles, SITE_URL } from "@/lib/articles";
+import {
+  getPublishedArticles,
+  getPublishedArticlesForSection,
+  SITE_URL,
+} from "@/lib/articles";
+
+const categorySections = [
+  { id: "community", label: "Community", query: "community" },
+  { id: "animals", label: "Animals", query: "animals" },
+  { id: "science", label: "Science", query: "science" },
+  { id: "wellness", label: "Wellness", query: "wellness" },
+  { id: "travel", label: "Travel", query: "travel" },
+  { id: "culture", label: "Culture", query: "culture" },
+  { id: "achievements", label: "Achievements", query: "achievement" },
+] satisfies {
+  id: ArticleCategorySection["id"];
+  label: string;
+  query: string;
+}[];
 
 const primarySections = [
-  "Top Stories",
-  "Community",
-  "Animals",
-  "Science",
-  "Wellness",
-  "Travel",
-  "Culture",
-  "Achievements",
+  { label: "Top Stories", href: "#top-stories" },
+  ...categorySections.map((section) => ({
+    label: section.label,
+    href: `#${section.id}`,
+  })),
 ];
 
 const trendingSections = [
-  "Feel-good moments",
-  "Kindness",
-  "Nature",
-  "Breakthroughs",
-  "Creative lives",
+  { label: "Feel-good moments", href: "#top-stories" },
+  { label: "Kindness", href: "#community" },
+  { label: "Nature", href: "#animals" },
+  { label: "Breakthroughs", href: "#science" },
+  { label: "Creative lives", href: "#culture" },
 ];
 
 export default async function Home() {
-  const { articles, nextPage, nextCursor } = await getPublishedArticles();
+  const [{ articles, nextPage, nextCursor }, initialCategorySections] =
+    await Promise.all([
+      getPublishedArticles(),
+      Promise.all(
+        categorySections.map(async (section) => ({
+          id: section.id,
+          articles: await getPublishedArticlesForSection(section.query),
+        })),
+      ),
+    ]);
 
   const homeJsonLd = {
     "@context": "https://schema.org",
@@ -78,8 +102,8 @@ export default async function Home() {
 
           <nav className="newspaper-primary-nav" aria-label="Primary sections">
             {primarySections.map((section) => (
-              <a key={section} href="#top-stories">
-                {section}
+              <a key={section.label} href={section.href}>
+                {section.label}
               </a>
             ))}
           </nav>
@@ -87,8 +111,8 @@ export default async function Home() {
           <div className="newspaper-trending-bar" aria-label="Trending topics">
             <span>Trending</span>
             {trendingSections.map((section) => (
-              <a key={section} href="#top-stories">
-                {section}
+              <a key={section.label} href={section.href}>
+                {section.label}
               </a>
             ))}
           </div>
@@ -98,6 +122,7 @@ export default async function Home() {
           initialArticles={articles}
           initialNextPage={nextPage}
           initialNextCursor={nextCursor}
+          initialCategorySections={initialCategorySections}
         />
       </div>
 
