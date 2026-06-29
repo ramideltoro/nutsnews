@@ -54,13 +54,11 @@ type FeedCopy = {
   loadError: string;
   tryAgain: string;
   topStories: string;
-  categoryMenu: string;
   leadStory: string;
   editorsPicks: string;
   latestBriefs: string;
   moreGoodNews: string;
   moreGoodNewsDeck: string;
-  categorySectionEyebrow: string;
   sourceLabel: string;
   categoryLabels: Record<CategoryId, string>;
 };
@@ -86,13 +84,11 @@ const copyByLanguage: Record<LanguageCode, FeedCopy> = {
     loadError: "Could not load more stories.",
     tryAgain: "Try again",
     topStories: "Top Stories",
-    categoryMenu: "Sections",
     leadStory: "Lead story",
     editorsPicks: "Editor-style picks",
     latestBriefs: "Latest briefs",
     moreGoodNews: "More Good News",
     moreGoodNewsDeck: "Keep reading from the full NutsNews feed.",
-    categorySectionEyebrow: "Section",
     sourceLabel: "Source",
     categoryLabels: {
       all: "All",
@@ -114,13 +110,11 @@ const copyByLanguage: Record<LanguageCode, FeedCopy> = {
     loadError: "Impossible de charger plus d’histoires.",
     tryAgain: "Réessayer",
     topStories: "À la une",
-    categoryMenu: "Rubriques",
     leadStory: "Article principal",
     editorsPicks: "Sélection",
     latestBriefs: "Dernières brèves",
     moreGoodNews: "Plus de bonnes nouvelles",
     moreGoodNewsDeck: "Continuez à lire le fil complet de NutsNews.",
-    categorySectionEyebrow: "Rubrique",
     sourceLabel: "Source",
     categoryLabels: {
       all: "Tout",
@@ -142,13 +136,11 @@ const copyByLanguage: Record<LanguageCode, FeedCopy> = {
     loadError: "ストーリーを読み込めませんでした。",
     tryAgain: "もう一度試す",
     topStories: "トップストーリー",
-    categoryMenu: "セクション",
     leadStory: "リード記事",
     editorsPicks: "注目記事",
     latestBriefs: "最新短報",
     moreGoodNews: "さらに良いニュース",
     moreGoodNewsDeck: "NutsNewsのフィードを続けて読む。",
-    categorySectionEyebrow: "セクション",
     sourceLabel: "出典",
     categoryLabels: {
       all: "すべて",
@@ -170,13 +162,11 @@ const copyByLanguage: Record<LanguageCode, FeedCopy> = {
     loadError: "Weitere Geschichten konnten nicht geladen werden.",
     tryAgain: "Erneut versuchen",
     topStories: "Top-Geschichten",
-    categoryMenu: "Rubriken",
     leadStory: "Hauptgeschichte",
     editorsPicks: "Auswahl",
     latestBriefs: "Kurzmeldungen",
     moreGoodNews: "Mehr gute Nachrichten",
     moreGoodNewsDeck: "Lies weiter im ganzen NutsNews-Feed.",
-    categorySectionEyebrow: "Rubrik",
     sourceLabel: "Quelle",
     categoryLabels: {
       all: "Alle",
@@ -198,13 +188,11 @@ const copyByLanguage: Record<LanguageCode, FeedCopy> = {
     loadError: "Weitere Geschichten konnten nicht geladen werden.",
     tryAgain: "Erneut versuchen",
     topStories: "Top-Geschichten",
-    categoryMenu: "Rubriken",
     leadStory: "Hauptgeschichte",
     editorsPicks: "Auswahl",
     latestBriefs: "Kurzmeldungen",
     moreGoodNews: "Mehr gute Nachrichten",
     moreGoodNewsDeck: "Lies weiter im gesamten NutsNews-Feed.",
-    categorySectionEyebrow: "Rubrik",
     sourceLabel: "Quelle",
     categoryLabels: {
       all: "Alle",
@@ -226,13 +214,11 @@ const copyByLanguage: Record<LanguageCode, FeedCopy> = {
     loadError: "Δεν ήταν δυνατή η φόρτωση περισσότερων ιστοριών.",
     tryAgain: "Δοκιμάστε ξανά",
     topStories: "Κύριες ιστορίες",
-    categoryMenu: "Ενότητες",
     leadStory: "Κύρια ιστορία",
     editorsPicks: "Επιλογές",
     latestBriefs: "Τελευταία σύντομα",
     moreGoodNews: "Περισσότερα καλά νέα",
     moreGoodNewsDeck: "Συνεχίστε να διαβάζετε από όλη τη ροή του NutsNews.",
-    categorySectionEyebrow: "Ενότητα",
     sourceLabel: "Πηγή",
     categoryLabels: {
       all: "Όλα",
@@ -311,21 +297,6 @@ function LoadingIndicator({ label }: { label: string }) {
         {label}
       </div>
     </div>
-  );
-}
-
-function CategoryMenu({ copy }: { copy: FeedCopy }) {
-  return (
-    <nav className="newspaper-category-menu" aria-label={copy.categoryMenu}>
-      <span className="newspaper-category-menu__label">{copy.categoryMenu}</span>
-      <div className="newspaper-category-menu__scroller" role="list">
-        {CATEGORY_NAV_ITEMS.map((item) => (
-          <a key={item.id} className="newspaper-category-chip" href={item.href}>
-            {copy.categoryLabels[item.id]}
-          </a>
-        ))}
-      </div>
-    </nav>
   );
 }
 
@@ -470,6 +441,20 @@ export function ArticleFeed({
     }),
     [articles],
   );
+
+  const orderedCategorySections = useMemo(() => {
+    const sectionsById = new Map(
+      categorySections.map((section) => [section.id, section.articles]),
+    );
+
+    return CATEGORY_NAV_ITEMS.filter(
+      (item): item is CategoryNavItem & { id: ArticleCategorySection["id"] } =>
+        item.id !== "all",
+    ).map((item) => ({
+      id: item.id,
+      articles: sectionsById.get(item.id) ?? [],
+    }));
+  }, [categorySections]);
 
   const fetchArticles = useCallback(
     async ({
@@ -719,12 +704,9 @@ export function ArticleFeed({
     <section className="newspaper-feed-shell" id="top-stories">
       <div className="newspaper-feed-heading">
         <div>
-          <p>{copy.topStories}</p>
           <h2>{copy.topStories}</h2>
         </div>
       </div>
-
-      <CategoryMenu copy={copy} />
 
       {articles.length === 0 && !isLoading ? (
         <div className="empty-feed-card px-5 py-8 text-center">
@@ -772,30 +754,7 @@ export function ArticleFeed({
         </div>
       ) : null}
 
-      {frontPage.more.length > 0 ? (
-        <section className="newspaper-more-section" aria-labelledby="more-good-news">
-          <div className="newspaper-section-rule">
-            <div>
-              <p>{copy.moreGoodNewsDeck}</p>
-              <h2 id="more-good-news">{copy.moreGoodNews}</h2>
-            </div>
-          </div>
-
-          <div className="newspaper-more-grid">
-            {frontPage.more.map((article, index) => (
-              <ArticleCard
-                key={article.id}
-                article={article}
-                index={index + 5}
-                languageCode={selectedLanguage}
-                variant="standard"
-              />
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {categorySections.map((section) => (
+      {orderedCategorySections.map((section) => (
         <section
           key={section.id}
           className="newspaper-more-section"
@@ -804,7 +763,6 @@ export function ArticleFeed({
         >
           <div className="newspaper-section-rule">
             <div>
-              <p>{copy.categorySectionEyebrow}</p>
               <h2 id={`${section.id}-heading`}>{copy.categoryLabels[section.id]}</h2>
             </div>
           </div>
@@ -829,9 +787,32 @@ export function ArticleFeed({
         </section>
       ))}
 
-      <div ref={sentinelRef} aria-hidden="true" className="h-8" />
+      <section className="newspaper-more-section" aria-labelledby="more-good-news">
+        <div className="newspaper-section-rule">
+          <div>
+            <p>{copy.moreGoodNewsDeck}</p>
+            <h2 id="more-good-news">{copy.moreGoodNews}</h2>
+          </div>
+        </div>
 
-      {isLoading ? <LoadingIndicator label={copy.loadingMore} /> : null}
+        {frontPage.more.length > 0 ? (
+          <div className="newspaper-more-grid">
+            {frontPage.more.map((article, index) => (
+              <ArticleCard
+                key={article.id}
+                article={article}
+                index={index + 5}
+                languageCode={selectedLanguage}
+                variant="standard"
+              />
+            ))}
+          </div>
+        ) : null}
+
+        <div ref={sentinelRef} aria-hidden="true" className="h-8" />
+
+        {isLoading ? <LoadingIndicator label={copy.loadingMore} /> : null}
+      </section>
 
       {loadError ? (
         <div className="empty-feed-card mt-5 p-4 text-center">

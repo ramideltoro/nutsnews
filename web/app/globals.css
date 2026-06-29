@@ -1516,6 +1516,15 @@ body {
   transform: translateY(0.04em);
 }
 
+.newspaper-tagline {
+  color: var(--theme-accent-soft);
+  font-size: clamp(0.78rem, 1.45vw, 1rem);
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
 
 .newspaper-primary-nav,
 .newspaper-trending-bar,
@@ -1538,8 +1547,8 @@ body {
   gap: clamp(1rem, 2.5vw, 2.4rem);
   overflow-x: auto;
   border-bottom: 1px solid var(--theme-border);
-  background: color-mix(in srgb, var(--theme-bg) 84%, transparent);
-  backdrop-filter: blur(18px);
+  background: transparent;
+  backdrop-filter: none;
   padding: 0.78rem 0;
   white-space: nowrap;
 }

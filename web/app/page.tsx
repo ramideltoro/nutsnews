@@ -98,6 +98,7 @@ export default async function Home() {
               </span>
               <span>News</span>
             </h1>
+            <p className="newspaper-tagline">Positive news, Simplified</p>
           </div>
 
           <nav className="newspaper-primary-nav" aria-label="Primary sections">
