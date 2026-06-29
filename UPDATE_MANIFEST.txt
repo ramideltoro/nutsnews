@@ -1,3 +1,9 @@
-Updated files:
-- scripts/backfill_article_summaries.mjs
-- docs/updates/README_BACKFILL_REPEAT_FIX.md
+NutsNews Worker summary translation task limit fix
+
+Files changed:
+- worker/src/index.ts
+- docs/updates/README_WORKER_SUMMARY_TRANSLATION_TASK_LIMIT_FIX.md
+
+Purpose:
+- Make SUMMARY_TRANSLATION_LIMIT=1 actually produce articleSummaryTranslationTaskBudget=1.
+- Prevent Cloudflare "Too many subrequests" errors during translation recovery.
