@@ -11,10 +11,10 @@
 		"test:e2e:offline": "node ../scripts/worker_offline_e2e_regression.mjs"
 	},
 	"dependencies": {
-		"@sentry/cloudflare": "^10.59.0"
+		"@sentry/cloudflare": "^10.62.0"
 	},
 	"devDependencies": {
-		"@cloudflare/workers-types": "^4.20260621.1",
+		"@cloudflare/workers-types": "^4.20260629.1",
 		"@types/node": "^20.19.43",
 		"typescript": "^5.9.3",
 		"wrangler": "^4.105.0"
