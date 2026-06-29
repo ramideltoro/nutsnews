@@ -1,10 +1,29 @@
 import Image from "next/image";
+
 export const revalidate = 300;
 
 import { ArticleFeed } from "./components/ArticleFeed";
-import { HeroTagline } from "./components/HeroTagline";
 import { SiteFooter } from "./components/SiteFooter";
 import { getPublishedArticles, SITE_URL } from "@/lib/articles";
+
+const primarySections = [
+  "Top Stories",
+  "Community",
+  "Animals",
+  "Science",
+  "Wellness",
+  "Travel",
+  "Culture",
+  "Achievements",
+];
+
+const trendingSections = [
+  "Feel-good moments",
+  "Kindness",
+  "Nature",
+  "Breakthroughs",
+  "Creative lives",
+];
 
 export default async function Home() {
   const { articles, nextPage, nextCursor } = await getPublishedArticles();
@@ -32,49 +51,46 @@ export default async function Home() {
   };
 
   return (
-    <main className="modern-home-shell min-h-screen overflow-hidden px-4 pb-32 pt-6 text-[var(--theme-text)] sm:px-6">
+    <main className="newspaper-home-shell min-h-screen text-[var(--theme-text)]">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(homeJsonLd) }}
       />
 
-      <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
-        <div className="floating-orb floating-orb--one" />
-        <div className="floating-orb floating-orb--two" />
-        <div className="floating-orb floating-orb--three" />
-        <div className="ambient-grid" />
-      </div>
+      <div className="newspaper-page-wrap">
+        <header className="newspaper-site-header" aria-label="NutsNews header">
+          <div className="newspaper-masthead">
+            <h1 className="newspaper-logo" aria-label="NutsNews">
+              <span>Nuts</span>
+              <span className="newspaper-logo__mark">
+                <Image
+                  src="/nutsnews-logo.png"
+                  alt=""
+                  width={96}
+                  height={96}
+                  priority
+                  className="h-full w-full object-contain"
+                />
+              </span>
+              <span>News</span>
+            </h1>
+          </div>
 
-      <section className="relative z-10 mx-auto w-full max-w-2xl">
-        <header className="mb-7">
-          <div className="hero-modern group">
-            <div className="hero-modern__shine" />
-            <div className="hero-modern__mesh" />
-            <div className="hero-modern__ring hero-modern__ring--one" />
-            <div className="hero-modern__ring hero-modern__ring--two" />
+          <nav className="newspaper-primary-nav" aria-label="Primary sections">
+            {primarySections.map((section) => (
+              <a key={section} href="#top-stories">
+                {section}
+              </a>
+            ))}
+          </nav>
 
-            <div className="relative z-10">
-              <div className="text-center">
-                <h1 className="hero-title flex flex-nowrap items-center justify-center gap-2 text-[2.5rem] font-black leading-none tracking-tight sm:gap-4 sm:text-6xl">
-                  <span className="text-[var(--theme-heading)]">Nuts</span>
-                  <span className="hero-logo-wrap flex h-14 w-14 shrink-0 items-center justify-center sm:h-16 sm:w-16">
-                    <Image
-                      src="/nutsnews-logo.png"
-                      alt="NutsNews logo"
-                      width={128}
-                      height={128}
-                      preload
-                      className="h-full w-full object-contain"
-                    />
-                  </span>
-                  <span className="text-[var(--theme-accent)]">News</span>
-                </h1>
-
-                <div className="mt-5 text-center">
-                  <HeroTagline />
-                </div>
-              </div>
-            </div>
+          <div className="newspaper-trending-bar" aria-label="Trending topics">
+            <span>Trending</span>
+            {trendingSections.map((section) => (
+              <a key={section} href="#top-stories">
+                {section}
+              </a>
+            ))}
           </div>
         </header>
 
@@ -83,7 +99,7 @@ export default async function Home() {
           initialNextPage={nextPage}
           initialNextCursor={nextCursor}
         />
-      </section>
+      </div>
 
       <SiteFooter />
     </main>

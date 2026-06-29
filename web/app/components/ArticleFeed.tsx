@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Article } from "@/lib/articles";
 import {
   DEFAULT_LANGUAGE_CODE,
@@ -24,28 +24,51 @@ type ArticlesResponse = {
   error?: string;
 };
 
-const copyByLanguage: Record<
-  LanguageCode,
-  {
-    recently: string;
-    loadingMore: string;
-    readFullStory: string;
-    emptyFeed: string;
-    loadError: string;
-    tryAgain: string;
-    searchLabel: string;
-    searchPlaceholder: string;
-    searchButton: string;
-    searchLoading: string;
-    searchLoadError: string;
-    clearSearch: string;
-    loadMoreResults: string;
-    searchHint: string;
-    searchResultsLabel: (count: number, query: string) => string;
-    noSearchResultsTitle: string;
-    noSearchResultsBody: (query: string) => string;
-  }
-> = {
+type CategoryId =
+  | "all"
+  | "community"
+  | "animals"
+  | "science"
+  | "wellness"
+  | "travel"
+  | "culture"
+  | "achievements";
+
+type CategoryNavItem = {
+  id: CategoryId;
+  query: string | null;
+};
+
+type FeedCopy = {
+  recently: string;
+  loadingMore: string;
+  readFullStory: string;
+  emptyFeed: string;
+  loadError: string;
+  tryAgain: string;
+  topStories: string;
+  categoryMenu: string;
+  leadStory: string;
+  editorsPicks: string;
+  latestBriefs: string;
+  moreGoodNews: string;
+  moreGoodNewsDeck: string;
+  sourceLabel: string;
+  categoryLabels: Record<CategoryId, string>;
+};
+
+const CATEGORY_NAV_ITEMS: CategoryNavItem[] = [
+  { id: "all", query: null },
+  { id: "community", query: "community" },
+  { id: "animals", query: "animals" },
+  { id: "science", query: "science" },
+  { id: "wellness", query: "wellness" },
+  { id: "travel", query: "travel" },
+  { id: "culture", query: "culture" },
+  { id: "achievements", query: "achievement" },
+];
+
+const copyByLanguage: Record<LanguageCode, FeedCopy> = {
   en: {
     recently: "Recently",
     loadingMore: "Loading more stories",
@@ -54,20 +77,24 @@ const copyByLanguage: Record<
       "No uplifting stories are available yet. Please check back soon.",
     loadError: "Could not load more stories.",
     tryAgain: "Try again",
-    searchLabel: "Search all NutsNews",
-    searchPlaceholder: "Search animals, science, community, wellness...",
-    searchButton: "Search",
-    searchLoading: "Searching the full archive",
-    searchLoadError: "Could not search the archive.",
-    clearSearch: "Clear search",
-    loadMoreResults: "Load more results",
-    searchHint:
-      "Search the full NutsNews archive, not just the stories currently loaded here.",
-    searchResultsLabel: (count, query) =>
-      `${count} result${count === 1 ? "" : "s"} for “${query}”`,
-    noSearchResultsTitle: "No matching stories yet",
-    noSearchResultsBody: (query) =>
-      `No published NutsNews stories matched “${query}”. Try a broader word like animals, science, community, travel, or wellness.`,
+    topStories: "Top Stories",
+    categoryMenu: "Sections",
+    leadStory: "Lead story",
+    editorsPicks: "Editor-style picks",
+    latestBriefs: "Latest briefs",
+    moreGoodNews: "More Good News",
+    moreGoodNewsDeck: "Keep reading from the full NutsNews feed.",
+    sourceLabel: "Source",
+    categoryLabels: {
+      all: "All",
+      community: "Community",
+      animals: "Animals",
+      science: "Science",
+      wellness: "Wellness",
+      travel: "Travel",
+      culture: "Culture",
+      achievements: "Achievements",
+    },
   },
   fr: {
     recently: "Récemment",
@@ -77,20 +104,24 @@ const copyByLanguage: Record<
       "Aucune histoire positive n’est disponible pour le moment. Revenez bientôt.",
     loadError: "Impossible de charger plus d’histoires.",
     tryAgain: "Réessayer",
-    searchLabel: "Rechercher dans tout NutsNews",
-    searchPlaceholder: "Animaux, science, communauté, bien-être...",
-    searchButton: "Rechercher",
-    searchLoading: "Recherche dans toute l’archive",
-    searchLoadError: "Impossible de rechercher dans l’archive.",
-    clearSearch: "Effacer la recherche",
-    loadMoreResults: "Charger plus de résultats",
-    searchHint:
-      "Recherchez dans toute l’archive NutsNews, pas seulement dans les histoires déjà affichées ici.",
-    searchResultsLabel: (count, query) =>
-      `${count} résultat${count === 1 ? "" : "s"} pour « ${query} »`,
-    noSearchResultsTitle: "Aucune histoire trouvée",
-    noSearchResultsBody: (query) =>
-      `Aucune histoire publiée ne correspond à « ${query} ». Essayez un mot plus large comme animaux, science, communauté, voyage ou bien-être.`,
+    topStories: "À la une",
+    categoryMenu: "Rubriques",
+    leadStory: "Article principal",
+    editorsPicks: "Sélection",
+    latestBriefs: "Dernières brèves",
+    moreGoodNews: "Plus de bonnes nouvelles",
+    moreGoodNewsDeck: "Continuez à lire le fil complet de NutsNews.",
+    sourceLabel: "Source",
+    categoryLabels: {
+      all: "Tout",
+      community: "Communauté",
+      animals: "Animaux",
+      science: "Science",
+      wellness: "Bien-être",
+      travel: "Voyage",
+      culture: "Culture",
+      achievements: "Réussites",
+    },
   },
   ja: {
     recently: "最近",
@@ -100,21 +131,25 @@ const copyByLanguage: Record<
       "前向きなストーリーはまだありません。しばらくしてからご確認ください。",
     loadError: "ストーリーを読み込めませんでした。",
     tryAgain: "もう一度試す",
-    searchLabel: "NutsNews全体を検索",
-    searchPlaceholder: "動物、科学、コミュニティ、健康...",
-    searchButton: "検索",
-    searchLoading: "全アーカイブを検索中",
-    searchLoadError: "アーカイブを検索できませんでした。",
-    clearSearch: "検索をクリア",
-    loadMoreResults: "さらに結果を表示",
-    searchHint:
-      "ここに表示中の記事だけでなく、NutsNews全体のアーカイブを検索できます。",
-    searchResultsLabel: (count, query) => `「${query}」の検索結果 ${count}件`,
-    noSearchResultsTitle: "一致するストーリーはありません",
-    noSearchResultsBody: (query) =>
-      `「${query}」に一致する公開済みストーリーはありません。動物、科学、コミュニティ、旅行、健康など広い言葉を試してください。`,
+    topStories: "トップストーリー",
+    categoryMenu: "セクション",
+    leadStory: "リード記事",
+    editorsPicks: "注目記事",
+    latestBriefs: "最新短報",
+    moreGoodNews: "さらに良いニュース",
+    moreGoodNewsDeck: "NutsNewsのフィードを続けて読む。",
+    sourceLabel: "出典",
+    categoryLabels: {
+      all: "すべて",
+      community: "コミュニティ",
+      animals: "動物",
+      science: "科学",
+      wellness: "ウェルネス",
+      travel: "旅行",
+      culture: "文化",
+      achievements: "達成",
+    },
   },
-
   "de-CH": {
     recently: "Kürzlich",
     loadingMore: "Weitere Geschichten werden geladen",
@@ -123,20 +158,24 @@ const copyByLanguage: Record<
       "Im Moment sind keine positiven Geschichten verfügbar. Schau bald wieder vorbei.",
     loadError: "Weitere Geschichten konnten nicht geladen werden.",
     tryAgain: "Erneut versuchen",
-    searchLabel: "Ganz NutsNews durchsuchen",
-    searchPlaceholder: "Tiere, Wissenschaft, Gemeinschaft, Wohlbefinden...",
-    searchButton: "Suchen",
-    searchLoading: "Das ganze Archiv wird durchsucht",
-    searchLoadError: "Das Archiv konnte nicht durchsucht werden.",
-    clearSearch: "Suche löschen",
-    loadMoreResults: "Mehr Ergebnisse laden",
-    searchHint:
-      "Durchsuche das ganze NutsNews-Archiv, nicht nur die hier geladenen Geschichten.",
-    searchResultsLabel: (count, query) =>
-      `${count} Ergebnis${count === 1 ? "" : "se"} für „${query}“`,
-    noSearchResultsTitle: "Noch keine passenden Geschichten",
-    noSearchResultsBody: (query) =>
-      `Keine veröffentlichte NutsNews-Geschichte passt zu „${query}“. Versuch ein breiteres Wort wie Tiere, Wissenschaft, Gemeinschaft, Reisen oder Wohlbefinden.`,
+    topStories: "Top-Geschichten",
+    categoryMenu: "Rubriken",
+    leadStory: "Hauptgeschichte",
+    editorsPicks: "Auswahl",
+    latestBriefs: "Kurzmeldungen",
+    moreGoodNews: "Mehr gute Nachrichten",
+    moreGoodNewsDeck: "Lies weiter im ganzen NutsNews-Feed.",
+    sourceLabel: "Quelle",
+    categoryLabels: {
+      all: "Alle",
+      community: "Gemeinschaft",
+      animals: "Tiere",
+      science: "Wissenschaft",
+      wellness: "Wohlbefinden",
+      travel: "Reisen",
+      culture: "Kultur",
+      achievements: "Erfolge",
+    },
   },
   de: {
     recently: "Kürzlich",
@@ -146,20 +185,24 @@ const copyByLanguage: Record<
       "Im Moment sind keine positiven Geschichten verfügbar. Schau bald wieder vorbei.",
     loadError: "Weitere Geschichten konnten nicht geladen werden.",
     tryAgain: "Erneut versuchen",
-    searchLabel: "Ganz NutsNews durchsuchen",
-    searchPlaceholder: "Tiere, Wissenschaft, Gemeinschaft, Wohlbefinden...",
-    searchButton: "Suchen",
-    searchLoading: "Das ganze Archiv wird durchsucht",
-    searchLoadError: "Das Archiv konnte nicht durchsucht werden.",
-    clearSearch: "Suche löschen",
-    loadMoreResults: "Mehr Ergebnisse laden",
-    searchHint:
-      "Durchsuche das ganze NutsNews-Archiv, nicht nur die hier geladenen Geschichten.",
-    searchResultsLabel: (count, query) =>
-      `${count} Ergebnis${count === 1 ? "" : "se"} für „${query}“`,
-    noSearchResultsTitle: "Noch keine passenden Geschichten",
-    noSearchResultsBody: (query) =>
-      `Keine veröffentlichte NutsNews-Geschichte passt zu „${query}“. Versuch ein breiteres Wort wie Tiere, Wissenschaft, Gemeinschaft, Reisen oder Wohlbefinden.`,
+    topStories: "Top-Geschichten",
+    categoryMenu: "Rubriken",
+    leadStory: "Hauptgeschichte",
+    editorsPicks: "Auswahl",
+    latestBriefs: "Kurzmeldungen",
+    moreGoodNews: "Mehr gute Nachrichten",
+    moreGoodNewsDeck: "Lies weiter im gesamten NutsNews-Feed.",
+    sourceLabel: "Quelle",
+    categoryLabels: {
+      all: "Alle",
+      community: "Gemeinschaft",
+      animals: "Tiere",
+      science: "Wissenschaft",
+      wellness: "Wohlbefinden",
+      travel: "Reisen",
+      culture: "Kultur",
+      achievements: "Erfolge",
+    },
   },
   el: {
     recently: "Πρόσφατα",
@@ -169,20 +212,24 @@ const copyByLanguage: Record<
       "Δεν υπάρχουν ακόμα θετικές ιστορίες. Ελέγξτε ξανά σύντομα.",
     loadError: "Δεν ήταν δυνατή η φόρτωση περισσότερων ιστοριών.",
     tryAgain: "Δοκιμάστε ξανά",
-    searchLabel: "Αναζήτηση σε όλο το NutsNews",
-    searchPlaceholder: "Ζώα, επιστήμη, κοινότητα, ευεξία...",
-    searchButton: "Αναζήτηση",
-    searchLoading: "Αναζήτηση σε όλο το αρχείο",
-    searchLoadError: "Δεν ήταν δυνατή η αναζήτηση στο αρχείο.",
-    clearSearch: "Καθαρισμός αναζήτησης",
-    loadMoreResults: "Φόρτωση περισσότερων αποτελεσμάτων",
-    searchHint:
-      "Αναζητήστε σε όλο το αρχείο του NutsNews, όχι μόνο στις ιστορίες που έχουν φορτωθεί εδώ.",
-    searchResultsLabel: (count, query) =>
-      `${count} αποτέλεσμα${count === 1 ? "" : "τα"} για «${query}»`,
-    noSearchResultsTitle: "Δεν βρέθηκαν ακόμα ιστορίες",
-    noSearchResultsBody: (query) =>
-      `Καμία δημοσιευμένη ιστορία του NutsNews δεν ταίριαξε με «${query}». Δοκιμάστε μια πιο γενική λέξη όπως ζώα, επιστήμη, κοινότητα, ταξίδια ή ευεξία.`,
+    topStories: "Κύριες ιστορίες",
+    categoryMenu: "Ενότητες",
+    leadStory: "Κύρια ιστορία",
+    editorsPicks: "Επιλογές",
+    latestBriefs: "Τελευταία σύντομα",
+    moreGoodNews: "Περισσότερα καλά νέα",
+    moreGoodNewsDeck: "Συνεχίστε να διαβάζετε από όλη τη ροή του NutsNews.",
+    sourceLabel: "Πηγή",
+    categoryLabels: {
+      all: "Όλα",
+      community: "Κοινότητα",
+      animals: "Ζώα",
+      science: "Επιστήμη",
+      wellness: "Ευεξία",
+      travel: "Ταξίδια",
+      culture: "Πολιτισμός",
+      achievements: "Επιτεύγματα",
+    },
   },
 };
 
@@ -204,6 +251,10 @@ function getStoredLanguage(): LanguageCode {
   return isSupportedLanguageCode(storedLanguage)
     ? storedLanguage
     : DEFAULT_LANGUAGE_CODE;
+}
+
+function getCategoryQuery(categoryId: CategoryId) {
+  return CATEGORY_NAV_ITEMS.find((item) => item.id === categoryId)?.query ?? null;
 }
 
 function formatSiteDate(dateValue: string | null, languageCode: LanguageCode) {
@@ -249,14 +300,54 @@ function LoadingIndicator({ label }: { label: string }) {
   );
 }
 
+function CategoryMenu({
+  copy,
+  selectedCategory,
+  onSelectCategory,
+}: {
+  copy: FeedCopy;
+  selectedCategory: CategoryId;
+  onSelectCategory: (categoryId: CategoryId) => void;
+}) {
+  return (
+    <nav className="newspaper-category-menu" aria-label={copy.categoryMenu}>
+      <span className="newspaper-category-menu__label">{copy.categoryMenu}</span>
+      <div className="newspaper-category-menu__scroller" role="list">
+        {CATEGORY_NAV_ITEMS.map((item) => {
+          const isActive = selectedCategory === item.id;
+
+          return (
+            <button
+              key={item.id}
+              type="button"
+              className="newspaper-category-chip"
+              aria-pressed={isActive}
+              data-active={isActive ? "true" : "false"}
+              onClick={() => onSelectCategory(item.id)}
+            >
+              {copy.categoryLabels[item.id]}
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+type ArticleCardVariant = "lead" | "feature" | "rail" | "standard";
+
 function ArticleCard({
   article,
   index,
   languageCode,
+  variant,
+  label,
 }: {
   article: Article;
   index: number;
   languageCode: LanguageCode;
+  variant: ArticleCardVariant;
+  label?: string;
 }) {
   const cardRef = useRef<HTMLElement | null>(null);
   const [isVisible, setIsVisible] = useState(false);
@@ -287,7 +378,7 @@ function ArticleCard({
       },
       {
         rootMargin: "0px 0px -8% 0px",
-        threshold: 0.14,
+        threshold: 0.12,
       },
     );
 
@@ -296,51 +387,61 @@ function ArticleCard({
     return () => observer.disconnect();
   }, []);
 
-  const revealDelay = `${Math.min(index % 5, 4) * 60}ms`;
+  const revealDelay = `${Math.min(index % 5, 4) * 50}ms`;
+  const sourceLabel = formatSourceLabel(article.source);
+  const siteDate = formatSiteDate(article.published_on_site_at, languageCode);
+  const showSummary = variant !== "rail";
+  const showCta = variant === "lead" || variant === "standard";
 
   return (
     <article
       ref={cardRef}
       style={{ transitionDelay: isVisible ? revealDelay : "0ms" }}
-      className={`article-card-modern group transition-all duration-700 ease-out will-change-transform motion-reduce:translate-y-0 motion-reduce:opacity-100 motion-reduce:blur-0 motion-reduce:transition-none ${
+      className={`wp-article-card wp-article-card--${variant} transition-all duration-700 ease-out motion-reduce:translate-y-0 motion-reduce:opacity-100 motion-reduce:blur-0 motion-reduce:transition-none ${
         isVisible
           ? "translate-y-0 opacity-100 blur-0"
-          : "translate-y-8 opacity-0 blur-[2px]"
+          : "translate-y-6 opacity-0 blur-[2px]"
       }`}
       lang={article.language_code ?? languageCode}
     >
-      <div className="article-card-modern__image relative aspect-[16/10] overflow-hidden">
-        <OptimizedArticleImage src={article.image_url} eager={index === 0} />
-        <div className="article-card-modern__image-glow" aria-hidden="true" />
-      </div>
-
-      <div className="article-card-modern__body space-y-4 p-5 sm:p-6">
-        <h2 className="article-card-modern__title text-2xl font-black leading-tight tracking-[-0.04em] sm:text-[1.7rem]">
-          {article.title}
-        </h2>
-
-        {article.ai_summary ? (
-          <p className="article-card-modern__summary text-[15px] leading-7">
-            {article.ai_summary}
-          </p>
-        ) : null}
-
-        <a
-          href={article.original_url}
-          target="_blank"
-          rel="noreferrer"
-          className="read-story-button"
-        >
-          {copyByLanguage[languageCode].readFullStory}
-        </a>
-
-        <div className="article-card-modern__meta flex flex-wrap items-center justify-between gap-3 border-t pt-4 text-[11px] font-bold uppercase tracking-[0.14em]">
-          <span>
-            {formatSiteDate(article.published_on_site_at, languageCode)}
-          </span>
-          <span>{formatSourceLabel(article.source)}</span>
+      <a
+        href={article.original_url}
+        target="_blank"
+        rel="noreferrer"
+        className="wp-article-card__link"
+      >
+        <div className="wp-article-card__image relative overflow-hidden">
+          <OptimizedArticleImage
+            src={article.image_url}
+            eager={index < 2}
+            sizes={
+              variant === "lead"
+                ? "(min-width: 1024px) 56vw, 100vw"
+                : "(min-width: 1024px) 28vw, 100vw"
+            }
+          />
         </div>
-      </div>
+
+        <div className="wp-article-card__body">
+          <div className="wp-article-card__meta" aria-label={`${sourceLabel} · ${siteDate}`}>
+            {label ? <span>{label}</span> : null}
+            <span>{sourceLabel}</span>
+            <span>{siteDate}</span>
+          </div>
+
+          <h2 className="wp-article-card__title">{article.title}</h2>
+
+          {article.ai_summary && showSummary ? (
+            <p className="wp-article-card__summary">{article.ai_summary}</p>
+          ) : null}
+
+          {showCta ? (
+            <span className="read-story-button wp-article-card__cta">
+              {copyByLanguage[languageCode].readFullStory}
+            </span>
+          ) : null}
+        </div>
+      </a>
     </article>
   );
 }
@@ -356,31 +457,50 @@ export function ArticleFeed({
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(
     DEFAULT_LANGUAGE_CODE,
   );
+  const [selectedCategory, setSelectedCategory] = useState<CategoryId>("all");
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const isReloadingLanguageRef = useRef(false);
+  const selectedCategoryRef = useRef<CategoryId>("all");
+  const isReloadingFirstPageRef = useRef(false);
 
   const copy = copyByLanguage[selectedLanguage];
+
+  const frontPage = useMemo(
+    () => ({
+      lead: articles[0] ?? null,
+      features: articles.slice(1, 3),
+      latest: articles.slice(3, 5),
+      more: articles.slice(5),
+    }),
+    [articles],
+  );
 
   const fetchArticles = useCallback(
     async ({
       page,
       cursor,
       languageCode,
+      categoryId,
       forceFresh = false,
     }: {
       page: number | null;
       cursor: string | null;
       languageCode: LanguageCode;
+      categoryId: CategoryId;
       forceFresh?: boolean;
     }) => {
       const query = new URLSearchParams();
+      const categoryQuery = getCategoryQuery(categoryId);
 
       if (page !== null) {
         query.set("page", String(page));
       } else if (cursor) {
         query.set("cursor", cursor);
+      }
+
+      if (categoryQuery) {
+        query.set("category", categoryQuery);
       }
 
       if (languageCode !== DEFAULT_LANGUAGE_CODE) {
@@ -419,12 +539,17 @@ export function ArticleFeed({
     [],
   );
 
-  const loadFirstPageForLanguage = useCallback(
-    async (
-      languageCode: LanguageCode,
-      options: { forceFresh?: boolean } = {},
-    ) => {
-      isReloadingLanguageRef.current = true;
+  const loadFirstPage = useCallback(
+    async ({
+      languageCode,
+      categoryId,
+      forceFresh = false,
+    }: {
+      languageCode: LanguageCode;
+      categoryId: CategoryId;
+      forceFresh?: boolean;
+    }) => {
+      isReloadingFirstPageRef.current = true;
       setIsLoading(true);
       setLoadError(null);
 
@@ -433,7 +558,8 @@ export function ArticleFeed({
           page: 0,
           cursor: null,
           languageCode,
-          forceFresh: options.forceFresh,
+          categoryId,
+          forceFresh,
         });
 
         setArticles(data.articles);
@@ -447,7 +573,7 @@ export function ArticleFeed({
             : copyByLanguage[languageCode].loadError,
         );
       } finally {
-        isReloadingLanguageRef.current = false;
+        isReloadingFirstPageRef.current = false;
         setIsLoading(false);
       }
     },
@@ -455,12 +581,20 @@ export function ArticleFeed({
   );
 
   useEffect(() => {
+    selectedCategoryRef.current = selectedCategory;
+  }, [selectedCategory]);
+
+  useEffect(() => {
     const storedLanguage = getStoredLanguage();
     document.documentElement.lang = storedLanguage;
 
     const initialRefreshTimer = window.setTimeout(() => {
       setSelectedLanguage(storedLanguage);
-      void loadFirstPageForLanguage(storedLanguage, { forceFresh: true });
+      void loadFirstPage({
+        languageCode: storedLanguage,
+        categoryId: selectedCategoryRef.current,
+        forceFresh: true,
+      });
     }, 0);
 
     const handleLanguageChange = (event: Event) => {
@@ -472,7 +606,10 @@ export function ArticleFeed({
       }
 
       setSelectedLanguage(nextLanguage);
-      void loadFirstPageForLanguage(nextLanguage);
+      void loadFirstPage({
+        languageCode: nextLanguage,
+        categoryId: selectedCategoryRef.current,
+      });
     };
 
     window.addEventListener(LANGUAGE_CHANGE_EVENT, handleLanguageChange);
@@ -481,13 +618,30 @@ export function ArticleFeed({
       window.clearTimeout(initialRefreshTimer);
       window.removeEventListener(LANGUAGE_CHANGE_EVENT, handleLanguageChange);
     };
-  }, [loadFirstPageForLanguage]);
+  }, [loadFirstPage]);
+
+  const handleSelectCategory = useCallback(
+    (categoryId: CategoryId) => {
+      if (categoryId === selectedCategoryRef.current) {
+        return;
+      }
+
+      selectedCategoryRef.current = categoryId;
+      setSelectedCategory(categoryId);
+      void loadFirstPage({
+        languageCode: selectedLanguage,
+        categoryId,
+        forceFresh: true,
+      });
+    },
+    [loadFirstPage, selectedLanguage],
+  );
 
   const loadMoreArticles = useCallback(async () => {
     if (
       (nextPage === null && !nextCursor) ||
       isLoading ||
-      isReloadingLanguageRef.current
+      isReloadingFirstPageRef.current
     ) {
       return;
     }
@@ -500,6 +654,7 @@ export function ArticleFeed({
         page: nextPage,
         cursor: nextCursor,
         languageCode: selectedLanguage,
+        categoryId: selectedCategoryRef.current,
       });
 
       setArticles((currentArticles) => {
@@ -550,24 +705,87 @@ export function ArticleFeed({
   }, [loadMoreArticles, nextCursor, nextPage]);
 
   return (
-    <>
-      {articles.length === 0 ? (
+    <section className="newspaper-feed-shell" id="top-stories">
+      <div className="newspaper-feed-heading">
+        <div>
+          <p>{copy.topStories}</p>
+          <h2>{copy.topStories}</h2>
+        </div>
+      </div>
+
+      <CategoryMenu
+        copy={copy}
+        selectedCategory={selectedCategory}
+        onSelectCategory={handleSelectCategory}
+      />
+
+      {articles.length === 0 && !isLoading ? (
         <div className="empty-feed-card px-5 py-8 text-center">
           <p className="text-sm font-semibold">{copy.emptyFeed}</p>
         </div>
       ) : null}
 
-      {articles.length > 0 ? (
-        <div className="space-y-6 sm:space-y-7">
-          {articles.map((article, index) => (
+      {frontPage.lead ? (
+        <div className="newspaper-front-grid">
+          <div className="newspaper-front-grid__lead">
             <ArticleCard
-              key={article.id}
-              article={article}
-              index={index}
+              article={frontPage.lead}
+              index={0}
               languageCode={selectedLanguage}
+              variant="lead"
+              label={copy.leadStory}
             />
-          ))}
+          </div>
+
+          <div className="newspaper-front-grid__features" aria-label={copy.editorsPicks}>
+            <div className="newspaper-column-label">{copy.editorsPicks}</div>
+            {frontPage.features.map((article, index) => (
+              <ArticleCard
+                key={article.id}
+                article={article}
+                index={index + 1}
+                languageCode={selectedLanguage}
+                variant="feature"
+              />
+            ))}
+          </div>
+
+          <aside className="newspaper-front-grid__rail" aria-label={copy.latestBriefs}>
+            <div className="newspaper-column-label">{copy.latestBriefs}</div>
+            {frontPage.latest.map((article, index) => (
+              <ArticleCard
+                key={article.id}
+                article={article}
+                index={index + 3}
+                languageCode={selectedLanguage}
+                variant="rail"
+              />
+            ))}
+          </aside>
         </div>
+      ) : null}
+
+      {frontPage.more.length > 0 ? (
+        <section className="newspaper-more-section" aria-labelledby="more-good-news">
+          <div className="newspaper-section-rule">
+            <div>
+              <p>{copy.moreGoodNewsDeck}</p>
+              <h2 id="more-good-news">{copy.moreGoodNews}</h2>
+            </div>
+          </div>
+
+          <div className="newspaper-more-grid">
+            {frontPage.more.map((article, index) => (
+              <ArticleCard
+                key={article.id}
+                article={article}
+                index={index + 5}
+                languageCode={selectedLanguage}
+                variant="standard"
+              />
+            ))}
+          </div>
+        </section>
       ) : null}
 
       <div ref={sentinelRef} aria-hidden="true" className="h-8" />
@@ -586,6 +804,6 @@ export function ArticleFeed({
           </button>
         </div>
       ) : null}
-    </>
+    </section>
   );
 }
