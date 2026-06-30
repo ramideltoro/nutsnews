@@ -43,7 +43,6 @@ const footerCopyByLanguage: Record<
     emptyTitle: string;
     emptyBody: (query: string) => string;
     footerNav: string;
-    apps: string;
     about: string;
     contact: string;
     privacy: string;
@@ -70,7 +69,6 @@ const footerCopyByLanguage: Record<
     emptyBody: (query) =>
       `No published NutsNews stories matched “${query}”. Try a broader word like animals, science, community, travel, or wellness.`,
     footerNav: "Footer navigation",
-    apps: "Apps",
     about: "About",
     contact: "Contact",
     privacy: "Privacy",
@@ -96,7 +94,6 @@ const footerCopyByLanguage: Record<
     emptyBody: (query) =>
       `Aucune histoire publiée ne correspond à « ${query} ». Essayez un mot plus large comme animaux, science, communauté, voyage ou bien-être.`,
     footerNav: "Navigation du pied de page",
-    apps: "Apps",
     about: "À propos",
     contact: "Contact",
     privacy: "Confidentialité",
@@ -121,7 +118,6 @@ const footerCopyByLanguage: Record<
     emptyBody: (query) =>
       `「${query}」に一致する公開済みストーリーはありません。動物、科学、コミュニティ、旅行、健康など広い言葉を試してください。`,
     footerNav: "フッターナビゲーション",
-    apps: "アプリ",
     about: "概要",
     contact: "お問い合わせ",
     privacy: "プライバシー",
@@ -148,7 +144,6 @@ const footerCopyByLanguage: Record<
     emptyBody: (query) =>
       `Keine veröffentlichte NutsNews-Geschichte passt zu „${query}“. Versuch ein breiteres Wort wie Tiere, Wissenschaft, Gemeinschaft, Reisen oder Wohlbefinden.`,
     footerNav: "Footer-Navigation",
-    apps: "Apps",
     about: "Über uns",
     contact: "Kontakt",
     privacy: "Datenschutz",
@@ -174,7 +169,6 @@ const footerCopyByLanguage: Record<
     emptyBody: (query) =>
       `Keine veröffentlichte NutsNews-Geschichte passt zu „${query}“. Versuch ein breiteres Wort wie Tiere, Wissenschaft, Gemeinschaft, Reisen oder Wohlbefinden.`,
     footerNav: "Footer-Navigation",
-    apps: "Apps",
     about: "Über uns",
     contact: "Kontakt",
     privacy: "Datenschutz",
@@ -200,7 +194,6 @@ const footerCopyByLanguage: Record<
     emptyBody: (query) =>
       `Καμία δημοσιευμένη ιστορία του NutsNews δεν ταίριαξε με «${query}». Δοκιμάστε μια πιο γενική λέξη όπως ζώα, επιστήμη, κοινότητα, ταξίδια ή ευεξία.`,
     footerNav: "Πλοήγηση υποσέλιδου",
-    apps: "Εφαρμογές",
     about: "Σχετικά",
     contact: "Επικοινωνία",
     privacy: "Απόρρητο",
@@ -679,9 +672,6 @@ export function SiteFooter() {
           </div>
 
           <nav aria-label={copy.footerNav} className="site-footer-modern__nav">
-            <Link href="/apps" className="site-footer-modern__link">
-              {copy.apps}
-            </Link>
             <Link href="/about" className="site-footer-modern__link">
               {copy.about}
             </Link>
