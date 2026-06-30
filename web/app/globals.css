@@ -1965,3 +1965,37 @@ body {
     transition: none;
   }
 }
+
+@keyframes nutsnewsHomeArrivalFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+    filter: blur(8px);
+  }
+  60% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+html.nutsnews-home-arrival .newspaper-home-shell .newspaper-page-wrap,
+html.nutsnews-home-arrival .newspaper-home-shell .site-footer-modern {
+  animation: nutsnewsHomeArrivalFadeIn 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+html.nutsnews-home-arrival .newspaper-home-shell .site-footer-modern {
+  animation-delay: 80ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.nutsnews-home-arrival .newspaper-home-shell .newspaper-page-wrap,
+  html.nutsnews-home-arrival .newspaper-home-shell .site-footer-modern {
+    animation: none;
+  }
+}
+

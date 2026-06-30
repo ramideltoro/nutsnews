@@ -334,17 +334,26 @@ export function ContactForm() {
         />
       </div>
 
-      <label
-        htmlFor="contact-email"
-        className="text-xs font-black uppercase tracking-[0.22em] text-amber-300/80"
-      >
-        {copy.emailLabel}
-      </label>
+      <div>
+        <label
+          htmlFor="contact-email"
+          className="block text-xs font-black uppercase tracking-[0.22em] text-amber-300/80"
+        >
+          {copy.emailLabel}
+        </label>
+        <p
+          id="contact-email-help"
+          className="mt-1 text-[11px] leading-5 text-neutral-500"
+        >
+          {copy.privacyNote}
+        </p>
+      </div>
       <input
         id="contact-email"
         name="email"
         type="email"
         autoComplete="email"
+        aria-describedby="contact-email-help"
         required
         maxLength={320}
         value={email}
@@ -378,8 +387,7 @@ export function ContactForm() {
         onTokenChange={setTurnstileToken}
       />
 
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <p className="text-xs leading-5 text-neutral-500">{copy.privacyNote}</p>
+      <div className="mt-4 flex justify-end">
         <button
           type="submit"
           disabled={isSending}

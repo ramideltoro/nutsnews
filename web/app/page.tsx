@@ -3,6 +3,7 @@ import Image from "next/image";
 export const revalidate = 300;
 
 import { ArticleFeed, type ArticleCategorySection } from "./components/ArticleFeed";
+import { HomeArrivalAnimation } from "./components/HomeArrivalAnimation";
 import { NewspaperPrimaryNav } from "./components/NewspaperPrimaryNav";
 import { SiteFooter } from "./components/SiteFooter";
 import {
@@ -61,6 +62,7 @@ export default async function Home() {
 
   return (
     <main className="newspaper-home-shell min-h-screen text-[var(--theme-text)]">
+      <HomeArrivalAnimation />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(homeJsonLd) }}

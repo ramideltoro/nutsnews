@@ -2,9 +2,17 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type FormEvent,
+  type MouseEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 
 import type { Article } from "@/lib/articles";
 import { DEFAULT_LANGUAGE_CODE, type LanguageCode } from "@/lib/languages";
@@ -12,6 +20,7 @@ import { ThemeSwitcher } from "./ThemeSwitcher";
 import { useSelectedLanguage } from "./useSelectedLanguage";
 
 const COPYRIGHT_YEAR = 2026;
+const FOOTER_HOME_TRANSITION_KEY = "nutsnews.footerHomeTransition";
 
 type SearchResponse = {
   articles: Article[];
@@ -216,6 +225,46 @@ const dateLocaleByLanguage: Record<LanguageCode, string> = {
   de: "de-DE",
   el: "el-GR",
 };
+
+
+function easeOutCubic(progress: number) {
+  return 1 - Math.pow(1 - progress, 3);
+}
+
+function scrollHomePageToTop() {
+  const prefersReducedMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
+
+  if (prefersReducedMotion) {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    return;
+  }
+
+  const startY = window.scrollY || document.documentElement.scrollTop || 0;
+
+  if (startY <= 4) {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    return;
+  }
+
+  const duration = Math.min(920, Math.max(460, startY * 0.42));
+  const startedAt = window.performance.now();
+
+  function step(now: number) {
+    const elapsed = now - startedAt;
+    const progress = Math.min(elapsed / duration, 1);
+    const eased = easeOutCubic(progress);
+
+    window.scrollTo(0, Math.round(startY * (1 - eased)));
+
+    if (progress < 1) {
+      window.requestAnimationFrame(step);
+    }
+  }
+
+  window.requestAnimationFrame(step);
+}
 
 function HomeIcon({ className = "" }: { className?: string }) {
   return (
@@ -636,8 +685,47 @@ function SearchMenu({
 export function SiteFooter() {
   const selectedLanguage = useSelectedLanguage();
   const copy = footerCopyByLanguage[selectedLanguage];
+  const pathname = usePathname();
+  const router = useRouter();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSearchButtonAnimating, setIsSearchButtonAnimating] = useState(false);
+  const [isHomeButtonAnimating, setIsHomeButtonAnimating] = useState(false);
+
+  function pulseHomeButton() {
+    setIsHomeButtonAnimating(false);
+    window.requestAnimationFrame(() => setIsHomeButtonAnimating(true));
+    window.setTimeout(() => setIsHomeButtonAnimating(false), 620);
+  }
+
+  function handleHomeClick(event: MouseEvent<HTMLAnchorElement>) {
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.shiftKey
+    ) {
+      return;
+    }
+
+    pulseHomeButton();
+
+    if (pathname === "/") {
+      event.preventDefault();
+      scrollHomePageToTop();
+      return;
+    }
+
+    try {
+      window.sessionStorage.setItem(FOOTER_HOME_TRANSITION_KEY, "1");
+    } catch {
+      // Navigation still works if session storage is unavailable.
+    }
+
+    event.preventDefault();
+    router.push("/");
+  }
 
   function openSearchMenu() {
     setIsSearchButtonAnimating(false);
@@ -656,8 +744,11 @@ export function SiteFooter() {
           >
             <Link
               href="/"
-              className="footer-icon-button"
+              className={`footer-icon-button ${
+                isHomeButtonAnimating ? "footer-icon-button--home-pulse" : ""
+              }`}
               aria-label={copy.homeAria}
+              onClick={handleHomeClick}
             >
               <span className="footer-icon-button__halo" />
               <HomeIcon className="footer-icon-button__icon" />
@@ -737,6 +828,22 @@ export function SiteFooter() {
           }
         }
 
+
+        @keyframes nutsnewsFooterHomePulse {
+          0% {
+            transform: translateY(0) scale(1);
+            box-shadow: 0 0 0 0 var(--theme-glow-soft);
+          }
+          45% {
+            transform: translateY(-3px) scale(1.09);
+            box-shadow: 0 0 0 10px var(--theme-glow-soft);
+          }
+          100% {
+            transform: translateY(0) scale(1);
+            box-shadow: 0 0 0 0 transparent;
+          }
+        }
+
         @keyframes nutsnewsFooterSearchPulse {
           0% {
             transform: translateY(0) scale(1);
@@ -776,6 +883,10 @@ export function SiteFooter() {
           transform-origin: center;
         }
 
+        .footer-icon-button--home-pulse {
+          animation: nutsnewsFooterHomePulse 620ms ease-out both;
+        }
+
         .footer-icon-button--search-pulse {
           animation: nutsnewsFooterSearchPulse 520ms ease-out both;
         }
@@ -787,6 +898,7 @@ export function SiteFooter() {
         @media (prefers-reduced-motion: reduce) {
           .search-menu-backdrop,
           .search-menu-panel,
+          .footer-icon-button--home-pulse,
           .footer-icon-button--search-pulse,
           .search-submit-button--pulse {
             animation: none;
