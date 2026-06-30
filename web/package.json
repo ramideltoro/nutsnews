@@ -34,5 +34,20 @@
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "webpack": "5.108.0",
+    "@sentry/bundler-plugin-core": {
+      "glob": {
+        "minimatch": {
+          "brace-expansion": "5.0.7"
+        }
+      }
+    },
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": {
+        "brace-expansion": "5.0.7"
+      }
+    }
   }
 }
