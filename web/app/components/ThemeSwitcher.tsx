@@ -40,7 +40,7 @@ const themes = [
   },
   {
     id: "creative-premium",
-    name: "Friday",
+    name: "Butterfly",
     description: "Navy purple premium glow.",
     swatches: ["#0f172a", "#1e293b", "#7c3aed"],
   },
