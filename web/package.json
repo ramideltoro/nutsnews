@@ -48,6 +48,7 @@
       "minimatch": {
         "brace-expansion": "5.0.7"
       }
-    }
+    },
+    "fast-uri": "4.0.1"
   }
 }
