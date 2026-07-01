@@ -6,11 +6,11 @@ import { ArticleFeed, type ArticleCategorySection } from "./components/ArticleFe
 import { HomeArrivalAnimation } from "./components/HomeArrivalAnimation";
 import { NewspaperPrimaryNav } from "./components/NewspaperPrimaryNav";
 import { SiteFooter } from "./components/SiteFooter";
+import { SITE_URL } from "@/lib/articles";
 import {
-  getPublishedArticles,
-  getPublishedArticlesForSection,
-  SITE_URL,
-} from "@/lib/articles";
+  getPublishedArticlesForSectionWithEdgeFallback,
+  getPublishedArticlesWithEdgeFallback,
+} from "@/lib/edgeFeedSnapshot";
 
 const categorySections = [
   { id: "community", label: "Community", query: "community" },
@@ -29,11 +29,11 @@ const categorySections = [
 export default async function Home() {
   const [{ articles, nextPage, nextCursor }, initialCategorySections] =
     await Promise.all([
-      getPublishedArticles(),
+      getPublishedArticlesWithEdgeFallback(),
       Promise.all(
         categorySections.map(async (section) => ({
           id: section.id,
-          articles: await getPublishedArticlesForSection(section.query),
+          articles: await getPublishedArticlesForSectionWithEdgeFallback(section.query),
         })),
       ),
     ]);

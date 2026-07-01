@@ -184,6 +184,14 @@ export default async function AdminPage() {
             />
 
             <DashboardCard
+              eyebrow="Resiliency"
+              title="Edge Snapshot"
+              description="Check the Cloudflare KV last-known-good public feed fallback, snapshot age, article count, and endpoint readiness."
+              href="/admin/edge-snapshot"
+              status="Live"
+            />
+
+            <DashboardCard
               eyebrow="Home AI"
               title="Local AI"
               description="Monitor the home-server Ollama model, qwen/local AI article decisions, fallback OpenAI calls, review latency, and model-level quality signals."

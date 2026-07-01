@@ -28,7 +28,7 @@ export type Article = {
   translation_available?: boolean;
 };
 
-export type PublishedArticleDataSource = "public_feed_snapshot" | "articles_fallback";
+export type PublishedArticleDataSource = "public_feed_snapshot" | "articles_fallback" | "edge_feed_snapshot";
 
 export type SearchArticlesResult = {
   articles: Article[];
@@ -79,12 +79,23 @@ type ArticleCursor = {
   id: string;
 };
 
+export type PublicFeedEdgeSnapshotMetadata = {
+  status: "hit" | "miss" | "unconfigured" | "error";
+  updatedAt: string | null;
+  ageSeconds: number | null;
+  articleCount: number | null;
+  version: number | null;
+  endpoint?: string | null;
+  message?: string | null;
+};
+
 export type PublishedArticlesResult = {
   articles: Article[];
   nextPage: number | null;
   nextCursor: string | null;
   dataSource: PublishedArticleDataSource;
   languageCode: LanguageCode;
+  edgeSnapshot?: PublicFeedEdgeSnapshotMetadata | null;
 };
 
 function encodeArticleCursor(article: Article) {
@@ -261,7 +272,10 @@ async function getPublishedArticlesFromSnapshot(
     .range(from, to);
 
   if (error) {
-    console.error("Failed to load published articles from public feed snapshot. Falling back to articles table:", error);
+    console.warn("Public feed snapshot unavailable. Falling back to articles table or edge snapshot.", {
+      code: error?.code,
+      message: error?.message,
+    });
     return null;
   }
 
@@ -288,7 +302,10 @@ async function getPublishedArticlesFromSourceTable(
     .range(from, to);
 
   if (error) {
-    console.error("Failed to load published articles from fallback articles table:", error);
+    console.warn("Fallback articles table unavailable. Edge snapshot fallback may still serve articles.", {
+      code: error?.code,
+      message: error?.message,
+    });
 
     return {
       articles: [],
@@ -364,10 +381,10 @@ export async function getPublishedArticlesForSection(
   }
 
   if (snapshotError) {
-    console.error(
-      "Failed to load category section articles from public feed snapshot. Falling back to articles table:",
-      snapshotError,
-    );
+    console.warn("Category public feed snapshot unavailable. Falling back to articles table or edge snapshot.", {
+      code: snapshotError?.code,
+      message: snapshotError?.message,
+    });
   }
 
   const { data, error } = await basePublishedArticleQuery(selectedCategory)
@@ -376,7 +393,10 @@ export async function getPublishedArticlesForSection(
     .limit(safeLimit);
 
   if (error) {
-    console.error("Failed to load category section articles from fallback articles table:", error);
+    console.warn("Category fallback articles table unavailable. Edge snapshot fallback may still serve articles.", {
+      code: error?.code,
+      message: error?.message,
+    });
     return [];
   }
 
