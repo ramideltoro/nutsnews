@@ -12,7 +12,8 @@ module.exports = {
       numberOfRuns: 3,
       settings: {
         preset: 'desktop',
-        chromeFlags: '--no-sandbox --disable-dev-shm-usage'
+        chromeFlags: '--no-sandbox --disable-dev-shm-usage',
+        budgetPath: './lighthouse-budget.json'
       }
     },
     assert: {

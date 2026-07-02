@@ -1,0 +1,44 @@
+{
+  "$schema": "https://nutsnews.com/schemas/homepage-performance-budget.v1.json",
+  "description": "Homepage performance budgets for NutsNews. Hard limits fail CI; warning limits create GitHub annotations and should be fixed before they become regressions.",
+  "reviewPolicy": "Budget file changes are intentional changes and must include [performance-budget-reviewed] in the pull request title or body.",
+  "homepage": {
+    "route": "/",
+    "largestContentfulPaintMs": {
+      "target": 2500,
+      "warn": 3000,
+      "fail": 4000,
+      "measuredBy": "Lighthouse CI and PageSpeed Insights"
+    },
+    "initialJavaScriptGzipBytes": {
+      "target": 184320,
+      "warn": 225280,
+      "fail": 266240,
+      "measuredBy": "web/scripts/homepage-performance-budget.mjs"
+    },
+    "initialCssGzipBytes": {
+      "target": 30720,
+      "warn": 46080,
+      "fail": 61440,
+      "measuredBy": "web/scripts/homepage-performance-budget.mjs"
+    },
+    "homepageStaticImageBytes": {
+      "target": 256000,
+      "warn": 358400,
+      "fail": 409600,
+      "measuredBy": "web/scripts/homepage-performance-budget.mjs"
+    },
+    "runtimeImageTransferBytes": {
+      "target": 204800,
+      "warn": 307200,
+      "fail": 409600,
+      "measuredBy": "Lighthouse CI and PageSpeed Insights"
+    },
+    "totalInitialTransferGzipBytes": {
+      "target": 368640,
+      "warn": 460800,
+      "fail": 563200,
+      "measuredBy": "web/scripts/homepage-performance-budget.mjs"
+    }
+  }
+}

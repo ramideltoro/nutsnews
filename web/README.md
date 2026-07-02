@@ -428,6 +428,26 @@ Admin dashboards and future controls are protected behind Google login and an ap
 
 Performance is handled at several layers.
 
+### Homepage performance budget
+
+The homepage has explicit budgets for LCP, initial JavaScript, initial CSS, static homepage images, runtime image transfer, and total initial transfer. The budget check writes Markdown and JSON reports under `web/reports/performance-budget`.
+
+Run it locally after a production build:
+
+```bash
+npm run build
+npm run analyze:homepage
+```
+
+Budget source files:
+
+```text
+web/performance-budget.json
+web/lighthouse-budget.json
+```
+
+See `docs/HOMEPAGE_PERFORMANCE_BUDGET.md` for the full review policy and common fixes.
+
 ### Cloudflare CDN
 
 Cloudflare sits in front of the public site and caches eligible public pages and API responses.
@@ -729,6 +749,7 @@ The important point is that the current architecture does not lock the project i
 | Cloudflare CDN      | Public caching and edge delivery   |
 | Vercel Edge Network | Frontend delivery                  |
 | Cache headers       | Control freshness and CDN behavior |
+| Homepage budget     | LCP, JS, CSS, image, and transfer-size guardrails |
 
 ### Observability
 
@@ -1008,6 +1029,7 @@ NutsNews improves performance by:
 * Caching public pages at Cloudflare
 * Using Vercel for frontend delivery
 * Keeping the mobile UI lightweight
+* Checking homepage JS, CSS, image, LCP, and transfer budgets in CI
 * Avoiding unnecessary repeated AI calls
 * Avoiding repeated database inserts
 * Splitting RSS processing across Worker shards

@@ -1,0 +1,92 @@
+name: Homepage Performance Budget
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/homepage-performance-budget.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/homepage-performance-budget.yml"
+      - "docs/HOMEPAGE_PERFORMANCE_BUDGET.md"
+      - "docs/PERFORMANCE_AND_RESILIENCY.md"
+      - "docs/README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  homepage-performance-budget:
+    name: Build-size report and homepage budget
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: web
+
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_APP_ENV: ci
+      AUTH_SECRET: ${{ secrets.AUTH_SECRET || 'ci-only-auth-secret-not-used-in-production' }}
+      NEXTAUTH_URL: http://localhost:3000
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Require intentional budget review
+        if: github.event_name == 'pull_request'
+        working-directory: .
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+
+          git fetch origin "$BASE_REF" --depth=1
+          changed_files="$(git diff --name-only "origin/$BASE_REF"...HEAD)"
+
+          if echo "$changed_files" | grep -Eq '^web/(performance-budget\.json|lighthouse-budget\.json)$'; then
+            if printf '%s\n%s\n' "$PR_TITLE" "$PR_BODY" | grep -q '\[performance-budget-reviewed\]'; then
+              echo "Performance budget changes were intentionally reviewed."
+            else
+              echo "::error title=Performance budget review required::This PR changes web/performance-budget.json or web/lighthouse-budget.json. Add [performance-budget-reviewed] to the PR title or body after reviewing the budget change."
+              exit 1
+            fi
+          else
+            echo "No performance budget config changes detected."
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build NutsNews
+        run: npm run build
+
+      - name: Generate homepage performance budget report
+        run: npm run analyze:homepage
+
+      - name: Upload homepage performance report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: homepage-performance-budget-report
+          path: web/reports/performance-budget
+          retention-days: 30
+          if-no-files-found: ignore
