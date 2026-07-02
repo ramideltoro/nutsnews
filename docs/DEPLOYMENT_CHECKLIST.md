@@ -795,7 +795,7 @@ Before closing a deployment issue, confirm:
 | Document | Purpose |
 | --- | --- |
 | [Operations](OPERATIONS.md) | Day-to-day operating model |
-| [Controller and Shards](CONTROLLER_AND_SHARDS.md) | Manual controller and shard commands |
+| Controller and Shards | Moved to ramideltoro/nutsnews-worker |
 | [Performance and Resiliency](PERFORMANCE_AND_RESILIENCY.md) | Cache, performance, resiliency, and cost controls |
 | [Observability](OBSERVABILITY.md) | Better Stack, Sentry, structured logs, and dashboards |
 | [Troubleshooting Guide](TROUBLESHOOTING.md) | Diagnose production problems |
