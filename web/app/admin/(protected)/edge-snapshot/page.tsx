@@ -44,10 +44,10 @@ function StatCard({ label, value }: { label: string; value: string }) {
 
 export default async function EdgeSnapshotAdminPage() {
   const status = await getEdgeFeedSnapshotStatus();
-  const isHealthy = status.status === "hit" && status.enabled;
+  const isHealthy = status.ready === true && status.status === "hit" && status.enabled;
 
   return (
-    <main className="min-h-screen bg-[#0a0a0a] px-4 py-6 text-amber-50 sm:px-6 lg:px-8">
+    <main data-edge-snapshot-ready={isHealthy ? "true" : "false"} className="min-h-screen bg-[#0a0a0a] px-4 py-6 text-amber-50 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
         <div className="mb-5">
           <Link
@@ -93,8 +93,10 @@ export default async function EdgeSnapshotAdminPage() {
             </span>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Configured" value={status.configured ? "Yes" : "No"} />
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <StatCard label="Endpoint configured" value={status.configured ? "Yes" : "No"} />
+            <StatCard label="Worker KV binding" value={status.kvBound === null ? "Unknown" : status.kvBound ? "Yes" : "No"} />
+            <StatCard label="HTTP status" value={String(status.httpStatus ?? "Unknown")} />
             <StatCard label="Snapshot age" value={formatAge(status.ageSeconds)} />
             <StatCard label="Article count" value={String(status.articleCount ?? "Unknown")} />
             <StatCard label="Version" value={String(status.version ?? "Unknown")} />

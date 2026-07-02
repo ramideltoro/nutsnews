@@ -309,7 +309,10 @@ function createExternalMockServer() {
           response,
           200,
           {
+            configured: true,
             enabled: true,
+            ready: true,
+            kvBound: true,
             status: "hit",
             updatedAt: "2026-06-28T02:00:00.000Z",
             refreshedAt: "2026-06-28T01:59:00.000Z",
@@ -473,6 +476,7 @@ function startNextDev() {
       NEXTAUTH_URL: webUrl,
       NEXT_PUBLIC_APP_ENV: "offline-e2e",
       NUTSNEWS_EDGE_FEED_SNAPSHOT_URL: mockExternalUrl,
+      NUTSNEWS_ADMIN_TEST_AUTH_BYPASS: "true",
     },
   });
 
@@ -683,6 +687,16 @@ async function runBrowserChecks() {
   expect(fallbackPayload.articles[0].title).toContain(runId);
   supabaseOutageMode = false;
   logOk("Article API recovered from the mocked edge snapshot fallback");
+
+  logStep("Verifying admin edge snapshot dashboard reflects Worker health");
+  await page.goto("/admin/edge-snapshot", { waitUntil: "networkidle" });
+  await expect(page.locator("main")).toHaveAttribute("data-edge-snapshot-ready", "true");
+  await expect(page.getByRole("heading", { name: "Edge Feed Snapshot" })).toBeVisible({ timeout: 10000 });
+  await expect(page.getByRole("heading", { name: "Edge fallback ready" })).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText("Worker KV binding", { exact: true })).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText("HTTP status", { exact: true })).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText(String(articles.length), { exact: true }).first()).toBeVisible({ timeout: 10000 });
+  logOk("Admin edge snapshot dashboard reflected the mocked healthy Worker status");
 
   await browser.close();
 }

@@ -10,6 +10,14 @@ export default async function ProtectedAdminLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const allowTestBypass =
+    process.env.NUTSNEWS_ADMIN_TEST_AUTH_BYPASS === "true" &&
+    process.env.NODE_ENV !== "production";
+
+  if (allowTestBypass) {
+    return <>{children}</>;
+  }
+
   const session = await auth();
   const email = session?.user?.email;
 

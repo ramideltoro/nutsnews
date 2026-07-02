@@ -277,3 +277,28 @@ Then check `/public-feed-snapshot/status` again.
 ### API never uses the edge snapshot
 
 That is normal while Supabase is healthy. The edge snapshot is a fallback, not the primary path.
+
+---
+
+## Admin Health Display Update
+
+`/admin/edge-snapshot` now reads the full Worker status payload and shows:
+
+```text
+Endpoint configured
+Worker KV binding
+HTTP status
+Snapshot age
+Article count
+Version
+```
+
+This makes the common failure mode clear:
+
+```text
+status: unbound
+kvBound: false
+message: NUTSNEWS_KV is not bound to this Worker
+```
+
+The offline web E2E regression includes a protected admin dashboard check using a dev-only test bypass. The bypass is disabled in production because it only works when `NODE_ENV !== "production"`.
