@@ -2,6 +2,9 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { isAllowedAdminEmail } from "@/lib/adminAuth";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function ProtectedAdminLayout({
   children,
 }: Readonly<{
@@ -18,5 +21,5 @@ export default async function ProtectedAdminLayout({
     redirect("/admin/access-denied");
   }
 
-  return <div className="admin-responsive-shell">{children}</div>;
+  return <>{children}</>;
 }

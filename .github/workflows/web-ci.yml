@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   web:
-    name: Typecheck, lint, and build web
+    name: Typecheck, lint, security headers, and build web
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -54,6 +54,9 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Security header checks
+        run: npm run test:security-headers
 
       - name: Build
         run: npm run build

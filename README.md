@@ -51,6 +51,7 @@ Common entry points:
 | Monitor free-tier risk | [Free-Tier Guardrails](docs/FREE_TIER_GUARDRAILS.md) |
 | Use local AI | See `ramideltoro/nutsnews-worker` |
 | Validate public web flows | [Web Offline E2E Test](docs/WEB_OFFLINE_E2E_REGRESSION_TEST.md) |
+| Review security hardening | [Security Hardening](docs/SECURITY_HARDENING.md) |
 | Validate Worker flows | See `ramideltoro/nutsnews-worker` |
 
 ---
@@ -73,6 +74,8 @@ Common entry points:
 ---
 
 ## Current Status
+
+- Security hardening for CSP, browser headers, admin no-store behavior, contact form controls, and CI validation
 
 NutsNews includes:
 
