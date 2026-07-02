@@ -1,23 +1,24 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { getSecurityHeaders } from "@/lib/securityHeaders";
 
-const PUBLIC_PAGE_CACHE_CONTROL =
-  "public, max-age=0, must-revalidate";
-
+const PUBLIC_PAGE_CACHE_CONTROL = "public, max-age=0, must-revalidate";
 const PUBLIC_CDN_CACHE_CONTROL =
   "public, s-maxage=300, stale-while-revalidate=300";
-
-const PUBLIC_LONG_CACHE_CONTROL =
-  "public, max-age=0, must-revalidate";
-
+const PUBLIC_LONG_CACHE_CONTROL = "public, max-age=0, must-revalidate";
 const NO_STORE_CACHE_CONTROL = "no-store, max-age=0";
 
-function setHeaders(response: NextResponse, headers: Record<string, string>) {
+type HeaderMap = Record<string, string>;
+
+function setHeaders(response: NextResponse, headers: HeaderMap) {
   for (const [key, value] of Object.entries(headers)) {
     response.headers.set(key, value);
   }
 }
 
-function getPublicCacheHeaders(policy: string, cacheControl = PUBLIC_PAGE_CACHE_CONTROL) {
+function getPublicCacheHeaders(
+  policy: string,
+  cacheControl = PUBLIC_PAGE_CACHE_CONTROL,
+): HeaderMap {
   return {
     "Cache-Control": cacheControl,
     "CDN-Cache-Control": PUBLIC_CDN_CACHE_CONTROL,
@@ -28,7 +29,7 @@ function getPublicCacheHeaders(policy: string, cacheControl = PUBLIC_PAGE_CACHE_
   };
 }
 
-function getBypassCacheHeaders(policy: string) {
+function getBypassCacheHeaders(policy: string): HeaderMap {
   return {
     "Cache-Control": NO_STORE_CACHE_CONTROL,
     "CDN-Cache-Control": "no-store",
@@ -39,15 +40,19 @@ function getBypassCacheHeaders(policy: string) {
   };
 }
 
-function isBypassRoute(pathname: string) {
+function isAdminRoute(pathname: string) {
+  return pathname === "/admin" || pathname.startsWith("/admin/");
+}
+
+function isOperationalNoStoreRoute(pathname: string) {
   return (
     pathname === "/monitoring" ||
     pathname.startsWith("/monitoring/") ||
     pathname === "/api/log-test" ||
     pathname.startsWith("/api/log-test/") ||
     pathname.startsWith("/api/auth/") ||
-    pathname === "/admin" ||
-    pathname.startsWith("/admin/")
+    pathname === "/api/contact" ||
+    isAdminRoute(pathname)
   );
 }
 
@@ -67,28 +72,18 @@ function isPublicReaderRoute(pathname: string) {
     pathname === "/contact" ||
     pathname === "/privacy" ||
     pathname === "/api/articles" ||
+    pathname === "/api/search" ||
     pathname.startsWith("/articles/") ||
     isLongCachePublicRoute(pathname)
   );
 }
 
 function getPolicyName(pathname: string) {
-  if (pathname === "/") {
-    return "public-home-cache-300s";
-  }
-
-  if (pathname === "/api/articles") {
-    return "public-api-cache-300s";
-  }
-
-  if (pathname.startsWith("/articles/")) {
-    return "public-article-cache-300s";
-  }
-
-  if (isLongCachePublicRoute(pathname)) {
-    return "public-long-cache-3600s";
-  }
-
+  if (pathname === "/") return "public-home-cache-300s";
+  if (pathname === "/api/articles") return "public-api-cache-300s";
+  if (pathname === "/api/search") return "public-search-cache-60s";
+  if (pathname.startsWith("/articles/")) return "public-article-cache-300s";
+  if (isLongCachePublicRoute(pathname)) return "public-long-cache-3600s";
   return "public-page-cache-300s";
 }
 
@@ -96,8 +91,20 @@ export function middleware(request: NextRequest) {
   const response = NextResponse.next();
   const { pathname } = request.nextUrl;
 
-  if (isBypassRoute(pathname)) {
+  setHeaders(
+    response,
+    getSecurityHeaders({
+      isDevelopment: process.env.NODE_ENV !== "production",
+    }),
+  );
+
+  if (isOperationalNoStoreRoute(pathname)) {
     setHeaders(response, getBypassCacheHeaders("bypass-operational-cache"));
+
+    if (isAdminRoute(pathname)) {
+      response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+    }
+
     return response;
   }
 
@@ -113,22 +120,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/",
-    "/about",
-    "/contact",
-    "/privacy",
-    "/articles/:path*",
-    "/api/articles",
-    "/api/log-test",
-    "/api/log-test/:path*",
-    "/api/auth/:path*",
-    "/admin",
-    "/admin/:path*",
-    "/monitoring",
-    "/monitoring/:path*",
-    "/opengraph-image",
-    "/robots.txt",
-    "/sitemap.xml",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

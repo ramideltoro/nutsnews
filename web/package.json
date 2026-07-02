@@ -12,7 +12,8 @@
     "audit:pagespeed:mobile": "node scripts/pagespeed-insights.mjs --strategy=mobile",
     "audit:pagespeed:desktop": "node scripts/pagespeed-insights.mjs --strategy=desktop",
     "audit:seo": "node scripts/seo-structured-data-audit.mjs",
-    "test:e2e:offline": "node ../scripts/web_offline_e2e_regression.mjs"
+    "test:e2e:offline": "node ../scripts/web_offline_e2e_regression.mjs",
+    "test:security-headers": "node scripts/assert-security-headers.mjs"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.59.0",
