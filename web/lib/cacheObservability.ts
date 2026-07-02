@@ -12,6 +12,7 @@ type CacheObservabilityRouteConfig = {
   expectedPolicy: string;
   expectedCacheIncludes?: string[];
   expectedCdnIncludes?: string[];
+  allowBrowserNoStoreWhenCloudflareHit?: boolean;
   requiredHeaders?: string[];
   description?: string;
 };
@@ -200,33 +201,58 @@ function evaluateRoute({
     failures.push(`Expected x-nutsnews-cache-policy=${route.expectedPolicy}, got ${policy}.`);
   }
 
+  const cfStatus = headers["cf-cache-status"];
+  const hasCloudflareHit = cfStatus.toUpperCase() === "HIT";
+
   for (const token of config.defaults.forbiddenCacheControlTokens) {
-    if (includesToken(cacheControl, token)) {
+    if (!includesToken(cacheControl, token)) {
+      continue;
+    }
+
+    if (route.allowBrowserNoStoreWhenCloudflareHit && hasCloudflareHit) {
+      warnings.push(
+        `cache-control includes ${token}, but Cloudflare returned HIT. Treating this as a browser-cache warning instead of an edge-cache failure.`,
+      );
+    } else {
       failures.push(`cache-control includes forbidden token: ${token}.`);
     }
   }
 
   for (const token of route.expectedCacheIncludes || []) {
     if (!includesToken(cacheControl, token)) {
-      failures.push(`cache-control does not include ${token}.`);
+      if (route.allowBrowserNoStoreWhenCloudflareHit && hasCloudflareHit) {
+        warnings.push(
+          `cache-control does not include ${token}, but Cloudflare returned HIT. Edge cache is working; browser cache policy should be reviewed separately.`,
+        );
+      } else {
+        failures.push(`cache-control does not include ${token}.`);
+      }
     }
   }
+
+  const visibleCdnControls = [
+    ["cdn-cache-control", cdnCacheControl],
+    ["cloudflare-cdn-cache-control", cloudflareCdnCacheControl],
+    ["vercel-cdn-cache-control", vercelCdnCacheControl],
+  ].filter(([, value]) => value);
 
   for (const token of route.expectedCdnIncludes || []) {
-    if (!includesToken(cdnCacheControl, token)) {
-      failures.push(`cdn-cache-control does not include ${token}.`);
-    }
+    const matchingHeaders = visibleCdnControls
+      .filter(([, value]) => includesToken(value, token))
+      .map(([name]) => name);
 
-    if (!includesToken(cloudflareCdnCacheControl, token)) {
-      failures.push(`cloudflare-cdn-cache-control does not include ${token}.`);
-    }
-
-    if (!includesToken(vercelCdnCacheControl, token)) {
-      failures.push(`vercel-cdn-cache-control does not include ${token}.`);
+    if (matchingHeaders.length === 0) {
+      failures.push(`no visible CDN cache-control header includes ${token}.`);
     }
   }
 
-  const cfStatus = headers["cf-cache-status"];
+  if (!cloudflareCdnCacheControl) {
+    warnings.push("cloudflare-cdn-cache-control was not visible in the final response. This can be normal after Cloudflare processes the origin response.");
+  }
+
+  if (!vercelCdnCacheControl) {
+    warnings.push("vercel-cdn-cache-control was not visible in the final response. This can be normal after Vercel processes the origin response.");
+  }
 
   if (!cfStatus) {
     warnings.push("cf-cache-status was not observed. This is normal on local/Vercel preview checks before Cloudflare.");
