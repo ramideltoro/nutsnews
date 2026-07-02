@@ -10,9 +10,6 @@
     "userAgent": "NutsNews-Cache-Observability/1.0 (+https://www.nutsnews.com)",
     "requiredHeaders": [
       "cache-control",
-      "cdn-cache-control",
-      "cloudflare-cdn-cache-control",
-      "vercel-cdn-cache-control",
       "x-nutsnews-cache-policy"
     ],
     "forbiddenCacheControlTokens": [
@@ -28,6 +25,15 @@
       "UPDATING",
       "BYPASS",
       "DYNAMIC"
+    ],
+    "visibleCdnControlHeaders": [
+      "cdn-cache-control",
+      "cloudflare-cdn-cache-control",
+      "vercel-cdn-cache-control"
+    ],
+    "hiddenAfterCdnHeaders": [
+      "cloudflare-cdn-cache-control",
+      "vercel-cdn-cache-control"
     ]
   },
   "routes": [
@@ -64,7 +70,8 @@
         "s-maxage=300"
       ],
       "description": "A live article detail page discovered from /api/articles.",
-      "method": "HEAD"
+      "method": "HEAD",
+      "allowBrowserNoStoreWhenCloudflareHit": true
     },
     {
       "key": "articles-api",
@@ -82,9 +89,6 @@
       ],
       "requiredHeaders": [
         "cache-control",
-        "cdn-cache-control",
-        "cloudflare-cdn-cache-control",
-        "vercel-cdn-cache-control",
         "x-nutsnews-cache-policy",
         "x-nutsnews-article-data-source",
         "x-nutsnews-feed-snapshot"
