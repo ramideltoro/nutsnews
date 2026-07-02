@@ -7,7 +7,7 @@ NutsNews uses Snyk as an extra dependency scanner alongside Dependabot and CodeQ
 The workflow scans both npm projects:
 
 - `web/` — the Next.js app, API routes, admin pages, contact form, and UI dependencies.
-- `worker/` — the Cloudflare Worker feed/AI pipeline dependencies.
+- Worker dependency scans now live in ramideltoro/nutsnews-worker.
 
 It runs `snyk test` with a `high` severity threshold, so high and critical dependency issues fail the workflow. Lower severity issues still appear in Snyk output but do not block normal development.
 
@@ -52,7 +52,7 @@ SNYK_TOKEN="your_token" npx snyk test --file=package.json --package-manager=npm 
 From the worker:
 
 ```bash
-cd worker
+cd ../nutsnews-worker/worker
 SNYK_TOKEN="your_token" npx snyk test --file=package.json --package-manager=npm --severity-threshold=high --project-name=nutsnews-worker
 ```
 

@@ -9,9 +9,6 @@ on:
       - docs/**
       - reports/**/*.md
       - web/**/*.md
-      - worker/**/*.md
-      - controller/**/*.md
-      - local-ai-service/**/*.md
       - scripts/build_github_wiki.mjs
       - .github/workflows/sync-wiki.yml
   workflow_dispatch:

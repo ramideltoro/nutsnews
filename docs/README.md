@@ -17,8 +17,8 @@ This folder is organized by what you are trying to do: understand the product, c
 | Fix a production issue | [Troubleshooting](TROUBLESHOOTING.md) |
 | Check cost and quota risk | [Free-Tier Guardrails](FREE_TIER_GUARDRAILS.md) |
 | Work on translations | [Multi-language Summaries](MULTI_LANGUAGE_SUMMARIES.md) |
-| Work on local AI | [Home Server Local AI](HOME_SERVER_LOCAL_AI.md) |
-| Run regression tests | [Web Offline E2E](WEB_OFFLINE_E2E_REGRESSION_TEST.md) and [Worker Offline E2E](WORKER_OFFLINE_E2E_REGRESSION_TEST.md) |
+| Work on local AI | See ramideltoro/nutsnews-worker |
+| Run regression tests | [Web Offline E2E](WEB_OFFLINE_E2E_REGRESSION_TEST.md); Worker tests live in ramideltoro/nutsnews-worker |
 
 ---
 
@@ -70,7 +70,7 @@ These docs explain the product and the system at a high level.
 
 | Doc | Use it for |
 | --- | --- |
-| [Controller and Shards](CONTROLLER_AND_SHARDS.md) | Worker shard operations and manual tests |
+| Worker ingestion, controller, and local AI | See ramideltoro/nutsnews-worker |
 | [Public Feed Snapshot and Edge Fallback](PUBLIC_FEED_SNAPSHOT.md) | Supabase snapshot reads, Cloudflare KV fallback, headers, admin status, and recovery checks |
 | [RSS Source Quality](RSS_SOURCE_QUALITY.md) | Feed quality scoring, ranking, and source decisions |
 | [Image Delivery](IMAGE_DELIVERY.md) | Thumbnails, image optimization, cache TTL, and fallbacks |
@@ -90,15 +90,13 @@ These docs explain the product and the system at a high level.
 
 | Doc | Use it for |
 | --- | --- |
-| [Home Server Local AI](HOME_SERVER_LOCAL_AI.md) | Production local AI setup with Ollama/qwen and Cloudflare Tunnel |
-| [Oracle Local AI](ORACLE_LOCAL_AI.md) | Older Oracle Free Tier local AI fallback design |
-| [Multi-language Summaries](MULTI_LANGUAGE_SUMMARIES.md) | Translation generation and recovery |
+| Worker/local AI repository | See ramideltoro/nutsnews-worker |
+| [Multi-language Summaries](MULTI_LANGUAGE_SUMMARIES.md) | Website translation display and recovery context |
 
 #### Automation and Workers
 
 | Doc | Use it for |
 | --- | --- |
-| [Cloudflare KV Worker State](CLOUDFLARE_KV_WORKER_STATE.md) | KV state behavior for Workers |
 | [Cloudflare Turnstile Contact Form](CLOUDFLARE_TURNSTILE_CONTACT_FORM.md) | Contact form bot protection |
 | [GitHub Actions Automation](GITHUB_ACTIONS_AUTOMATION.md) | CI and automation workflow overview |
 | [GitHub Wiki Automation](GITHUB_WIKI_AUTOMATION.md) | Publishing docs to the GitHub Wiki |
@@ -109,7 +107,7 @@ These docs explain the product and the system at a high level.
 
 | Doc | Use it for |
 | --- | --- |
-| [Deployment Checklist](DEPLOYMENT_CHECKLIST.md) | Safe release steps for web, Worker, controller, DB, and cache |
+| [Deployment Checklist](DEPLOYMENT_CHECKLIST.md) | Safe release steps for web, DB, and cache |
 | [Dependency Updates](DEPENDENCY_UPDATES.md) | npm audit, safe upgrades, Dependabot, and validation |
 | [Platform Improvement Backlog](PLATFORM_IMPROVEMENT_ISSUE_BACKLOG.md) | Planned platform improvement issues |
 
@@ -146,7 +144,7 @@ These docs explain the product and the system at a high level.
 | Doc | Use it for |
 | --- | --- |
 | [Web Offline E2E Regression Test](WEB_OFFLINE_E2E_REGRESSION_TEST.md) | Fully mocked public web flow test |
-| [Worker Offline E2E Regression Test](WORKER_OFFLINE_E2E_REGRESSION_TEST.md) | Fully mocked Worker ingestion and translation test |
+| Worker Offline E2E Regression Test | See ramideltoro/nutsnews-worker |
 
 ### 7. Archive and Update Notes
 

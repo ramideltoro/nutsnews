@@ -17,4 +17,3 @@ paths-ignore:
   - "**/reports/**"
   - "**/*.map"
   - "**/*.min.js"
-  - "worker/generated-wrangler/**"

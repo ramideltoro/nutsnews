@@ -24,18 +24,12 @@ The project is built to stay simple, inexpensive, observable, and easy to operat
 
 ## Repository Map
 
-```text
-nutsnews/
-├── web/              # Next.js public site and admin portal
-├── worker/           # Cloudflare Worker RSS ingestion engine
-├── controller/       # Cloudflare Worker shard controller
-├── local-ai-service/ # Home-server local AI endpoint
-├── supabase/         # Database config, migrations, and restore validation
-├── scripts/          # Operational and regression-test scripts
-├── docs/             # Project documentation
-├── README.md         # Project landing page
-└── LICENSE           # MIT license
-```
+This repo now contains the public website/admin app, database config, website scripts, docs, README, and license.
+
+Related repositories:
+
+- ramideltoro/nutsnews-worker: Cloudflare Worker ingestion, controller, local AI, and backend automation
+- ramideltoro/nutsnews-ios: Native iOS app
 
 ---
 
@@ -55,9 +49,9 @@ Common entry points:
 | Deploy safely | [Deployment Checklist](docs/DEPLOYMENT_CHECKLIST.md) |
 | Debug production issues | [Troubleshooting](docs/TROUBLESHOOTING.md) |
 | Monitor free-tier risk | [Free-Tier Guardrails](docs/FREE_TIER_GUARDRAILS.md) |
-| Use local AI | [Home Server Local AI](docs/HOME_SERVER_LOCAL_AI.md) |
+| Use local AI | See `ramideltoro/nutsnews-worker` |
 | Validate public web flows | [Web Offline E2E Test](docs/WEB_OFFLINE_E2E_REGRESSION_TEST.md) |
-| Validate Worker flows | [Worker Offline E2E Test](docs/WORKER_OFFLINE_E2E_REGRESSION_TEST.md) |
+| Validate Worker flows | See `ramideltoro/nutsnews-worker` |
 
 ---
 

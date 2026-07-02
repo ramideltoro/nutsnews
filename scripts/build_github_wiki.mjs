@@ -160,7 +160,6 @@ function classify(page) {
     return 'Product and Experience';
   }
   if (p.startsWith('web/')) return 'Web App';
-  if (p.startsWith('worker/') || p.startsWith('controller/') || p.startsWith('local-ai-service/')) return 'Services';
   if (p.startsWith('reports/')) return 'Reports';
   return 'Other Documentation';
 }

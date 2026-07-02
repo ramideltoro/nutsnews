@@ -25,8 +25,6 @@ jobs:
         project:
           - name: web
             path: web
-          - name: worker
-            path: worker
 
     steps:
       - name: Checkout repository
