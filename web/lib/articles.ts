@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { supabase } from "@/lib/supabase";
+import { validateTranslatedSummary } from "@/lib/translationQuality";
 import {
   DEFAULT_LANGUAGE_CODE,
   type LanguageCode,
@@ -212,6 +213,35 @@ async function applyArticleSummaries(
     const localizedSummary = summariesByUrl.get(article.original_url);
 
     if (!localizedSummary) {
+      return {
+        ...article,
+        language_code: DEFAULT_LANGUAGE_CODE,
+        requested_language_code: requestedLanguageCode,
+        translation_available: false,
+      };
+    }
+
+    const quality = validateTranslatedSummary(
+      {
+        language_code: localizedSummary.language_code,
+        title: localizedSummary.title,
+        summary: localizedSummary.summary,
+        sourceTitle: article.title,
+        sourceSummary: article.ai_summary,
+      },
+      requestedLanguageCode,
+    );
+
+    if (!quality.usable) {
+      console.warn(
+        "Localized article summary failed quality checks. Falling back to English:",
+        {
+          originalUrl: article.original_url,
+          requestedLanguageCode,
+          warnings: quality.warnings.map((warning) => warning.code),
+        },
+      );
+
       return {
         ...article,
         language_code: DEFAULT_LANGUAGE_CODE,

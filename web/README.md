@@ -1288,3 +1288,14 @@ It combines a calm reader experience with a practical cloud architecture:
 The mission is simple:
 
 > Help people find more good in the world, one uplifting story at a time.
+
+
+## Translation quality audit
+
+Run the multilingual coverage and quality report from the web package:
+
+```bash
+npm run audit:translations
+```
+
+The report checks translated summary existence, length, language code, likely English leakage, and fallback safety for the latest public feed sample. Admin visibility is available at `/admin/translations`.

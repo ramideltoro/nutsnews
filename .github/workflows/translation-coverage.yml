@@ -35,10 +35,14 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 22
-      - name: Run translation audit
+      - name: Run translation quality audit
+        env:
+          TRANSLATION_QUALITY_REPORT_PATH: reports/translations/translation-quality.md
+          TRANSLATION_QUALITY_FAIL_ON_CRITICAL: "false"
         run: |
           mkdir -p reports/translations
           node scripts/audit_article_translations.mjs | tee reports/translations/translation-coverage.txt
+          cat reports/translations/translation-quality.md >> "$GITHUB_STEP_SUMMARY"
       - name: Upload translation report
         if: always()
         uses: actions/upload-artifact@v6

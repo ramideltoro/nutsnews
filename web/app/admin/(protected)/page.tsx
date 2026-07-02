@@ -176,6 +176,14 @@ export default async function AdminPage() {
             />
 
             <DashboardCard
+              eyebrow="Translations"
+              title="Translation Quality"
+              description="Monitor multilingual summary coverage, missing rows, language-code mismatches, likely English leakage, and fallback behavior for public article cards."
+              href="/admin/translations"
+              status="Live"
+            />
+
+            <DashboardCard
               eyebrow="Free Tiers"
               title="Guardrails"
               description="Forecast database growth, AI spend, Worker invocations, email sends, Redis/KV usage, egress, and API pressure before free-tier limits are hit."
