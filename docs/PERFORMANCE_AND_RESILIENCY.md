@@ -141,6 +141,41 @@ Expected:
 cf-cache-status: HIT
 ```
 
+### Cloudflare Cache Observability
+
+Issue #91 adds a scheduled expected-vs-actual cache header report for the key public routes that protect Supabase and origin capacity.
+
+Checked routes include:
+
+```text
+/
+/articles/<id>
+/api/articles?limit=1
+/sitemap.xml
+/robots.txt
+/icon.png
+/apple-icon.png
+```
+
+Run locally or against a Vercel preview URL:
+
+```bash
+cd web
+npm run audit:cache -- --url https://www.nutsnews.com
+```
+
+Admin dashboard:
+
+```text
+/admin/cache
+```
+
+Full guide:
+
+```text
+docs/CLOUDFLARE_CACHE_OBSERVABILITY.md
+```
+
 ---
 
 ## Deployment and Cache Validation

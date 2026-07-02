@@ -15,7 +15,9 @@
     "test:e2e:offline": "node ../scripts/web_offline_e2e_regression.mjs",
     "test:security-headers": "node scripts/assert-security-headers.mjs",
     "analyze:homepage": "node scripts/homepage-performance-budget.mjs",
-    "analyze:homepage:warn": "node scripts/homepage-performance-budget.mjs --warn-only"
+    "analyze:homepage:warn": "node scripts/homepage-performance-budget.mjs --warn-only",
+    "audit:cache": "node scripts/cache-observability.mjs",
+    "audit:cache:config": "node scripts/cache-observability.mjs --mode=config"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.59.0",

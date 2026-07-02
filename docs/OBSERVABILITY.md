@@ -23,6 +23,7 @@ NutsNews uses multiple observability layers:
 | Grafana Cloud | Prometheus metrics, Explore queries, backup dashboard panels, and backup alerts |
 | Sentry | Application error monitoring |
 | Cloudflare | CDN and Worker visibility |
+| Cloudflare Cache Observability | Expected-vs-actual cache header dashboard, scheduled checks, and GitHub Actions alerting |
 | Vercel | Deployment and frontend runtime visibility |
 | Supabase | Database state and operational tables |
 
@@ -323,8 +324,29 @@ curl -I "https://www.nutsnews.com/contact"
 
 ### Cache
 
+Quick HIT-rate spot check:
+
 ```bash
 ./scripts/validate_cloudflare_cache_hit_rate.sh https://www.nutsnews.com
+```
+
+Full expected-vs-actual cache policy report:
+
+```bash
+cd web
+npm run audit:cache -- --url https://www.nutsnews.com
+```
+
+Protected dashboard:
+
+```text
+/admin/cache
+```
+
+Detailed guide:
+
+```text
+docs/CLOUDFLARE_CACHE_OBSERVABILITY.md
 ```
 
 ### Worker

@@ -1,0 +1,104 @@
+name: Cloudflare Cache Observability
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "docs/**"
+      - ".github/workflows/cloudflare-cache-observability.yml"
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "docs/**"
+      - ".github/workflows/cloudflare-cache-observability.yml"
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Base URL to audit
+        required: false
+        default: https://www.nutsnews.com
+      article_path:
+        description: Optional article path, for example /articles/<id>
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  config:
+    name: Cache config regression check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate cache observability config
+        run: npm run audit:cache:config
+
+      - name: Upload config report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: cache-observability-config-report
+          path: web/reports/cache-observability
+          if-no-files-found: ignore
+
+  live:
+    name: Live cache policy and alert check
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: web
+
+    env:
+      NUTSNEWS_CACHE_OBSERVABILITY_URL: ${{ inputs.url || vars.NUTSNEWS_CACHE_OBSERVABILITY_URL || 'https://www.nutsnews.com' }}
+      NUTSNEWS_CACHE_ARTICLE_PATH: ${{ inputs.article_path || vars.NUTSNEWS_CACHE_ARTICLE_PATH || '' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check live Cloudflare/Vercel cache headers
+        run: npm run audit:cache -- --url "$NUTSNEWS_CACHE_OBSERVABILITY_URL" --article-path "$NUTSNEWS_CACHE_ARTICLE_PATH"
+
+      - name: Upload live cache report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: cloudflare-cache-observability-report
+          path: web/reports/cache-observability
+          if-no-files-found: error

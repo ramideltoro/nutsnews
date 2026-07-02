@@ -184,6 +184,14 @@ export default async function AdminPage() {
             />
 
             <DashboardCard
+              eyebrow="CDN Cache"
+              title="Cache Observability"
+              description="Compare expected and actual Cloudflare/Vercel cache headers for the homepage, article pages, articles API, sitemap, robots, and static assets."
+              href="/admin/cache"
+              status="Live"
+            />
+
+            <DashboardCard
               eyebrow="Resiliency"
               title="Edge Snapshot"
               description="Check the Cloudflare KV last-known-good public feed fallback, snapshot age, article count, and endpoint readiness."

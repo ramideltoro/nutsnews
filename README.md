@@ -52,6 +52,7 @@ Common entry points:
 | Use local AI | See `ramideltoro/nutsnews-worker` |
 | Validate public web flows | [Web Offline E2E Test](docs/WEB_OFFLINE_E2E_REGRESSION_TEST.md) |
 | Validate homepage performance | [Homepage Performance Budget](docs/HOMEPAGE_PERFORMANCE_BUDGET.md) |
+| Monitor cache regressions | [Cloudflare Cache Observability](docs/CLOUDFLARE_CACHE_OBSERVABILITY.md) |
 | Review security hardening | [Security Hardening](docs/SECURITY_HARDENING.md) |
 | Validate Worker flows | See `ramideltoro/nutsnews-worker` |
 
@@ -71,11 +72,13 @@ Common entry points:
 | Feed management | `/admin/feeds` |
 | Free-tier guardrails | `/admin/guardrails` |
 | Edge snapshot | `/admin/edge-snapshot` |
+| Cache observability | `/admin/cache` |
 
 ---
 
 ## Current Status
 
+- Cloudflare cache observability for public cache headers, scheduled alerts, and the `/admin/cache` dashboard
 - Security hardening for CSP, browser headers, admin no-store behavior, contact form controls, and CI validation
 
 NutsNews includes:
@@ -90,7 +93,7 @@ NutsNews includes:
 - Cloudflare KV edge feed snapshot fallback
 - Protected admin dashboards
 - CDN caching and image delivery controls
-- Better Stack, Sentry, UptimeRobot, Grafana, Lighthouse, PageSpeed, homepage performance budgets, and accessibility documentation
+- Better Stack, Sentry, UptimeRobot, Grafana, Lighthouse, PageSpeed, homepage performance budgets, Cloudflare cache observability, and accessibility documentation
 - Supabase backup and restore runbooks
 - Offline mocked E2E tests for the web app and Worker
 
