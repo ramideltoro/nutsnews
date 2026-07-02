@@ -472,6 +472,15 @@ Important public routes include:
 
 The homepage and API can stay fresh while still allowing short-term CDN caching.
 
+Cache observability checks expected vs actual headers for the homepage, article pages, `/api/articles`, sitemap, robots, and static app icons.
+
+```bash
+npm run audit:cache:config
+npm run audit:cache -- --url https://www.nutsnews.com
+```
+
+The protected admin dashboard lives at `/admin/cache`, and the full guide lives in `docs/CLOUDFLARE_CACHE_OBSERVABILITY.md`.
+
 ### Vercel edge delivery
 
 The Next.js app runs on Vercel, which provides fast global delivery for the frontend.

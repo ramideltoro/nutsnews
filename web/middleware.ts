@@ -4,7 +4,10 @@ import { getSecurityHeaders } from "@/lib/securityHeaders";
 const PUBLIC_PAGE_CACHE_CONTROL = "public, max-age=0, must-revalidate";
 const PUBLIC_CDN_CACHE_CONTROL =
   "public, s-maxage=300, stale-while-revalidate=300";
-const PUBLIC_LONG_CACHE_CONTROL = "public, max-age=0, must-revalidate";
+const PUBLIC_LONG_CACHE_CONTROL =
+  "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400";
+const PUBLIC_LONG_CDN_CACHE_CONTROL =
+  "public, s-maxage=3600, stale-while-revalidate=86400";
 const NO_STORE_CACHE_CONTROL = "no-store, max-age=0";
 
 type HeaderMap = Record<string, string>;
@@ -18,12 +21,13 @@ function setHeaders(response: NextResponse, headers: HeaderMap) {
 function getPublicCacheHeaders(
   policy: string,
   cacheControl = PUBLIC_PAGE_CACHE_CONTROL,
+  cdnCacheControl = PUBLIC_CDN_CACHE_CONTROL,
 ): HeaderMap {
   return {
     "Cache-Control": cacheControl,
-    "CDN-Cache-Control": PUBLIC_CDN_CACHE_CONTROL,
-    "Cloudflare-CDN-Cache-Control": PUBLIC_CDN_CACHE_CONTROL,
-    "Vercel-CDN-Cache-Control": PUBLIC_CDN_CACHE_CONTROL,
+    "CDN-Cache-Control": cdnCacheControl,
+    "Cloudflare-CDN-Cache-Control": cdnCacheControl,
+    "Vercel-CDN-Cache-Control": cdnCacheControl,
     "X-NutsNews-Cache-Policy": policy,
     "X-NutsNews-Cache-Issue": "7",
   };
@@ -82,6 +86,12 @@ function getPolicyName(pathname: string) {
   if (pathname === "/") return "public-home-cache-300s";
   if (pathname === "/api/articles") return "public-api-cache-300s";
   if (pathname === "/api/search") return "public-search-cache-60s";
+  if (pathname === "/robots.txt") return "public-robots-cache-3600s";
+  if (pathname === "/sitemap.xml") return "public-sitemap-cache-3600s";
+  if (pathname === "/opengraph-image") return "public-og-image-cache-3600s";
+  if (pathname.endsWith("/opengraph-image")) {
+    return "public-article-og-image-cache-3600s";
+  }
   if (pathname.startsWith("/articles/")) return "public-article-cache-300s";
   if (isLongCachePublicRoute(pathname)) return "public-long-cache-3600s";
   return "public-page-cache-300s";
@@ -113,7 +123,16 @@ export function middleware(request: NextRequest) {
       ? PUBLIC_LONG_CACHE_CONTROL
       : PUBLIC_PAGE_CACHE_CONTROL;
 
-    setHeaders(response, getPublicCacheHeaders(getPolicyName(pathname), cacheControl));
+    setHeaders(
+      response,
+      getPublicCacheHeaders(
+        getPolicyName(pathname),
+        cacheControl,
+        isLongCachePublicRoute(pathname)
+          ? PUBLIC_LONG_CDN_CACHE_CONTROL
+          : PUBLIC_CDN_CACHE_CONTROL,
+      ),
+    );
   }
 
   return response;

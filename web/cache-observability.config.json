@@ -1,0 +1,172 @@
+{
+  "$schema": "https://nutsnews.com/schemas/cache-observability.schema.json",
+  "version": 1,
+  "description": "Expected public cache policy for Cloudflare/Vercel observability checks.",
+  "defaultBaseUrl": "https://www.nutsnews.com",
+  "defaults": {
+    "timeoutMs": 15000,
+    "sampleCount": 2,
+    "sampleDelayMs": 1500,
+    "userAgent": "NutsNews-Cache-Observability/1.0 (+https://www.nutsnews.com)",
+    "requiredHeaders": [
+      "cache-control",
+      "cdn-cache-control",
+      "cloudflare-cdn-cache-control",
+      "vercel-cdn-cache-control",
+      "x-nutsnews-cache-policy"
+    ],
+    "forbiddenCacheControlTokens": [
+      "no-store",
+      "private"
+    ],
+    "allowedCloudflareStatuses": [
+      "HIT",
+      "MISS",
+      "EXPIRED",
+      "REVALIDATED",
+      "STALE",
+      "UPDATING",
+      "BYPASS",
+      "DYNAMIC"
+    ]
+  },
+  "routes": [
+    {
+      "key": "homepage",
+      "label": "Homepage",
+      "path": "/",
+      "expectedStatuses": [
+        200
+      ],
+      "expectedPolicy": "public-home-cache-300s",
+      "expectedCacheIncludes": [
+        "public"
+      ],
+      "expectedCdnIncludes": [
+        "s-maxage=300"
+      ],
+      "description": "Primary reader landing page. Must stay CDN-cacheable to protect Vercel and Supabase.",
+      "method": "HEAD"
+    },
+    {
+      "key": "article-page",
+      "label": "Article page",
+      "path": "/articles/__discovered__",
+      "discoverArticleFromApi": true,
+      "expectedStatuses": [
+        200
+      ],
+      "expectedPolicy": "public-article-cache-300s",
+      "expectedCacheIncludes": [
+        "public"
+      ],
+      "expectedCdnIncludes": [
+        "s-maxage=300"
+      ],
+      "description": "A live article detail page discovered from /api/articles.",
+      "method": "HEAD"
+    },
+    {
+      "key": "articles-api",
+      "label": "Articles API",
+      "path": "/api/articles?limit=1",
+      "expectedStatuses": [
+        200
+      ],
+      "expectedPolicy": "public-api-cache-300s",
+      "expectedCacheIncludes": [
+        "public"
+      ],
+      "expectedCdnIncludes": [
+        "s-maxage=300"
+      ],
+      "requiredHeaders": [
+        "cache-control",
+        "cdn-cache-control",
+        "cloudflare-cdn-cache-control",
+        "vercel-cdn-cache-control",
+        "x-nutsnews-cache-policy",
+        "x-nutsnews-article-data-source",
+        "x-nutsnews-feed-snapshot"
+      ],
+      "description": "Public feed API. This is the highest-priority regression alert because non-cacheable API responses can increase Supabase pressure.",
+      "method": "GET"
+    },
+    {
+      "key": "sitemap",
+      "label": "Sitemap",
+      "path": "/sitemap.xml",
+      "expectedStatuses": [
+        200
+      ],
+      "expectedPolicy": "public-sitemap-cache-3600s",
+      "expectedCacheIncludes": [
+        "public",
+        "s-maxage=3600"
+      ],
+      "expectedCdnIncludes": [
+        "s-maxage=3600"
+      ],
+      "description": "Search-engine sitemap. Should be cacheable longer than normal reader pages.",
+      "method": "HEAD"
+    },
+    {
+      "key": "robots",
+      "label": "Robots",
+      "path": "/robots.txt",
+      "expectedStatuses": [
+        200
+      ],
+      "expectedPolicy": "public-robots-cache-3600s",
+      "expectedCacheIncludes": [
+        "public",
+        "s-maxage=3600"
+      ],
+      "expectedCdnIncludes": [
+        "s-maxage=3600"
+      ],
+      "description": "Search crawler policy file. Should be cacheable longer than normal reader pages.",
+      "method": "HEAD"
+    },
+    {
+      "key": "icon",
+      "label": "Icon asset",
+      "path": "/icon.png",
+      "expectedStatuses": [
+        200
+      ],
+      "expectedPolicy": "public-static-asset-cache-immutable",
+      "expectedCacheIncludes": [
+        "public",
+        "max-age=31536000",
+        "immutable"
+      ],
+      "expectedCdnIncludes": [
+        "max-age=31536000",
+        "immutable"
+      ],
+      "description": "Static app icon. Should be immutable at the CDN edge.",
+      "method": "HEAD"
+    },
+    {
+      "key": "apple-icon",
+      "label": "Apple icon asset",
+      "path": "/apple-icon.png",
+      "expectedStatuses": [
+        200
+      ],
+      "expectedPolicy": "public-static-asset-cache-immutable",
+      "expectedCacheIncludes": [
+        "public",
+        "max-age=31536000",
+        "immutable"
+      ],
+      "expectedCdnIncludes": [
+        "max-age=31536000",
+        "immutable"
+      ],
+      "description": "Static Apple touch icon. Should be immutable at the CDN edge.",
+      "method": "HEAD"
+    }
+  ]
+}

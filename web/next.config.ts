@@ -8,8 +8,11 @@ const PUBLIC_PAGE_CACHE_CONTROL =
 const PUBLIC_CDN_CACHE_CONTROL =
   "public, s-maxage=300, stale-while-revalidate=300";
 
+const PUBLIC_LONG_CDN_CACHE_CONTROL =
+  "public, s-maxage=3600, stale-while-revalidate=86400";
+
 const PUBLIC_LONG_CACHE_CONTROL =
-  "public, max-age=0, must-revalidate";
+  "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400";
 
 const STATIC_ASSET_CACHE_CONTROL =
   "public, max-age=31536000, immutable";
@@ -22,7 +25,11 @@ const shouldUploadSentrySourceMaps =
   Boolean(process.env.SENTRY_ORG) &&
   Boolean(process.env.SENTRY_PROJECT);
 
-function publicCacheHeaders(policy: string, cacheControl = PUBLIC_PAGE_CACHE_CONTROL) {
+function publicCacheHeaders(
+  policy: string,
+  cacheControl = PUBLIC_PAGE_CACHE_CONTROL,
+  cdnCacheControl = PUBLIC_CDN_CACHE_CONTROL,
+) {
   return [
     {
       key: "Cache-Control",
@@ -30,15 +37,15 @@ function publicCacheHeaders(policy: string, cacheControl = PUBLIC_PAGE_CACHE_CON
     },
     {
       key: "CDN-Cache-Control",
-      value: PUBLIC_CDN_CACHE_CONTROL,
+      value: cdnCacheControl,
     },
     {
       key: "Cloudflare-CDN-Cache-Control",
-      value: PUBLIC_CDN_CACHE_CONTROL,
+      value: cdnCacheControl,
     },
     {
       key: "Vercel-CDN-Cache-Control",
-      value: PUBLIC_CDN_CACHE_CONTROL,
+      value: cdnCacheControl,
     },
     {
       key: "X-NutsNews-Cache-Policy",
@@ -138,11 +145,11 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/opengraph-image",
-        headers: publicCacheHeaders("public-og-image-cache-3600s", PUBLIC_LONG_CACHE_CONTROL),
+        headers: publicCacheHeaders("public-og-image-cache-3600s", PUBLIC_LONG_CACHE_CONTROL, PUBLIC_LONG_CDN_CACHE_CONTROL),
       },
       {
         source: "/articles/:id/opengraph-image",
-        headers: publicCacheHeaders("public-article-og-image-cache-3600s", PUBLIC_LONG_CACHE_CONTROL),
+        headers: publicCacheHeaders("public-article-og-image-cache-3600s", PUBLIC_LONG_CACHE_CONTROL, PUBLIC_LONG_CDN_CACHE_CONTROL),
       },
       {
         source: "/icon.png",
@@ -157,6 +164,10 @@ const nextConfig: NextConfig = {
           },
           {
             key: "Cloudflare-CDN-Cache-Control",
+            value: STATIC_ASSET_CACHE_CONTROL,
+          },
+          {
+            key: "Vercel-CDN-Cache-Control",
             value: STATIC_ASSET_CACHE_CONTROL,
           },
           {
@@ -181,6 +192,10 @@ const nextConfig: NextConfig = {
             value: STATIC_ASSET_CACHE_CONTROL,
           },
           {
+            key: "Vercel-CDN-Cache-Control",
+            value: STATIC_ASSET_CACHE_CONTROL,
+          },
+          {
             key: "X-NutsNews-Cache-Policy",
             value: "public-static-asset-cache-immutable",
           },
@@ -202,6 +217,10 @@ const nextConfig: NextConfig = {
             value: STATIC_ASSET_CACHE_CONTROL,
           },
           {
+            key: "Vercel-CDN-Cache-Control",
+            value: STATIC_ASSET_CACHE_CONTROL,
+          },
+          {
             key: "X-NutsNews-Cache-Policy",
             value: "public-static-asset-cache",
           },
@@ -209,11 +228,11 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/robots.txt",
-        headers: publicCacheHeaders("public-robots-cache-3600s", PUBLIC_LONG_CACHE_CONTROL),
+        headers: publicCacheHeaders("public-robots-cache-3600s", PUBLIC_LONG_CACHE_CONTROL, PUBLIC_LONG_CDN_CACHE_CONTROL),
       },
       {
         source: "/sitemap.xml",
-        headers: publicCacheHeaders("public-sitemap-cache-3600s", PUBLIC_LONG_CACHE_CONTROL),
+        headers: publicCacheHeaders("public-sitemap-cache-3600s", PUBLIC_LONG_CACHE_CONTROL, PUBLIC_LONG_CDN_CACHE_CONTROL),
       },
       {
         source: "/admin/:path*",

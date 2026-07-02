@@ -76,6 +76,7 @@ These docs explain the product and the system at a high level.
 | [Image Delivery](IMAGE_DELIVERY.md) | Thumbnails, image optimization, cache TTL, and fallbacks |
 | [Performance and Resiliency](PERFORMANCE_AND_RESILIENCY.md) | Caching, pagination, indexes, sharding, and reliability |
 | [Homepage Performance Budget](HOMEPAGE_PERFORMANCE_BUDGET.md) | Homepage LCP, JS, CSS, image, and transfer budgets |
+| [Cloudflare Cache Observability](CLOUDFLARE_CACHE_OBSERVABILITY.md) | Cache policy dashboard, scheduled alerts, route expectations, and common fixes |
 
 #### Data protection and recovery
 
@@ -117,6 +118,7 @@ These docs explain the product and the system at a high level.
 | Doc | Use it for |
 | --- | --- |
 | [Observability](OBSERVABILITY.md) | Logs, errors, dashboards, and health checks |
+| [Cloudflare Cache Observability](CLOUDFLARE_CACHE_OBSERVABILITY.md) | Expected-vs-actual cache header reports and alerts |
 | [UptimeRobot Onboarding](UPTIMEROBOT_ONBOARDING.md) | External uptime monitors |
 | [Grafana Backup Monitoring](GRAFANA_BACKUP_MONITORING.md) | Backup freshness and success panels |
 | [PageSpeed Insights](PAGESPEED_INSIGHTS.md) | Production performance audits |
