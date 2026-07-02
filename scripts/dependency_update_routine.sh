@@ -215,7 +215,7 @@ if command -v git >/dev/null 2>&1 && [[ -d "$REPO_ROOT/.git" ]]; then
   echo
   echo "Git diff summary:"
   git -C "$REPO_ROOT" status --short
-  git -C "$REPO_ROOT" diff --stat -- web/package.json web/package-lock.json worker/package.json worker/package-lock.json controller/package.json controller/package-lock.json || true
+  git -C "$REPO_ROOT" diff --stat -- web/package.json web/package-lock.json || true
 fi
 
 echo
