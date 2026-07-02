@@ -16,7 +16,7 @@ This folder is organized by what you are trying to do: understand the product, c
 | Ship a change | [Deployment Checklist](DEPLOYMENT_CHECKLIST.md) |
 | Fix a production issue | [Troubleshooting](TROUBLESHOOTING.md) |
 | Check cost and quota risk | [Free-Tier Guardrails](FREE_TIER_GUARDRAILS.md) |
-| Work on translations | [Multi-language Summaries](MULTI_LANGUAGE_SUMMARIES.md) |
+| Work on translations | [Multi-language Summaries](MULTI_LANGUAGE_SUMMARIES.md); [Multilingual Quality and Fallbacks](MULTILINGUAL_QUALITY_AND_FALLBACKS.md) |
 | Work on local AI | See ramideltoro/nutsnews-worker |
 | Run regression tests | [Web Offline E2E](WEB_OFFLINE_E2E_REGRESSION_TEST.md); Worker tests live in ramideltoro/nutsnews-worker |
 
@@ -42,7 +42,8 @@ These docs explain the product and the system at a high level.
 | Doc | Use it for |
 | --- | --- |
 | [Full Archive Search](FULL_ARCHIVE_SEARCH.md) | Search behavior and archive lookup flow |
-| [Multi-language Summaries](MULTI_LANGUAGE_SUMMARIES.md) | French/Japanese summaries, recovery, and validation |
+| [Multi-language Summaries](MULTI_LANGUAGE_SUMMARIES.md) | Supported languages, storage, Worker generation, and API display behavior |
+| [Multilingual Quality and Fallbacks](MULTILINGUAL_QUALITY_AND_FALLBACKS.md) | Translation coverage checks, English-leak detection, admin visibility, and fallback policy |
 | [Public Page Translations](NUTSNEWS_PUBLIC_PAGE_TRANSLATIONS.md) | About, Contact, Privacy, and settings language behavior |
 | [Public Pages Theme Consistency](NUTSNEWS_PUBLIC_PAGES_THEME_CONSISTENCY.md) | Theme behavior across public pages |
 
@@ -94,6 +95,7 @@ These docs explain the product and the system at a high level.
 | --- | --- |
 | Worker/local AI repository | See ramideltoro/nutsnews-worker |
 | [Multi-language Summaries](MULTI_LANGUAGE_SUMMARIES.md) | Website translation display and recovery context |
+| [Multilingual Quality and Fallbacks](MULTILINGUAL_QUALITY_AND_FALLBACKS.md) | Quality gates, daily reports, admin dashboard, and fallback behavior |
 
 #### Automation and Workers
 
@@ -130,6 +132,7 @@ These docs explain the product and the system at a high level.
 | Doc | Use it for |
 | --- | --- |
 | [Homepage Performance Budget](HOMEPAGE_PERFORMANCE_BUDGET.md) | Build-size report, hard budgets, and common fixes |
+| [Multilingual Quality and Fallbacks](MULTILINGUAL_QUALITY_AND_FALLBACKS.md) | Translation coverage report, language-code checks, and fallback quality rules |
 | [Lighthouse CI Onboarding](LIGHTHOUSE_CI_ONBOARDING.md) | Lighthouse CI setup and thresholds |
 | [PageSpeed Insights](PAGESPEED_INSIGHTS.md) | Manual production speed checks |
 | [axe Playwright Accessibility CI](AXE_PLAYWRIGHT_ACCESSIBILITY_CI.md) | Accessibility regression checks |

@@ -17,7 +17,8 @@
     "analyze:homepage": "node scripts/homepage-performance-budget.mjs",
     "analyze:homepage:warn": "node scripts/homepage-performance-budget.mjs --warn-only",
     "audit:cache": "node scripts/cache-observability.mjs",
-    "audit:cache:config": "node scripts/cache-observability.mjs --mode=config"
+    "audit:cache:config": "node scripts/cache-observability.mjs --mode=config",
+    "audit:translations": "node ../scripts/audit_article_translations.mjs"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.59.0",

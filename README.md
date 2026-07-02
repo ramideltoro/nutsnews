@@ -102,3 +102,8 @@ NutsNews includes:
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE).
+
+
+## Translation quality
+
+Issue #99 added multilingual quality checks, a daily translation coverage report, and `/admin/translations` dashboard visibility. See `docs/MULTILINGUAL_QUALITY_AND_FALLBACKS.md`.
