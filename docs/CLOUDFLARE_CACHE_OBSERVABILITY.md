@@ -224,3 +224,5 @@ Static assets should send `Cache-Control`, `CDN-Cache-Control`, `Cloudflare-CDN-
 `Cloudflare-CDN-Cache-Control` and `Vercel-CDN-Cache-Control` are origin/CDN control headers. They may be consumed or hidden by the CDN layer and should not be required as visible browser response headers. The dashboard treats missing targeted CDN control headers as warnings when the visible cache policy marker and shared CDN/browser cache headers still show the route is cacheable.
 
 For article detail pages, Cloudflare `HIT` is treated as the edge-cache source of truth. A browser-visible `private` or `no-store` header on an article page is still surfaced as a warning so it can be reviewed separately.
+
+A visible `Cache-Control` header that includes `s-maxage` also counts as CDN cache evidence. Some platforms consume or hide targeted CDN headers, but `s-maxage` in the final `Cache-Control` response still proves the route is intentionally shared-cacheable.

@@ -306,6 +306,7 @@ function evaluateRoute({ route, samples, resolvedPath, requiredHeaders, forbidde
   }
 
   const visibleCdnControls = [
+    ["cache-control", cacheControl],
     ["cdn-cache-control", cdnCacheControl],
     ["cloudflare-cdn-cache-control", cloudflareCdnCacheControl],
     ["vercel-cdn-cache-control", vercelCdnCacheControl],
