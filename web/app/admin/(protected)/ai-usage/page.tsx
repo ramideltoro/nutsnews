@@ -148,6 +148,7 @@ function QuickNav() {
     const links = [
         ["Cost", "#cost"],
         ["Tokens", "#tokens"],
+        ["Activity Breakdown", "#activity-breakdown"],
         ["Daily Usage", "#daily-usage"],
         ["Shard Usage", "#shard-usage"],
         ["Latest Runs", "#latest-worker-runs"],
@@ -184,40 +185,34 @@ function CostSection({
             id="cost"
             eyebrow="Cost"
             title="Cost Overview"
-            description="Track estimated OpenAI cost across recent time windows using exact token usage saved from Worker runs."
+            description="Track total estimated OpenAI cost, including review and translation activity, plus the estimated cost avoided by using local AI."
         >
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-4">
                 <MetricCard
-                    label="Last 24 Hours"
+                    label="OpenAI Cost, 24h"
                     value={formatCurrency(last24Hours.estimatedCostUsd)}
-                    helper={`${formatNumber(
-                        last24Hours.openAiCallCount,
-                    )} OpenAI calls · ${formatNumber(last24Hours.aiReviewedCount)} AI reviews.`}
+                    helper={`${formatNumber(last24Hours.openAiCallCount)} OpenAI activities · ${formatNumber(last24Hours.aiReviewedCount)} reviews.`}
                 />
                 <MetricCard
-                    label="Last 7 Days"
+                    label="OpenAI Cost, 7d"
                     value={formatCurrency(last7Days.estimatedCostUsd)}
-                    helper={`${formatNumber(
-                        last7Days.costProtectionHitCount,
-                    )} cost protection hits · ${formatNumber(
-                        last7Days.spikeWarningCount,
-                    )} spike warnings.`}
-                    tone={
-                        last7Days.costProtectionHitCount > 0 || last7Days.spikeWarningCount > 0
-                            ? "warning"
-                            : "default"
-                    }
+                    helper={`${formatNumber(last7Days.costProtectionHitCount)} cost protection hits · ${formatNumber(last7Days.spikeWarningCount)} spike warnings.`}
+                    tone={last7Days.costProtectionHitCount > 0 || last7Days.spikeWarningCount > 0 ? "warning" : "default"}
                 />
                 <MetricCard
-                    label="Last 30 Days"
+                    label="OpenAI Cost, 30d"
                     value={formatCurrency(last30Days.estimatedCostUsd)}
-                    helper={`${formatNumber(last30Days.runCount)} Worker runs across ${formatNumber(
-                        last30Days.shardCount,
-                    )} shards.`}
+                    helper={`${formatNumber(last30Days.runCount)} Worker runs across ${formatNumber(last30Days.shardCount)} shards.`}
+                />
+                <MetricCard
+                    label="Local AI Savings, 30d"
+                    value={formatCurrency(last30Days.estimatedLocalAiSavingsUsd)}
+                    helper="Estimated OpenAI cost avoided by using local AI for reviews and translations."
+                    tone="good"
                 />
             </div>
 
-            <div className="mt-4 grid gap-4 md:grid-cols-4">
+            <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
                 <MetricCard
                     label="Accepted"
                     value={formatNumber(last30Days.acceptedCount)}
@@ -230,9 +225,15 @@ function CostSection({
                     helper={`${last30Days.rejectionRate}% rejection rate over the last 30 days.`}
                 />
                 <MetricCard
-                    label="OpenAI Calls"
+                    label="OpenAI Activities"
                     value={formatNumber(last30Days.openAiCallCount)}
-                    helper="Total OpenAI calls captured from Worker run metrics."
+                    helper={`${formatNumber(last30Days.openAiReviewCount)} reviews · ${formatNumber(last30Days.openAiTranslationCount)} translations.`}
+                />
+                <MetricCard
+                    label="Local AI Activities"
+                    value={formatNumber(last30Days.localAiCallCount)}
+                    helper={`${formatNumber(last30Days.localAiReviewCount)} reviews · ${formatNumber(last30Days.localAiTranslationCount)} translations.`}
+                    tone="good"
                 />
                 <MetricCard
                     label="Average Run Time"
@@ -282,6 +283,12 @@ function TokenSection({
 
             <div className="mt-4 grid gap-4 md:grid-cols-3">
                 <MetricCard
+                    label="Local AI Tokens"
+                    value={formatCompactNumber(last30Days.localAiReviewTokens + last30Days.localAiTranslationTokens)}
+                    helper={`${formatCompactNumber(last30Days.localAiReviewTokens)} review/summary · ${formatCompactNumber(last30Days.localAiTranslationTokens)} translation tokens.`}
+                    tone="good"
+                />
+                <MetricCard
                     label="Last 24 Hours"
                     value={formatCompactNumber(last24Hours.totalTokens)}
                     helper={`${formatCompactNumber(
@@ -304,6 +311,84 @@ function TokenSection({
                     value={latestModel}
                     helper="Model name from the latest saved Worker AI usage run."
                 />
+            </div>
+        </DashboardSection>
+    );
+}
+
+function ActivityBreakdownSection({ last30Days }: { last30Days: AiUsageSummary }) {
+    const rows = [
+        {
+            activity: "Review + English summary",
+            openAiCount: last30Days.openAiReviewCount,
+            localAiCount: last30Days.localAiReviewCount,
+            openAiTokens: last30Days.openAiReviewTokens,
+            localAiTokens: last30Days.localAiReviewTokens,
+            openAiCost: last30Days.estimatedOpenAiReviewCostUsd,
+        },
+        {
+            activity: "Summary translations",
+            openAiCount: last30Days.openAiTranslationCount,
+            localAiCount: last30Days.localAiTranslationCount,
+            openAiTokens: last30Days.openAiTranslationTokens,
+            localAiTokens: last30Days.localAiTranslationTokens,
+            openAiCost: last30Days.estimatedOpenAiTranslationCostUsd,
+        },
+    ];
+
+    return (
+        <DashboardSection
+            id="activity-breakdown"
+            eyebrow="AI Activity"
+            title="OpenAI vs Local AI Breakdown"
+            description="Compare what each provider handled across article review, English summaries, and summary translations over the last 30 days."
+        >
+            <div className="mb-4 grid gap-4 md:grid-cols-3">
+                <MetricCard
+                    label="Total AI Activities"
+                    value={formatNumber(last30Days.totalAiActivityCount)}
+                    helper={`${formatNumber(last30Days.openAiCallCount)} OpenAI · ${formatNumber(last30Days.localAiCallCount)} local AI.`}
+                />
+                <MetricCard
+                    label="OpenAI Breakdown"
+                    value={formatNumber(last30Days.openAiCallCount)}
+                    helper={`${formatNumber(last30Days.openAiReviewCount)} review/summary · ${formatNumber(last30Days.openAiTranslationCount)} translations.`}
+                />
+                <MetricCard
+                    label="Local AI Breakdown"
+                    value={formatNumber(last30Days.localAiCallCount)}
+                    helper={`${formatNumber(last30Days.localAiReviewCount)} review/summary · ${formatNumber(last30Days.localAiTranslationCount)} translations.`}
+                    tone="good"
+                />
+            </div>
+
+            <div className="overflow-hidden rounded-[1.35rem] border border-amber-300/15">
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-amber-300/10 text-left text-sm">
+                        <thead className="bg-black/40 text-[10px] uppercase tracking-[0.16em] text-amber-300/75">
+                        <tr>
+                            <th className="px-4 py-3 font-black">Activity</th>
+                            <th className="px-4 py-3 font-black">OpenAI Count</th>
+                            <th className="px-4 py-3 font-black">Local AI Count</th>
+                            <th className="px-4 py-3 font-black">OpenAI Tokens</th>
+                            <th className="px-4 py-3 font-black">Local AI Tokens</th>
+                            <th className="px-4 py-3 font-black">OpenAI Cost</th>
+                        </tr>
+                        </thead>
+                        <tbody className="divide-y divide-amber-300/10 bg-black/20">
+                        {rows.map((row) => (
+                            <tr key={row.activity}>
+                                <td className="whitespace-nowrap px-4 py-3 font-black text-amber-50">{row.activity}</td>
+                                <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">{formatNumber(row.openAiCount)}</td>
+                                <td className="whitespace-nowrap px-4 py-3 text-emerald-100/80">{formatNumber(row.localAiCount)}</td>
+                                <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">{formatCompactNumber(row.openAiTokens)}</td>
+                                <td className="whitespace-nowrap px-4 py-3 text-emerald-100/80">{formatCompactNumber(row.localAiTokens)}</td>
+                                <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">{formatCurrency(row.openAiCost)}</td>
+                            </tr>
+                        ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </DashboardSection>
     );
@@ -612,8 +697,8 @@ export default async function AdminAiUsagePage() {
                             </h1>
 
                             <p className="mt-3 max-w-3xl text-sm leading-6 text-amber-100/70">
-                                A clear operational view of OpenAI cost, token usage, daily
-                                activity, shard usage, and latest Worker runs.
+                                A clear operational view of OpenAI cost, local AI savings,
+                                provider activity, shard usage, and latest Worker runs.
                             </p>
                         </div>
 
@@ -675,6 +760,8 @@ export default async function AdminAiUsagePage() {
                         last30Days={dashboardData.last30Days}
                         latestModel={latestModel}
                     />
+
+                    <ActivityBreakdownSection last30Days={dashboardData.last30Days} />
 
                     <DailyUsageSection daily={dashboardData.daily} />
 

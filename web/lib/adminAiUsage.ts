@@ -28,6 +28,32 @@ type AiUsageRunRow = {
     openai_completion_tokens: number;
     openai_total_tokens: number;
     estimated_openai_cost_usd: number | string;
+    openai_review_count: number | string | null;
+    openai_review_prompt_tokens: number | string | null;
+    openai_review_completion_tokens: number | string | null;
+    openai_review_total_tokens: number | string | null;
+    estimated_openai_review_cost_usd: number | string | null;
+    openai_translation_count: number | string | null;
+    openai_translation_prompt_tokens: number | string | null;
+    openai_translation_completion_tokens: number | string | null;
+    openai_translation_total_tokens: number | string | null;
+    estimated_openai_translation_cost_usd: number | string | null;
+    local_ai_model: string | null;
+    local_ai_call_count: number | string | null;
+    local_ai_prompt_tokens: number | string | null;
+    local_ai_completion_tokens: number | string | null;
+    local_ai_total_tokens: number | string | null;
+    local_ai_accepted_count: number | string | null;
+    local_ai_rejected_count: number | string | null;
+    local_ai_review_count: number | string | null;
+    local_ai_review_prompt_tokens: number | string | null;
+    local_ai_review_completion_tokens: number | string | null;
+    local_ai_review_total_tokens: number | string | null;
+    local_ai_translation_count: number | string | null;
+    local_ai_translation_prompt_tokens: number | string | null;
+    local_ai_translation_completion_tokens: number | string | null;
+    local_ai_translation_total_tokens: number | string | null;
+    estimated_local_ai_savings_usd: number | string | null;
     openai_accepted_count: number;
     openai_rejected_count: number;
     published_accepted_count: number;
@@ -45,6 +71,8 @@ export type AiUsageSummary = {
     runCount: number;
     shardCount: number;
     openAiCallCount: number;
+    localAiCallCount: number;
+    totalAiActivityCount: number;
     aiReviewedCount: number;
     acceptedCount: number;
     rejectedCount: number;
@@ -54,6 +82,17 @@ export type AiUsageSummary = {
     completionTokens: number;
     totalTokens: number;
     estimatedCostUsd: number;
+    estimatedLocalAiSavingsUsd: number;
+    openAiReviewCount: number;
+    openAiTranslationCount: number;
+    localAiReviewCount: number;
+    localAiTranslationCount: number;
+    openAiReviewTokens: number;
+    openAiTranslationTokens: number;
+    localAiReviewTokens: number;
+    localAiTranslationTokens: number;
+    estimatedOpenAiReviewCostUsd: number;
+    estimatedOpenAiTranslationCostUsd: number;
     costProtectionHitCount: number;
     spikeWarningCount: number;
     averageDurationMs: number;
@@ -64,6 +103,8 @@ export type AiUsageDailyPoint = {
     date: string;
     runCount: number;
     openAiCallCount: number;
+    localAiCallCount: number;
+    totalAiActivityCount: number;
     aiReviewedCount: number;
     acceptedCount: number;
     rejectedCount: number;
@@ -71,6 +112,17 @@ export type AiUsageDailyPoint = {
     completionTokens: number;
     totalTokens: number;
     estimatedCostUsd: number;
+    estimatedLocalAiSavingsUsd: number;
+    openAiReviewCount: number;
+    openAiTranslationCount: number;
+    localAiReviewCount: number;
+    localAiTranslationCount: number;
+    openAiReviewTokens: number;
+    openAiTranslationTokens: number;
+    localAiReviewTokens: number;
+    localAiTranslationTokens: number;
+    estimatedOpenAiReviewCostUsd: number;
+    estimatedOpenAiTranslationCostUsd: number;
     costProtectionHitCount: number;
     spikeWarningCount: number;
 };
@@ -79,11 +131,14 @@ export type AiUsageShardPoint = {
     shardIndex: number;
     runCount: number;
     openAiCallCount: number;
+    localAiCallCount: number;
+    totalAiActivityCount: number;
     aiReviewedCount: number;
     acceptedCount: number;
     rejectedCount: number;
     totalTokens: number;
     estimatedCostUsd: number;
+    estimatedLocalAiSavingsUsd: number;
     latestRunAt: string | null;
     costProtectionHitCount: number;
     spikeWarningCount: number;
@@ -96,11 +151,18 @@ export type AiUsageLatestRun = {
     shardIndex: number;
     openAiModel: string;
     openAiCallCount: number;
+    localAiCallCount: number;
+    totalAiActivityCount: number;
     aiReviewedCount: number;
     acceptedCount: number;
     rejectedCount: number;
     totalTokens: number;
     estimatedCostUsd: number;
+    estimatedLocalAiSavingsUsd: number;
+    openAiReviewCount: number;
+    openAiTranslationCount: number;
+    localAiReviewCount: number;
+    localAiTranslationCount: number;
     costProtectionLimitReached: boolean;
     spikeWarningTriggered: boolean;
     durationMs: number;
@@ -125,6 +187,8 @@ function emptySummary(): AiUsageSummary {
         runCount: 0,
         shardCount: 0,
         openAiCallCount: 0,
+        localAiCallCount: 0,
+        totalAiActivityCount: 0,
         aiReviewedCount: 0,
         acceptedCount: 0,
         rejectedCount: 0,
@@ -134,6 +198,17 @@ function emptySummary(): AiUsageSummary {
         completionTokens: 0,
         totalTokens: 0,
         estimatedCostUsd: 0,
+        estimatedLocalAiSavingsUsd: 0,
+        openAiReviewCount: 0,
+        openAiTranslationCount: 0,
+        localAiReviewCount: 0,
+        localAiTranslationCount: 0,
+        openAiReviewTokens: 0,
+        openAiTranslationTokens: 0,
+        localAiReviewTokens: 0,
+        localAiTranslationTokens: 0,
+        estimatedOpenAiReviewCostUsd: 0,
+        estimatedOpenAiTranslationCostUsd: 0,
         costProtectionHitCount: 0,
         spikeWarningCount: 0,
         averageDurationMs: 0,
@@ -184,74 +259,111 @@ function filterRowsSince(rows: AiUsageRunRow[], since: Date) {
     });
 }
 
+
+function getOpenAiTranslationCount(row: AiUsageRunRow) {
+    return toNumber(row.openai_translation_count);
+}
+
+function getOpenAiReviewCount(row: AiUsageRunRow) {
+    const explicitCount = toNumber(row.openai_review_count);
+
+    if (explicitCount > 0) {
+        return explicitCount;
+    }
+
+    return Math.max(0, toNumber(row.openai_call_count) - getOpenAiTranslationCount(row));
+}
+
+function getLocalAiTranslationCount(row: AiUsageRunRow) {
+    return toNumber(row.local_ai_translation_count);
+}
+
+function getLocalAiReviewCount(row: AiUsageRunRow) {
+    const explicitCount = toNumber(row.local_ai_review_count);
+
+    if (explicitCount > 0) {
+        return explicitCount;
+    }
+
+    return Math.max(0, toNumber(row.local_ai_call_count) - getLocalAiTranslationCount(row));
+}
+
+function getOpenAiReviewTokens(row: AiUsageRunRow) {
+    const explicitTokens = toNumber(row.openai_review_total_tokens);
+
+    if (explicitTokens > 0) {
+        return explicitTokens;
+    }
+
+    return Math.max(0, toNumber(row.openai_total_tokens) - toNumber(row.openai_translation_total_tokens));
+}
+
+function getOpenAiReviewCost(row: AiUsageRunRow) {
+    const explicitCost = toNumber(row.estimated_openai_review_cost_usd);
+
+    if (explicitCost > 0) {
+        return explicitCost;
+    }
+
+    return Math.max(0, toNumber(row.estimated_openai_cost_usd) - toNumber(row.estimated_openai_translation_cost_usd));
+}
+
 function summarizeRuns(rows: AiUsageRunRow[]): AiUsageSummary {
     if (rows.length === 0) {
         return emptySummary();
     }
 
     const shardIndexes = new Set(rows.map((row) => row.shard_index));
-    const openAiCallCount = rows.reduce(
-        (total, row) => total + row.openai_call_count,
-        0,
-    );
-    const aiReviewedCount = rows.reduce(
-        (total, row) => total + row.ai_reviewed_count,
-        0,
-    );
-    const acceptedCount = rows.reduce(
-        (total, row) => total + row.openai_accepted_count,
-        0,
-    );
-    const rejectedCount = rows.reduce(
-        (total, row) => total + row.openai_rejected_count,
-        0,
-    );
-    const promptTokens = rows.reduce(
-        (total, row) => total + row.openai_prompt_tokens,
-        0,
-    );
-    const completionTokens = rows.reduce(
-        (total, row) => total + row.openai_completion_tokens,
-        0,
-    );
-    const totalTokens = rows.reduce(
-        (total, row) => total + row.openai_total_tokens,
-        0,
-    );
-    const estimatedCostUsd = rows.reduce(
-        (total, row) => total + toNumber(row.estimated_openai_cost_usd),
-        0,
-    );
-    const costProtectionHitCount = rows.filter(
-        (row) => row.cost_protection_limit_reached,
-    ).length;
-    const spikeWarningCount = rows.filter(
-        (row) => row.spike_warning_triggered,
-    ).length;
-    const totalDurationMs = rows.reduce(
-        (total, row) => total + row.duration_ms,
-        0,
-    );
+    const openAiCallCount = rows.reduce((total, row) => total + toNumber(row.openai_call_count), 0);
+    const localAiCallCount = rows.reduce((total, row) => total + toNumber(row.local_ai_call_count), 0);
+    const openAiReviewCount = rows.reduce((total, row) => total + getOpenAiReviewCount(row), 0);
+    const openAiTranslationCount = rows.reduce((total, row) => total + getOpenAiTranslationCount(row), 0);
+    const localAiReviewCount = rows.reduce((total, row) => total + getLocalAiReviewCount(row), 0);
+    const localAiTranslationCount = rows.reduce((total, row) => total + getLocalAiTranslationCount(row), 0);
+    const aiReviewedCount = rows.reduce((total, row) => total + row.ai_reviewed_count, 0);
+    const acceptedCount = rows.reduce((total, row) => total + row.openai_accepted_count + toNumber(row.local_ai_accepted_count), 0);
+    const rejectedCount = rows.reduce((total, row) => total + row.openai_rejected_count + toNumber(row.local_ai_rejected_count), 0);
+    const promptTokens = rows.reduce((total, row) => total + toNumber(row.openai_prompt_tokens), 0);
+    const completionTokens = rows.reduce((total, row) => total + toNumber(row.openai_completion_tokens), 0);
+    const totalTokens = rows.reduce((total, row) => total + toNumber(row.openai_total_tokens), 0);
+    const estimatedCostUsd = rows.reduce((total, row) => total + toNumber(row.estimated_openai_cost_usd), 0);
+    const estimatedLocalAiSavingsUsd = rows.reduce((total, row) => total + toNumber(row.estimated_local_ai_savings_usd), 0);
+    const openAiReviewTokens = rows.reduce((total, row) => total + getOpenAiReviewTokens(row), 0);
+    const openAiTranslationTokens = rows.reduce((total, row) => total + toNumber(row.openai_translation_total_tokens), 0);
+    const localAiReviewTokens = rows.reduce((total, row) => total + toNumber(row.local_ai_review_total_tokens || row.local_ai_total_tokens), 0);
+    const localAiTranslationTokens = rows.reduce((total, row) => total + toNumber(row.local_ai_translation_total_tokens), 0);
+    const estimatedOpenAiReviewCostUsd = rows.reduce((total, row) => total + getOpenAiReviewCost(row), 0);
+    const estimatedOpenAiTranslationCostUsd = rows.reduce((total, row) => total + toNumber(row.estimated_openai_translation_cost_usd), 0);
+    const costProtectionHitCount = rows.filter((row) => row.cost_protection_limit_reached).length;
+    const spikeWarningCount = rows.filter((row) => row.spike_warning_triggered).length;
+    const totalDurationMs = rows.reduce((total, row) => total + row.duration_ms, 0);
 
     return {
         runCount: rows.length,
         shardCount: shardIndexes.size,
         openAiCallCount,
+        localAiCallCount,
+        totalAiActivityCount: openAiCallCount + localAiCallCount,
         aiReviewedCount,
         acceptedCount,
         rejectedCount,
-        acceptanceRate:
-            aiReviewedCount === 0
-                ? 0
-                : Math.round((acceptedCount / aiReviewedCount) * 100),
-        rejectionRate:
-            aiReviewedCount === 0
-                ? 0
-                : Math.round((rejectedCount / aiReviewedCount) * 100),
+        acceptanceRate: aiReviewedCount === 0 ? 0 : Math.round((acceptedCount / aiReviewedCount) * 100),
+        rejectionRate: aiReviewedCount === 0 ? 0 : Math.round((rejectedCount / aiReviewedCount) * 100),
         promptTokens,
         completionTokens,
         totalTokens,
         estimatedCostUsd,
+        estimatedLocalAiSavingsUsd,
+        openAiReviewCount,
+        openAiTranslationCount,
+        localAiReviewCount,
+        localAiTranslationCount,
+        openAiReviewTokens,
+        openAiTranslationTokens,
+        localAiReviewTokens,
+        localAiTranslationTokens,
+        estimatedOpenAiReviewCostUsd,
+        estimatedOpenAiTranslationCostUsd,
         costProtectionHitCount,
         spikeWarningCount,
         averageDurationMs: Math.round(totalDurationMs / rows.length),
@@ -277,6 +389,8 @@ function buildDailyPoints(rows: AiUsageRunRow[]): AiUsageDailyPoint[] {
             date: dateKey,
             runCount: summary.runCount,
             openAiCallCount: summary.openAiCallCount,
+            localAiCallCount: summary.localAiCallCount,
+            totalAiActivityCount: summary.totalAiActivityCount,
             aiReviewedCount: summary.aiReviewedCount,
             acceptedCount: summary.acceptedCount,
             rejectedCount: summary.rejectedCount,
@@ -284,6 +398,17 @@ function buildDailyPoints(rows: AiUsageRunRow[]): AiUsageDailyPoint[] {
             completionTokens: summary.completionTokens,
             totalTokens: summary.totalTokens,
             estimatedCostUsd: summary.estimatedCostUsd,
+            estimatedLocalAiSavingsUsd: summary.estimatedLocalAiSavingsUsd,
+            openAiReviewCount: summary.openAiReviewCount,
+            openAiTranslationCount: summary.openAiTranslationCount,
+            localAiReviewCount: summary.localAiReviewCount,
+            localAiTranslationCount: summary.localAiTranslationCount,
+            openAiReviewTokens: summary.openAiReviewTokens,
+            openAiTranslationTokens: summary.openAiTranslationTokens,
+            localAiReviewTokens: summary.localAiReviewTokens,
+            localAiTranslationTokens: summary.localAiTranslationTokens,
+            estimatedOpenAiReviewCostUsd: summary.estimatedOpenAiReviewCostUsd,
+            estimatedOpenAiTranslationCostUsd: summary.estimatedOpenAiTranslationCostUsd,
             costProtectionHitCount: summary.costProtectionHitCount,
             spikeWarningCount: summary.spikeWarningCount,
         };
@@ -307,11 +432,14 @@ function buildShardPoints(rows: AiUsageRunRow[]): AiUsageShardPoint[] {
                 shardIndex,
                 runCount: summary.runCount,
                 openAiCallCount: summary.openAiCallCount,
+                localAiCallCount: summary.localAiCallCount,
+                totalAiActivityCount: summary.totalAiActivityCount,
                 aiReviewedCount: summary.aiReviewedCount,
                 acceptedCount: summary.acceptedCount,
                 rejectedCount: summary.rejectedCount,
                 totalTokens: summary.totalTokens,
                 estimatedCostUsd: summary.estimatedCostUsd,
+                estimatedLocalAiSavingsUsd: summary.estimatedLocalAiSavingsUsd,
                 latestRunAt: summary.latestRunAt,
                 costProtectionHitCount: summary.costProtectionHitCount,
                 spikeWarningCount: summary.spikeWarningCount,
@@ -327,12 +455,19 @@ function buildLatestRuns(rows: AiUsageRunRow[]): AiUsageLatestRun[] {
         runSource: row.run_source,
         shardIndex: row.shard_index,
         openAiModel: row.openai_model,
-        openAiCallCount: row.openai_call_count,
+        openAiCallCount: toNumber(row.openai_call_count),
+        localAiCallCount: toNumber(row.local_ai_call_count),
+        totalAiActivityCount: toNumber(row.openai_call_count) + toNumber(row.local_ai_call_count),
         aiReviewedCount: row.ai_reviewed_count,
         acceptedCount: row.openai_accepted_count,
         rejectedCount: row.openai_rejected_count,
         totalTokens: row.openai_total_tokens,
         estimatedCostUsd: toNumber(row.estimated_openai_cost_usd),
+        estimatedLocalAiSavingsUsd: toNumber(row.estimated_local_ai_savings_usd),
+        openAiReviewCount: getOpenAiReviewCount(row),
+        openAiTranslationCount: getOpenAiTranslationCount(row),
+        localAiReviewCount: getLocalAiReviewCount(row),
+        localAiTranslationCount: getLocalAiTranslationCount(row),
         costProtectionLimitReached: row.cost_protection_limit_reached,
         spikeWarningTriggered: row.spike_warning_triggered,
         durationMs: row.duration_ms,
@@ -396,6 +531,32 @@ async function loadUsageRunsSince(since: Date) {
                 "openai_completion_tokens",
                 "openai_total_tokens",
                 "estimated_openai_cost_usd",
+                "openai_review_count",
+                "openai_review_prompt_tokens",
+                "openai_review_completion_tokens",
+                "openai_review_total_tokens",
+                "estimated_openai_review_cost_usd",
+                "openai_translation_count",
+                "openai_translation_prompt_tokens",
+                "openai_translation_completion_tokens",
+                "openai_translation_total_tokens",
+                "estimated_openai_translation_cost_usd",
+                "local_ai_model",
+                "local_ai_call_count",
+                "local_ai_prompt_tokens",
+                "local_ai_completion_tokens",
+                "local_ai_total_tokens",
+                "local_ai_accepted_count",
+                "local_ai_rejected_count",
+                "local_ai_review_count",
+                "local_ai_review_prompt_tokens",
+                "local_ai_review_completion_tokens",
+                "local_ai_review_total_tokens",
+                "local_ai_translation_count",
+                "local_ai_translation_prompt_tokens",
+                "local_ai_translation_completion_tokens",
+                "local_ai_translation_total_tokens",
+                "estimated_local_ai_savings_usd",
                 "openai_accepted_count",
                 "openai_rejected_count",
                 "published_accepted_count",
