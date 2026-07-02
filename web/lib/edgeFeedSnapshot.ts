@@ -37,6 +37,9 @@ type EdgeSnapshotPayload = {
 export type EdgeFeedSnapshotStatus = PublicFeedEdgeSnapshotMetadata & {
   configured: boolean;
   enabled: boolean;
+  ready: boolean;
+  kvBound: boolean | null;
+  httpStatus: number | null;
   articleCount: number | null;
   maxArticles?: number | null;
   refreshedAt?: string | null;
@@ -243,6 +246,22 @@ export async function getPublishedArticlesForSectionWithEdgeFallback(
   return edgeResult?.articles ?? [];
 }
 
+async function readEdgeStatusPayload(response: Response): Promise<(Partial<EdgeFeedSnapshotStatus> & { status?: EdgeFeedSnapshotStatus["status"] | null }) | null> {
+  const text = await response.text();
+
+  if (!text.trim()) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text) as Partial<EdgeFeedSnapshotStatus> & { status?: EdgeFeedSnapshotStatus["status"] | null };
+  } catch {
+    return {
+      message: text.slice(0, 500),
+    };
+  }
+}
+
 export async function getEdgeFeedSnapshotStatus(): Promise<EdgeFeedSnapshotStatus> {
   const endpoint = getEdgeSnapshotEndpoint("/status");
 
@@ -250,6 +269,9 @@ export async function getEdgeFeedSnapshotStatus(): Promise<EdgeFeedSnapshotStatu
     return {
       configured: false,
       enabled: false,
+      ready: false,
+      kvBound: null,
+      httpStatus: null,
       status: "unconfigured",
       updatedAt: null,
       ageSeconds: null,
@@ -268,36 +290,34 @@ export async function getEdgeFeedSnapshotStatus(): Promise<EdgeFeedSnapshotStatu
       cache: "no-store",
     });
     const metadata = buildEdgeMetadata(response, endpoint);
-
-    if (!response.ok) {
-      return {
-        configured: true,
-        enabled: false,
-        ...metadata,
-        status: metadata.status === "hit" ? "error" : metadata.status,
-        message: `Worker returned HTTP ${response.status}.`,
-      };
-    }
-
-    const payload = (await response.json()) as Partial<EdgeFeedSnapshotStatus>;
+    const payload = await readEdgeStatusPayload(response);
+    const payloadStatus = payload?.status ?? null;
+    const ready = payload?.ready ?? (response.ok && payloadStatus === "hit");
+    const kvBound = typeof payload?.kvBound === "boolean" ? payload.kvBound : null;
 
     return {
       configured: true,
-      enabled: true,
-      status: "hit",
-      updatedAt: payload.updatedAt ?? metadata.updatedAt,
-      ageSeconds: payload.ageSeconds ?? metadata.ageSeconds,
-      articleCount: payload.articleCount ?? metadata.articleCount,
-      version: payload.version ?? metadata.version,
+      enabled: payload?.enabled ?? response.ok,
+      ready,
+      kvBound,
+      httpStatus: response.status,
+      status: payloadStatus ?? (response.ok ? "hit" : "error"),
+      updatedAt: payload?.updatedAt ?? metadata.updatedAt,
+      ageSeconds: payload?.ageSeconds ?? metadata.ageSeconds,
+      articleCount: payload?.articleCount ?? metadata.articleCount,
+      version: payload?.version ?? metadata.version,
       endpoint,
-      maxArticles: payload.maxArticles ?? null,
-      refreshedAt: payload.refreshedAt ?? null,
-      message: payload.message ?? null,
+      maxArticles: payload?.maxArticles ?? null,
+      refreshedAt: payload?.refreshedAt ?? null,
+      message: payload?.message ?? (response.ok ? null : `Worker returned HTTP ${response.status}.`),
     };
   } catch (error) {
     return {
       configured: true,
       enabled: false,
+      ready: false,
+      kvBound: null,
+      httpStatus: null,
       status: "error",
       updatedAt: null,
       ageSeconds: null,

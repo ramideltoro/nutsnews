@@ -81,7 +81,7 @@ type ArticleCursor = {
 };
 
 export type PublicFeedEdgeSnapshotMetadata = {
-  status: "hit" | "miss" | "unconfigured" | "error";
+  status: "hit" | "miss" | "unconfigured" | "unbound" | "empty" | "error";
   updatedAt: string | null;
   ageSeconds: number | null;
   articleCount: number | null;
