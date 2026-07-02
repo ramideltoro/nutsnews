@@ -75,6 +75,7 @@ These docs explain the product and the system at a high level.
 | [RSS Source Quality](RSS_SOURCE_QUALITY.md) | Feed quality scoring, ranking, and source decisions |
 | [Image Delivery](IMAGE_DELIVERY.md) | Thumbnails, image optimization, cache TTL, and fallbacks |
 | [Performance and Resiliency](PERFORMANCE_AND_RESILIENCY.md) | Caching, pagination, indexes, sharding, and reliability |
+| [Homepage Performance Budget](HOMEPAGE_PERFORMANCE_BUDGET.md) | Homepage LCP, JS, CSS, image, and transfer budgets |
 
 #### Data protection and recovery
 
@@ -126,6 +127,7 @@ These docs explain the product and the system at a high level.
 
 | Doc | Use it for |
 | --- | --- |
+| [Homepage Performance Budget](HOMEPAGE_PERFORMANCE_BUDGET.md) | Build-size report, hard budgets, and common fixes |
 | [Lighthouse CI Onboarding](LIGHTHOUSE_CI_ONBOARDING.md) | Lighthouse CI setup and thresholds |
 | [PageSpeed Insights](PAGESPEED_INSIGHTS.md) | Manual production speed checks |
 | [axe Playwright Accessibility CI](AXE_PLAYWRIGHT_ACCESSIBILITY_CI.md) | Accessibility regression checks |
