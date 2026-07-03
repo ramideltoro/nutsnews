@@ -19,7 +19,7 @@ const mockExternalUrl = `http://127.0.0.1:${mockExternalPort}`;
 const webUrl = `http://127.0.0.1:${webPort}`;
 
 const articleUrlOne = `https://mock.nutsnews.test/story/cotton-candy-planets-${runId}`;
-const articleUrlTwo = `https://mock.nutsnews.test/story/community-garden-${runId}`;
+const articleUrlTwo = `https://mock.nutsnews.test/story/therapy-dogs-${runId}`;
 
 const articles = [
   {
@@ -38,15 +38,15 @@ const articles = [
   },
   {
     id: `web-e2e-article-2-${runId}`,
-    source: "NutsNews Mock Community",
-    title: `Mock community garden shares joy ${runId}`,
+    source: "NutsNews Mock Animals",
+    title: `Mock therapy dogs bring community joy ${runId}`,
     original_url: articleUrlTwo,
-    image_url: `${mockExternalUrl}/images/community-garden.png`,
+    image_url: `${mockExternalUrl}/images/therapy-dogs.png`,
     published_at: "2026-06-28T00:00:00+00:00",
     published_on_site_at: "2026-06-28T00:30:00+00:00",
     ai_summary:
-      "Neighbors share vegetables, smiles, and a calm moment in a mock community garden.",
-    category: "Community | Wellness",
+      "Friendly therapy dogs visit a community garden and help neighbors share vegetables, smiles, and a calm moment.",
+    category: "Animals | Community | Wellness",
     positivity_score: 8,
     snapshot_rank: 2,
   },
@@ -58,26 +58,70 @@ const articleSummaries = [
     language_code: "fr",
     title: `Planètes super légères de test ${runId}`,
     summary:
-      "Une histoire de test en français sur des planètes légères et une découverte joyeuse.",
+      "Une histoire de test en français raconte comment des astronomes observent des planètes très légères et partagent une découverte joyeuse avec les lecteurs.",
   },
   {
     original_url: articleUrlTwo,
     language_code: "fr",
-    title: `Jardin communautaire de test ${runId}`,
+    title: `Chiens de thérapie de test ${runId}`,
     summary:
-      "Des voisins partagent un moment positif dans un jardin communautaire simulé.",
+      "Des chiens de thérapie visitent un jardin communautaire simulé, où des voisins partagent des légumes, des sourires et un moment positif ensemble.",
   },
   {
     original_url: articleUrlOne,
     language_code: "ja",
     title: `テスト用の軽い惑星 ${runId}`,
-    summary: "軽い惑星の発見を伝える前向きな日本語テスト記事です。",
+    summary:
+      "天文学者がとても軽い惑星を見つけたという、前向きな日本語のテスト記事です。読者に発見の楽しさと穏やかな驚きを伝えます。",
   },
   {
     original_url: articleUrlTwo,
     language_code: "ja",
-    title: `テスト用コミュニティガーデン ${runId}`,
-    summary: "地域の人々が笑顔を分かち合う日本語のテスト記事です。",
+    title: `テスト用セラピー犬 ${runId}`,
+    summary:
+      "セラピー犬が地域の庭を訪れ、近所の人たちが野菜と笑顔を分かち合う様子を伝える日本語のテスト記事です。",
+  },
+  {
+    original_url: articleUrlOne,
+    language_code: "de-CH",
+    title: `Testplaneten mit leichter Form ${runId}`,
+    summary:
+      "Eine Schweizerdeutsche Testfassung erzählt von Astronomen, die sehr leichte Planeten entdecken und diese freundliche Nachricht mit neugierigen Lesern teilen.",
+  },
+  {
+    original_url: articleUrlTwo,
+    language_code: "de-CH",
+    title: `Therapiehunde im Test ${runId}`,
+    summary:
+      "Eine Schweizerdeutsche Testfassung zeigt Therapiehunde in einem Gemeinschaftsgarten, wo Nachbarn Gemüse, Ruhe und ein freundliches Erlebnis teilen.",
+  },
+  {
+    original_url: articleUrlOne,
+    language_code: "de",
+    title: `Leichte Testplaneten entdeckt ${runId}`,
+    summary:
+      "Eine deutsche Testfassung erzählt von Astronomen, die sehr leichte Planeten entdecken und diese freundliche Nachricht mit neugierigen Lesern teilen.",
+  },
+  {
+    original_url: articleUrlTwo,
+    language_code: "de",
+    title: `Therapiehunde bringen Freude ${runId}`,
+    summary:
+      "Eine deutsche Testfassung zeigt Therapiehunde in einem Gemeinschaftsgarten, wo Nachbarn Gemüse, Ruhe und ein freundliches Erlebnis miteinander teilen.",
+  },
+  {
+    original_url: articleUrlOne,
+    language_code: "el",
+    title: `Δοκιμαστικοί ελαφριοί πλανήτες ${runId}`,
+    summary:
+      "Μια ελληνική δοκιμαστική ιστορία μιλά για αστρονόμους που ανακαλύπτουν πολύ ελαφριούς πλανήτες και μοιράζονται μια χαρούμενη ανακάλυψη.",
+  },
+  {
+    original_url: articleUrlTwo,
+    language_code: "el",
+    title: `Σκύλοι θεραπείας σε δοκιμή ${runId}`,
+    summary:
+      "Μια ελληνική δοκιμαστική ιστορία δείχνει σκύλους θεραπείας σε κοινοτικό κήπο, όπου γείτονες μοιράζονται λαχανικά, χαμόγελα και ηρεμία.",
   },
 ];
 
@@ -371,7 +415,7 @@ function createExternalMockServer() {
         return;
       }
 
-      if ((url.pathname === "/images/super-puff.png" || url.pathname === "/images/community-garden.png") && request.method === "GET") {
+      if ((url.pathname === "/images/super-puff.png" || url.pathname === "/images/therapy-dogs.png") && request.method === "GET") {
         const png = Buffer.from(
           "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
           "base64",
@@ -550,10 +594,8 @@ async function runBrowserChecks() {
   const page = await context.newPage();
 
   async function openSettingsPanel() {
-    const settingsButton = page.getByRole("button", {
-      name: /Open NutsNews settings|Ouvrir les paramètres NutsNews|NutsNewsの設定を開く/i,
-    });
-    const settingsPanel = page.locator(".theme-panel").first();
+    const settingsButton = page.getByTestId("nutsnews-settings-toggle");
+    const settingsPanel = page.getByTestId("nutsnews-settings-panel");
 
     await expect(settingsButton).toBeVisible({ timeout: 20000 });
     await settingsButton.scrollIntoViewIfNeeded();
@@ -586,17 +628,21 @@ async function runBrowserChecks() {
   }
 
   async function closeSettingsPanel() {
-    const settingsPanel = page.locator(".theme-panel").first();
+    const settingsPanel = page.getByTestId("nutsnews-settings-panel");
 
     if (!(await settingsPanel.isVisible().catch(() => false))) {
       return;
     }
 
-    const settingsButton = page.getByRole("button", {
-      name: /Open NutsNews settings|Ouvrir les paramètres NutsNews|NutsNewsの設定を開く/i,
-    });
+    const settingsButton = page.getByTestId("nutsnews-settings-toggle");
     await settingsButton.click({ force: true });
     await expect(settingsPanel).toBeHidden({ timeout: 10000 }).catch(() => {});
+  }
+
+  async function firstArticleTitle() {
+    const firstTitle = page.getByTestId("nutsnews-article-card").first().locator(".wp-article-card__title");
+    await expect(firstTitle).not.toHaveText("", { timeout: 10000 });
+    return (await firstTitle.innerText()).trim();
   }
 
   logStep("Verifying homepage rendering");
@@ -606,21 +652,36 @@ async function runBrowserChecks() {
   await expect(page.getByText(articles[0].title).first()).toBeVisible();
   logOk("Homepage rendered with mock article");
 
-  logStep("Verifying footer home, search, settings, about, contact, and privacy controls");
-  await page.getByLabel("Go to NutsNews home").click();
+  logStep("Verifying footer home, search, settings, themes, about, contact, and privacy controls");
+  const footerHomeButton = page.getByTestId("nutsnews-footer-home");
+  await expect(footerHomeButton).toBeAttached({ timeout: 10000 });
+  await page.evaluate(() => {
+    const maxScrollTop = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    window.scrollTo({ top: Math.min(700, maxScrollTop), behavior: "instant" });
+  });
+  await expect.poll(async () => page.evaluate(() => window.scrollY), { timeout: 10000 }).toBeGreaterThan(50);
+  await footerHomeButton.dispatchEvent("click");
+  await expect.poll(async () => page.evaluate(() => window.scrollY), { timeout: 10000 }).toBeLessThanOrEqual(4);
   await expect(page).toHaveURL(/\/$/);
 
   await openSettingsPanel();
+  await page.getByTestId("nutsnews-settings-theme").click();
+  for (const themeId of ["amber", "sakura", "modern-saas", "san-juan", "creative-premium", "moody-cyberpunk"]) {
+    await page.getByTestId(`nutsnews-theme-option-${themeId}`).click();
+    await expect(page.locator("html")).toHaveAttribute("data-nutsnews-theme", themeId);
+  }
   await closeSettingsPanel();
+  logOk("Settings menu applied every theme");
 
-  await page.getByLabel("Open search").click();
-  const searchDialog = page.getByRole("dialog", { name: /Search/i });
+  await page.getByTestId("nutsnews-footer-search").click();
+  const searchDialog = page.getByTestId("nutsnews-search-dialog");
   await expect(searchDialog).toBeVisible();
-  await searchDialog.locator("#footer-archive-search").fill("planets");
-  await searchDialog.getByRole("button", { name: "Search", exact: true }).click();
-  await expect(page.getByText(articles[0].title).first()).toBeVisible();
+  await page.getByTestId("nutsnews-search-input").fill("dogs");
+  await page.getByTestId("nutsnews-search-submit").click();
+  await expect(page.getByText(articles[1].title).first()).toBeVisible();
+  await expect.poll(async () => page.getByTestId("nutsnews-search-result-card").count(), { timeout: 10000 }).toBeGreaterThan(0);
   await searchDialog.getByRole("button", { name: "Close search", exact: true }).click();
-  logOk("Footer search returned a mock article");
+  logOk("Footer search for dogs returned a mock article");
 
   const footer = page.locator("footer");
   const footerNavigationTimeoutMs = 20000;
@@ -632,6 +693,11 @@ async function runBrowserChecks() {
     await link.click();
     await page.waitForURL(expectedUrlPattern, { timeout: footerNavigationTimeoutMs });
   }
+
+  await clickFooterLink("Apps", "/apps", /\/apps$/);
+  await expect(page.locator("main").getByText("NutsNews for iPhone is here.", { exact: true })).toBeVisible({
+    timeout: footerNavigationTimeoutMs,
+  });
 
   await clickFooterLink("About", "/about", /\/about$/);
   await expect(page.locator("main").getByText("About NutsNews", { exact: true })).toBeVisible({
@@ -665,14 +731,38 @@ async function runBrowserChecks() {
   }
   logOk("Contact form sent one mock email");
 
-  logStep("Verifying language switch renders translated article text");
+  logStep("Verifying language switch renders translated article text for every supported language");
   await page.goto("/", { waitUntil: "networkidle" });
+  const englishTitle = await firstArticleTitle();
   const languageSettingsPanel = await openSettingsPanel();
-  await languageSettingsPanel.getByRole("button", { name: /Language/i }).click();
-  await languageSettingsPanel.getByRole("button", { name: /Français|French/i }).click();
-  await expect(page.getByText(articleSummaries[0].title).first()).toBeVisible({ timeout: 10000 });
-  await expect(page.locator("html")).toHaveAttribute("lang", "fr");
-  logOk("French language change rendered translated articles");
+  await languageSettingsPanel.getByTestId("nutsnews-settings-language").click();
+
+  for (const languageCode of ["fr", "ja", "de-CH", "de", "el"]) {
+    const translatedSummary = articleSummaries.find(
+      (summary) => summary.original_url === articleUrlOne && summary.language_code === languageCode,
+    );
+
+    if (!translatedSummary) {
+      fail(`Missing mock translated summary for ${languageCode}.`);
+    }
+
+    const articleResponsePromise = page.waitForResponse((response) =>
+      response.url().includes("/api/articles") && response.url().includes(`lang=${languageCode}`),
+    );
+
+    await languageSettingsPanel.getByTestId(`nutsnews-language-option-${languageCode}`).click();
+    await articleResponsePromise;
+    await expect(page.locator("html")).toHaveAttribute("lang", languageCode);
+    await expect(page.getByText(translatedSummary.title).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId("nutsnews-article-card").first()).toHaveAttribute("lang", languageCode);
+    expect(await firstArticleTitle()).not.toBe(englishTitle);
+  }
+
+  await languageSettingsPanel.getByTestId("nutsnews-language-option-en").click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page.getByTestId("nutsnews-article-card").first()).toHaveAttribute("lang", "en");
+  await expect.poll(async () => firstArticleTitle(), { timeout: 10000 }).toBe(englishTitle);
+  logOk("Language changes rendered translated articles and returned to English");
 
   logStep("Verifying /api/articles falls back to the edge snapshot during a Supabase outage");
   supabaseOutageMode = true;

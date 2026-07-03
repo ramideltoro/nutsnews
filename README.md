@@ -50,7 +50,7 @@ Common entry points:
 | Debug production issues | [Troubleshooting](docs/TROUBLESHOOTING.md) |
 | Monitor free-tier risk | [Free-Tier Guardrails](docs/FREE_TIER_GUARDRAILS.md) |
 | Use local AI | See `ramideltoro/nutsnews-worker` |
-| Validate public web flows | [Web Offline E2E Test](docs/WEB_OFFLINE_E2E_REGRESSION_TEST.md) |
+| Validate public web flows | [Web Offline E2E Test](docs/WEB_OFFLINE_E2E_REGRESSION_TEST.md) and [Vercel Preview Smoke Test](docs/VERCEL_PREVIEW_SMOKE_TEST.md) |
 | Validate homepage performance | [Homepage Performance Budget](docs/HOMEPAGE_PERFORMANCE_BUDGET.md) |
 | Monitor cache regressions | [Cloudflare Cache Observability](docs/CLOUDFLARE_CACHE_OBSERVABILITY.md) |
 | Review security hardening | [Security Hardening](docs/SECURITY_HARDENING.md) |
@@ -95,7 +95,7 @@ NutsNews includes:
 - CDN caching and image delivery controls
 - Better Stack, Sentry, UptimeRobot, Grafana, Lighthouse, PageSpeed, homepage performance budgets, Cloudflare cache observability, and accessibility documentation
 - Supabase backup and restore runbooks
-- Offline mocked E2E tests for the web app and Worker
+- Offline mocked E2E tests for the web app and Worker, plus a live Vercel Preview smoke test for PR deployments
 - Worker local-AI deployment lock documented in `docs/NUTSNEWS_WORKER_LOCAL_AI_LOCK.md`
 
 ---

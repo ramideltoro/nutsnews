@@ -1,0 +1,88 @@
+name: Vercel Preview Smoke Test
+
+on:
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      preview_url:
+        description: Vercel preview URL to test manually
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  deployments: read
+
+concurrency:
+  group: vercel-preview-smoke-${{ github.event.deployment.id || github.event.inputs.preview_url }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Live Vercel preview regression
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.deployment_status.state == 'success' &&
+        github.event.deployment_status.target_url != '' &&
+        github.event.deployment.environment != 'Production' &&
+        contains(github.event.deployment_status.target_url, 'vercel.app')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: web
+
+    env:
+      PLAYWRIGHT_BASE_URL: ${{ github.event.inputs.preview_url || github.event.deployment_status.target_url }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Mask Vercel automation bypass secret
+        if: env.VERCEL_AUTOMATION_BYPASS_SECRET != ''
+        run: echo "::add-mask::${VERCEL_AUTOMATION_BYPASS_SECRET}"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Vercel preview smoke test
+        run: npm run test:e2e:preview
+
+      - name: Summarize preview URL
+        if: always()
+        run: |
+          {
+            echo "## Vercel Preview Smoke Test"
+            echo ""
+            echo "Preview URL: ${PLAYWRIGHT_BASE_URL}"
+            if [ -n "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
+              echo "Vercel deployment protection bypass: configured"
+            else
+              echo "Vercel deployment protection bypass: not configured"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Playwright preview report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: vercel-preview-smoke-playwright-report
+          path: |
+            web/playwright-report
+            web/test-results
+          if-no-files-found: ignore
