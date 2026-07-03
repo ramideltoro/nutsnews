@@ -5,13 +5,11 @@ on:
     branches: [main]
     paths:
       - "web/**"
-      - "docs/**"
       - ".github/workflows/cloudflare-cache-observability.yml"
   push:
     branches: [main]
     paths:
       - "web/**"
-      - "docs/**"
       - ".github/workflows/cloudflare-cache-observability.yml"
   schedule:
     - cron: "17 */6 * * *"

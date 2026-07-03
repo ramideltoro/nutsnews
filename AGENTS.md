@@ -6,6 +6,7 @@ This is the NutsNews web repository.
 
 - Production site: https://nutsnews.com
 - Main repository: https://github.com/ramideltoro/nutsnews
+- Shared documentation repository: https://github.com/ramideltoro/nutsnews-docs
 - Primary branch: main
 - Hosting: Vercel
 - CDN/DNS/security: Cloudflare
@@ -21,7 +22,8 @@ This is the NutsNews web repository.
 - Prefer the smallest safe code change that solves the issue.
 - Inspect existing project patterns before adding new files or dependencies.
 - Do not add production dependencies unless clearly needed.
-- Update documentation when behavior, deployment steps, cache behavior, workers, automation, or environment variables change.
+- Update documentation in `ramideltoro/nutsnews-docs` when behavior, deployment steps, cache behavior, workers, automation, or environment variables change.
+- Do not add product, operations, deployment, cache, automation, or environment documentation to this application repository. Documentation-only updates belong in `ramideltoro/nutsnews-docs` so they do not trigger application deployments.
 - Preserve existing UI style unless the requested task explicitly changes it.
 - For cache/CDN work, verify headers and document expected behavior.
 - For GitHub Actions work, include regression checks when practical.

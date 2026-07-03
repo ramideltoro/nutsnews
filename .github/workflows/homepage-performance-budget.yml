@@ -11,9 +11,6 @@ on:
     paths:
       - "web/**"
       - ".github/workflows/homepage-performance-budget.yml"
-      - "docs/HOMEPAGE_PERFORMANCE_BUDGET.md"
-      - "docs/PERFORMANCE_AND_RESILIENCY.md"
-      - "docs/README.md"
   workflow_dispatch:
 
 permissions:
