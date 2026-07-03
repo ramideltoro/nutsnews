@@ -25,6 +25,7 @@ const PUBLISHED_ARTICLE_SELECT_COLUMNS = [
   "image_url",
   "published_at",
   "published_on_site_at",
+  "created_at",
   "ai_summary",
   "category",
   "positivity_score",
@@ -32,6 +33,7 @@ const PUBLISHED_ARTICLE_SELECT_COLUMNS = [
 ].join(",");
 
 export const ARTICLE_REVIEW_PAGE_SIZE = 50;
+export const RECENT_PUBLISHED_ARTICLE_LIMIT = 10;
 const MAX_OPTION_ROWS = 5000;
 
 type SupabaseConfig = {
@@ -80,6 +82,7 @@ type PublishedArticleDbRow = {
   image_url: string | null;
   published_at: string | null;
   published_on_site_at: string | null;
+  created_at: string | null;
   ai_summary: string | null;
   category: string | null;
   positivity_score: number | string | null;
@@ -97,6 +100,24 @@ export type ArticleReviewPublishedArticle = {
   publishedAt: string | null;
   publishedOnSiteAt: string | null;
   status: string | null;
+};
+
+export type AdminRecentPublishedArticle = {
+  id: string;
+  originalUrl: string;
+  source: string;
+  title: string;
+  imageUrl: string | null;
+  publishedAt: string | null;
+  publishedOnSiteAt: string | null;
+  createdAt: string | null;
+  category: string;
+  positivityScore: number;
+  status: string;
+  hasReview: boolean;
+  reviewId: number | null;
+  reviewedAt: string | null;
+  reviewedAtLabel: string;
 };
 
 export type ArticleReviewRow = {
@@ -140,6 +161,7 @@ export type ArticleReviewDashboardData = {
   filters: ArticleReviewFilters;
   summary: ArticleReviewSummary;
   reviews: ArticleReviewRow[];
+  recentPublishedArticles: AdminRecentPublishedArticle[];
   sourceOptions: string[];
   categoryOptions: string[];
   hasPreviousPage: boolean;
@@ -147,6 +169,7 @@ export type ArticleReviewDashboardData = {
   previousPageHref: string;
   nextPageHref: string;
   reviewSql: string;
+  recentPublishedArticlesSql: string;
 };
 
 function getSupabaseConfig(): SupabaseConfig | null {
@@ -295,6 +318,7 @@ function emptyDashboardData(
     filters,
     summary: emptySummary(filters),
     reviews: [],
+    recentPublishedArticles: [],
     sourceOptions: [],
     categoryOptions: [],
     hasPreviousPage: filters.page > 0,
@@ -302,6 +326,7 @@ function emptyDashboardData(
     previousPageHref: buildHref(filters, Math.max(0, filters.page - 1)),
     nextPageHref: buildHref(filters, filters.page + 1),
     reviewSql: buildReviewSql(filters),
+    recentPublishedArticlesSql: buildRecentPublishedArticlesSql(),
   };
 }
 
@@ -348,6 +373,10 @@ function buildReviewSql(filters: ArticleReviewFilters) {
   }
 
   return `select\n  reviewed_at,\n  decision,\n  source,\n  category,\n  positivity_score,\n  ai_provider,\n  ai_model,\n  review_duration_ms,\n  title,\n  reason,\n  original_url\nfrom public.article_ai_reviews\nwhere ${conditions.join("\n  and ")}\norder by reviewed_at ${filters.sort === "oldest" ? "asc" : "desc"}\nlimit ${ARTICLE_REVIEW_PAGE_SIZE};`;
+}
+
+function buildRecentPublishedArticlesSql() {
+  return `select\n  id,\n  original_url,\n  source,\n  title,\n  image_url,\n  published_at,\n  published_on_site_at,\n  created_at,\n  ai_summary,\n  category,\n  positivity_score,\n  status\nfrom public.articles\nwhere status = 'published'\norder by\n  published_on_site_at desc nulls last,\n  published_at desc nulls last,\n  id desc\nlimit ${RECENT_PUBLISHED_ARTICLE_LIMIT};`;
 }
 
 async function loadOptions(client: SupabaseClient) {
@@ -445,6 +474,71 @@ function mapReviewRow(
   };
 }
 
+function mapRecentPublishedArticle(
+  article: PublishedArticleDbRow,
+  reviewByOriginalUrl: Map<string, ArticleReviewDbRow>,
+): AdminRecentPublishedArticle {
+  const review = reviewByOriginalUrl.get(article.original_url) ?? null;
+
+  return {
+    id: article.id,
+    originalUrl: article.original_url,
+    source: article.source,
+    title: article.title,
+    imageUrl: article.image_url,
+    publishedAt: article.published_at,
+    publishedOnSiteAt: article.published_on_site_at,
+    createdAt: article.created_at,
+    category: article.category || "Uncategorized",
+    positivityScore: toNumber(article.positivity_score),
+    status: article.status || "unknown",
+    hasReview: Boolean(review?.id),
+    reviewId: review?.id ?? null,
+    reviewedAt: review?.reviewed_at ?? null,
+    reviewedAtLabel: formatAdminDateTime(
+      review?.reviewed_at ?? null,
+      "No review row",
+    ),
+  };
+}
+
+async function loadRecentPublishedArticles(client: SupabaseClient) {
+  const { data, error } = await client
+    .from("articles")
+    .select(PUBLISHED_ARTICLE_SELECT_COLUMNS)
+    .eq("status", "published")
+    .order("published_on_site_at", { ascending: false, nullsFirst: false })
+    .order("published_at", { ascending: false, nullsFirst: false })
+    .order("id", { ascending: false })
+    .limit(RECENT_PUBLISHED_ARTICLE_LIMIT);
+
+  if (error) {
+    return [];
+  }
+
+  const articleRows = (data ?? []) as unknown as PublishedArticleDbRow[];
+  const originalUrls = Array.from(
+    new Set(articleRows.map((row) => row.original_url).filter(Boolean)),
+  );
+  const reviewByOriginalUrl = new Map<string, ArticleReviewDbRow>();
+
+  if (originalUrls.length > 0) {
+    const { data: reviewData } = await client
+      .from("article_ai_reviews")
+      .select(REVIEW_SELECT_COLUMNS)
+      .in("original_url", originalUrls);
+
+    for (const review of (reviewData ??
+      []) as unknown as ArticleReviewDbRow[]) {
+      reviewByOriginalUrl.set(review.original_url, review);
+    }
+  }
+
+  return articleRows.map((article) =>
+    mapRecentPublishedArticle(article, reviewByOriginalUrl),
+  );
+}
+
 function summarizeVisibleReviews(
   filters: ArticleReviewFilters,
   reviews: ArticleReviewRow[],
@@ -499,9 +593,11 @@ export async function getAdminArticleReviewDashboardData(
     },
   });
 
-  const [{ sourceOptions, categoryOptions }] = await Promise.all([
-    loadOptions(client),
-  ]);
+  const [{ sourceOptions, categoryOptions }, recentPublishedArticles] =
+    await Promise.all([
+      loadOptions(client),
+      loadRecentPublishedArticles(client),
+    ]);
 
   const from = filters.page * ARTICLE_REVIEW_PAGE_SIZE;
   const to = from + ARTICLE_REVIEW_PAGE_SIZE - 1;
@@ -540,6 +636,7 @@ export async function getAdminArticleReviewDashboardData(
       ...emptyDashboardData(filters, error.message),
       sourceOptions,
       categoryOptions,
+      recentPublishedArticles,
     };
   }
 
@@ -573,6 +670,7 @@ export async function getAdminArticleReviewDashboardData(
     filters,
     summary: summarizeVisibleReviews(filters, reviews, totalMatchingReviews),
     reviews,
+    recentPublishedArticles,
     sourceOptions,
     categoryOptions,
     hasPreviousPage: filters.page > 0,
@@ -580,5 +678,6 @@ export async function getAdminArticleReviewDashboardData(
     previousPageHref: buildHref(filters, Math.max(0, filters.page - 1)),
     nextPageHref: buildHref(filters, filters.page + 1),
     reviewSql: buildReviewSql(filters),
+    recentPublishedArticlesSql: buildRecentPublishedArticlesSql(),
   };
 }

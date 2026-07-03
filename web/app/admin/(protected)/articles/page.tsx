@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import {
+  type AdminRecentPublishedArticle,
   type ArticleReviewDashboardData,
   type ArticleReviewDecision,
   type ArticleReviewFilters,
@@ -117,6 +118,7 @@ function MetricCard({
 function QuickNav() {
   const links = [
     ["Summary", "#summary"],
+    ["Published", "#published"],
     ["Filters", "#filters"],
     ["Reviews", "#reviews"],
     ["SQL", "#review-sql"],
@@ -395,6 +397,122 @@ function SummarySection({ data }: { data: ArticleReviewDashboardData }) {
   );
 }
 
+function PublishedArticleCard({
+  article,
+}: {
+  article: AdminRecentPublishedArticle;
+}) {
+  return (
+    <article className="rounded-[1.75rem] border border-amber-300/15 bg-black/30 p-4 shadow-lg shadow-amber-950/10 sm:p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <StatusPill label={article.status} tone="ok" />
+            <StatusPill
+              label={article.imageUrl ? "Has Image" : "Missing Image"}
+              tone={article.imageUrl ? "ok" : "watch"}
+            />
+            <StatusPill
+              label={article.hasReview ? "Has Review" : "Missing Review"}
+              tone={article.hasReview ? "ok" : "watch"}
+            />
+            <ScorePill score={article.positivityScore} />
+          </div>
+
+          <h3 className="text-xl font-black leading-snug text-amber-50">
+            {article.title}
+          </h3>
+
+          <p className="mt-2 text-xs font-black uppercase tracking-[0.14em] text-amber-300/70">
+            {article.source} • {article.category} • Published{" "}
+            {formatDateTime(article.publishedOnSiteAt)}
+          </p>
+        </div>
+
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <a
+            href={article.originalUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-full border border-amber-300/25 bg-black/30 px-4 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-amber-100 transition hover:border-amber-300/50 hover:bg-amber-400/10"
+          >
+            Original
+          </a>
+
+          <Link
+            href={`/articles/${article.id}`}
+            className="rounded-full border border-emerald-300/25 bg-emerald-400/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-100 transition hover:border-emerald-300/50"
+          >
+            Site Story
+          </Link>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 text-xs text-amber-100/55 md:grid-cols-4">
+        <p>
+          <span className="font-black uppercase tracking-[0.12em] text-amber-300/70">
+            Site Publish:
+          </span>{" "}
+          {formatDateTime(article.publishedOnSiteAt)}
+        </p>
+        <p>
+          <span className="font-black uppercase tracking-[0.12em] text-amber-300/70">
+            Source Publish:
+          </span>{" "}
+          {formatDateTime(article.publishedAt)}
+        </p>
+        <p>
+          <span className="font-black uppercase tracking-[0.12em] text-amber-300/70">
+            Reviewed:
+          </span>{" "}
+          {article.reviewedAtLabel}
+        </p>
+        <p className="truncate">
+          <span className="font-black uppercase tracking-[0.12em] text-amber-300/70">
+            URL:
+          </span>{" "}
+          {article.originalUrl}
+        </p>
+      </div>
+    </article>
+  );
+}
+
+function PublishedArticlesSection({
+  data,
+}: {
+  data: ArticleReviewDashboardData;
+}) {
+  return (
+    <DashboardSection
+      id="published"
+      eyebrow="Published Articles"
+      title="Latest Published Articles"
+      description="Canonical newest published rows from public.articles, ordered by site publish time. Use this to confirm whether new Supabase articles reached the admin dashboard even when their AI review happened earlier."
+    >
+      <div className="mb-5 flex flex-wrap gap-2">
+        <StatusPill
+          label={`${formatNumber(data.recentPublishedArticles.length)} loaded`}
+          tone="neutral"
+        />
+        <StatusPill label="Sorted by published_on_site_at" tone="neutral" />
+      </div>
+
+      <div className="grid gap-4">
+        {data.recentPublishedArticles.length === 0 ? (
+          <div className="rounded-[1.5rem] border border-amber-300/15 bg-black/25 p-5 text-center text-sm text-amber-100/65">
+            No published articles loaded from the articles table.
+          </div>
+        ) : (
+          data.recentPublishedArticles.map((article) => (
+            <PublishedArticleCard key={article.id} article={article} />
+          ))
+        )}
+      </div>
+    </DashboardSection>
+  );
+}
+
 function ArticleReviewCard({ review }: { review: ArticleReviewRow }) {
   return (
     <article className="rounded-[1.75rem] border border-amber-300/15 bg-black/30 p-4 shadow-lg shadow-amber-950/10 sm:p-5">
@@ -555,11 +673,27 @@ function ReviewSqlSection({ data }: { data: ArticleReviewDashboardData }) {
       id="review-sql"
       eyebrow="Supabase Query"
       title="Review SQL"
-      description="Use this query in Supabase SQL Editor to reproduce the current article-review view."
+      description="Use these queries in Supabase SQL Editor to reproduce the current published-article freshness view and article-review view."
     >
-      <pre className="overflow-x-auto rounded-[1.5rem] border border-amber-300/15 bg-black/45 p-4 text-xs leading-6 text-amber-100/75">
-        <code>{data.reviewSql}</code>
-      </pre>
+      <div className="grid gap-4">
+        <div>
+          <p className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-amber-300/70">
+            Latest Published Articles
+          </p>
+          <pre className="overflow-x-auto rounded-[1.5rem] border border-amber-300/15 bg-black/45 p-4 text-xs leading-6 text-amber-100/75">
+            <code>{data.recentPublishedArticlesSql}</code>
+          </pre>
+        </div>
+
+        <div>
+          <p className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-amber-300/70">
+            AI Review Decisions
+          </p>
+          <pre className="overflow-x-auto rounded-[1.5rem] border border-amber-300/15 bg-black/45 p-4 text-xs leading-6 text-amber-100/75">
+            <code>{data.reviewSql}</code>
+          </pre>
+        </div>
+      </div>
     </DashboardSection>
   );
 }
@@ -652,6 +786,7 @@ export default async function AdminArticlesPage({
 
         <div className="grid gap-5">
           <SummarySection data={data} />
+          <PublishedArticlesSection data={data} />
           <ReviewFilters data={data} />
           <ReviewsSection data={data} />
           <ReviewSqlSection data={data} />
