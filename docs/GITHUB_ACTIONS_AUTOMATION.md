@@ -17,6 +17,9 @@ This update adds the missing GitHub Actions around build safety, operations, bac
 - `app-store-docs-check.yml` — Checks that App Store support/privacy/contact docs still exist.
 - `release-notes.yml` — Generates GitHub release notes when a `v*` tag is pushed.
 
+- `cloudflare-production-cache-purge.yml` — Purges the full Cloudflare zone cache after a successful production deployment status, plus manual dry-run support.
+- `cloudflare-production-cache-purge-regression.yml` — Locks the production-only purge trigger, Cloudflare secret usage, and purge-everything behavior.
+
 The branch already had Dependabot, CodeQL, Snyk, Lighthouse CI, accessibility CI, PageSpeed Insights, SEO structured data audit, and GitHub Wiki sync.
 
 ## Recommended repository secrets
@@ -34,6 +37,8 @@ Add these in GitHub under **Settings → Secrets and variables → Actions**:
 - `NUTSNEWS_SHARD_URL` — optional shard endpoint, for example a shard 0 URL without `?limit=1`.
 - `PAGESPEED_INSIGHTS_API_KEY` — optional for PageSpeed API quota.
 - `SNYK_TOKEN` — only needed if using the existing Snyk workflow.
+- `CLOUDFLARE_API_TOKEN` — Cloudflare token scoped to the NutsNews zone with cache purge permission.
+- `CLOUDFLARE_ZONE_ID` — Cloudflare zone id for the NutsNews production zone.
 
 Most operational workflows skip cleanly if their required Supabase secrets are missing. Web CI needs the normal build-time environment variables for a complete production-like build.
 

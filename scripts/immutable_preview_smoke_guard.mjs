@@ -4,7 +4,11 @@ import { execFileSync } from 'node:child_process';
 const protectedFiles = [
   '.github/workflows/immutable-tests-guard.yml',
   '.github/workflows/vercel-preview-smoke.yml',
+  '.github/workflows/cloudflare-production-cache-purge.yml',
+  '.github/workflows/cloudflare-production-cache-purge-regression.yml',
   'scripts/immutable_preview_smoke_guard.mjs',
+  'scripts/cloudflare_purge_cache.mjs',
+  'scripts/cloudflare_production_cache_purge_regression.mjs',
   'scripts/web_offline_e2e_regression.mjs',
   'web/tests/vercel-preview-smoke.spec.ts',
 ];
