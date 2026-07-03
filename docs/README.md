@@ -17,7 +17,7 @@ This folder is organized by what you are trying to do: understand the product, c
 | Fix a production issue | [Troubleshooting](TROUBLESHOOTING.md) |
 | Check cost and quota risk | [Free-Tier Guardrails](FREE_TIER_GUARDRAILS.md) |
 | Work on translations | [Multi-language Summaries](MULTI_LANGUAGE_SUMMARIES.md); [Multilingual Quality and Fallbacks](MULTILINGUAL_QUALITY_AND_FALLBACKS.md) |
-| Work on local AI | See ramideltoro/nutsnews-worker |
+| Work on local AI | [Worker Local AI Lock](NUTSNEWS_WORKER_LOCAL_AI_LOCK.md); see ramideltoro/nutsnews-worker |
 | Run regression tests | [Web Offline E2E](WEB_OFFLINE_E2E_REGRESSION_TEST.md); Worker tests live in ramideltoro/nutsnews-worker |
 
 ---
@@ -93,6 +93,7 @@ These docs explain the product and the system at a high level.
 
 | Doc | Use it for |
 | --- | --- |
+| [Worker Local AI Lock](NUTSNEWS_WORKER_LOCAL_AI_LOCK.md) | Web-side note for the Worker repo local-AI deployment lock |
 | Worker/local AI repository | See ramideltoro/nutsnews-worker |
 | [Multi-language Summaries](MULTI_LANGUAGE_SUMMARIES.md) | Website translation display and recovery context |
 | [Multilingual Quality and Fallbacks](MULTILINGUAL_QUALITY_AND_FALLBACKS.md) | Quality gates, daily reports, admin dashboard, and fallback behavior |
@@ -153,6 +154,7 @@ These docs explain the product and the system at a high level.
 | --- | --- |
 | [Web Offline E2E Regression Test](WEB_OFFLINE_E2E_REGRESSION_TEST.md) | Fully mocked public web flow test |
 | Worker Offline E2E Regression Test | See ramideltoro/nutsnews-worker |
+| [Worker Local AI Lock](NUTSNEWS_WORKER_LOCAL_AI_LOCK.md) | Why the Worker repo prevents accidental OpenAI-first deploys |
 
 ### 7. Archive and Update Notes
 

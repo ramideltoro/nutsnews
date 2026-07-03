@@ -96,6 +96,7 @@ NutsNews includes:
 - Better Stack, Sentry, UptimeRobot, Grafana, Lighthouse, PageSpeed, homepage performance budgets, Cloudflare cache observability, and accessibility documentation
 - Supabase backup and restore runbooks
 - Offline mocked E2E tests for the web app and Worker
+- Worker local-AI deployment lock documented in `docs/NUTSNEWS_WORKER_LOCAL_AI_LOCK.md`
 
 ---
 
