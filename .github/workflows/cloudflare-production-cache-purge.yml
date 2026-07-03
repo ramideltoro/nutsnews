@@ -1,0 +1,61 @@
+name: Purge Cloudflare Cache After Production Deploy
+
+on:
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: Why are you manually purging the production Cloudflare cache?
+        required: false
+        type: string
+      dry_run:
+        description: Validate configuration without calling Cloudflare
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  deployments: read
+
+concurrency:
+  group: cloudflare-production-cache-purge
+  cancel-in-progress: false
+
+jobs:
+  purge-cloudflare-production-cache:
+    name: Purge Cloudflare production cache
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.deployment_status.state == 'success' &&
+        (
+          github.event.deployment.environment == 'Production' ||
+          github.event.deployment.environment == 'production' ||
+          github.event.deployment_status.environment == 'Production' ||
+          github.event.deployment_status.environment == 'production'
+        )
+      )
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Purge everything from Cloudflare cache
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          CLOUDFLARE_PURGE_EVERYTHING: 'true'
+          CLOUDFLARE_PURGE_DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          DEPLOYMENT_ENVIRONMENT: ${{ github.event.deployment.environment || github.event.deployment_status.environment || 'manual' }}
+          DEPLOYMENT_STATE: ${{ github.event.deployment_status.state || 'manual' }}
+          DEPLOYMENT_URL: ${{ github.event.deployment_status.environment_url || github.event.deployment_status.target_url || '' }}
+          MANUAL_PURGE_REASON: ${{ github.event.inputs.reason || '' }}
+        run: node scripts/cloudflare_purge_cache.mjs

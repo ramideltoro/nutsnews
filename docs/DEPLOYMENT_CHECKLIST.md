@@ -20,6 +20,20 @@ README or docs include one clear deployment checklist.
 
 ---
 
+
+## Cloudflare production cache purge
+
+After a Vercel production deployment succeeds, GitHub receives a production `deployment_status` event. The `Purge Cloudflare Cache After Production Deploy` workflow then purges the full Cloudflare zone cache with `purge_everything`.
+
+Before relying on the automation, confirm these GitHub Actions secrets exist:
+
+```text
+CLOUDFLARE_API_TOKEN
+CLOUDFLARE_ZONE_ID
+```
+
+After merge, verify the workflow completed successfully and that `https://www.nutsnews.com` shows the deployed production changes.
+
 ## Deployment Principles
 
 Use this deployment flow for normal production releases:
