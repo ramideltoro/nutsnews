@@ -362,6 +362,7 @@ function ArticleCard({
   return (
     <article
       ref={cardRef}
+      data-testid="nutsnews-article-card"
       style={{ transitionDelay: isVisible ? revealDelay : "0ms" }}
       className={`wp-article-card wp-article-card--${variant} transition-all duration-700 ease-out motion-reduce:translate-y-0 motion-reduce:opacity-100 motion-reduce:blur-0 motion-reduce:transition-none ${
         isVisible
@@ -701,7 +702,7 @@ export function ArticleFeed({
   }, [loadMoreArticles, nextCursor, nextPage]);
 
   return (
-    <section className="newspaper-feed-shell" id="top-stories">
+    <section className="newspaper-feed-shell" id="top-stories" data-testid="nutsnews-article-feed">
       <div className="newspaper-feed-heading">
         <div>
           <h2>{copy.topStories}</h2>

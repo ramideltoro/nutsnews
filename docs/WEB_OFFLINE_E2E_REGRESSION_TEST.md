@@ -6,13 +6,15 @@ It can be run from either the repository root or the `web/` directory. The test 
 
 The test verifies:
 
-- Home page renders with mock articles.
-- Footer navigation works for Home, Search, About, Contact, and Privacy.
-- Search returns a mock article.
-- About and Contact pages render.
+- Home page renders with mock article cards.
+- Footer Home scrolls the page back to the top with animated movement.
+- Footer navigation works for Home, Search, Apps, About, Contact, and Privacy.
+- Search for `dogs` returns a mock article.
+- Settings opens and every theme can be applied.
+- Apps, About, Contact, and Privacy pages render.
 - Contact form submits through mocked Turnstile and mocked Resend.
 - A mock `quota_usage_events` email event is recorded.
-- Switching to French renders translated article text.
+- Language switching renders translated article text for French, Japanese, Swiss German, German, Greek, and back to English.
 
 Run:
 
@@ -32,7 +34,7 @@ A passing run ends with:
 
 ## Locator and mock-image stability
 
-The test uses strict Playwright selectors. For the settings panel, it targets the settings region directly with `getByRole("region", { name: "NutsNews settings" })` so the locator does not also match the settings button.
+The test uses strict Playwright selectors and stable `data-testid` hooks for the feed, footer controls, search dialog, settings menu, theme options, and language options. Those hooks exist only to keep the regression reliable across copy changes and translated UI labels.
 
 Mock article images are served from the local mock external service so the test remains fully offline and Next Image does not try to resolve external DNS.
 

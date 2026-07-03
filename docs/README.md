@@ -18,7 +18,7 @@ This folder is organized by what you are trying to do: understand the product, c
 | Check cost and quota risk | [Free-Tier Guardrails](FREE_TIER_GUARDRAILS.md) |
 | Work on translations | [Multi-language Summaries](MULTI_LANGUAGE_SUMMARIES.md); [Multilingual Quality and Fallbacks](MULTILINGUAL_QUALITY_AND_FALLBACKS.md) |
 | Work on local AI | [Worker Local AI Lock](NUTSNEWS_WORKER_LOCAL_AI_LOCK.md); see ramideltoro/nutsnews-worker |
-| Run regression tests | [Web Offline E2E](WEB_OFFLINE_E2E_REGRESSION_TEST.md); Worker tests live in ramideltoro/nutsnews-worker |
+| Run regression tests | [Web Offline E2E](WEB_OFFLINE_E2E_REGRESSION_TEST.md); [Vercel Preview Smoke Test](VERCEL_PREVIEW_SMOKE_TEST.md); Worker tests live in ramideltoro/nutsnews-worker |
 
 ---
 
@@ -148,11 +148,12 @@ These docs explain the product and the system at a high level.
 | [Security Hardening](SECURITY_HARDENING.md) | CSP, browser headers, admin no-store behavior, contact form controls, and CI validation |
 | [Dependency Updates](DEPENDENCY_UPDATES.md) | Safe package update routine |
 
-#### Offline regression tests
+#### Public web regression tests
 
 | Doc | Use it for |
 | --- | --- |
-| [Web Offline E2E Regression Test](WEB_OFFLINE_E2E_REGRESSION_TEST.md) | Fully mocked public web flow test |
+| [Web Offline E2E Regression Test](WEB_OFFLINE_E2E_REGRESSION_TEST.md) | Fully mocked public web flow test before preview deploy |
+| [Vercel Preview Smoke Test](VERCEL_PREVIEW_SMOKE_TEST.md) | Live PR preview checks after Vercel deploys |
 | Worker Offline E2E Regression Test | See ramideltoro/nutsnews-worker |
 | [Worker Local AI Lock](NUTSNEWS_WORKER_LOCAL_AI_LOCK.md) | Why the Worker repo prevents accidental OpenAI-first deploys |
 
@@ -206,3 +207,8 @@ Keep docs:
 - Archived when they become one-off notes
 
 See [Documentation Style Guide](DOCUMENTATION_STYLE_GUIDE.md) for naming, structure, and wording rules.
+
+
+## Vercel preview smoke test protection bypass
+
+Protected Vercel preview deployments require the GitHub Actions secret `VERCEL_AUTOMATION_BYPASS_SECRET`, created from Vercel Project Settings -> Deployment Protection -> Protection Bypass for Automation. The live Playwright smoke test uses this secret only as an HTTP header and does not commit it to the repo.

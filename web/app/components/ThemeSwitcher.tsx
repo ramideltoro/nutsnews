@@ -393,6 +393,7 @@ export function ThemeSwitcher() {
     <div ref={panelRef} className="theme-switcher-shell">
       <button
         type="button"
+        data-testid="nutsnews-settings-toggle"
         className="theme-gear-button"
         aria-label={copy.openSettings}
         aria-expanded={isOpen}
@@ -403,7 +404,7 @@ export function ThemeSwitcher() {
       </button>
 
       {isOpen ? (
-        <section className="theme-panel" aria-label={copy.settingsLabel}>
+        <section className="theme-panel" data-testid="nutsnews-settings-panel" aria-label={copy.settingsLabel}>
           {activePanel === "menu" ? (
             <>
               <div className="theme-panel__header">
@@ -417,6 +418,7 @@ export function ThemeSwitcher() {
               <div className="settings-menu-list">
                 <button
                   type="button"
+                  data-testid="nutsnews-settings-theme"
                   className="settings-menu-item"
                   onClick={() => setActivePanel("theme")}
                 >
@@ -444,6 +446,7 @@ export function ThemeSwitcher() {
 
                 <button
                   type="button"
+                  data-testid="nutsnews-settings-language"
                   className="settings-menu-item"
                   onClick={() => setActivePanel("language")}
                 >
@@ -490,6 +493,7 @@ export function ThemeSwitcher() {
                     <button
                       key={theme.id}
                       type="button"
+                      data-testid={`nutsnews-theme-option-${theme.id}`}
                       className={`theme-option ${isSelected ? "theme-option--active" : ""}`}
                       aria-pressed={isSelected}
                       onClick={() => handleThemeSelect(theme.id)}
@@ -548,6 +552,7 @@ export function ThemeSwitcher() {
                     <button
                       key={language.code}
                       type="button"
+                      data-testid={`nutsnews-language-option-${language.code}`}
                       className={`theme-option ${isSelected ? "theme-option--active" : ""}`}
                       aria-pressed={isSelected}
                       onClick={() => handleLanguageSelect(language.code)}

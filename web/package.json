@@ -13,6 +13,7 @@
     "audit:pagespeed:desktop": "node scripts/pagespeed-insights.mjs --strategy=desktop",
     "audit:seo": "node scripts/seo-structured-data-audit.mjs",
     "test:e2e:offline": "node ../scripts/web_offline_e2e_regression.mjs",
+    "test:e2e:preview": "playwright test --config=playwright.config.ts tests/vercel-preview-smoke.spec.ts",
     "test:security-headers": "node scripts/assert-security-headers.mjs",
     "analyze:homepage": "node scripts/homepage-performance-budget.mjs",
     "analyze:homepage:warn": "node scripts/homepage-performance-budget.mjs --warn-only",

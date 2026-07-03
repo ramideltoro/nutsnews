@@ -504,6 +504,7 @@ function SearchMenu({
         role="dialog"
         aria-modal="true"
         aria-labelledby="footer-search-title"
+        data-testid="nutsnews-search-dialog"
         className="search-menu-panel relative my-auto max-h-[82dvh] w-full max-w-2xl overflow-hidden rounded-[2rem] border border-[var(--theme-border)] bg-[var(--theme-surface)] shadow-2xl shadow-black/40"
       >
         <div className="flex items-center justify-between gap-4 border-b border-[var(--theme-border)] px-5 py-4">
@@ -529,6 +530,7 @@ function SearchMenu({
             </label>
             <input
               id="footer-archive-search"
+              data-testid="nutsnews-search-input"
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
               placeholder={copy.searchPlaceholder}
@@ -539,6 +541,7 @@ function SearchMenu({
             />
             <button
               type="submit"
+              data-testid="nutsnews-search-submit"
               className={`read-story-button search-submit-button min-h-12 w-full justify-center px-6 ${
                 isSubmitAnimating ? "search-submit-button--pulse" : ""
               }`}
@@ -599,6 +602,7 @@ function SearchMenu({
             {articles.map((article) => (
               <article
                 key={article.id}
+                data-testid="nutsnews-search-result-card"
                 className="overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-surface-soft)]"
               >
                 <div className="grid gap-0 sm:grid-cols-[150px_1fr]">
@@ -744,6 +748,7 @@ export function SiteFooter() {
           >
             <Link
               href="/"
+              data-testid="nutsnews-footer-home"
               className={`footer-icon-button ${
                 isHomeButtonAnimating ? "footer-icon-button--home-pulse" : ""
               }`}
@@ -756,6 +761,7 @@ export function SiteFooter() {
 
             <button
               type="button"
+              data-testid="nutsnews-footer-search"
               className={`footer-icon-button footer-icon-button--search ${
                 isSearchButtonAnimating ? "footer-icon-button--search-pulse" : ""
               }`}
