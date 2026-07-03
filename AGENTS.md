@@ -29,14 +29,16 @@ This is the NutsNews web repository.
 
 ## Local validation expectations
 
-Before opening or updating a PR, inspect package.json and run the relevant checks that exist in this repository.
+The Next.js web app lives in `web/`.
+
+Before opening or updating a PR, inspect `web/package.json` and run the relevant checks that exist there.
 
 Common checks may include:
 
-- npm install
-- npm run lint
-- npm run build
-- npm test
+- cd web && npm install
+- cd web && npm run lint
+- cd web && npm run build
+- cd web && npm test
 
 Only run commands that exist in this repository.
 
