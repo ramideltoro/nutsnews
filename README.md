@@ -24,10 +24,11 @@ The project is built to stay simple, inexpensive, observable, and easy to operat
 
 ## Repository Map
 
-This repo now contains the public website/admin app, database config, website scripts, docs, README, and license.
+This repo contains the public website/admin app, database config, website scripts, README, and license. Shared documentation lives in `ramideltoro/nutsnews-docs` so documentation-only updates do not trigger NutsNews web deployments.
 
 Related repositories:
 
+- ramideltoro/nutsnews-docs: Shared documentation for web, Worker, and iOS
 - ramideltoro/nutsnews-worker: Cloudflare Worker ingestion, controller, local AI, and backend automation
 - ramideltoro/nutsnews-ios: Native iOS app
 
@@ -35,25 +36,25 @@ Related repositories:
 
 ## Documentation
 
-Start with the main docs index:
+Start with the shared docs index:
 
-**[Open the NutsNews documentation map](docs/README.md)**
+**[Open the NutsNews documentation map](https://github.com/ramideltoro/nutsnews-docs/blob/main/README.md)**
 
 Common entry points:
 
 | Need | Go to |
 | --- | --- |
-| Understand the product | [Project Overview](docs/PROJECT.md) |
-| Understand the system | [Architecture](docs/ARCHITECTURE.md) |
-| Run or maintain the app | [Operations](docs/OPERATIONS.md) |
-| Deploy safely | [Deployment Checklist](docs/DEPLOYMENT_CHECKLIST.md) |
-| Debug production issues | [Troubleshooting](docs/TROUBLESHOOTING.md) |
-| Monitor free-tier risk | [Free-Tier Guardrails](docs/FREE_TIER_GUARDRAILS.md) |
+| Understand the product | [Project Overview](https://github.com/ramideltoro/nutsnews-docs/blob/main/PROJECT.md) |
+| Understand the system | [Architecture](https://github.com/ramideltoro/nutsnews-docs/blob/main/ARCHITECTURE.md) |
+| Run or maintain the app | [Operations](https://github.com/ramideltoro/nutsnews-docs/blob/main/OPERATIONS.md) |
+| Deploy safely | [Deployment Checklist](https://github.com/ramideltoro/nutsnews-docs/blob/main/DEPLOYMENT_CHECKLIST.md) |
+| Debug production issues | [Troubleshooting](https://github.com/ramideltoro/nutsnews-docs/blob/main/TROUBLESHOOTING.md) |
+| Monitor free-tier risk | [Free-Tier Guardrails](https://github.com/ramideltoro/nutsnews-docs/blob/main/FREE_TIER_GUARDRAILS.md) |
 | Use local AI | See `ramideltoro/nutsnews-worker` |
-| Validate public web flows | [Web Offline E2E Test](docs/WEB_OFFLINE_E2E_REGRESSION_TEST.md) and [Vercel Preview Smoke Test](docs/VERCEL_PREVIEW_SMOKE_TEST.md) |
-| Validate homepage performance | [Homepage Performance Budget](docs/HOMEPAGE_PERFORMANCE_BUDGET.md) |
-| Monitor cache regressions | [Cloudflare Cache Observability](docs/CLOUDFLARE_CACHE_OBSERVABILITY.md) |
-| Review security hardening | [Security Hardening](docs/SECURITY_HARDENING.md) |
+| Validate public web flows | [Web Offline E2E Test](https://github.com/ramideltoro/nutsnews-docs/blob/main/WEB_OFFLINE_E2E_REGRESSION_TEST.md) and [Vercel Preview Smoke Test](https://github.com/ramideltoro/nutsnews-docs/blob/main/VERCEL_PREVIEW_SMOKE_TEST.md) |
+| Validate homepage performance | [Homepage Performance Budget](https://github.com/ramideltoro/nutsnews-docs/blob/main/HOMEPAGE_PERFORMANCE_BUDGET.md) |
+| Monitor cache regressions | [Cloudflare Cache Observability](https://github.com/ramideltoro/nutsnews-docs/blob/main/CLOUDFLARE_CACHE_OBSERVABILITY.md) |
+| Review security hardening | [Security Hardening](https://github.com/ramideltoro/nutsnews-docs/blob/main/SECURITY_HARDENING.md) |
 | Validate Worker flows | See `ramideltoro/nutsnews-worker` |
 
 ---
@@ -96,7 +97,7 @@ NutsNews includes:
 - Better Stack, Sentry, UptimeRobot, Grafana, Lighthouse, PageSpeed, homepage performance budgets, Cloudflare cache observability, and accessibility documentation
 - Supabase backup and restore runbooks
 - Offline mocked E2E tests for the web app and Worker, plus a live Vercel Preview smoke test for PR deployments
-- Worker local-AI deployment lock documented in `docs/NUTSNEWS_WORKER_LOCAL_AI_LOCK.md`
+- Worker local-AI deployment lock documented in [Worker Local AI Lock](https://github.com/ramideltoro/nutsnews-docs/blob/main/NUTSNEWS_WORKER_LOCAL_AI_LOCK.md)
 
 ---
 
@@ -107,4 +108,4 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE).
 
 ## Translation quality
 
-Issue #99 added multilingual quality checks, a daily translation coverage report, and `/admin/translations` dashboard visibility. See `docs/MULTILINGUAL_QUALITY_AND_FALLBACKS.md`.
+Issue #99 added multilingual quality checks, a daily translation coverage report, and `/admin/translations` dashboard visibility. See [Multilingual Quality and Fallbacks](https://github.com/ramideltoro/nutsnews-docs/blob/main/MULTILINGUAL_QUALITY_AND_FALLBACKS.md).

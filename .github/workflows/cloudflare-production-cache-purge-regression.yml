@@ -9,8 +9,6 @@ on:
       - 'scripts/cloudflare_purge_cache.mjs'
       - 'scripts/cloudflare_production_cache_purge_regression.mjs'
       - 'scripts/immutable_preview_smoke_guard.mjs'
-      - 'docs/CLOUDFLARE_PRODUCTION_CACHE_PURGE.md'
-      - 'docs/updates/README_CLOUDFLARE_PRODUCTION_CACHE_PURGE_UPDATE.md'
   push:
     branches: [main]
     paths:
@@ -19,8 +17,6 @@ on:
       - 'scripts/cloudflare_purge_cache.mjs'
       - 'scripts/cloudflare_production_cache_purge_regression.mjs'
       - 'scripts/immutable_preview_smoke_guard.mjs'
-      - 'docs/CLOUDFLARE_PRODUCTION_CACHE_PURGE.md'
-      - 'docs/updates/README_CLOUDFLARE_PRODUCTION_CACHE_PURGE_UPDATE.md'
   workflow_dispatch:
 
 permissions:

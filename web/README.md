@@ -310,7 +310,7 @@ NEXT_PUBLIC_TURNSTILE_SITE_KEY=your_cloudflare_turnstile_site_key
 TURNSTILE_SECRET_KEY=your_cloudflare_turnstile_secret_key
 ```
 
-See `docs/CLOUDFLARE_TURNSTILE_CONTACT_FORM.md` for setup, local testing, and troubleshooting.
+See [Cloudflare Turnstile Contact Form](https://github.com/ramideltoro/nutsnews-docs/blob/main/CLOUDFLARE_TURNSTILE_CONTACT_FORM.md) for setup, local testing, and troubleshooting.
 
 ### Current limitation
 
@@ -446,7 +446,7 @@ web/performance-budget.json
 web/lighthouse-budget.json
 ```
 
-See `docs/HOMEPAGE_PERFORMANCE_BUDGET.md` for the full review policy and common fixes.
+See [Homepage Performance Budget](https://github.com/ramideltoro/nutsnews-docs/blob/main/HOMEPAGE_PERFORMANCE_BUDGET.md) for the full review policy and common fixes.
 
 ### Cloudflare CDN
 
@@ -479,7 +479,7 @@ npm run audit:cache:config
 npm run audit:cache -- --url https://www.nutsnews.com
 ```
 
-The protected admin dashboard lives at `/admin/cache`, and the full guide lives in `docs/CLOUDFLARE_CACHE_OBSERVABILITY.md`.
+The protected admin dashboard lives at `/admin/cache`, and the full guide lives in [Cloudflare Cache Observability](https://github.com/ramideltoro/nutsnews-docs/blob/main/CLOUDFLARE_CACHE_OBSERVABILITY.md).
 
 ### Vercel edge delivery
 
@@ -1259,7 +1259,7 @@ The first visible feed image loads eagerly. Lower feed images lazy-load. Optimiz
 See the repository-level guide:
 
 ```text
-../docs/IMAGE_DELIVERY.md
+https://github.com/ramideltoro/nutsnews-docs/blob/main/IMAGE_DELIVERY.md
 ```
 
 ## License

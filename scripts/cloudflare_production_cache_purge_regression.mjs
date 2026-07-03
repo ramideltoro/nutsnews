@@ -10,8 +10,6 @@ const requiredFiles = [
   'scripts/cloudflare_purge_cache.mjs',
   'scripts/cloudflare_production_cache_purge_regression.mjs',
   'scripts/immutable_preview_smoke_guard.mjs',
-  'docs/CLOUDFLARE_PRODUCTION_CACHE_PURGE.md',
-  'docs/updates/README_CLOUDFLARE_PRODUCTION_CACHE_PURGE_UPDATE.md',
 ];
 
 function read(relativePath) {
@@ -74,12 +72,6 @@ try {
     assertIncludes(immutableGuard, `'${file}'`, 'immutable_preview_smoke_guard.mjs');
   }
   assertIncludes(immutableGuard, 'IMMUTABLE TEST CHANGE APPROVED BY RAMI', 'immutable_preview_smoke_guard.mjs');
-
-  const docs = `${read('docs/CLOUDFLARE_PRODUCTION_CACHE_PURGE.md')}\n${read('docs/updates/README_CLOUDFLARE_PRODUCTION_CACHE_PURGE_UPDATE.md')}`;
-  assertIncludes(docs, 'CLOUDFLARE_API_TOKEN', 'Cloudflare production cache purge docs');
-  assertIncludes(docs, 'CLOUDFLARE_ZONE_ID', 'Cloudflare production cache purge docs');
-  assertIncludes(docs, 'purge_everything', 'Cloudflare production cache purge docs');
-  assertIncludes(docs, 'deployment_status', 'Cloudflare production cache purge docs');
 
   console.log('Cloudflare production cache purge regression passed.');
 } catch (error) {
