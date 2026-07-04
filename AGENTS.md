@@ -25,7 +25,7 @@ This is the NutsNews web repository.
 
 - MUST start from an up-to-date main branch unless the user explicitly directs work on the current branch or an existing PR branch.
 - MUST create a feature branch for changes unless already on the user-requested branch.
-- Documentation-only changes are the only exception to the feature-branch requirement: work from the latest repository default branch, commit the documentation update, push directly to the default branch, and report the commit SHA.
+- Documentation-only changes belong in `ramideltoro/nutsnews-docs`, not this repository.
 - MUST NOT commit secrets, .env files, API keys, tokens, database dumps, or private credentials.
 - MUST NOT print secret values in logs, docs, PR descriptions, or terminal summaries.
 - MUST prefer the smallest safe change that solves the issue.
@@ -33,9 +33,9 @@ This is the NutsNews web repository.
 - MUST NOT add production dependencies unless clearly needed.
 - MUST update documentation in `ramideltoro/nutsnews-docs` for ANY NutsNews work. There is no "no docs needed" exception.
 - MUST NOT add product, operations, deployment, cache, automation, or environment documentation to this application repository. Documentation-only updates belong in `ramideltoro/nutsnews-docs` so they do not trigger application deployments.
-- Documentation-only updates do not require a pull request. This direct-push rule applies only to documentation-only changes.
-- Application code, runtime behavior, CI workflow, test, dependency, secret/configuration, deployment, cache, Worker, database, and infrastructure changes still require the normal branch and PR flow unless the user explicitly says otherwise.
-- If branch protection blocks a documentation-only direct push, STOP and report the blocker instead of opening a PR automatically.
+- Documentation-only changes in `ramideltoro/nutsnews-docs` MUST be committed and pushed directly to `main`. Do not create a PR for docs-only changes in the docs repo.
+- If direct push to `main` in `ramideltoro/nutsnews-docs` is blocked by branch protection, STOP and report the blocker. MUST NOT silently create a PR.
+- Any change to this repository, including application code, runtime behavior, CI workflow, tests, dependencies, secrets/configuration, deployment, cache, database, infrastructure, or AGENTS.md instruction changes, MUST go through the normal branch and pull request flow unless Rami explicitly says otherwise.
 - Repository instruction updates to AGENTS.md are allowed in this repository when the user explicitly requests them.
 - MUST preserve existing UI style unless the requested task explicitly changes it.
 - For cache/CDN work, verify headers and document expected behavior.
@@ -132,12 +132,12 @@ Only run commands that exist in this repository.
 For documentation-only changes:
 
 1. MUST confirm clean working tree or explicitly document existing user changes.
-2. MUST checkout the repository default branch.
-3. MUST pull the latest default branch when network access and permissions allow.
-4. MUST make only the requested documentation changes.
+2. MUST make the documentation change in `ramideltoro/nutsnews-docs`, not this repository.
+3. MUST checkout `main` in `ramideltoro/nutsnews-docs`.
+4. MUST pull latest `origin/main` in `ramideltoro/nutsnews-docs` when network access and permissions allow.
 5. MUST run lightweight docs/instruction validation that already exists.
-6. MUST commit directly on the default branch.
-7. MUST push directly to the default branch.
+6. MUST commit directly on `main` in `ramideltoro/nutsnews-docs`.
+7. MUST push directly to `main` in `ramideltoro/nutsnews-docs`.
 8. MUST report the pushed commit SHA in the final response.
 9. MUST NOT open a PR unless the user explicitly asks for one.
 10. If branch protection blocks the push, MUST stop and report the blocker.
@@ -153,14 +153,19 @@ For normal implementation tasks:
 7. MUST commit with a clear message when a PR is required.
 8. MUST push the branch when a PR is required.
 9. MUST create a PR using `gh pr create` when a PR is required.
-10. MUST watch PR checks using `gh pr checks` and `gh run watch` when practical.
-11. If checks fail, MUST inspect logs, fix, push again, and repeat until checks pass or a real blocker is documented.
-12. MUST NOT merge unless all required checks pass and the user explicitly asks to merge.
-13. MUST NOT auto-merge unless the user explicitly requested auto-merge.
+10. MUST create normal ready-to-merge PRs. MUST NOT create draft PRs.
+11. If using `gh pr create`, MUST NOT pass `--draft`.
+12. If using a GitHub connector/API, MUST set `draft: false`.
+13. If a PR is accidentally created as draft, MUST mark it ready before reporting completion.
+14. MUST watch PR checks using `gh pr checks` and `gh run watch` when practical.
+15. If checks fail, MUST inspect logs, fix, push again, and repeat until checks pass or a real blocker is documented.
+16. MUST NOT merge unless all required checks pass and Rami explicitly asks to merge.
+17. MUST NOT auto-merge unless Rami explicitly requested auto-merge.
 
 ## PR Rules
 
-- Documentation-only changes do not require a PR. Push documentation-only commits directly to the repository default branch and report the commit SHA.
+- Documentation-only changes belong in `ramideltoro/nutsnews-docs`; commit and push docs-only changes directly to `main` in that repo and report the commit SHA.
+- Any change to this repository MUST use a pull request unless Rami explicitly says otherwise.
 - If the task requires a PR, or this AGENTS.md says to raise a PR, Codex MUST create the PR before the final response.
 - For NutsNews work, Codex MUST create or update the application repository PR as required by this AGENTS.md.
 - For NutsNews work, Codex MUST create or update a documentation repository PR in `ramideltoro/nutsnews-docs` for the documentation change.
@@ -168,7 +173,11 @@ For normal implementation tasks:
 - Every PR MUST include release notes with Simple Summary, Intermediate Summary, and Expert Summary.
 - Every PR MUST include tests/checks run with exact commands and pass/fail results.
 - MUST include the PR link in the final response when a PR is created.
-- MUST NOT merge the PR unless the user explicitly asks.
+- PRs MUST be normal ready-to-merge PRs, not draft PRs.
+- If using `gh pr create`, MUST NOT pass `--draft`.
+- If using a GitHub connector/API, MUST set `draft: false`.
+- If a PR is accidentally created as draft, MUST mark it ready before reporting completion.
+- MUST NOT merge the PR unless Rami explicitly asks.
 - If a PR cannot be created, MUST explain the exact blocker and what remains.
 - If the user explicitly asks not to create a PR, MUST follow the user's instruction and document that no PR was created.
 
@@ -219,7 +228,7 @@ A task is NOT done until:
 - Required Mermaid diagrams were included when applicable.
 - Required PR summary sections were completed, including user/admin impact, documentation status, release notes, tests/checks, risks, rollback, and graph status.
 - Relevant checks/tests were run and reported.
-- Required application PR and documentation PR were created and linked, or documentation-only changes were pushed directly to the default branch and the commit SHA was reported.
+- Required application PR and documentation PR were created and linked, or documentation-only changes were pushed directly to `main` in `ramideltoro/nutsnews-docs` and the commit SHA was reported.
 - Any skipped REQUIRED step has an explicit blocker.
 
 ## Useful commands
