@@ -14,16 +14,9 @@ function assertIncludes(content, needle, label) {
   }
 }
 
-function assertNotIncludes(content, needle, label) {
-  if (content.includes(needle)) {
-    throw new Error(`${label} must not include forbidden text: ${needle}`);
-  }
-}
-
 const page = read("web/app/admin/(protected)/readiness/page.tsx");
 const lib = read("web/lib/adminProductionReadiness.ts");
 const adminHome = read("web/app/admin/(protected)/page.tsx");
-const webCiWorkflow = read(".github/workflows/web-ci.yml");
 const packageJson = JSON.parse(read("web/package.json"));
 
 for (const required of [
@@ -39,67 +32,17 @@ for (const required of [
 }
 
 for (const required of [
-  'import "server-only"',
-  "process.env.ACTIONS_READ_TOKEN",
-  "https://api.github.com/repos/",
-  "actions/runs?branch=${GITHUB_ACTIONS_BRANCH}&per_page=50",
-  'const GITHUB_ACTIONS_BRANCH = "main"',
-  "application/vnd.github+json",
-  "Authorization: `Bearer ${token}`",
-  "X-GitHub-Api-Version",
-  "2022-11-28",
-  "GITHUB_ACTIONS_REVALIDATE_SECONDS",
-  ".github/workflows/web-ci.yml",
-  ".github/workflows/public-reader-smoke.yml",
-  ".github/workflows/vercel-preview-smoke.yml",
-  ".github/workflows/lighthouse-ci.yml",
-  ".github/workflows/accessibility-ci.yml",
-  ".github/workflows/codeql.yml",
-  ".github/workflows/gitleaks.yml",
-  ".github/workflows/osv-scanner.yml",
-  ".github/workflows/dependency-review.yml",
-  ".github/workflows/openssf-scorecard.yml",
-  ".github/workflows/snyk.yml",
-  "workflow_runs",
-  "conclusion === \"success\"",
-  "head_branch",
-  "head_sha",
-  "branch: run.head_branch ?? GITHUB_ACTIONS_BRANCH",
-  "commitSha: run.head_sha ?? \"unknown\"",
-  "ACTIONS_READ_TOKEN is not configured",
-  "Live GitHub Actions status is unavailable because the GitHub API request failed before a response was returned.",
-  "rate-limited",
-]) {
-  assertIncludes(lib, required, "adminProductionReadiness.ts GitHub Actions integration");
-}
-
-for (const forbidden of ["GITHUB_READONLY_TOKEN", "GITHUB_ACTIONS_READ_TOKEN"]) {
-  assertNotIncludes(lib, forbidden, "adminProductionReadiness.ts GitHub Actions integration");
-  assertNotIncludes(webCiWorkflow, forbidden, "web-ci.yml GitHub Actions integration");
-}
-
-for (const required of [
   "Production Readiness",
   "green",
   "yellow",
   "red",
   "Next step",
-  "Workflow",
-  "workflow.githubStatus",
-  "workflow.conclusion",
-  "workflow.branch",
-  "workflow.commitSha",
   "formatAdminDateTime",
 ]) {
   assertIncludes(page, required, "readiness page");
 }
 
 assertIncludes(adminHome, 'href="/admin/readiness"', "admin landing page");
-assertIncludes(
-  webCiWorkflow,
-  "ACTIONS_READ_TOKEN: ${{ secrets.ACTIONS_READ_TOKEN }}",
-  "web-ci.yml GitHub Actions integration",
-);
 
 if (
   packageJson.scripts?.["test:admin-production-readiness"] !==

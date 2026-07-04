@@ -34,7 +34,6 @@ jobs:
       NEXTAUTH_URL: http://localhost:3000
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
       TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
-      ACTIONS_READ_TOKEN: ${{ secrets.ACTIONS_READ_TOKEN }}
 
     steps:
       - name: Checkout repository
