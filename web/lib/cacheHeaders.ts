@@ -27,10 +27,13 @@ export const PUBLIC_CDN_CACHE_CONTROL =
 export const PUBLIC_LONG_CACHE_CONTROL =
   PUBLIC_PAGE_CACHE_CONTROL;
 
+export const ARTICLE_API_BROWSER_CACHE_CONTROL =
+  "public, s-maxage=300, stale-while-revalidate=3600";
+
 export const NO_STORE_CACHE_CONTROL = "no-store, max-age=0";
 
 export const ARTICLE_API_CACHE_HEADERS = {
-  "Cache-Control": PUBLIC_PAGE_CACHE_CONTROL,
+  "Cache-Control": ARTICLE_API_BROWSER_CACHE_CONTROL,
   "CDN-Cache-Control": PUBLIC_CDN_CACHE_CONTROL,
   "Cloudflare-CDN-Cache-Control": PUBLIC_CDN_CACHE_CONTROL,
   "Vercel-CDN-Cache-Control": PUBLIC_CDN_CACHE_CONTROL,

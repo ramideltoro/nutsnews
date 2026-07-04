@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import path from "node:path";
 import { withSentryConfig } from "@sentry/nextjs";
 import {
+  ARTICLE_API_BROWSER_CACHE_CONTROL,
   PUBLIC_CDN_CACHE_CONTROL,
   PUBLIC_CDN_S_MAXAGE_SECONDS,
   PUBLIC_PAGE_CACHE_CONTROL,
@@ -147,11 +148,17 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/api/articles",
-        headers: publicCacheHeaders(`public-api-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`),
+        headers: publicCacheHeaders(
+          `public-api-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`,
+          ARTICLE_API_BROWSER_CACHE_CONTROL,
+        ),
       },
       {
         source: "/api/home-feed",
-        headers: publicCacheHeaders(`public-home-feed-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`),
+        headers: publicCacheHeaders(
+          `public-home-feed-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`,
+          ARTICLE_API_BROWSER_CACHE_CONTROL,
+        ),
       },
       {
         source: "/healthz",
