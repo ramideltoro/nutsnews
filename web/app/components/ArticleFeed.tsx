@@ -426,6 +426,7 @@ function ArticleCard({
         <div className="wp-article-card__image relative overflow-hidden">
           <OptimizedArticleImage
             src={article.image_url}
+            category={article.category}
             eager={index < 2}
             sizes={
               variant === "lead"

@@ -139,17 +139,16 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
           <article>
             <header className="overflow-hidden rounded-[2rem] border border-amber-500/20 bg-neutral-900 shadow-2xl shadow-black/40">
-              {article.image_url ? (
-                  <div className="relative h-64 overflow-hidden bg-neutral-800">
-                    <OptimizedArticleImage
-                        src={article.image_url}
-                        eager
-                        sizes={ARTICLE_DETAIL_IMAGE_SIZES}
-                    />
+              <div className="relative h-64 overflow-hidden bg-neutral-800">
+                <OptimizedArticleImage
+                  src={article.image_url}
+                  category={article.category}
+                  eager
+                  sizes={ARTICLE_DETAIL_IMAGE_SIZES}
+                />
 
-                    <div className="absolute inset-0 bg-gradient-to-t from-neutral-950/85 via-neutral-950/20 to-transparent" />
-                  </div>
-              ) : null}
+                <div className="absolute inset-0 bg-gradient-to-t from-neutral-950/85 via-neutral-950/20 to-transparent" />
+              </div>
 
               <div className="p-6">
                 <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-amber-400">
