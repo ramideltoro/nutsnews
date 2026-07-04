@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { SiteFooter } from "@/app/components/SiteFooter";
-import { getArticleById, SITE_URL } from "@/lib/articles";
+import { getArticleById, getRecentArticleSitemapItems, SITE_URL } from "@/lib/articles";
 import { OptimizedArticleImage } from "@/app/components/OptimizedArticleImage";
 import { ARTICLE_DETAIL_IMAGE_SIZES } from "@/lib/imageDelivery";
 
@@ -13,13 +13,11 @@ type ArticlePageProps = {
   params: Promise<{
     id: string;
   }>;
-  searchParams?: Promise<{
-    lang?: string;
-  }>;
 };
 
 export async function generateStaticParams() {
-  return [];
+  const articles = await getRecentArticleSitemapItems(100);
+  return articles.map((article) => ({ id: article.id }));
 }
 
 function formatDate(dateValue: string | null) {
@@ -36,11 +34,9 @@ function formatDate(dateValue: string | null) {
 
 export async function generateMetadata({
                                          params,
-                                         searchParams,
                                        }: ArticlePageProps): Promise<Metadata> {
   const { id } = await params;
-  const { lang } = (await searchParams) ?? {};
-  const article = await getArticleById(id, lang);
+  const article = await getArticleById(id);
 
   if (!article) {
     return {
@@ -55,7 +51,7 @@ export async function generateMetadata({
   const description =
       article.ai_summary ??
       "Read this uplifting story summary on NutsNews and visit the original publisher for the full article.";
-  const socialImageUrl = `/articles/${article.id}/opengraph-image`;
+  const socialImageUrl = "/opengraph-image";
 
   return {
     title: article.title,
@@ -89,10 +85,9 @@ export async function generateMetadata({
   };
 }
 
-export default async function ArticlePage({ params, searchParams }: ArticlePageProps) {
+export default async function ArticlePage({ params }: ArticlePageProps) {
   const { id } = await params;
-  const { lang } = (await searchParams) ?? {};
-  const article = await getArticleById(id, lang);
+  const article = await getArticleById(id);
 
   if (!article) {
     notFound();

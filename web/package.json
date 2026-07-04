@@ -17,6 +17,7 @@
     "test:admin-article-reviews": "node ../scripts/admin_article_reviews_regression.mjs",
     "test:security-headers": "node scripts/assert-security-headers.mjs",
     "test:fluid-cpu": "node ../scripts/fluid_active_cpu_regression.mjs",
+    "test:public-route-cpu-cache": "node ../scripts/public_route_cpu_cache_regression.mjs",
     "test:public-cache": "node ../scripts/public_cache_policy_regression.mjs",
     "test:article-dedupe": "node ../scripts/article_dedupe_regression.mjs",
     "test:admin-guardrails": "node ../scripts/admin_guardrails_regression.mjs",
