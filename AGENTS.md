@@ -5,13 +5,21 @@
 This is the NutsNews web repository.
 
 - Production site: https://nutsnews.com
-- Main repository: https://github.com/ramideltoro/nutsnews
+- Main web application repository: https://github.com/ramideltoro/nutsnews
+- Worker/automation repository: https://github.com/ramideltoro/nutsnews-worker
 - Shared documentation repository: https://github.com/ramideltoro/nutsnews-docs
 - Primary branch: main
 - Hosting: Vercel
 - CDN/DNS/security: Cloudflare
 - Database: Supabase Postgres
-- Workers: Cloudflare Workers in a separate repo when applicable
+- Workers: Cloudflare Workers live in `ramideltoro/nutsnews-worker`
+
+## Repository map
+
+- `ramideltoro/nutsnews`: production web application, Next.js admin/public UI, Vercel hosting, app routes, cache policy, PageSpeed tooling, and web-facing guardrails.
+- `ramideltoro/nutsnews-worker`: worker/controller jobs, Cloudflare Worker code, queue/scheduled automation, worker-side cache/KV behavior, and feed-processing automation.
+- `ramideltoro/nutsnews-docs`: shared operational documentation, runbooks, deployment notes, environment-variable inventory, cache behavior, and cross-repo architecture notes.
+- Keep implementation changes in the owning repo. If a change crosses web, worker, and docs boundaries, make coordinated PRs instead of mixing unrelated ownership into one repository.
 
 ## Working rules
 
