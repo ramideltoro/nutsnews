@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import {
   dedupeArticlesByIdentity,
   getArticleIdentityKey,
@@ -737,7 +738,7 @@ export async function getPublishedCategories(limit = 1000) {
   return Array.from(categories).sort((a, b) => a.localeCompare(b));
 }
 
-export const getArticleById = cache(async (id: string, requestedLanguageCode?: string | null) => {
+const getCachedArticleById = unstable_cache(async (id: string, requestedLanguageCode?: string | null) => {
   const languageCode = normalizeLanguageCode(requestedLanguageCode);
   const { data, error } = await supabase
     .from("articles")
@@ -755,7 +756,11 @@ export const getArticleById = cache(async (id: string, requestedLanguageCode?: s
 
   const [article] = await applyArticleSummaries([data as Article], languageCode);
   return article ?? null;
+}, ["published-article-by-id"], {
+  revalidate: 3600,
 });
+
+export const getArticleById = cache(getCachedArticleById);
 
 export async function getRecentArticleSitemapItems(limit = 1000) {
   const { data, error } = await supabase

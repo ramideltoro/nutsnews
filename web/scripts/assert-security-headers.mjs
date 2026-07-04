@@ -51,10 +51,7 @@ for (const directive of [
 
 for (const routeToken of [
   "isAdminRoute",
-  "isOperationalNoStoreRoute",
-  "/api/contact",
-  "/api/auth/",
-  "bypass-operational-cache",
+  "bypass-admin-cache",
   "X-Robots-Tag",
 ]) {
   assertIncludes(middleware, routeToken, "middleware.ts");

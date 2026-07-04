@@ -14,18 +14,6 @@ function isAdminRoute(pathname: string) {
   return pathname === "/admin" || pathname.startsWith("/admin/");
 }
 
-function isOperationalNoStoreRoute(pathname: string) {
-  return (
-    pathname === "/monitoring" ||
-    pathname.startsWith("/monitoring/") ||
-    pathname === "/api/log-test" ||
-    pathname.startsWith("/api/log-test/") ||
-    pathname.startsWith("/api/auth/") ||
-    pathname === "/api/contact" ||
-    isAdminRoute(pathname)
-  );
-}
-
 function getBypassCacheHeaders(policy: string): HeaderMap {
   return {
     "Cache-Control": NO_STORE_CACHE_CONTROL,
@@ -41,23 +29,14 @@ export function middleware(request: NextRequest) {
   const response = NextResponse.next();
   const { pathname } = request.nextUrl;
 
-  if (isOperationalNoStoreRoute(pathname)) {
-    setHeaders(response, getBypassCacheHeaders("bypass-operational-cache"));
-
-    if (isAdminRoute(pathname)) {
-      response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
-    }
+  if (isAdminRoute(pathname)) {
+    setHeaders(response, getBypassCacheHeaders("bypass-admin-cache"));
+    response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
   }
 
   return response;
 }
 
 export const config = {
-  matcher: [
-    "/admin/:path*",
-    "/monitoring/:path*",
-    "/api/log-test/:path*",
-    "/api/auth/:path*",
-    "/api/contact",
-  ],
+  matcher: ["/admin/:path*"],
 };

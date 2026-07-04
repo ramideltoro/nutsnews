@@ -93,7 +93,6 @@ export function createOgImage({
       <div
         style={{
           position: "relative",
-          zIndex: 1,
           display: "flex",
           width: "100%",
           flexDirection: "column",

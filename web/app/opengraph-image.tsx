@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { createOgImage, OG_IMAGE_SIZE } from "@/lib/ogImage";
 
-export const runtime = "edge";
+export const revalidate = 3600;
 export const alt = "NutsNews social preview image";
 export const size = OG_IMAGE_SIZE;
 export const contentType = "image/png";

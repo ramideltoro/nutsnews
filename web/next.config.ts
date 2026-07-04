@@ -154,6 +154,10 @@ const nextConfig: NextConfig = {
         headers: publicCacheHeaders(`public-home-feed-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`),
       },
       {
+        source: "/healthz",
+        headers: publicCacheHeaders("public-healthz-cache-60s", PUBLIC_PAGE_CACHE_CONTROL, "public, s-maxage=60, stale-while-revalidate=300"),
+      },
+      {
         source: "/api/contact",
         headers: noStoreHeaders("bypass-contact-api-cache"),
       },
@@ -264,14 +268,6 @@ const nextConfig: NextConfig = {
         source: "/api/log-test/:path*",
         headers: noStoreHeaders("bypass-log-test-cache"),
       },
-      {
-        source: "/monitoring",
-        headers: noStoreHeaders("bypass-monitoring-cache"),
-      },
-      {
-        source: "/monitoring/:path*",
-        headers: noStoreHeaders("bypass-monitoring-cache"),
-      },
     ];
   },
 };
@@ -281,7 +277,6 @@ export default withSentryConfig(nextConfig, {
   project: shouldUploadSentrySourceMaps ? process.env.SENTRY_PROJECT : undefined,
   authToken: shouldUploadSentrySourceMaps ? process.env.SENTRY_AUTH_TOKEN : undefined,
   widenClientFileUpload: true,
-  tunnelRoute: "/monitoring",
   telemetry: false,
   sourcemaps: {
     disable: !shouldUploadSentrySourceMaps,
