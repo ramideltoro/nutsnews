@@ -18,6 +18,10 @@ type ArticlePageProps = {
   }>;
 };
 
+export async function generateStaticParams() {
+  return [];
+}
+
 function formatDate(dateValue: string | null) {
   if (!dateValue) {
     return "Published recently";

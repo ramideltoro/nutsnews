@@ -30,6 +30,7 @@ const cacheHeaders = read("web/lib/cacheHeaders.ts");
 const nextConfig = read("web/next.config.ts");
 const articlesApi = read("web/app/api/articles/route.ts");
 const homeFeedApi = read("web/app/api/home-feed/route.ts");
+const healthz = read("web/app/healthz/route.ts");
 const cacheObservability = read("web/cache-observability.config.json");
 const middleware = read("web/middleware.ts");
 
@@ -72,12 +73,14 @@ for (const policy of [
 
 assertIncludes(articlesApi, "public-home-feed-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s", "articles API");
 assertIncludes(homeFeedApi, "public-home-feed-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s", "home-feed API");
+assertIncludes(healthz, "public-healthz-cache-60s", "healthz route");
 
 for (const route of [
   '"/"',
   '"/articles/:path*"',
   '"/api/articles"',
   '"/api/home-feed"',
+  '"/healthz"',
 ]) {
   assertIncludes(nextConfig, `source: ${route}`, "next.config.ts");
 }
@@ -85,10 +88,10 @@ for (const route of [
 assertRouteUsesNoStore(nextConfig, "/admin/:path*", "bypass-admin-cache");
 assertRouteUsesNoStore(nextConfig, "/api/auth/:path*", "bypass-auth-cache");
 assertRouteUsesNoStore(nextConfig, "/api/contact", "bypass-contact-api-cache");
-assertRouteUsesNoStore(nextConfig, "/monitoring", "bypass-monitoring-cache");
-assertRouteUsesNoStore(nextConfig, "/monitoring/:path*", "bypass-monitoring-cache");
 
 assertIncludes(middleware, '"Cloudflare-CDN-Cache-Control": "no-store"', "middleware.ts");
+assertExcludes(middleware, '"/api/', "middleware.ts");
+assertExcludes(middleware, '"/monitoring', "middleware.ts");
 assertIncludes(cacheObservability, '"expectedPolicy": "public-home-cache-3600s"', "cache-observability.config.json");
 assertIncludes(cacheObservability, '"expectedPolicy": "public-article-cache-3600s"', "cache-observability.config.json");
 assertIncludes(cacheObservability, '"expectedPolicy": "public-api-cache-3600s"', "cache-observability.config.json");

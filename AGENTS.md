@@ -26,6 +26,10 @@ This is the NutsNews web repository.
 - Do not add product, operations, deployment, cache, automation, or environment documentation to this application repository. Documentation-only updates belong in `ramideltoro/nutsnews-docs` so they do not trigger application deployments.
 - Preserve existing UI style unless the requested task explicitly changes it.
 - For cache/CDN work, verify headers and document expected behavior.
+- Avoid routing telemetry tunnels through middleware; prefer direct-to-provider telemetry unless a tunnel is explicitly required.
+- Keep generated OG image routes cacheable and lightweight; avoid remote fetches and unsupported `ImageResponse` CSS.
+- External uptime monitors such as Better Stack or UptimeRobot should hit `/healthz`, not public pages or article APIs.
+- Prefer ISR and cached fetch/database helpers for public article pages when freshness allows.
 - For GitHub Actions work, include regression checks when practical.
 - For Vercel/Cloudflare deployment work, include safe dry-run or validation paths when practical.
 
