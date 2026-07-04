@@ -17,7 +17,6 @@ const extraHTTPHeaders = vercelAutomationBypassSecret
 
 export default defineConfig({
   testDir: './tests',
-  testMatch: /accessibility\.spec\.ts/,
   timeout: 60_000,
   expect: {
     timeout: 10_000,
