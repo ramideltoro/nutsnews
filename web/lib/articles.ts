@@ -8,8 +8,20 @@ import {
 } from "@/lib/languages";
 
 export const PAGE_SIZE = 5;
+export const CURSOR_PAGE_SIZE = 15;
 export const SEARCH_PAGE_SIZE = 20;
 export const CATEGORY_SECTION_SIZE = 8;
+export const HOME_FEED_SNAPSHOT_SCAN_LIMIT = 250;
+
+export const HOME_FEED_SECTIONS = [
+  { id: "community", query: "community" },
+  { id: "animals", query: "animals" },
+  { id: "science", query: "science" },
+  { id: "wellness", query: "wellness" },
+  { id: "travel", query: "travel" },
+  { id: "culture", query: "culture" },
+  { id: "achievements", query: "achievement" },
+] as const;
 export const SITE_URL = "https://www.nutsnews.com";
 export const PUBLIC_FEED_SNAPSHOT_TABLE = "public_feed_snapshot";
 
@@ -97,6 +109,17 @@ export type PublishedArticlesResult = {
   dataSource: PublishedArticleDataSource;
   languageCode: LanguageCode;
   edgeSnapshot?: PublicFeedEdgeSnapshotMetadata | null;
+};
+
+export type HomeFeedSectionId = (typeof HOME_FEED_SECTIONS)[number]["id"];
+
+export type HomeFeedSection = {
+  id: HomeFeedSectionId;
+  articles: Article[];
+};
+
+export type HomeFeedPayload = PublishedArticlesResult & {
+  sections: HomeFeedSection[];
 };
 
 function encodeArticleCursor(article: Article) {
@@ -267,16 +290,18 @@ async function shapePublishedArticlesResult({
   includeNextPage,
   dataSource,
   languageCode,
+  pageSize = PAGE_SIZE,
 }: {
   data: Article[] | null;
   page: number;
   includeNextPage: boolean;
   dataSource: PublishedArticleDataSource;
   languageCode: LanguageCode;
+  pageSize?: number;
 }): Promise<PublishedArticlesResult> {
   const rows = data ?? [];
-  const hasMore = rows.length > PAGE_SIZE;
-  const baseArticles = rows.slice(0, PAGE_SIZE);
+  const hasMore = rows.length > pageSize;
+  const baseArticles = rows.slice(0, pageSize);
   const articles = await applyArticleSummaries(baseArticles, languageCode);
   const lastArticle = baseArticles.at(-1);
 
@@ -433,6 +458,75 @@ export async function getPublishedArticlesForSection(
   return applyArticleSummaries((data ?? []) as Article[], languageCode);
 }
 
+function articleMatchesSection(article: Article, query: string) {
+  return article.category?.toLowerCase().includes(query.toLowerCase()) ?? false;
+}
+
+export async function getHomeFeedFromSnapshot(
+  requestedLanguageCode?: string | null,
+): Promise<HomeFeedPayload | null> {
+  const languageCode = normalizeLanguageCode(requestedLanguageCode);
+  const { data, error } = await basePublicFeedSnapshotQuery()
+    .order("snapshot_rank", { ascending: true })
+    .limit(HOME_FEED_SNAPSHOT_SCAN_LIMIT);
+
+  if (error || !data || data.length === 0) {
+    if (error) {
+      console.warn("Homepage snapshot unavailable. Falling back to legacy feed reads.", {
+        code: error?.code,
+        message: error?.message,
+      });
+    }
+
+    return null;
+  }
+
+  const rows = data as Article[];
+  const mainBaseArticles = rows.slice(0, PAGE_SIZE);
+  const sectionBaseArticles = HOME_FEED_SECTIONS.map((section) => ({
+    id: section.id,
+    articles: rows
+      .filter((article) => articleMatchesSection(article, section.query))
+      .slice(0, CATEGORY_SECTION_SIZE),
+  }));
+
+  const uniqueArticlesById = new Map<string, Article>();
+
+  for (const article of mainBaseArticles) {
+    uniqueArticlesById.set(article.id, article);
+  }
+
+  for (const section of sectionBaseArticles) {
+    for (const article of section.articles) {
+      uniqueArticlesById.set(article.id, article);
+    }
+  }
+
+  const localizedArticles = await applyArticleSummaries(
+    Array.from(uniqueArticlesById.values()),
+    languageCode,
+  );
+  const localizedById = new Map(localizedArticles.map((article) => [article.id, article]));
+  const lastMainArticle = mainBaseArticles.at(-1);
+
+  return {
+    articles: mainBaseArticles.map((article) => localizedById.get(article.id) ?? article),
+    nextPage: null,
+    nextCursor:
+      rows.length > PAGE_SIZE && lastMainArticle
+        ? encodeArticleCursor(lastMainArticle)
+        : null,
+    dataSource: "public_feed_snapshot",
+    languageCode,
+    sections: sectionBaseArticles.map((section) => ({
+      id: section.id,
+      articles: section.articles.map(
+        (article) => localizedById.get(article.id) ?? article,
+      ),
+    })),
+  };
+}
+
 async function getPublishedArticlesByCursorFromSourceTable(
   decodedCursor: ArticleCursor | null,
   category?: string | null,
@@ -449,7 +543,7 @@ async function getPublishedArticlesByCursorFromSourceTable(
   const { data, error } = await query
     .order("published_on_site_at", { ascending: false })
     .order("id", { ascending: false })
-    .limit(PAGE_SIZE + 1);
+    .limit(CURSOR_PAGE_SIZE + 1);
 
   if (error) {
     console.error("Failed to load cursor-paginated published articles from fallback articles table:", error);
@@ -469,6 +563,7 @@ async function getPublishedArticlesByCursorFromSourceTable(
     includeNextPage: false,
     dataSource: "articles_fallback",
     languageCode,
+    pageSize: CURSOR_PAGE_SIZE,
   });
 }
 

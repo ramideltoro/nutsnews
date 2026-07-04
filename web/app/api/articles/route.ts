@@ -1,19 +1,21 @@
 import { NextResponse } from "next/server";
 
 import {
+  CURSOR_PAGE_SIZE,
   getPublishedArticlesByCursor,
   PAGE_SIZE,
   type PublishedArticlesResult,
 } from "@/lib/articles";
 import {
   getEdgeFeedSnapshotPage,
+  getHomeFeedDataWithEdgeFallback,
   getPublishedArticlesWithEdgeFallback,
 } from "@/lib/edgeFeedSnapshot";
 import { normalizeLanguageCode } from "@/lib/languages";
 import { ARTICLE_API_CACHE_HEADERS, BYPASS_CACHE_HEADERS } from "@/lib/cacheHeaders";
-import { logError, logInfo } from "@/lib/logger";
+import { logError, logInfoSampled } from "@/lib/logger";
 
-export const revalidate = 300;
+export const revalidate = 900;
 
 const MAX_SAFE_OFFSET_PAGE = 1000;
 
@@ -80,26 +82,23 @@ export async function GET(request: Request) {
   const page = parsePage(searchParams.get("page"));
   const cursor = searchParams.get("cursor");
   const category = searchParams.get("category");
+  const homeMode = searchParams.get("home") === "1";
   const languageCode = normalizeLanguageCode(searchParams.get("lang"));
-  const paginationMode = cursor ? "cursor" : "offset";
-
-  await logInfo("api.articles.request_started", "Articles API request started", {
-    route: "/api/articles",
-    method: "GET",
-    page,
-    hasCursor: Boolean(cursor),
-    paginationMode,
-    pageSize: PAGE_SIZE,
-    category: category ?? "all",
-    languageCode,
-  });
+  const paginationMode = homeMode ? "home" : cursor ? "cursor" : "offset";
 
   try {
-    const result = cursor
-      ? await getPublishedArticlesByCursor(cursor, category, languageCode)
-      : await getPublishedArticlesWithEdgeFallback(page, category, languageCode);
+    const responsePageSize = homeMode
+      ? PAGE_SIZE
+      : cursor
+        ? CURSOR_PAGE_SIZE
+        : PAGE_SIZE;
+    const result = homeMode
+      ? await getHomeFeedDataWithEdgeFallback(languageCode)
+      : cursor
+        ? await getPublishedArticlesByCursor(cursor, category, languageCode)
+        : await getPublishedArticlesWithEdgeFallback(page, category, languageCode);
 
-    await logInfo(
+    await logInfoSampled(
       "api.articles.request_completed",
       "Articles API request completed",
       {
@@ -108,8 +107,9 @@ export async function GET(request: Request) {
         status: 200,
         page,
         hasCursor: Boolean(cursor),
+        homeMode,
         paginationMode,
-        pageSize: PAGE_SIZE,
+        pageSize: responsePageSize,
         category: category ?? "all",
         languageCode,
         articleCount: result.articles.length,
@@ -121,11 +121,16 @@ export async function GET(request: Request) {
     );
 
     return NextResponse.json(result, {
-      headers: buildArticleApiHeaders({
-        result,
-        paginationMode,
-        languageCode,
-      }),
+      headers: {
+        ...buildArticleApiHeaders({
+          result,
+          paginationMode,
+          languageCode,
+        }),
+        ...(homeMode
+          ? { "X-NutsNews-Cache-Policy": "public-home-feed-cache-900s" }
+          : {}),
+      },
     });
   } catch (error) {
     await logError(
@@ -138,15 +143,16 @@ export async function GET(request: Request) {
         status: 500,
         page,
         hasCursor: Boolean(cursor),
+        homeMode,
         paginationMode,
-        pageSize: PAGE_SIZE,
+        pageSize: homeMode ? PAGE_SIZE : cursor ? CURSOR_PAGE_SIZE : PAGE_SIZE,
         category: category ?? "all",
         languageCode,
         durationMs: Date.now() - startedAt,
       },
     );
 
-    if (!cursor) {
+    if (!cursor && !homeMode) {
       const edgeResult = await getEdgeFeedSnapshotPage({
         page,
         category,
@@ -154,7 +160,7 @@ export async function GET(request: Request) {
       });
 
       if (edgeResult) {
-        await logInfo(
+        await logInfoSampled(
           "api.articles.edge_snapshot_recovered",
           "Articles API recovered from Cloudflare edge feed snapshot",
           {
@@ -163,7 +169,7 @@ export async function GET(request: Request) {
             status: 200,
             page,
             paginationMode,
-            pageSize: PAGE_SIZE,
+            pageSize: cursor ? CURSOR_PAGE_SIZE : PAGE_SIZE,
             category: category ?? "all",
             languageCode,
             articleCount: edgeResult.articles.length,
@@ -189,7 +195,8 @@ export async function GET(request: Request) {
         articles: [],
         nextPage: null,
         nextCursor: null,
-        error: "Failed to load articles",
+        ...(homeMode ? { sections: [] } : {}),
+        error: homeMode ? "Failed to load home feed" : "Failed to load articles",
       },
       {
         status: 500,

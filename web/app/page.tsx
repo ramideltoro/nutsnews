@@ -1,42 +1,17 @@
 import Image from "next/image";
 
-export const revalidate = 300;
+export const revalidate = 900;
 
-import { ArticleFeed, type ArticleCategorySection } from "./components/ArticleFeed";
+import { ArticleFeed } from "./components/ArticleFeed";
 import { HomeArrivalAnimation } from "./components/HomeArrivalAnimation";
 import { NewspaperPrimaryNav } from "./components/NewspaperPrimaryNav";
 import { SiteFooter } from "./components/SiteFooter";
 import { SITE_URL } from "@/lib/articles";
-import {
-  getPublishedArticlesForSectionWithEdgeFallback,
-  getPublishedArticlesWithEdgeFallback,
-} from "@/lib/edgeFeedSnapshot";
-
-const categorySections = [
-  { id: "community", label: "Community", query: "community" },
-  { id: "animals", label: "Animals", query: "animals" },
-  { id: "science", label: "Science", query: "science" },
-  { id: "wellness", label: "Wellness", query: "wellness" },
-  { id: "travel", label: "Travel", query: "travel" },
-  { id: "culture", label: "Culture", query: "culture" },
-  { id: "achievements", label: "Achievements", query: "achievement" },
-] satisfies {
-  id: ArticleCategorySection["id"];
-  label: string;
-  query: string;
-}[];
+import { getHomeFeedDataWithEdgeFallback } from "@/lib/edgeFeedSnapshot";
 
 export default async function Home() {
-  const [{ articles, nextPage, nextCursor }, initialCategorySections] =
-    await Promise.all([
-      getPublishedArticlesWithEdgeFallback(),
-      Promise.all(
-        categorySections.map(async (section) => ({
-          id: section.id,
-          articles: await getPublishedArticlesForSectionWithEdgeFallback(section.query),
-        })),
-      ),
-    ]);
+  const { articles, nextPage, nextCursor, sections } =
+    await getHomeFeedDataWithEdgeFallback();
 
   const homeJsonLd = {
     "@context": "https://schema.org",
@@ -98,7 +73,7 @@ export default async function Home() {
           initialArticles={articles}
           initialNextPage={nextPage}
           initialNextCursor={nextCursor}
-          initialCategorySections={initialCategorySections}
+          initialCategorySections={sections}
         />
       </div>
 
