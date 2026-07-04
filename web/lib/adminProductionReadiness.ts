@@ -1,3 +1,5 @@
+import "server-only";
+
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import { PAGE_SIZE } from "@/lib/articles";
@@ -11,8 +13,87 @@ const IMAGE_GREEN_PERCENT = 85;
 const IMAGE_YELLOW_PERCENT = 70;
 const TRANSLATION_GREEN_PERCENT = 90;
 const TRANSLATION_YELLOW_PERCENT = 75;
+const GITHUB_REPO_OWNER = "ramideltoro";
+const GITHUB_REPO_NAME = "nutsnews";
+const GITHUB_ACTIONS_BRANCH = "main";
+const GITHUB_ACTIONS_REVALIDATE_SECONDS = 300;
+const GITHUB_ACTIONS_STALE_HOURS = 72;
+const GITHUB_ACTIONS_URL = `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/actions`;
+const GITHUB_ACTIONS_RUNS_API_URL = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/actions/runs?branch=${GITHUB_ACTIONS_BRANCH}&per_page=50`;
+
+const REQUIRED_GITHUB_WORKFLOWS = [
+  {
+    label: "Web CI",
+    names: ["Web CI"],
+    paths: [".github/workflows/web-ci.yml"],
+  },
+  {
+    label: "Public smoke",
+    names: ["Public Reader Smoke Tests"],
+    paths: [".github/workflows/public-reader-smoke.yml"],
+  },
+  {
+    label: "Preview smoke",
+    names: ["Vercel Preview Smoke Test"],
+    paths: [".github/workflows/vercel-preview-smoke.yml"],
+  },
+  {
+    label: "Lighthouse",
+    names: ["Lighthouse CI"],
+    paths: [".github/workflows/lighthouse-ci.yml"],
+  },
+  {
+    label: "Axe accessibility",
+    names: ["Accessibility CI"],
+    paths: [".github/workflows/accessibility-ci.yml"],
+  },
+  {
+    label: "CodeQL",
+    names: ["CodeQL Security Scan"],
+    paths: [".github/workflows/codeql.yml"],
+  },
+  {
+    label: "Gitleaks secrets",
+    names: ["Gitleaks Secret Scan"],
+    paths: [".github/workflows/gitleaks.yml"],
+  },
+  {
+    label: "OSV Scanner",
+    names: ["OSV Scanner"],
+    paths: [".github/workflows/osv-scanner.yml"],
+  },
+  {
+    label: "Dependency Review",
+    names: ["Dependency Review"],
+    paths: [".github/workflows/dependency-review.yml"],
+  },
+  {
+    label: "OpenSSF Scorecard",
+    names: ["OpenSSF Scorecard"],
+    paths: [".github/workflows/openssf-scorecard.yml"],
+  },
+  {
+    label: "Snyk Security Scan",
+    names: ["Snyk Security Scan"],
+    paths: [".github/workflows/snyk.yml"],
+  },
+] as const;
 
 export type ProductionReadinessStatus = "green" | "yellow" | "red";
+
+export type ProductionReadinessWorkflow = {
+  name: string;
+  status: ProductionReadinessStatus;
+  statusLabel: string;
+  githubStatus: string;
+  conclusion: string;
+  branch: string;
+  commitSha: string;
+  updatedAt: string | null;
+  href: string;
+  linkLabel: string;
+  detail: string;
+};
 
 export type ProductionReadinessSignal = {
   id: string;
@@ -24,6 +105,7 @@ export type ProductionReadinessSignal = {
   nextStep: string;
   href: string;
   linkLabel: string;
+  workflows?: ProductionReadinessWorkflow[];
 };
 
 export type ProductionReadinessDashboardData = {
@@ -72,6 +154,23 @@ type WorkerRunRow = {
 type SummaryRow = {
   original_url: string;
   language_code: string;
+};
+
+type GitHubWorkflowRun = {
+  id: number;
+  name: string | null;
+  path: string | null;
+  status: string | null;
+  conclusion: string | null;
+  head_branch: string | null;
+  head_sha: string | null;
+  html_url: string | null;
+  updated_at: string | null;
+  created_at: string | null;
+};
+
+type GitHubWorkflowRunsResponse = {
+  workflow_runs?: GitHubWorkflowRun[];
 };
 
 function getSupabaseConfig(): SupabaseConfig | null {
@@ -157,6 +256,7 @@ function signal({
   nextStep,
   href,
   linkLabel,
+  workflows,
 }: ProductionReadinessSignal): ProductionReadinessSignal {
   return {
     id,
@@ -168,6 +268,7 @@ function signal({
     nextStep,
     href,
     linkLabel,
+    workflows,
   };
 }
 
@@ -572,21 +673,274 @@ function buildBackupSignal() {
   });
 }
 
-function buildCiSignal() {
+function getGitHubActionsToken() {
+  return process.env.ACTIONS_READ_TOKEN?.trim() || null;
+}
+
+function normalizeWorkflowValue(value: string | null) {
+  return (value ?? "").trim().toLowerCase();
+}
+
+function matchesRequiredWorkflow(
+  run: GitHubWorkflowRun,
+  required: (typeof REQUIRED_GITHUB_WORKFLOWS)[number],
+) {
+  const runName = normalizeWorkflowValue(run.name);
+  const runPath = normalizeWorkflowValue(run.path);
+
+  return (
+    required.names.some((name) => runName === normalizeWorkflowValue(name)) ||
+    required.paths.some((path) => runPath.endsWith(normalizeWorkflowValue(path)))
+  );
+}
+
+function getRequiredWorkflowHref(required: (typeof REQUIRED_GITHUB_WORKFLOWS)[number]) {
+  const workflowParts = required.paths[0]?.split("/") ?? [];
+  const workflowFile = workflowParts[workflowParts.length - 1];
+
+  if (!workflowFile) {
+    return GITHUB_ACTIONS_URL;
+  }
+
+  return `${GITHUB_ACTIONS_URL}/workflows/${workflowFile}`;
+}
+
+function workflowRunTimestamp(run: GitHubWorkflowRun) {
+  return new Date(run.updated_at ?? run.created_at ?? 0).getTime();
+}
+
+function findLatestWorkflowRun(
+  runs: GitHubWorkflowRun[],
+  required: (typeof REQUIRED_GITHUB_WORKFLOWS)[number],
+) {
+  return runs
+    .filter((run) => matchesRequiredWorkflow(run, required))
+    .sort((a, b) => workflowRunTimestamp(b) - workflowRunTimestamp(a))[0];
+}
+
+function isWorkflowRunStale(updatedAt: string | null) {
+  if (!updatedAt) {
+    return true;
+  }
+
+  const updatedTime = new Date(updatedAt).getTime();
+
+  if (Number.isNaN(updatedTime)) {
+    return true;
+  }
+
+  return Date.now() - updatedTime > GITHUB_ACTIONS_STALE_HOURS * 60 * 60 * 1000;
+}
+
+function mapWorkflowRunStatus(
+  required: (typeof REQUIRED_GITHUB_WORKFLOWS)[number],
+  run: GitHubWorkflowRun | undefined,
+): ProductionReadinessWorkflow {
+  if (!run) {
+    return {
+      name: required.label,
+      status: "yellow",
+      statusLabel: "Missing",
+      githubStatus: "missing",
+      conclusion: "missing",
+      branch: GITHUB_ACTIONS_BRANCH,
+      commitSha: "unknown",
+      updatedAt: null,
+      href: getRequiredWorkflowHref(required),
+      linkLabel: "Open workflow",
+      detail: "No matching workflow run was returned for the main branch.",
+    };
+  }
+
+  const status = normalizeWorkflowValue(run.status);
+  const conclusion = normalizeWorkflowValue(run.conclusion);
+  const isCompleted = status === "completed";
+  const stale = isCompleted && isWorkflowRunStale(run.updated_at);
+  const href = run.html_url ?? getRequiredWorkflowHref(required);
+  const name = run.name ?? required.label;
+
+  if (!isCompleted) {
+    return {
+      name,
+      status: "yellow",
+      statusLabel: status || "Pending",
+      githubStatus: status || "unknown",
+      conclusion: conclusion || "pending",
+      branch: run.head_branch ?? GITHUB_ACTIONS_BRANCH,
+      commitSha: run.head_sha ?? "unknown",
+      updatedAt: run.updated_at,
+      href,
+      linkLabel: "Open run",
+      detail: "The latest workflow run is queued, in progress, or otherwise not complete.",
+    };
+  }
+
+  if (conclusion === "success" && !stale) {
+    return {
+      name,
+      status: "green",
+      statusLabel: "Passing",
+      githubStatus: status,
+      conclusion,
+      branch: run.head_branch ?? GITHUB_ACTIONS_BRANCH,
+      commitSha: run.head_sha ?? "unknown",
+      updatedAt: run.updated_at,
+      href,
+      linkLabel: "Open run",
+      detail: "The latest completed run on main passed.",
+    };
+  }
+
+  if (
+    ["failure", "cancelled", "timed_out", "action_required"].includes(
+      conclusion,
+    )
+  ) {
+    return {
+      name,
+      status: "red",
+      statusLabel: "Failed",
+      githubStatus: status,
+      conclusion,
+      branch: run.head_branch ?? GITHUB_ACTIONS_BRANCH,
+      commitSha: run.head_sha ?? "unknown",
+      updatedAt: run.updated_at,
+      href,
+      linkLabel: "Open run",
+      detail: "The latest completed required workflow run needs attention.",
+    };
+  }
+
+  return {
+    name,
+    status: "yellow",
+    statusLabel: stale ? "Stale" : conclusion || "Verify",
+    githubStatus: status,
+    conclusion: stale ? `${conclusion || "success"}; stale` : conclusion || "unknown",
+    branch: run.head_branch ?? GITHUB_ACTIONS_BRANCH,
+    commitSha: run.head_sha ?? "unknown",
+    updatedAt: run.updated_at,
+    href,
+    linkLabel: "Open run",
+    detail: stale
+      ? `The latest completed run is older than ${GITHUB_ACTIONS_STALE_HOURS} hours.`
+      : "The latest completed run was skipped, neutral, startup-failed, or otherwise not a clear success.",
+  };
+}
+
+function aggregateWorkflowStatus(workflows: ProductionReadinessWorkflow[]) {
+  const red = workflows.filter((workflow) => workflow.status === "red").length;
+  const yellow = workflows.filter((workflow) => workflow.status === "yellow").length;
+
+  if (red > 0) {
+    return {
+      status: "red" as const,
+      statusLabel: "Failing",
+      value: `${red} red`,
+      detail: `${red} required GitHub Actions workflow${red === 1 ? "" : "s"} failed, was cancelled, timed out, or requires action.`,
+      nextStep: "Open the failing workflow run and inspect failed job logs.",
+      href:
+        workflows.find((workflow) => workflow.status === "red")?.href ??
+        GITHUB_ACTIONS_URL,
+    };
+  }
+
+  if (yellow > 0) {
+    return {
+      status: "yellow" as const,
+      statusLabel: "Verify",
+      value: `${yellow} verify`,
+      detail: `${yellow} required GitHub Actions workflow${yellow === 1 ? "" : "s"} is missing, pending, stale, skipped, neutral, rate-limited, or unavailable.`,
+      nextStep: "Open GitHub Actions and confirm pending or stale workflows before promotion.",
+      href:
+        workflows.find((workflow) => workflow.status === "yellow")?.href ??
+        GITHUB_ACTIONS_URL,
+    };
+  }
+
+  return {
+    status: "green" as const,
+    statusLabel: "Passing",
+    value: `${workflows.length}/${workflows.length} green`,
+    detail: `All ${workflows.length} required GitHub Actions workflows have latest completed successful runs on main.`,
+    nextStep: "If promotion is blocked elsewhere, review GitHub Actions for non-required workflows.",
+    href: GITHUB_ACTIONS_URL,
+  };
+}
+
+function buildCiFallbackSignal(detail: string) {
   return signal({
     id: "ci-status",
     title: "CI status",
     status: "yellow",
     statusLabel: "Verify",
     value: "External",
-    detail: "GitHub Actions status is not queried from the admin app because no existing server-side GitHub status integration is configured.",
+    detail,
     nextStep: "Open GitHub Actions and confirm Web CI, public smoke, preview smoke, Lighthouse, axe, CodeQL, and security scans are green.",
-    href: "https://github.com/ramideltoro/nutsnews/actions",
+    href: GITHUB_ACTIONS_URL,
     linkLabel: "Open GitHub Actions",
   });
 }
 
-function emptyDashboard(errorMessage: string | null): ProductionReadinessDashboardData {
+async function buildCiSignal() {
+  const token = getGitHubActionsToken();
+
+  if (!token) {
+    return buildCiFallbackSignal(
+      "GitHub Actions status is not queried from the admin app because ACTIONS_READ_TOKEN is not configured.",
+    );
+  }
+
+  try {
+    const response = await fetch(GITHUB_ACTIONS_RUNS_API_URL, {
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${token}`,
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+      next: { revalidate: GITHUB_ACTIONS_REVALIDATE_SECONDS },
+    });
+
+    if (!response.ok) {
+      const rateLimited =
+        response.status === 403 &&
+        response.headers.get("x-ratelimit-remaining") === "0";
+      return buildCiFallbackSignal(
+        rateLimited
+          ? "Live GitHub Actions status is rate-limited. The admin app preserved the external verification fallback."
+          : `Live GitHub Actions status is unavailable because GitHub returned HTTP ${response.status}.`,
+      );
+    }
+
+    const data = (await response.json()) as GitHubWorkflowRunsResponse;
+    const runs = Array.isArray(data.workflow_runs) ? data.workflow_runs : [];
+    const workflows = REQUIRED_GITHUB_WORKFLOWS.map((required) =>
+      mapWorkflowRunStatus(required, findLatestWorkflowRun(runs, required)),
+    );
+    const aggregate = aggregateWorkflowStatus(workflows);
+
+    return signal({
+      id: "ci-status",
+      title: "CI status",
+      status: aggregate.status,
+      statusLabel: aggregate.statusLabel,
+      value: aggregate.value,
+      detail: aggregate.detail,
+      nextStep: aggregate.nextStep,
+      href: aggregate.href,
+      linkLabel: "Open GitHub Actions",
+      workflows,
+    });
+  } catch {
+    return buildCiFallbackSignal(
+      "Live GitHub Actions status is unavailable because the GitHub API request failed before a response was returned.",
+    );
+  }
+}
+
+async function emptyDashboard(
+  errorMessage: string | null,
+): Promise<ProductionReadinessDashboardData> {
   const signals = [
     signal({
       id: "configuration",
@@ -600,7 +954,7 @@ function emptyDashboard(errorMessage: string | null): ProductionReadinessDashboa
       linkLabel: "Open guardrails",
     }),
     buildBackupSignal(),
-    buildCiSignal(),
+    await buildCiSignal(),
   ];
   const summary = summarize(signals);
 
@@ -649,6 +1003,7 @@ export async function getAdminProductionReadinessDashboardData(): Promise<Produc
       countArticlesSince(client, 24 * 7),
     ]);
     const { summaries, expectedCount } = await loadRecentSummaries(client, recentArticles);
+    const ciSignal = await buildCiSignal();
     const signals = [
       buildPublicApiSignal({ publicFeedSnapshotCount, recentArticles }),
       buildWorkerSignal(workerRun, now),
@@ -663,7 +1018,7 @@ export async function getAdminProductionReadinessDashboardData(): Promise<Produc
       }),
       buildImageSignal(recentArticles),
       buildBackupSignal(),
-      buildCiSignal(),
+      ciSignal,
     ].sort((a, b) => statusRank(b.status) - statusRank(a.status));
     const summary = summarize(signals);
     const overallStatus: ProductionReadinessStatus =
@@ -685,6 +1040,8 @@ export async function getAdminProductionReadinessDashboardData(): Promise<Produc
       signals,
     };
   } catch (error) {
-    return emptyDashboard(error instanceof Error ? error.message : "Unknown readiness load failure.");
+    return emptyDashboard(
+      error instanceof Error ? error.message : "Unknown readiness load failure.",
+    );
   }
 }

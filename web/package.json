@@ -24,6 +24,7 @@
     "test:admin-guardrails": "node ../scripts/admin_guardrails_regression.mjs",
     "test:admin-guardrails-cloudflare-forecast": "node ../scripts/admin_guardrails_cloudflare_forecast_regression.mjs",
     "test:admin-production-readiness": "node ../scripts/admin_production_readiness_regression.mjs",
+    "test:admin-readiness-actions-token": "node ../scripts/admin_readiness_actions_token_contract.mjs",
     "analyze:homepage": "node scripts/homepage-performance-budget.mjs",
     "analyze:homepage:warn": "node scripts/homepage-performance-budget.mjs --warn-only",
     "audit:cache": "node scripts/cache-observability.mjs",
