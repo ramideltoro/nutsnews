@@ -81,12 +81,48 @@ function riskClass(riskLevel: GuardrailMetric["riskLevel"]) {
   }
 }
 
+function forecastStatusLabel(status: GuardrailMetric["forecastStatus"]) {
+  switch (status) {
+    case "safe":
+      return "Safe";
+    case "approaching_limit":
+      return "Approaching limit";
+    case "projected_to_breach":
+      return "Projected to breach";
+    case "insufficient_trend_data":
+      return "Insufficient trend data";
+  }
+}
+
+function forecastStatusClass(status: GuardrailMetric["forecastStatus"]) {
+  switch (status) {
+    case "safe":
+      return "border-emerald-300/25 bg-emerald-400/10 text-emerald-100";
+    case "approaching_limit":
+      return "border-orange-300/30 bg-orange-400/10 text-orange-100";
+    case "projected_to_breach":
+      return "border-red-300/30 bg-red-400/10 text-red-100";
+    case "insufficient_trend_data":
+      return "border-amber-300/20 bg-black/30 text-amber-100/70";
+  }
+}
+
 function RiskPill({ riskLevel }: { riskLevel: GuardrailMetric["riskLevel"] }) {
   return (
     <span
       className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${riskClass(riskLevel)}`}
     >
       {riskLabel(riskLevel)}
+    </span>
+  );
+}
+
+function ForecastPill({ status }: { status: GuardrailMetric["forecastStatus"] }) {
+  return (
+    <span
+      className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${forecastStatusClass(status)}`}
+    >
+      {forecastStatusLabel(status)}
     </span>
   );
 }
@@ -128,8 +164,13 @@ function MetricCard({ metric }: { metric: GuardrailMetric }) {
             Forecast
           </p>
           <p className="mt-1 text-2xl font-black text-amber-50">
-            {formatValue(metric.forecast30DayValue, metric.unit)}
+            {metric.forecastStatus === "insufficient_trend_data"
+              ? "Insufficient trend data"
+              : formatValue(metric.forecast30DayValue, metric.unit)}
           </p>
+          <div className="mt-2">
+            <ForecastPill status={metric.forecastStatus} />
+          </div>
         </div>
       </div>
 
@@ -144,6 +185,9 @@ function MetricCard({ metric }: { metric: GuardrailMetric }) {
         {metric.usagePercent === null
           ? "No hard quota configured for this metric yet."
           : `${metric.usagePercent}% of configured limit · warning at ${metric.warningThresholdPercent}% · danger at ${metric.dangerThresholdPercent}%.`}
+      </p>
+      <p className="mt-2 text-xs font-semibold text-amber-100/55">
+        Forecast: {metric.forecastReason}
       </p>
       <p className="mt-4 text-sm leading-6 text-amber-100/70">{metric.description}</p>
       <div className="mt-4 rounded-2xl border border-amber-300/15 bg-black/25 p-4">

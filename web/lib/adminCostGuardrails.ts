@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { formatAdminDateTime } from "@/lib/adminTime";
 
 type RiskLevel = "ok" | "watch" | "danger" | "unknown";
+type ForecastStatus = "safe" | "approaching_limit" | "projected_to_breach" | "insufficient_trend_data";
 
 type AiUsageRunRow = {
   run_started_at: string;
@@ -55,6 +56,10 @@ export type GuardrailMetric = {
   riskLevel: RiskLevel;
   usagePercent: number | null;
   forecast30DayValue: number | null;
+  forecastDailyUsage: number | null;
+  forecastUsagePercent: number | null;
+  forecastStatus: ForecastStatus;
+  forecastReason: string;
   warningThresholdPercent: number;
   dangerThresholdPercent: number;
   description: string;
@@ -211,8 +216,141 @@ function riskLevel(
   return "ok";
 }
 
-function forecast30DayValue(valueLast7Days: number) {
-  return Math.round((valueLast7Days / 7) * 30);
+function roundMetricValue(value: number, unit: string) {
+  if (unit === "USD") {
+    return Math.round(value * 1_000_000) / 1_000_000;
+  }
+
+  if (unit === "GB" || unit === "GB-Hrs" || unit === "hours" || unit === "ms") {
+    return Math.round(value * 100) / 100;
+  }
+
+  return Math.round(value);
+}
+
+function forecastWindowLabel(days: number) {
+  return days === 1 ? "last 24 hours" : `last ${days} days`;
+}
+
+function forecastStatus(
+  forecastValue: number | null,
+  limit: number | null,
+  warningThresholdPercent: number,
+): ForecastStatus {
+  if (forecastValue === null || limit === null || limit <= 0) {
+    return "insufficient_trend_data";
+  }
+
+  const percent = usagePercent(forecastValue, limit);
+
+  if (percent === null) {
+    return "insufficient_trend_data";
+  }
+
+  if (percent >= 100) {
+    return "projected_to_breach";
+  }
+
+  if (percent >= warningThresholdPercent) {
+    return "approaching_limit";
+  }
+
+  return "safe";
+}
+
+function riskLevelFromForecastStatus(status: ForecastStatus): RiskLevel {
+  switch (status) {
+    case "projected_to_breach":
+      return "danger";
+    case "approaching_limit":
+      return "watch";
+    case "safe":
+      return "ok";
+    case "insufficient_trend_data":
+      return "unknown";
+  }
+}
+
+function highestRiskLevel(currentRiskLevel: RiskLevel, forecastRiskLevel: RiskLevel): RiskLevel {
+  if (currentRiskLevel === "danger" || forecastRiskLevel === "danger") {
+    return "danger";
+  }
+
+  if (currentRiskLevel === "watch" || forecastRiskLevel === "watch") {
+    return "watch";
+  }
+
+  if (currentRiskLevel === "ok" || forecastRiskLevel === "ok") {
+    return "ok";
+  }
+
+  return "unknown";
+}
+
+function mitigationForForecast(label: string, mitigation: string, status: ForecastStatus) {
+  switch (status) {
+    case "projected_to_breach":
+      return `${label} is projected to breach its configured limit within 30 days. Prioritize this mitigation now: ${mitigation}`;
+    case "approaching_limit":
+      return `${label} is approaching its configured limit on the current trend. Review this mitigation before the next deployment: ${mitigation}`;
+    case "safe":
+      return `${label} is safe on the current 30-day projection. Keep this mitigation ready if the trend changes: ${mitigation}`;
+    case "insufficient_trend_data":
+      return `Trend data is insufficient for ${label}. First configure live usage or quota events, then use this mitigation if usage rises: ${mitigation}`;
+  }
+}
+
+function buildForecast({
+  forecastSourceValue,
+  forecastSourceDays,
+  limit,
+  unit,
+  warningThresholdPercent,
+  insufficientReason,
+}: {
+  forecastSourceValue: number | null | undefined;
+  forecastSourceDays: number | null | undefined;
+  limit: number | null;
+  unit: string;
+  warningThresholdPercent: number;
+  insufficientReason?: string;
+}) {
+  if (
+    typeof forecastSourceValue !== "number" ||
+    !Number.isFinite(forecastSourceValue) ||
+    forecastSourceValue < 0 ||
+    typeof forecastSourceDays !== "number" ||
+    !Number.isFinite(forecastSourceDays) ||
+    forecastSourceDays <= 0
+  ) {
+    return {
+      forecast30DayValue: null,
+      forecastDailyUsage: null,
+      forecastUsagePercent: null,
+      forecastStatus: "insufficient_trend_data" as const,
+      forecastReason:
+        insufficientReason ??
+        "Insufficient trend data: no recent usage values were available from Cloudflare, quota events, or manual inputs.",
+    };
+  }
+
+  const dailyUsage = forecastSourceValue / forecastSourceDays;
+  const forecastValue = roundMetricValue(dailyUsage * 30, unit);
+  const forecastPercent = usagePercent(forecastValue, limit);
+  const status = forecastStatus(forecastValue, limit, warningThresholdPercent);
+  const sourceWindow = forecastWindowLabel(forecastSourceDays);
+  const reason =
+    limit === null || limit <= 0
+      ? `Projected from ${roundMetricValue(dailyUsage, unit).toLocaleString("en-US")} ${unit}/day over the ${sourceWindow}; no configured limit is available to compare against.`
+      : `Projected from ${roundMetricValue(dailyUsage, unit).toLocaleString("en-US")} ${unit}/day over the ${sourceWindow}; forecast is ${forecastPercent ?? "unknown"}% of the configured limit.`;
+
+  return {
+    forecast30DayValue: forecastValue,
+    forecastDailyUsage: roundMetricValue(dailyUsage, unit),
+    forecastUsagePercent: forecastPercent,
+    forecastStatus: status,
+    forecastReason: reason,
+  };
 }
 
 function buildMetric({
@@ -225,6 +363,9 @@ function buildMetric({
   warningThresholdPercent = 70,
   dangerThresholdPercent = 90,
   forecastSourceLast7Days,
+  forecastSourceValue,
+  forecastSourceDays,
+  forecastInsufficientReason,
   description,
   mitigation,
   dataSource,
@@ -241,6 +382,9 @@ function buildMetric({
   warningThresholdPercent?: number;
   dangerThresholdPercent?: number;
   forecastSourceLast7Days?: number;
+  forecastSourceValue?: number | null;
+  forecastSourceDays?: number | null;
+  forecastInsufficientReason?: string;
   description: string;
   mitigation: string;
   dataSource: string;
@@ -248,6 +392,25 @@ function buildMetric({
   sourceLabel?: string | null;
   inputNames?: string[];
 }): GuardrailMetric {
+  const forecast = buildForecast({
+    forecastSourceValue:
+      typeof forecastSourceValue === "number" || forecastSourceValue === null
+        ? forecastSourceValue
+        : forecastSourceLast7Days,
+    forecastSourceDays:
+      typeof forecastSourceDays === "number" || forecastSourceValue !== undefined
+        ? forecastSourceDays
+        : typeof forecastSourceLast7Days === "number"
+          ? 7
+          : null,
+    limit,
+    unit,
+    warningThresholdPercent,
+    insufficientReason: forecastInsufficientReason,
+  });
+  const currentRiskLevel = riskLevel(value, limit, warningThresholdPercent, dangerThresholdPercent);
+  const forecastRiskLevel = riskLevelFromForecastStatus(forecast.forecastStatus);
+
   return {
     id,
     label,
@@ -257,14 +420,11 @@ function buildMetric({
     unit,
     warningThresholdPercent,
     dangerThresholdPercent,
-    riskLevel: riskLevel(value, limit, warningThresholdPercent, dangerThresholdPercent),
+    riskLevel: highestRiskLevel(currentRiskLevel, forecastRiskLevel),
     usagePercent: usagePercent(value, limit),
-    forecast30DayValue:
-      typeof forecastSourceLast7Days === "number"
-        ? forecast30DayValue(forecastSourceLast7Days)
-        : null,
+    ...forecast,
     description,
-    mitigation,
+    mitigation: mitigationForForecast(label, mitigation, forecast.forecastStatus),
     dataSource,
     sourceUrl,
     sourceLabel,
@@ -926,6 +1086,10 @@ function emptyCloudflareUsage(errorMessage: string | null = null): CloudflareGra
   };
 }
 
+function appendCloudflareUsageError(usage: CloudflareGraphQlUsage, message: string) {
+  usage.errorMessage = usage.errorMessage ? `${usage.errorMessage} ${message}` : message;
+}
+
 function toGigabytes(bytes: number) {
   return Math.round((bytes / 1_000_000_000) * 100) / 100;
 }
@@ -951,14 +1115,16 @@ async function loadCloudflareGraphQlUsage(): Promise<CloudflareGraphQlUsage> {
   const until = now.toISOString();
   const usage = emptyCloudflareUsage(null);
 
-  try {
-    if (accountId && workerScriptNames.length > 0) {
+  if (accountId) {
+    try {
+      const workerScriptFilter = workerScriptNames.length > 0 ? "scriptName: $scriptName," : "";
+      const workerScriptVariable = workerScriptNames.length > 0 ? ", $scriptName: string" : "";
       const workerQuery = `
-        query GetWorkersAnalytics($accountTag: string, $datetimeStart: string, $datetimeEnd: string, $scriptName: string) {
+        query GetWorkersAnalytics($accountTag: string, $datetimeStart: string, $datetimeEnd: string${workerScriptVariable}) {
           viewer {
             accounts(filter: { accountTag: $accountTag }) {
               workersInvocationsAdaptive(limit: 10000, filter: {
-                scriptName: $scriptName,
+                ${workerScriptFilter}
                 datetime_geq: $datetimeStart,
                 datetime_leq: $datetimeEnd
               }) {
@@ -979,8 +1145,25 @@ async function loadCloudflareGraphQlUsage(): Promise<CloudflareGraphQlUsage> {
       let requests30d = 0;
       let subrequests30d = 0;
       const cpuP99Values: number[] = [];
+      const scriptNames = workerScriptNames.length > 0 ? workerScriptNames : [null];
 
-      for (const scriptName of workerScriptNames) {
+      for (const scriptName of scriptNames) {
+        const variables24h: Record<string, unknown> = {
+          accountTag: accountId,
+          datetimeStart: since24h,
+          datetimeEnd: until,
+        };
+        const variables30d: Record<string, unknown> = {
+          accountTag: accountId,
+          datetimeStart: since30d,
+          datetimeEnd: until,
+        };
+
+        if (scriptName) {
+          variables24h.scriptName = scriptName;
+          variables30d.scriptName = scriptName;
+        }
+
         const [last24h, last30d] = await Promise.all([
           fetchCloudflareGraphQl<{
             viewer?: {
@@ -991,7 +1174,7 @@ async function loadCloudflareGraphQlUsage(): Promise<CloudflareGraphQlUsage> {
                 }>;
               }>;
             };
-          }>(workerQuery, { accountTag: accountId, datetimeStart: since24h, datetimeEnd: until, scriptName }, apiToken),
+          }>(workerQuery, variables24h, apiToken),
           fetchCloudflareGraphQl<{
             viewer?: {
               accounts?: Array<{
@@ -1001,7 +1184,7 @@ async function loadCloudflareGraphQlUsage(): Promise<CloudflareGraphQlUsage> {
                 }>;
               }>;
             };
-          }>(workerQuery, { accountTag: accountId, datetimeStart: since30d, datetimeEnd: until, scriptName }, apiToken),
+          }>(workerQuery, variables30d, apiToken),
         ]);
 
         const last24Rows = last24h.viewer?.accounts?.[0]?.workersInvocationsAdaptive ?? [];
@@ -1023,9 +1206,18 @@ async function loadCloudflareGraphQlUsage(): Promise<CloudflareGraphQlUsage> {
       usage.workersRequests30d = requests30d;
       usage.workersSubrequests30d = subrequests30d;
       usage.workersCpuP99Ms = average(cpuP99Values);
+    } catch (error) {
+      appendCloudflareUsageError(
+        usage,
+        error instanceof Error
+          ? `Workers Analytics unavailable: ${error.message}`
+          : "Workers Analytics unavailable.",
+      );
     }
+  }
 
-    if (zoneId) {
+  if (zoneId) {
+    try {
       const cdnQuery = `
         query GetZoneHttpAnalytics($zoneTag: string, $datetimeStart: string, $datetimeEnd: string) {
           viewer {
@@ -1057,18 +1249,17 @@ async function loadCloudflareGraphQlUsage(): Promise<CloudflareGraphQlUsage> {
       usage.cdnRequests30d = sum(rows, (row) => toNumber(row.sum?.requests));
       usage.cdnBandwidthGb30d = toGigabytes(sum(rows, (row) => toNumber(row.sum?.bytes)));
       usage.cdnCachedBandwidthGb30d = toGigabytes(sum(rows, (row) => toNumber(row.sum?.cachedBytes)));
+    } catch (error) {
+      appendCloudflareUsageError(
+        usage,
+        error instanceof Error
+          ? `Zone HTTP Analytics unavailable: ${error.message}`
+          : "Zone HTTP Analytics unavailable.",
+      );
     }
-
-    if (accountId && workerScriptNames.length === 0) {
-      usage.errorMessage = "Set CLOUDFLARE_WORKER_SCRIPT_NAMES to enable live Workers usage from Cloudflare GraphQL Analytics.";
-    }
-
-    return usage;
-  } catch (error) {
-    return emptyCloudflareUsage(
-      error instanceof Error ? error.message : "Unable to load Cloudflare GraphQL Analytics usage.",
-    );
   }
+
+  return usage;
 }
 
 function getCloudflareMetricValue({
@@ -1091,6 +1282,77 @@ function getCloudflareMetricValue({
   return readNumberEnv(metric.envName, fallbackValue);
 }
 
+function getCloudflareMetricTrend({
+  metric,
+  value,
+  usage,
+  eventRows,
+}: {
+  metric: CloudflareUsageMetricConfig;
+  value: number | null;
+  usage: CloudflareGraphQlUsage;
+  eventRows: QuotaUsageEventRow[];
+}) {
+  const manualValue = readNumberEnv(metric.envName, null);
+
+  if (manualValue !== null) {
+    return {
+      forecastSourceValue: manualValue,
+      forecastSourceDays: metric.windowDays ?? 30,
+      forecastInsufficientReason: undefined,
+    };
+  }
+
+  if (metric.persistedEventTypes) {
+    const last7Days = filterSince(eventRows, daysAgo(7));
+    const persistedLast7Days = sumQuotaEventTypes(last7Days, metric.persistedEventTypes);
+
+    if (persistedLast7Days > 0) {
+      return {
+        forecastSourceValue: persistedLast7Days,
+        forecastSourceDays: 7,
+        forecastInsufficientReason: undefined,
+      };
+    }
+  }
+
+  if (
+    (metric.id === "cloudflare-workers-requests-24h" ||
+      metric.id === "cloudflare-workers-requests-30d") &&
+    usage.workersRequests24h !== null
+  ) {
+    return {
+      forecastSourceValue: usage.workersRequests24h,
+      forecastSourceDays: 1,
+      forecastInsufficientReason: undefined,
+    };
+  }
+
+  if (metric.windowDays && value !== null) {
+    return {
+      forecastSourceValue: value,
+      forecastSourceDays: metric.windowDays,
+      forecastInsufficientReason: undefined,
+    };
+  }
+
+  if (value !== null) {
+    return {
+      forecastSourceValue: value,
+      forecastSourceDays: 30,
+      forecastInsufficientReason: undefined,
+    };
+  }
+
+  return {
+    forecastSourceValue: null,
+    forecastSourceDays: null,
+    forecastInsufficientReason:
+      usage.errorMessage ??
+      `Insufficient trend data: no recent Cloudflare Analytics, quota_usage_events, or ${metric.envName} value is available.`,
+  };
+}
+
 function getCloudflareDataSource(metric: CloudflareUsageMetricConfig, usage: CloudflareGraphQlUsage) {
   if (process.env[metric.envName]?.trim()) {
     return `Cloudflare manual input (${metric.envName})`;
@@ -1100,7 +1362,7 @@ function getCloudflareDataSource(metric: CloudflareUsageMetricConfig, usage: Clo
     return `quota_usage_events ${metric.persistedEventTypes.join("/")}, Cloudflare GraphQL Analytics, or ${metric.envName}`;
   }
 
-  if (!usage.errorMessage && metric.apiValue(usage) !== null) {
+  if (metric.apiValue(usage) !== null) {
     return "Cloudflare GraphQL Analytics API";
   }
 
@@ -1115,6 +1377,7 @@ function buildCloudflareUsageMetrics(usage: CloudflareGraphQlUsage, eventRows: Q
   return metrics.map((metric) => {
     const value = getCloudflareMetricValue({ metric, usage, eventRows });
     const limit = readNumberEnv(metric.limitEnvName, metric.defaultLimit);
+    const trend = getCloudflareMetricTrend({ metric, value, usage, eventRows });
     const missingInputs =
       value === null || limit === null
         ? ` Set ${metric.envName} and ${metric.limitEnvName} if Cloudflare does not expose this usage through the configured API.`
@@ -1129,6 +1392,9 @@ function buildCloudflareUsageMetrics(usage: CloudflareGraphQlUsage, eventRows: Q
       unit: metric.unit,
       warningThresholdPercent: metric.warningThresholdPercent ?? 70,
       dangerThresholdPercent: metric.dangerThresholdPercent ?? 90,
+      forecastSourceValue: trend.forecastSourceValue,
+      forecastSourceDays: trend.forecastSourceDays,
+      forecastInsufficientReason: trend.forecastInsufficientReason,
       description: `${metric.description}${missingInputs}`,
       mitigation: metric.mitigation,
       dataSource: getCloudflareDataSource(metric, usage),
