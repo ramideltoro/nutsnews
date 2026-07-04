@@ -1,0 +1,30 @@
+name: OWASP ZAP Baseline
+
+on:
+  schedule:
+    - cron: "11 13 * * 3"
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: Public or staging URL to scan
+        required: false
+        default: "https://www.nutsnews.com"
+
+permissions:
+  contents: read
+
+jobs:
+  zap-baseline:
+    name: Passive baseline scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+
+    steps:
+      - name: Run ZAP baseline
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: ${{ inputs.target_url || 'https://www.nutsnews.com' }}
+          fail_action: false
+          allow_issue_writing: false
+          cmd_options: "-a"
