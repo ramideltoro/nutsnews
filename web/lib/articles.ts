@@ -1,4 +1,8 @@
 import { cache } from "react";
+import {
+  dedupeArticlesByIdentity,
+  getArticleIdentityKey,
+} from "@/lib/articleIdentity";
 import { supabase } from "@/lib/supabase";
 import { validateTranslatedSummary } from "@/lib/translationQuality";
 import {
@@ -300,8 +304,9 @@ async function shapePublishedArticlesResult({
   pageSize?: number;
 }): Promise<PublishedArticlesResult> {
   const rows = data ?? [];
-  const hasMore = rows.length > pageSize;
-  const baseArticles = rows.slice(0, pageSize);
+  const uniqueRows = dedupeArticlesByIdentity(rows);
+  const hasMore = rows.length > pageSize || uniqueRows.length > pageSize;
+  const baseArticles = uniqueRows.slice(0, pageSize);
   const articles = await applyArticleSummaries(baseArticles, languageCode);
   const lastArticle = baseArticles.at(-1);
 
@@ -432,7 +437,10 @@ export async function getPublishedArticlesForSection(
       .limit(safeLimit);
 
   if (!snapshotError && snapshotData && snapshotData.length > 0) {
-    return applyArticleSummaries(snapshotData as Article[], languageCode);
+    return applyArticleSummaries(
+      dedupeArticlesByIdentity(snapshotData as Article[]).slice(0, safeLimit),
+      languageCode,
+    );
   }
 
   if (snapshotError) {
@@ -455,7 +463,10 @@ export async function getPublishedArticlesForSection(
     return [];
   }
 
-  return applyArticleSummaries((data ?? []) as Article[], languageCode);
+  return applyArticleSummaries(
+    dedupeArticlesByIdentity((data ?? []) as Article[]).slice(0, safeLimit),
+    languageCode,
+  );
 }
 
 function articleMatchesSection(article: Article, query: string) {
@@ -481,36 +492,82 @@ export async function getHomeFeedFromSnapshot(
     return null;
   }
 
-  const rows = data as Article[];
+  const rows = dedupeArticlesByIdentity(data as Article[]);
   const mainBaseArticles = rows.slice(0, PAGE_SIZE);
-  const sectionBaseArticles = HOME_FEED_SECTIONS.map((section) => ({
-    id: section.id,
-    articles: rows
-      .filter((article) => articleMatchesSection(article, section.query))
-      .slice(0, CATEGORY_SECTION_SIZE),
-  }));
+  const seenArticleKeys = new Set(
+    mainBaseArticles
+      .map((article) => getArticleIdentityKey(article))
+      .filter((articleKey): articleKey is string => Boolean(articleKey)),
+  );
+  const sectionBaseArticles = HOME_FEED_SECTIONS.map((section) => {
+    const sectionArticles: Article[] = [];
 
-  const uniqueArticlesById = new Map<string, Article>();
+    for (const article of rows) {
+      if (
+        sectionArticles.length >= CATEGORY_SECTION_SIZE ||
+        !articleMatchesSection(article, section.query)
+      ) {
+        continue;
+      }
+
+      const articleKey = getArticleIdentityKey(article);
+
+      if (articleKey && seenArticleKeys.has(articleKey)) {
+        continue;
+      }
+
+      sectionArticles.push(article);
+
+      if (articleKey) {
+        seenArticleKeys.add(articleKey);
+      }
+    }
+
+    return {
+      id: section.id,
+      articles: sectionArticles,
+    };
+  });
+
+  const uniqueArticlesByKey = new Map<string, Article>();
 
   for (const article of mainBaseArticles) {
-    uniqueArticlesById.set(article.id, article);
+    const articleKey = getArticleIdentityKey(article);
+
+    if (articleKey) {
+      uniqueArticlesByKey.set(articleKey, article);
+    }
   }
 
   for (const section of sectionBaseArticles) {
     for (const article of section.articles) {
-      uniqueArticlesById.set(article.id, article);
+      const articleKey = getArticleIdentityKey(article);
+
+      if (articleKey) {
+        uniqueArticlesByKey.set(articleKey, article);
+      }
     }
   }
 
   const localizedArticles = await applyArticleSummaries(
-    Array.from(uniqueArticlesById.values()),
+    Array.from(uniqueArticlesByKey.values()),
     languageCode,
   );
-  const localizedById = new Map(localizedArticles.map((article) => [article.id, article]));
+  const localizedByKey = new Map(
+    localizedArticles
+      .map((article) => {
+        const articleKey = getArticleIdentityKey(article);
+        return articleKey ? [articleKey, article] as const : null;
+      })
+      .filter((entry): entry is readonly [string, Article] => Boolean(entry)),
+  );
   const lastMainArticle = mainBaseArticles.at(-1);
 
   return {
-    articles: mainBaseArticles.map((article) => localizedById.get(article.id) ?? article),
+    articles: mainBaseArticles.map((article) => {
+      const articleKey = getArticleIdentityKey(article);
+      return articleKey ? localizedByKey.get(articleKey) ?? article : article;
+    }),
     nextPage: null,
     nextCursor:
       rows.length > PAGE_SIZE && lastMainArticle
@@ -521,7 +578,10 @@ export async function getHomeFeedFromSnapshot(
     sections: sectionBaseArticles.map((section) => ({
       id: section.id,
       articles: section.articles.map(
-        (article) => localizedById.get(article.id) ?? article,
+        (article) => {
+          const articleKey = getArticleIdentityKey(article);
+          return articleKey ? localizedByKey.get(articleKey) ?? article : article;
+        },
       ),
     })),
   };

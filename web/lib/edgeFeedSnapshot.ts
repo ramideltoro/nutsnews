@@ -11,6 +11,10 @@ import {
   type PublishedArticlesResult,
 } from "@/lib/articles";
 import {
+  dedupeArticlesByIdentity,
+  getArticleIdentityKey,
+} from "@/lib/articleIdentity";
+import {
   DEFAULT_LANGUAGE_CODE,
   normalizeLanguageCode,
   type LanguageCode,
@@ -91,7 +95,7 @@ function readHeaderText(headers: Headers, name: string) {
 }
 
 function normalizeEdgeArticles(articles: Article[], requestedLanguageCode: LanguageCode) {
-  return articles.map((article) => ({
+  return dedupeArticlesByIdentity(articles).map((article) => ({
     ...article,
     language_code: DEFAULT_LANGUAGE_CODE,
     requested_language_code: requestedLanguageCode,
@@ -245,11 +249,38 @@ export async function getHomeFeedDataWithEdgeFallback(
       })),
     ),
   ]);
+  const seenArticleKeys = new Set(
+    mainResult.articles
+      .map((article) => getArticleIdentityKey(article))
+      .filter((articleKey): articleKey is string => Boolean(articleKey)),
+  );
+  const uniqueSections = sections.map((section) => {
+    const uniqueArticles: Article[] = [];
+
+    for (const article of section.articles) {
+      const articleKey = getArticleIdentityKey(article);
+
+      if (articleKey && seenArticleKeys.has(articleKey)) {
+        continue;
+      }
+
+      uniqueArticles.push(article);
+
+      if (articleKey) {
+        seenArticleKeys.add(articleKey);
+      }
+    }
+
+    return {
+      ...section,
+      articles: uniqueArticles,
+    };
+  });
 
   return {
     ...mainResult,
     nextPage: mainResult.nextCursor ? null : mainResult.nextPage,
-    sections,
+    sections: uniqueSections,
   };
 }
 

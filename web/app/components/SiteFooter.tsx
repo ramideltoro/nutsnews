@@ -14,6 +14,10 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
+import {
+  dedupeArticlesByIdentity,
+  getArticleIdentityKey,
+} from "@/lib/articleIdentity";
 import type { Article } from "@/lib/articles";
 import { DEFAULT_LANGUAGE_CODE, type LanguageCode } from "@/lib/languages";
 import { ThemeSwitcher } from "./ThemeSwitcher";
@@ -445,14 +449,10 @@ function SearchMenu({
         setActiveSearchQuery(data.query || safeQuery);
         setArticles((currentArticles) => {
           if (!append) {
-            return data.articles;
+            return dedupeArticlesByIdentity(data.articles);
           }
 
-          const seenIds = new Set(currentArticles.map((article) => article.id));
-          const newArticles = data.articles.filter(
-            (article) => !seenIds.has(article.id),
-          );
-          return [...currentArticles, ...newArticles];
+          return dedupeArticlesByIdentity([...currentArticles, ...data.articles]);
         });
         setNextPage(Number.isFinite(data.nextPage) ? data.nextPage : null);
       } catch (searchError) {
@@ -599,9 +599,9 @@ function SearchMenu({
           ) : null}
 
           <div className="mt-5 space-y-3">
-            {articles.map((article) => (
+            {articles.map((article, index) => (
               <article
-                key={article.id}
+                key={getArticleIdentityKey(article) ?? `unkeyed:${index}`}
                 data-testid="nutsnews-search-result-card"
                 className="overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-surface-soft)]"
               >

@@ -1,6 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  dedupeArticlesByIdentity,
+  getArticleIdentityKey,
+} from "@/lib/articleIdentity";
 import type { Article } from "@/lib/articles";
 import {
   DEFAULT_LANGUAGE_CODE,
@@ -306,6 +310,44 @@ function LoadingIndicator({ label }: { label: string }) {
 
 type ArticleCardVariant = "lead" | "feature" | "rail" | "standard";
 
+function getArticleRenderKey(article: Article, index: number) {
+  return getArticleIdentityKey(article) ?? `unkeyed:${index}`;
+}
+
+function dedupeCategorySectionsForPage(
+  sections: ArticleCategorySection[],
+  pageArticles: Article[],
+) {
+  const seenArticleKeys = new Set(
+    pageArticles
+      .map((article) => getArticleIdentityKey(article))
+      .filter((articleKey): articleKey is string => Boolean(articleKey)),
+  );
+
+  return sections.map((section) => {
+    const uniqueArticles: Article[] = [];
+
+    for (const article of section.articles) {
+      const articleKey = getArticleIdentityKey(article);
+
+      if (articleKey && seenArticleKeys.has(articleKey)) {
+        continue;
+      }
+
+      uniqueArticles.push(article);
+
+      if (articleKey) {
+        seenArticleKeys.add(articleKey);
+      }
+    }
+
+    return {
+      ...section,
+      articles: uniqueArticles,
+    };
+  });
+}
+
 function ArticleCard({
   article,
   index,
@@ -423,21 +465,33 @@ export function ArticleFeed({
   initialNextCursor,
   initialCategorySections,
 }: ArticleFeedProps) {
-  const [articles, setArticles] = useState(initialArticles);
+  const initialUniqueArticles = useMemo(
+    () => dedupeArticlesByIdentity(initialArticles),
+    [initialArticles],
+  );
+  const initialUniqueCategorySections = useMemo(
+    () =>
+      dedupeCategorySectionsForPage(
+        initialCategorySections,
+        initialUniqueArticles,
+      ),
+    [initialCategorySections, initialUniqueArticles],
+  );
+  const [articles, setArticles] = useState(initialUniqueArticles);
   const [nextPage, setNextPage] = useState(initialNextPage);
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(
     DEFAULT_LANGUAGE_CODE,
   );
-  const [categorySections, setCategorySections] = useState(initialCategorySections);
+  const [categorySections, setCategorySections] = useState(initialUniqueCategorySections);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const isReloadingFirstPageRef = useRef(false);
-  const initialEnglishArticlesRef = useRef(initialArticles);
+  const initialEnglishArticlesRef = useRef(initialUniqueArticles);
   const initialEnglishNextPageRef = useRef(initialNextPage);
   const initialEnglishNextCursorRef = useRef(initialNextCursor);
-  const initialEnglishCategorySectionsRef = useRef(initialCategorySections);
+  const initialEnglishCategorySectionsRef = useRef(initialUniqueCategorySections);
 
   const copy = copyByLanguage[selectedLanguage];
 
@@ -452,8 +506,12 @@ export function ArticleFeed({
   );
 
   const orderedCategorySections = useMemo(() => {
+    const pageUniqueSections = dedupeCategorySectionsForPage(
+      categorySections,
+      articles,
+    );
     const sectionsById = new Map(
-      categorySections.map((section) => [section.id, section.articles]),
+      pageUniqueSections.map((section) => [section.id, section.articles]),
     );
 
     return CATEGORY_NAV_ITEMS.filter(
@@ -463,7 +521,7 @@ export function ArticleFeed({
       id: item.id,
       articles: sectionsById.get(item.id) ?? [],
     }));
-  }, [categorySections]);
+  }, [articles, categorySections]);
 
   const fetchArticles = useCallback(
     async ({
@@ -558,10 +616,13 @@ export function ArticleFeed({
           throw new Error(data.error);
         }
 
-        setArticles(data.articles);
+        const uniqueArticles = dedupeArticlesByIdentity(data.articles);
+        setArticles(uniqueArticles);
         setNextPage(Number.isFinite(data.nextPage) ? data.nextPage : null);
         setNextCursor(data.nextCursor ?? null);
-        setCategorySections(data.sections);
+        setCategorySections(
+          dedupeCategorySectionsForPage(data.sections, uniqueArticles),
+        );
         document.documentElement.lang = languageCode;
       } catch (error) {
         setLoadError(
@@ -639,14 +700,9 @@ export function ArticleFeed({
         languageCode: selectedLanguage,
       });
 
-      setArticles((currentArticles) => {
-        const seenIds = new Set(currentArticles.map((article) => article.id));
-        const newArticles = data.articles.filter(
-          (article) => !seenIds.has(article.id),
-        );
-
-        return [...currentArticles, ...newArticles];
-      });
+      setArticles((currentArticles) =>
+        dedupeArticlesByIdentity([...currentArticles, ...data.articles]),
+      );
       setNextPage(Number.isFinite(data.nextPage) ? data.nextPage : null);
       setNextCursor(data.nextCursor ?? null);
     } catch (error) {
@@ -716,7 +772,7 @@ export function ArticleFeed({
             <div className="newspaper-column-label">{copy.editorsPicks}</div>
             {frontPage.features.map((article, index) => (
               <ArticleCard
-                key={article.id}
+                key={getArticleRenderKey(article, index + 1)}
                 article={article}
                 index={index + 1}
                 languageCode={selectedLanguage}
@@ -729,7 +785,7 @@ export function ArticleFeed({
             <div className="newspaper-column-label">{copy.latestBriefs}</div>
             {frontPage.latest.map((article, index) => (
               <ArticleCard
-                key={article.id}
+                key={getArticleRenderKey(article, index + 3)}
                 article={article}
                 index={index + 3}
                 languageCode={selectedLanguage}
@@ -757,7 +813,7 @@ export function ArticleFeed({
             <div className="newspaper-more-grid">
               {section.articles.map((article, index) => (
                 <ArticleCard
-                  key={article.id}
+                  key={getArticleRenderKey(article, index + 10)}
                   article={article}
                   index={index + 10}
                   languageCode={selectedLanguage}
@@ -785,7 +841,7 @@ export function ArticleFeed({
           <div className="newspaper-more-grid">
             {frontPage.more.map((article, index) => (
               <ArticleCard
-                key={article.id}
+                key={getArticleRenderKey(article, index + 5)}
                 article={article}
                 index={index + 5}
                 languageCode={selectedLanguage}
