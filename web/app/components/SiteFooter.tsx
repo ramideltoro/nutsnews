@@ -4,6 +4,7 @@
 
 import {
   type FormEvent,
+  type MouseEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -700,10 +701,11 @@ export function SiteFooter() {
     window.setTimeout(() => setIsHomeButtonAnimating(false), 620);
   }
 
-  function handleHomeClick() {
+  function handleHomeClick(event: MouseEvent<HTMLAnchorElement>) {
     pulseHomeButton();
 
     if (pathname === "/") {
+      event.preventDefault();
       scrollHomePageToTop();
       return;
     }
@@ -714,6 +716,7 @@ export function SiteFooter() {
       // Navigation still works if session storage is unavailable.
     }
 
+    event.preventDefault();
     router.push("/");
   }
 
@@ -732,8 +735,8 @@ export function SiteFooter() {
             className="site-footer-modern__controls"
             aria-label={copy.shortcuts}
           >
-            <button
-              type="button"
+            <Link
+              href="/#top"
               data-testid="nutsnews-footer-home"
               className={`footer-icon-button ${
                 isHomeButtonAnimating ? "footer-icon-button--home-pulse" : ""
@@ -743,7 +746,7 @@ export function SiteFooter() {
             >
               <span className="footer-icon-button__halo" />
               <HomeIcon className="footer-icon-button__icon" />
-            </button>
+            </Link>
 
             <button
               type="button"

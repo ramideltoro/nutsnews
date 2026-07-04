@@ -44,14 +44,14 @@ assert.match(
 
 assert.match(
   siteFooter,
-  /<button[\s\S]*type="button"[\s\S]*data-testid="nutsnews-footer-home"[\s\S]*onClick=\{handleHomeClick\}/,
-  "Footer home control must be a button so test clicks cannot trigger stale same-page link navigation.",
+  /<Link[\s\S]*href="\/#top"[\s\S]*data-testid="nutsnews-footer-home"[\s\S]*onClick=\{handleHomeClick\}/,
+  "Footer home control must have a native /#top fallback so pre-hydration test clicks scroll home.",
 );
 
-assert.doesNotMatch(
-  siteFooter,
-  /function handleHomeClick\([^)]*event[\s\S]*event\.button/,
-  "Footer home click handling must not ignore synthetic click events used by the offline E2E check.",
+assert.match(
+  readFileSync(path.join(repoRoot, "web/app/page.tsx"), "utf8"),
+  /<main[\s\S]*id="top"/,
+  "Home page must expose the #top target used by the footer home fallback.",
 );
 
 assert.match(
