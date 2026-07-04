@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = process.cwd();
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), "utf8");
@@ -51,7 +52,7 @@ assertIncludes(articles, "getHomeFeedFromSnapshot", "articles.ts");
 assertIncludes(articles, ".limit(HOME_FEED_SNAPSHOT_SCAN_LIMIT)", "articles.ts");
 assertIncludes(articles, "pageSize: CURSOR_PAGE_SIZE", "articles.ts");
 
-assertIncludes(cacheHeaders, "s-maxage=900", "cacheHeaders.ts");
+assertIncludes(cacheHeaders, "s-maxage=${PUBLIC_CDN_S_MAXAGE_SECONDS}", "cacheHeaders.ts");
 assertIncludes(homeFeedApi, "export const revalidate = 900", "home-feed API");
 assertIncludes(articlesApi, "export const revalidate = 900", "articles API");
 
@@ -64,8 +65,8 @@ assertIncludes(logger, "shouldSampleInfoEvent", "logger.ts");
 
 assertIncludes(nextConfig, 'source: "/:path*"', "next.config.ts");
 assertIncludes(nextConfig, "GLOBAL_SECURITY_HEADERS", "next.config.ts");
-assertIncludes(nextConfig, "public-home-cache-900s", "next.config.ts");
-assertIncludes(nextConfig, "public-privacy-cache-900s", "next.config.ts");
+assertIncludes(nextConfig, "public-home-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s", "next.config.ts");
+assertIncludes(nextConfig, "public-privacy-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s", "next.config.ts");
 assertIncludes(middleware, '"/admin/:path*"', "middleware.ts");
 assertExcludes(middleware, 'matcher: ["/((?!_next/static', "middleware.ts");
 

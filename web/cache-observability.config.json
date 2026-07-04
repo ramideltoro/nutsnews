@@ -44,12 +44,12 @@
       "expectedStatuses": [
         200
       ],
-      "expectedPolicy": "public-home-cache-300s",
+      "expectedPolicy": "public-home-cache-3600s",
       "expectedCacheIncludes": [
         "public"
       ],
       "expectedCdnIncludes": [
-        "s-maxage=300"
+        "s-maxage=3600"
       ],
       "description": "Primary reader landing page. Must stay CDN-cacheable to protect Vercel and Supabase.",
       "method": "HEAD"
@@ -62,12 +62,12 @@
       "expectedStatuses": [
         200
       ],
-      "expectedPolicy": "public-article-cache-300s",
+      "expectedPolicy": "public-article-cache-3600s",
       "expectedCacheIncludes": [
         "public"
       ],
       "expectedCdnIncludes": [
-        "s-maxage=300"
+        "s-maxage=3600"
       ],
       "description": "A live article detail page discovered from /api/articles.",
       "method": "HEAD",
@@ -80,12 +80,12 @@
       "expectedStatuses": [
         200
       ],
-      "expectedPolicy": "public-api-cache-300s",
+      "expectedPolicy": "public-api-cache-3600s",
       "expectedCacheIncludes": [
         "public"
       ],
       "expectedCdnIncludes": [
-        "s-maxage=300"
+        "s-maxage=3600"
       ],
       "requiredHeaders": [
         "cache-control",

@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { ARTICLE_API_CACHE_HEADERS, BYPASS_CACHE_HEADERS } from "@/lib/cacheHeaders";
+import {
+  ARTICLE_API_CACHE_HEADERS,
+  BYPASS_CACHE_HEADERS,
+  PUBLIC_CDN_S_MAXAGE_SECONDS,
+} from "@/lib/cacheHeaders";
 import { getHomeFeedDataWithEdgeFallback } from "@/lib/edgeFeedSnapshot";
 import { normalizeLanguageCode } from "@/lib/languages";
 import { logError, logInfoSampled } from "@/lib/logger";
@@ -29,7 +33,7 @@ export async function GET(request: Request) {
     return NextResponse.json(result, {
       headers: {
         ...ARTICLE_API_CACHE_HEADERS,
-        "X-NutsNews-Cache-Policy": "public-home-feed-cache-900s",
+        "X-NutsNews-Cache-Policy": `public-home-feed-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`,
       },
     });
   } catch (error) {

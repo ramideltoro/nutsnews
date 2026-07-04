@@ -17,6 +17,7 @@
     "test:admin-article-reviews": "node ../scripts/admin_article_reviews_regression.mjs",
     "test:security-headers": "node scripts/assert-security-headers.mjs",
     "test:fluid-cpu": "node ../scripts/fluid_active_cpu_regression.mjs",
+    "test:public-cache": "node ../scripts/public_cache_policy_regression.mjs",
     "analyze:homepage": "node scripts/homepage-performance-budget.mjs",
     "analyze:homepage:warn": "node scripts/homepage-performance-budget.mjs --warn-only",
     "audit:cache": "node scripts/cache-observability.mjs",
