@@ -9,6 +9,9 @@ const PUBLIC_PAGE_CACHE_CONTROL =
 const PUBLIC_CDN_CACHE_CONTROL =
   "public, s-maxage=900, stale-while-revalidate=3600";
 
+const PUBLIC_CLOUDFLARE_CDN_CACHE_CONTROL =
+  "public, max-age=3600, stale-while-revalidate=86400";
+
 const PUBLIC_LONG_CDN_CACHE_CONTROL =
   "public, s-maxage=3600, stale-while-revalidate=86400";
 
@@ -34,6 +37,7 @@ function publicCacheHeaders(
   policy: string,
   cacheControl = PUBLIC_PAGE_CACHE_CONTROL,
   cdnCacheControl = PUBLIC_CDN_CACHE_CONTROL,
+  cloudflareCdnCacheControl = PUBLIC_CLOUDFLARE_CDN_CACHE_CONTROL,
 ) {
   return [
     {
@@ -46,7 +50,7 @@ function publicCacheHeaders(
     },
     {
       key: "Cloudflare-CDN-Cache-Control",
-      value: cdnCacheControl,
+      value: cloudflareCdnCacheControl,
     },
     {
       key: "Vercel-CDN-Cache-Control",

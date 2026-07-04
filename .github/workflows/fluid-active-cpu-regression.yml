@@ -27,3 +27,6 @@ jobs:
 
       - name: Run Fluid Active CPU regression
         run: node scripts/fluid_active_cpu_regression.mjs
+
+      - name: Run Cloudflare one-hour cache regression
+        run: node scripts/cloudflare_cache_1h_regression.mjs
