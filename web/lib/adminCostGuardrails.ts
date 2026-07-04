@@ -39,7 +39,15 @@ type QuotaUsageEventRow = {
 export type GuardrailMetric = {
   id: string;
   label: string;
-  group: "Database" | "AI" | "Workers" | "Redis/KV" | "Email" | "PageSpeed/API" | "Egress";
+  group:
+    | "Database"
+    | "AI"
+    | "Workers"
+    | "Redis/KV"
+    | "Email"
+    | "PageSpeed/API"
+    | "Egress"
+    | "Vercel";
   value: number | null;
   limit: number | null;
   unit: string;
@@ -51,6 +59,9 @@ export type GuardrailMetric = {
   description: string;
   mitigation: string;
   dataSource: string;
+  sourceUrl: string | null;
+  sourceLabel: string | null;
+  inputNames: string[];
 };
 
 export type GuardrailsDashboardData = {
@@ -116,6 +127,11 @@ function readNumberEnv(name: string, fallback: number | null) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
+function readStringEnv(name: string, fallback: string | null) {
+  const value = process.env[name]?.trim();
+  return value ? value : fallback;
+}
+
 function daysAgo(days: number) {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 }
@@ -135,6 +151,14 @@ function filterSince<T extends { run_started_at?: string; created_at?: string }>
 
 function sum<T>(rows: T[], mapper: (row: T) => number) {
   return rows.reduce((total, row) => total + mapper(row), 0);
+}
+
+function sumQuotaEventTypes(rows: QuotaUsageEventRow[], eventTypes: string[]) {
+  const eventTypeSet = new Set(eventTypes);
+  return sum(
+    rows.filter((row) => eventTypeSet.has(row.event_type)),
+    (row) => toNumber(row.quantity),
+  );
 }
 
 function usagePercent(value: number | null, limit: number | null) {
@@ -185,6 +209,9 @@ function buildMetric({
   description,
   mitigation,
   dataSource,
+  sourceUrl = null,
+  sourceLabel = null,
+  inputNames = [],
 }: {
   id: string;
   label: string;
@@ -198,6 +225,9 @@ function buildMetric({
   description: string;
   mitigation: string;
   dataSource: string;
+  sourceUrl?: string | null;
+  sourceLabel?: string | null;
+  inputNames?: string[];
 }): GuardrailMetric {
   return {
     id,
@@ -217,7 +247,222 @@ function buildMetric({
     description,
     mitigation,
     dataSource,
+    sourceUrl,
+    sourceLabel,
+    inputNames,
   };
+}
+
+type VercelUsageMetricConfig = {
+  id: string;
+  label: string;
+  envName: string;
+  unit: string;
+  currentValue: number;
+  includedLimit: number;
+  upperLimit?: number;
+  usageMetric: string;
+  description: string;
+  mitigation: string;
+};
+
+const VERCEL_USAGE_METRICS: VercelUsageMetricConfig[] = [
+  {
+    id: "vercel-fluid-active-cpu",
+    label: "Fluid Active CPU",
+    envName: "NUTSNEWS_VERCEL_FLUID_ACTIVE_CPU_HOURS",
+    unit: "hours",
+    currentValue: 3.2,
+    includedLimit: 4,
+    upperLimit: 16,
+    usageMetric: "fluid-active-cpu",
+    description: "Vercel Fluid Compute active CPU time for the current billing period.",
+    mitigation:
+      "Keep public pages cached, avoid telemetry tunnels through middleware, and move uptime monitors to /healthz.",
+  },
+  {
+    id: "vercel-isr-writes",
+    label: "ISR Writes",
+    envName: "NUTSNEWS_VERCEL_ISR_WRITES",
+    unit: "writes",
+    currentValue: 61000,
+    includedLimit: 200000,
+    upperLimit: 2000000,
+    usageMetric: "isr-writes",
+    description: "Incremental Static Regeneration writes reported by Vercel.",
+    mitigation:
+      "Keep revalidation intervals coarse for public pages and avoid unnecessary path/tag revalidation loops.",
+  },
+  {
+    id: "vercel-image-transformations",
+    label: "Image Optimization Transformations",
+    envName: "NUTSNEWS_VERCEL_IMAGE_TRANSFORMATIONS",
+    unit: "transformations",
+    currentValue: 1200,
+    includedLimit: 5000,
+    upperLimit: 10000,
+    usageMetric: "image-optimization-transformations",
+    description: "Vercel Image Optimization transformation count.",
+    mitigation:
+      "Prefer stable image sizes, keep image cache TTLs long, and avoid transforming unsupported publisher image formats repeatedly.",
+  },
+  {
+    id: "vercel-fast-origin-transfer",
+    label: "Fast Origin Transfer",
+    envName: "NUTSNEWS_VERCEL_FAST_ORIGIN_TRANSFER_GB",
+    unit: "GB",
+    currentValue: 1.31,
+    includedLimit: 10,
+    upperLimit: 100,
+    usageMetric: "fast-origin-transfer",
+    description: "Vercel Fast Origin Transfer usage for uncached or origin-bound traffic.",
+    mitigation:
+      "Protect public API/page cache headers, keep Cloudflare cache hit rate high, and move monitors to /healthz.",
+  },
+  {
+    id: "vercel-image-cache-writes",
+    label: "Image Optimization Cache Writes",
+    envName: "NUTSNEWS_VERCEL_IMAGE_CACHE_WRITES",
+    unit: "writes",
+    currentValue: 11000,
+    includedLimit: 100000,
+    upperLimit: 200000,
+    usageMetric: "image-optimization-cache-writes",
+    description: "Vercel Image Optimization cache writes.",
+    mitigation:
+      "Constrain image variants, reuse consistent sizes, and keep publisher image URLs stable where possible.",
+  },
+  {
+    id: "vercel-edge-requests",
+    label: "Edge Requests",
+    envName: "NUTSNEWS_VERCEL_EDGE_REQUESTS",
+    unit: "requests",
+    currentValue: 105000,
+    includedLimit: 1000000,
+    upperLimit: 10000000,
+    usageMetric: "edge-requests",
+    description: "Vercel Edge Network request volume.",
+    mitigation:
+      "Keep bots on /healthz, preserve CDN caching for public pages/APIs, and reduce noisy telemetry routes.",
+  },
+  {
+    id: "vercel-function-invocations",
+    label: "Function Invocations",
+    envName: "NUTSNEWS_VERCEL_FUNCTION_INVOCATIONS",
+    unit: "invocations",
+    currentValue: 72000,
+    includedLimit: 1000000,
+    usageMetric: "function-invocations",
+    description: "Vercel serverless/function invocation count.",
+    mitigation:
+      "Keep public routes static/ISR where possible, cache API responses, and avoid middleware on public/API paths.",
+  },
+  {
+    id: "vercel-isr-reads",
+    label: "ISR Reads",
+    envName: "NUTSNEWS_VERCEL_ISR_READS",
+    unit: "reads",
+    currentValue: 60000,
+    includedLimit: 1000000,
+    upperLimit: 10000000,
+    usageMetric: "isr-reads",
+    description: "Vercel ISR cache read volume.",
+    mitigation:
+      "Keep ISR useful for public pages, but avoid high-cardinality route generation for low-value bot traffic.",
+  },
+  {
+    id: "vercel-fluid-provisioned-memory",
+    label: "Fluid Provisioned Memory",
+    envName: "NUTSNEWS_VERCEL_FLUID_PROVISIONED_MEMORY_GB_HOURS",
+    unit: "GB-Hrs",
+    currentValue: 14.4,
+    includedLimit: 360,
+    upperLimit: 1440,
+    usageMetric: "fluid-provisioned-memory",
+    description: "Vercel Fluid Compute provisioned memory usage.",
+    mitigation:
+      "Avoid long-running public functions, reduce repeated bot/API work, and keep expensive admin pages authenticated.",
+  },
+  {
+    id: "vercel-fast-data-transfer",
+    label: "Fast Data Transfer",
+    envName: "NUTSNEWS_VERCEL_FAST_DATA_TRANSFER_GB",
+    unit: "GB",
+    currentValue: 1.93,
+    includedLimit: 100,
+    usageMetric: "fast-data-transfer",
+    description: "Vercel Fast Data Transfer usage for delivered traffic.",
+    mitigation:
+      "Keep payloads small, preserve CDN caching, and avoid unbounded public API polling.",
+  },
+];
+
+function getVercelUsageBaseUrl() {
+  return readStringEnv(
+    "NUTSNEWS_VERCEL_USAGE_URL",
+    "https://vercel.com/nutsnews/nutsnews/usage",
+  );
+}
+
+function buildUsageUrl(baseUrl: string | null, metric: string) {
+  if (!baseUrl) {
+    return null;
+  }
+
+  try {
+    const url = new URL(baseUrl);
+    url.searchParams.set("metric", metric);
+    return url.toString();
+  } catch {
+    const separator = baseUrl.includes("?") ? "&" : "?";
+    return `${baseUrl}${separator}metric=${encodeURIComponent(metric)}`;
+  }
+}
+
+function formatCompactValue(value: number, unit: string) {
+  if (unit === "hours") {
+    const wholeHours = Math.floor(value);
+    const minutes = Math.round((value - wholeHours) * 60);
+    return minutes > 0 ? `${wholeHours}h ${minutes}m` : `${wholeHours}h`;
+  }
+
+  if (unit === "GB" || unit === "GB-Hrs") {
+    return `${value.toLocaleString("en-US", { maximumFractionDigits: 2 })} ${unit}`;
+  }
+
+  return `${value.toLocaleString("en-US")} ${unit}`;
+}
+
+function buildVercelUsageMetrics() {
+  const vercelUsageBaseUrl = getVercelUsageBaseUrl();
+
+  return VERCEL_USAGE_METRICS.map((metric) => {
+    const value = readNumberEnv(metric.envName, metric.currentValue);
+    const limit = metric.upperLimit ?? metric.includedLimit;
+    const warningThresholdPercent = metric.upperLimit
+      ? Math.round((metric.includedLimit / metric.upperLimit) * 1000) / 10
+      : 70;
+
+    return buildMetric({
+      id: metric.id,
+      label: metric.label,
+      group: "Vercel",
+      value,
+      limit,
+      unit: metric.unit,
+      warningThresholdPercent,
+      dangerThresholdPercent: metric.upperLimit ? 90 : 100,
+      description:
+        `${metric.description} Included/free threshold: ${formatCompactValue(metric.includedLimit, metric.unit)}${
+          metric.upperLimit ? `; upper threshold: ${formatCompactValue(metric.upperLimit, metric.unit)}` : ""
+        }.`,
+      mitigation: metric.mitigation,
+      dataSource: `Vercel usage manual input (${metric.envName})`,
+      sourceUrl: buildUsageUrl(vercelUsageBaseUrl, metric.usageMetric),
+      sourceLabel: "Vercel usage",
+      inputNames: [metric.envName, "NUTSNEWS_VERCEL_USAGE_URL"],
+    });
+  });
 }
 
 function getSupabaseAdminConfig() {
@@ -444,6 +689,29 @@ export async function getAdminCostGuardrailsDashboardData(): Promise<GuardrailsD
       eventRows: filterSince(eventRows, daysAgo(7)),
     });
     const last30Days = buildWindowStats({ workerRows, aiRows, eventRows });
+    const persistedRedisKvOps = sumQuotaEventTypes(eventRows, [
+      "redis_kv_operation",
+      "redis_kv_ops",
+      "kv_operation",
+      "kv_read",
+      "kv_write",
+    ]);
+    const persistedEgressGb = sumQuotaEventTypes(eventRows, [
+      "egress_gb",
+      "bandwidth_gb",
+      "fast_data_transfer_gb",
+      "fast_origin_transfer_gb",
+    ]);
+    const persistedPageSpeedCalls = sumQuotaEventTypes(eventRows, [
+      "pagespeed_api_call",
+      "pagespeed_api_calls",
+      "third_party_api_call",
+    ]);
+    const vercelFastOriginTransferGb =
+      readNumberEnv("NUTSNEWS_VERCEL_FAST_ORIGIN_TRANSFER_GB", 1.31) ?? 1.31;
+    const vercelFastDataTransferGb =
+      readNumberEnv("NUTSNEWS_VERCEL_FAST_DATA_TRANSFER_GB", 1.93) ?? 1.93;
+    const vercelEstimatedEgressGb = vercelFastOriginTransferGb + vercelFastDataTransferGb;
 
     const totalContentRows =
       articleCount === null || summaryCount === null || feedCount === null
@@ -561,41 +829,74 @@ export async function getAdminCostGuardrailsDashboardData(): Promise<GuardrailsD
         id: "redis-kv-ops",
         label: "Redis/KV usage",
         group: "Redis/KV",
-        value: readNumberEnv("NUTSNEWS_REDIS_KV_30D_OPS", null),
-        limit: readNumberEnv("NUTSNEWS_REDIS_KV_30D_OP_LIMIT", null),
+        value: readNumberEnv("NUTSNEWS_REDIS_KV_30D_OPS", persistedRedisKvOps),
+        limit: readNumberEnv("NUTSNEWS_REDIS_KV_30D_OP_LIMIT", 100000),
         unit: "ops",
         description:
-          "Optional manual input until Redis/KV operation counters are persisted. Set NUTSNEWS_REDIS_KV_30D_OPS and NUTSNEWS_REDIS_KV_30D_OP_LIMIT to track it here.",
+          "Redis/KV operations in the last 30 days from quota_usage_events when present, or from manual environment input. A zero value means no matching quota events have been recorded yet.",
         mitigation:
           "Increase TTLs, avoid caching permanent no-thumbnail rejects, and keep Redis locks short-lived.",
-        dataSource: "Environment override",
+        dataSource: "quota_usage_events redis/kv event types or NUTSNEWS_REDIS_KV_30D_OPS",
+        sourceUrl: readStringEnv("NUTSNEWS_REDIS_KV_USAGE_URL", "https://dash.cloudflare.com/"),
+        sourceLabel: "Redis/KV provider usage",
+        inputNames: [
+          "NUTSNEWS_REDIS_KV_30D_OPS",
+          "NUTSNEWS_REDIS_KV_30D_OP_LIMIT",
+          "NUTSNEWS_REDIS_KV_USAGE_URL",
+        ],
       }),
       buildMetric({
         id: "egress-month-gb",
         label: "Estimated egress, last 30 days",
         group: "Egress",
-        value: readNumberEnv("NUTSNEWS_EGRESS_30D_GB", null),
-        limit: readNumberEnv("NUTSNEWS_EGRESS_30D_GB_LIMIT", null),
+        value: readNumberEnv(
+          "NUTSNEWS_EGRESS_30D_GB",
+          persistedEgressGb > 0 ? persistedEgressGb : Number(vercelEstimatedEgressGb.toFixed(2)),
+        ),
+        limit: readNumberEnv("NUTSNEWS_EGRESS_30D_GB_LIMIT", 100),
         unit: "GB",
         description:
-          "Optional manual/CDN input for bandwidth risk. Set NUTSNEWS_EGRESS_30D_GB and NUTSNEWS_EGRESS_30D_GB_LIMIT when Cloudflare/Vercel data is available.",
+          "Estimated 30-day bandwidth from persisted quota events, manual CDN input, or the current Vercel Fast Data Transfer plus Fast Origin Transfer values.",
         mitigation:
           "Use CDN caching, optimize images, keep API responses small, and avoid uncached high-frequency homepage/API refreshes.",
-        dataSource: "Environment override",
+        dataSource: "quota_usage_events bandwidth event types, NUTSNEWS_EGRESS_30D_GB, or Vercel transfer inputs",
+        sourceUrl: readStringEnv(
+          "NUTSNEWS_EGRESS_USAGE_URL",
+          buildUsageUrl(getVercelUsageBaseUrl(), "fast-data-transfer"),
+        ),
+        sourceLabel: "Bandwidth usage",
+        inputNames: [
+          "NUTSNEWS_EGRESS_30D_GB",
+          "NUTSNEWS_EGRESS_30D_GB_LIMIT",
+          "NUTSNEWS_EGRESS_USAGE_URL",
+          "NUTSNEWS_VERCEL_FAST_DATA_TRANSFER_GB",
+          "NUTSNEWS_VERCEL_FAST_ORIGIN_TRANSFER_GB",
+        ],
       }),
       buildMetric({
         id: "pagespeed-api-calls",
         label: "PageSpeed/API calls, last 30 days",
         group: "PageSpeed/API",
-        value: readNumberEnv("NUTSNEWS_PAGESPEED_30D_CALLS", null),
-        limit: readNumberEnv("NUTSNEWS_PAGESPEED_30D_CALL_LIMIT", null),
+        value: readNumberEnv("NUTSNEWS_PAGESPEED_30D_CALLS", persistedPageSpeedCalls),
+        limit: readNumberEnv("NUTSNEWS_PAGESPEED_30D_CALL_LIMIT", 25000),
         unit: "calls",
         description:
-          "Optional PageSpeed or third-party API usage input. Set NUTSNEWS_PAGESPEED_30D_CALLS and NUTSNEWS_PAGESPEED_30D_CALL_LIMIT to track it here.",
+          "PageSpeed or third-party API calls in the last 30 days from quota_usage_events when present, or from manual environment input. A zero value means audits have not recorded quota events yet.",
         mitigation:
           "Run PageSpeed audits less often, cache reports, or move scheduled audits to manual workflow_dispatch during incidents.",
-        dataSource: "Environment override",
+        dataSource: "quota_usage_events pagespeed_api_call or NUTSNEWS_PAGESPEED_30D_CALLS",
+        sourceUrl: readStringEnv(
+          "NUTSNEWS_PAGESPEED_USAGE_URL",
+          "https://console.cloud.google.com/apis/api/pagespeedonline.googleapis.com/quotas",
+        ),
+        sourceLabel: "PageSpeed API quotas",
+        inputNames: [
+          "NUTSNEWS_PAGESPEED_30D_CALLS",
+          "NUTSNEWS_PAGESPEED_30D_CALL_LIMIT",
+          "NUTSNEWS_PAGESPEED_USAGE_URL",
+        ],
       }),
+      ...buildVercelUsageMetrics(),
     ];
 
     const warnings = metrics.filter(

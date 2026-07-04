@@ -25,6 +25,12 @@ function formatValue(value: number | null, unit: string) {
     return "Unknown";
   }
 
+  if (unit === "hours") {
+    const wholeHours = Math.floor(value);
+    const minutes = Math.round((value - wholeHours) * 60);
+    return minutes > 0 ? `${wholeHours}h ${minutes}m` : `${wholeHours}h`;
+  }
+
   if (unit === "USD") {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -36,6 +42,10 @@ function formatValue(value: number | null, unit: string) {
 
   if (unit === "GB") {
     return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value)} GB`;
+  }
+
+  if (unit === "GB-Hrs") {
+    return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value)} GB-Hrs`;
   }
 
   return `${formatNumber(value)} ${unit}`;
@@ -137,7 +147,24 @@ function MetricCard({ metric }: { metric: GuardrailMetric }) {
           Mitigation
         </p>
         <p className="mt-2 text-sm leading-6 text-amber-100/70">{metric.mitigation}</p>
-        <p className="mt-2 text-xs text-amber-100/45">Source: {metric.dataSource}</p>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-amber-100/45">
+          <span>Source: {metric.dataSource}</span>
+          {metric.sourceUrl ? (
+            <a
+              href={metric.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-full border border-amber-300/20 px-2 py-1 font-bold text-amber-200/80 transition hover:border-amber-300/45 hover:text-amber-100"
+            >
+              {metric.sourceLabel ?? "Details"}
+            </a>
+          ) : null}
+        </div>
+        {metric.inputNames.length > 0 ? (
+          <p className="mt-2 text-xs leading-5 text-amber-100/45">
+            Inputs: {metric.inputNames.join(", ")}
+          </p>
+        ) : null}
       </div>
     </article>
   );
