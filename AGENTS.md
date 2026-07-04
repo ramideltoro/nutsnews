@@ -30,7 +30,7 @@ This is the NutsNews web repository.
 - MUST prefer the smallest safe change that solves the issue.
 - MUST inspect existing project patterns before adding new files or dependencies.
 - MUST NOT add production dependencies unless clearly needed.
-- Update documentation in `ramideltoro/nutsnews-docs` when behavior, deployment steps, cache behavior, workers, automation, or environment variables change.
+- MUST update documentation in `ramideltoro/nutsnews-docs` for ANY NutsNews work. There is no "no docs needed" exception.
 - MUST NOT add product, operations, deployment, cache, automation, or environment documentation to this application repository. Documentation-only updates belong in `ramideltoro/nutsnews-docs` so they do not trigger application deployments.
 - Repository instruction updates to AGENTS.md are allowed in this repository when the user explicitly requests them.
 - MUST preserve existing UI style unless the requested task explicitly changes it.
@@ -65,13 +65,18 @@ STOP before editing until this preflight is complete.
 
 ## Documentation Requirements
 
-- Every code change MUST include a documentation review.
-- If the change affects users, admins, APIs, configuration, deployment, billing, limits, metrics, caching, security, or operations, Codex MUST update the relevant documentation.
+- For ANY work done on NutsNews, Codex MUST update documentation in `ramideltoro/nutsnews-docs`.
+- This applies to code, configuration, tests, scripts, UI, APIs, database behavior, infrastructure, Cloudflare, admin tools, caching, security, performance, bug fixes, documentation-only process changes, and repository instruction changes.
+- There is no "no docs needed" exception. At minimum, every change MUST create or update a documentation entry summarizing what changed and why it happened.
+- Codex MUST inspect the `ramideltoro/nutsnews-docs` structure and place the update in the most appropriate existing location.
+- If no appropriate docs page exists, Codex MUST create a clearly named change note or changelog entry that follows the existing docs repo style.
 - Documentation updates for product, operations, deployment, cache, automation, architecture, runbooks, environment variables, billing, limits, metrics, security, and cross-repo behavior MUST go in `ramideltoro/nutsnews-docs` unless the user explicitly requests instruction-only updates in this repository.
 - Documentation updates MUST be specific, not generic.
-- Documentation MUST explain what changed, why it matters, how to use it, and any operational risks, setup steps, configuration, environment variables, rollback notes, or follow-up checks.
-- If no documentation file needs changing, Codex MUST explicitly say why in the final response and in the PR description.
-- Codex MUST NOT claim documentation is complete unless the relevant docs were updated or the no-docs-needed rationale is explicit and tied to the actual change scope.
+- Documentation MUST explain what changed, why it changed, who is affected, how behavior is different, and any setup, environment variables, permissions, migrations, limits, or operational steps.
+- Documentation MUST include risks, mitigations, and rollback notes when applicable.
+- Documentation MUST include links to related PRs or issues when available.
+- Every docs update MUST include Simple Summary, Intermediate Summary, and Expert Summary sections.
+- Codex MUST NOT claim documentation is complete unless the relevant `ramideltoro/nutsnews-docs` update exists.
 
 ## Release Notes Requirements
 
@@ -86,6 +91,7 @@ Release notes MUST be specific to the actual change. Codex MUST NOT use generic 
 ## Graphs And Details
 
 - When a change affects workflows, data flow, caching, metrics, background jobs, APIs, auth, infrastructure, deployment, billing, limits, or operations, Codex MUST include a Mermaid diagram in the PR description or release notes.
+- When a change affects workflows, request flow, data flow, caching, Cloudflare, metrics, auth, background jobs, APIs, database behavior, deployment, or infrastructure, Codex MUST include a Mermaid diagram in the `ramideltoro/nutsnews-docs` update.
 - Mermaid diagrams MUST use flowcharts or sequence diagrams where helpful.
 - The diagram MUST show before/after behavior or the important request, data, operational, or control path.
 - If a graph would not add value, Codex MUST explicitly say why in the PR description.
@@ -138,6 +144,11 @@ For normal implementation tasks:
 ## PR Rules
 
 - If the task requires a PR, or this AGENTS.md says to raise a PR, Codex MUST create the PR before the final response.
+- For NutsNews work, Codex MUST create or update the application repository PR as required by this AGENTS.md.
+- For NutsNews work, Codex MUST create or update a documentation repository PR in `ramideltoro/nutsnews-docs` for the documentation change.
+- Codex MUST link the application PR and documentation PR to each other when both PRs exist and permissions allow.
+- Every PR MUST include release notes with Simple Summary, Intermediate Summary, and Expert Summary.
+- Every PR MUST include tests/checks run with exact commands and pass/fail results.
 - MUST include the PR link in the final response when a PR is created.
 - MUST NOT merge the PR unless the user explicitly asks.
 - If a PR cannot be created, MUST explain the exact blocker and what remains.
@@ -151,12 +162,13 @@ Every PR description MUST include all of the following:
 - Intermediate Summary.
 - Expert Summary.
 - User/admin impact.
-- Documentation updated, with links or file paths, or an explicit no-docs-needed rationale.
+- Documentation updated, with `ramideltoro/nutsnews-docs` links, PR links, or file paths.
 - Release notes containing the three required audience levels.
 - Tests/checks run with exact commands and pass/fail results.
 - Risks and mitigations.
 - Rollback plan.
 - Mermaid graph when applicable, or an explicit explanation of why a graph would not add value.
+- Related application PR and documentation PR links when both PRs exist.
 
 Codex MUST update the PR description before the final response if any required section is missing, stale, or contradicted by the final implementation.
 
@@ -165,12 +177,14 @@ Codex MUST update the PR description before the final response if any required s
 Codex MUST include all of the following before finishing:
 
 - AGENTS.md files read.
+- NutsNews docs repo files updated.
 - Summary of changes.
 - Files changed.
-- Docs updated, or why no docs were needed.
+- Documentation update summary.
 - Release notes added.
 - Tests/checks run with exact commands and pass/fail results.
-- PR link, if required.
+- Application PR link, if created or required.
+- Documentation PR link, if created or required.
 - Any blockers or unverified items.
 - Final "AGENTS.md compliance checklist".
 
@@ -181,11 +195,12 @@ A task is NOT done until:
 - Applicable AGENTS.md files were read and named.
 - User changes were preserved.
 - Requested code/doc changes were completed.
-- Documentation impact was reviewed and handled with either specific docs updates or an explicit no-docs-needed rationale.
+- Documentation was updated in `ramideltoro/nutsnews-docs`.
 - Release notes were included with Simple Summary, Intermediate Summary, and Expert Summary.
+- Required Mermaid diagrams were included when applicable.
 - Required PR summary sections were completed, including user/admin impact, documentation status, release notes, tests/checks, risks, rollback, and graph status.
 - Relevant checks/tests were run and reported.
-- Required PR was created and linked.
+- Required application PR and documentation PR were created and linked.
 - Any skipped REQUIRED step has an explicit blocker.
 
 ## Useful commands
