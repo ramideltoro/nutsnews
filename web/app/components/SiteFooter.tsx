@@ -701,7 +701,7 @@ export function SiteFooter() {
     window.setTimeout(() => setIsHomeButtonAnimating(false), 620);
   }
 
-  function handleHomeClick(event: MouseEvent<HTMLAnchorElement>) {
+  function handleHomeClick(event: MouseEvent<HTMLButtonElement>) {
     if (
       event.defaultPrevented ||
       event.button !== 0 ||
@@ -746,8 +746,8 @@ export function SiteFooter() {
             className="site-footer-modern__controls"
             aria-label={copy.shortcuts}
           >
-            <Link
-              href="/"
+            <button
+              type="button"
               data-testid="nutsnews-footer-home"
               className={`footer-icon-button ${
                 isHomeButtonAnimating ? "footer-icon-button--home-pulse" : ""
@@ -757,7 +757,7 @@ export function SiteFooter() {
             >
               <span className="footer-icon-button__halo" />
               <HomeIcon className="footer-icon-button__icon" />
-            </Link>
+            </button>
 
             <button
               type="button"
