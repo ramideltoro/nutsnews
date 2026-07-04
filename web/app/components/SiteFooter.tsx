@@ -1,7 +1,5 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
-
 import {
   type FormEvent,
   type MouseEvent,
@@ -21,6 +19,7 @@ import {
 import type { Article } from "@/lib/articles";
 import { DEFAULT_LANGUAGE_CODE, type LanguageCode } from "@/lib/languages";
 import { ThemeSwitcher } from "./ThemeSwitcher";
+import { OptimizedArticleImage } from "./OptimizedArticleImage";
 import { useSelectedLanguage } from "./useSelectedLanguage";
 
 const COPYRIGHT_YEAR = 2026;
@@ -606,23 +605,19 @@ function SearchMenu({
                 className="overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-surface-soft)]"
               >
                 <div className="grid gap-0 sm:grid-cols-[150px_1fr]">
-                  {article.image_url ? (
-                    <a
-                      href={article.original_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block bg-[var(--theme-surface-strong)]"
-                      aria-label={`${copy.readFullStory}: ${article.title}`}
-                    >
-                      <img
-                        src={article.image_url}
-                        alt=""
-                        className="h-36 w-full object-cover sm:h-full"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    </a>
-                  ) : null}
+                  <a
+                    href={article.original_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="relative block h-36 overflow-hidden bg-[var(--theme-surface-strong)] sm:h-full"
+                    aria-label={`${copy.readFullStory}: ${article.title}`}
+                  >
+                    <OptimizedArticleImage
+                      src={article.image_url}
+                      category={article.category}
+                      sizes="(min-width: 640px) 150px, 100vw"
+                    />
+                  </a>
 
                   <div className="p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-black uppercase tracking-[0.12em] text-[var(--theme-muted)]">

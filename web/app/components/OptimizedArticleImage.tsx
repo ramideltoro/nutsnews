@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { type CSSProperties, useState } from "react";
 import {
   ARTICLE_CARD_IMAGE_SIZES,
   ARTICLE_IMAGE_PLACEHOLDER,
@@ -9,6 +9,7 @@ import {
   normalizeArticleImageUrl,
   shouldBypassNextImageOptimization,
 } from "@/lib/imageDelivery";
+import { getFallbackThumbnailVisual } from "@/lib/fallbackThumbnails";
 
 type ImageMode = "optimized" | "raw" | "fallback";
 
@@ -16,6 +17,7 @@ type OptimizedArticleImageProps = {
   src: string | null;
   alt?: string;
   className?: string;
+  category?: string | null;
   eager?: boolean;
   sizes?: string;
 };
@@ -31,23 +33,68 @@ function ArticleImageLoadingBackdrop() {
   );
 }
 
-export function ArticleImageFallback() {
-  return (
-    <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top_right,_rgba(245,158,11,0.42),_transparent_36%),linear-gradient(135deg,_#171717,_#0a0a0a_58%,_#451a03)]">
-      <span className="absolute left-7 top-6 text-5xl text-amber-200/25">
-        ✦
-      </span>
-      <span className="absolute bottom-7 right-8 text-6xl text-amber-300/20">
-        ●
-      </span>
-      <span className="absolute right-12 top-9 text-3xl text-orange-200/25">
-        ✧
-      </span>
+export function ArticleImageFallback({
+  category,
+  className = "",
+}: {
+  category?: string | null;
+  className?: string;
+}) {
+  const visual = getFallbackThumbnailVisual(category);
+  const style = {
+    "--fallback-pattern": visual.pattern,
+    "--fallback-accent": visual.accent,
+    "--fallback-glow": visual.glow,
+    backgroundImage: visual.gradient,
+  } as CSSProperties;
 
-      <div className="relative z-10 rounded-[1.5rem] border border-amber-200/20 bg-black/30 px-5 py-4 text-center shadow-2xl shadow-black/30 backdrop-blur-md">
-        <div className="text-4xl">✨</div>
-        <p className="mt-2 text-[11px] font-black uppercase tracking-[0.2em] text-amber-100">
-          Positive Story
+  return (
+    <div
+      role="img"
+      aria-label={visual.ariaLabel}
+      data-fallback-thumbnail={visual.id}
+      style={style}
+      className={`relative flex h-full w-full items-center justify-center overflow-hidden ${className}`}
+    >
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 opacity-95 [background-image:var(--fallback-pattern)]"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute -left-10 top-8 h-32 w-32 rounded-full blur-2xl"
+        style={{ backgroundColor: visual.glow }}
+      />
+      <div
+        aria-hidden="true"
+        className="absolute -bottom-12 right-5 h-40 w-40 rounded-full blur-3xl"
+        style={{ backgroundColor: visual.glow }}
+      />
+      <span
+        aria-hidden="true"
+        className="absolute left-7 top-6 h-12 w-12 rounded-full border text-center text-[10px] font-black uppercase leading-[3rem] tracking-[0.14em]"
+        style={{ borderColor: visual.accent, color: visual.accent }}
+      >
+        {visual.monogram}
+      </span>
+      <span
+        aria-hidden="true"
+        className="absolute bottom-7 right-8 h-16 w-16 rounded-full border opacity-40"
+        style={{ borderColor: visual.accent }}
+      />
+
+      <div className="relative z-10 max-w-[72%] rounded-[1.5rem] border border-white/15 bg-black/35 px-5 py-4 text-center shadow-2xl shadow-black/30 backdrop-blur-md">
+        <p
+          className="text-[10px] font-black uppercase tracking-[0.2em]"
+          style={{ color: visual.accent }}
+        >
+          {visual.eyebrow}
+        </p>
+        <p className="mt-2 text-lg font-black uppercase tracking-[0.08em] text-amber-50">
+          {visual.title}
+        </p>
+        <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-amber-100/60">
+          No article image
         </p>
       </div>
     </div>
@@ -58,6 +105,7 @@ export function OptimizedArticleImage({
   src,
   alt = "",
   className = "object-cover",
+  category,
   eager = false,
   sizes = ARTICLE_CARD_IMAGE_SIZES,
 }: OptimizedArticleImageProps) {
@@ -65,7 +113,7 @@ export function OptimizedArticleImage({
   const [mode, setMode] = useState<ImageMode>("optimized");
 
   if (!normalizedSrc || mode === "fallback") {
-    return <ArticleImageFallback />;
+    return <ArticleImageFallback category={category} />;
   }
 
   const loading = eager ? "eager" : "lazy";

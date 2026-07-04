@@ -427,6 +427,13 @@ function PublishedArticleCard({
             {article.source} • {article.category} • Published{" "}
             {formatDateTime(article.publishedOnSiteAt)}
           </p>
+
+          {!article.imageUrl ? (
+            <p className="mt-3 rounded-2xl border border-orange-300/25 bg-orange-400/10 px-4 py-3 text-sm font-semibold leading-6 text-orange-100">
+              Missing thumbnail: verify the Worker no-image rejection path and
+              add a usable publisher image before promoting this story further.
+            </p>
+          ) : null}
         </div>
 
         <div className="flex shrink-0 flex-wrap gap-2">
@@ -540,6 +547,14 @@ function ArticleReviewCard({ review }: { review: ArticleReviewRow }) {
             {review.source} • {review.category} • {review.aiProviderLabel} /{" "}
             {review.aiModel} • Reviewed {review.reviewedAtLabel}
           </p>
+
+          {review.publishedArticle && !review.publishedArticle.imageUrl ? (
+            <p className="mt-3 rounded-2xl border border-orange-300/25 bg-orange-400/10 px-4 py-3 text-sm font-semibold leading-6 text-orange-100">
+              Published without a thumbnail. Confirm this was intentional, then
+              replace it with a usable publisher image or keep it out of public
+              reader feeds.
+            </p>
+          ) : null}
         </div>
 
         <div className="flex shrink-0 flex-wrap gap-2">
