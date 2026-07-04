@@ -47,7 +47,8 @@ export type GuardrailMetric = {
     | "Email"
     | "PageSpeed/API"
     | "Egress"
-    | "Vercel";
+    | "Vercel"
+    | "Cloudflare";
   value: number | null;
   limit: number | null;
   unit: string;
@@ -102,6 +103,7 @@ export type GuardrailsDashboardData = {
 };
 
 const MAX_ROWS_TO_LOAD = 10000;
+const CLOUDFLARE_API_ENDPOINT = "https://api.cloudflare.com/client/v4/graphql";
 
 function toNumber(value: number | string | null | undefined) {
   if (typeof value === "number") {
@@ -130,6 +132,23 @@ function readNumberEnv(name: string, fallback: number | null) {
 function readStringEnv(name: string, fallback: string | null) {
   const value = process.env[name]?.trim();
   return value ? value : fallback;
+}
+
+function readBooleanEnv(name: string, fallback = false) {
+  const value = process.env[name]?.trim().toLowerCase();
+
+  if (!value) {
+    return fallback;
+  }
+
+  return ["1", "true", "yes", "on"].includes(value);
+}
+
+function readStringListEnv(name: string) {
+  return (process.env[name] ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
 }
 
 function daysAgo(days: number) {
@@ -419,6 +438,24 @@ function buildUsageUrl(baseUrl: string | null, metric: string) {
   }
 }
 
+function getCloudflareDashboardBaseUrl() {
+  return readStringEnv("CLOUDFLARE_DASHBOARD_URL", "https://dash.cloudflare.com/");
+}
+
+function getCloudflareDashboardUrl(pathname: string) {
+  const baseUrl = getCloudflareDashboardBaseUrl();
+
+  if (!baseUrl) {
+    return null;
+  }
+
+  try {
+    return new URL(pathname.replace(/^\/+/, ""), baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`).toString();
+  } catch {
+    return `${baseUrl.replace(/\/+$/, "")}/${pathname.replace(/^\/+/, "")}`;
+  }
+}
+
 function formatCompactValue(value: number, unit: string) {
   if (unit === "hours") {
     const wholeHours = Math.floor(value);
@@ -461,6 +498,651 @@ function buildVercelUsageMetrics() {
       sourceUrl: buildUsageUrl(vercelUsageBaseUrl, metric.usageMetric),
       sourceLabel: "Vercel usage",
       inputNames: [metric.envName, "NUTSNEWS_VERCEL_USAGE_URL"],
+    });
+  });
+}
+
+type CloudflareGraphQlUsage = {
+  workersRequests24h: number | null;
+  workersRequests30d: number | null;
+  workersCpuP99Ms: number | null;
+  workersSubrequests30d: number | null;
+  cdnRequests30d: number | null;
+  cdnBandwidthGb30d: number | null;
+  cdnCachedBandwidthGb30d: number | null;
+  errorMessage: string | null;
+};
+
+type CloudflareUsageMetricConfig = {
+  id: string;
+  label: string;
+  envName: string;
+  limitEnvName: string;
+  unit: string;
+  defaultLimit: number | null;
+  windowDays?: number;
+  usageMetric: string;
+  description: string;
+  mitigation: string;
+  warningThresholdPercent?: number;
+  dangerThresholdPercent?: number;
+  apiValue: (usage: CloudflareGraphQlUsage) => number | null;
+  persistedEventTypes?: string[];
+  enabled?: () => boolean;
+};
+
+const CLOUDFLARE_USAGE_METRICS: CloudflareUsageMetricConfig[] = [
+  {
+    id: "cloudflare-workers-requests-24h",
+    label: "Workers requests, last 24h",
+    envName: "CLOUDFLARE_WORKERS_REQUESTS_24H",
+    limitEnvName: "CLOUDFLARE_WORKERS_REQUESTS_DAILY_LIMIT",
+    unit: "requests",
+    defaultLimit: 100000,
+    windowDays: 1,
+    usageMetric: "workers-and-pages",
+    description:
+      "Cloudflare Workers account request pressure for the last 24 hours. The Workers Free plan has a 100,000 requests/day account limit.",
+    mitigation:
+      "Reduce shard schedule frequency, pause low-quality feeds, and confirm uptime monitors are not calling Worker endpoints.",
+    apiValue: (usage) => usage.workersRequests24h,
+    persistedEventTypes: ["cloudflare_worker_request", "cloudflare_workers_request"],
+  },
+  {
+    id: "cloudflare-workers-requests-30d",
+    label: "Workers requests, last 30d",
+    envName: "CLOUDFLARE_WORKERS_REQUESTS_30D",
+    limitEnvName: "CLOUDFLARE_WORKERS_REQUESTS_30D_LIMIT",
+    unit: "requests",
+    defaultLimit: 3000000,
+    usageMetric: "workers-and-pages",
+    description:
+      "30-day Workers request volume. This is a trend guardrail derived from the 100,000 requests/day free-tier limit.",
+    mitigation:
+      "Keep Worker runs bounded, reduce shard count during spikes, and use KV snapshots to avoid repeated expensive refreshes.",
+    apiValue: (usage) => usage.workersRequests30d,
+    persistedEventTypes: ["cloudflare_worker_request", "cloudflare_workers_request"],
+  },
+  {
+    id: "cloudflare-workers-cpu-p99",
+    label: "Workers CPU p99",
+    envName: "CLOUDFLARE_WORKERS_CPU_P99_MS",
+    limitEnvName: "CLOUDFLARE_WORKERS_CPU_P99_MS_LIMIT",
+    unit: "ms",
+    defaultLimit: 10,
+    usageMetric: "workers-and-pages",
+    description:
+      "Cloudflare Workers p99 CPU time. Waiting on network calls does not count as CPU, but CPU overages can trigger Worker 1102 errors.",
+    mitigation:
+      "Move CPU-heavy parsing to smaller batches, lower per-run review limits, and profile worker code before raising paid-plan limits.",
+    warningThresholdPercent: 70,
+    dangerThresholdPercent: 100,
+    apiValue: (usage) => usage.workersCpuP99Ms,
+  },
+  {
+    id: "cloudflare-workers-subrequests-30d",
+    label: "Workers subrequests, last 30d",
+    envName: "CLOUDFLARE_WORKERS_SUBREQUESTS_30D",
+    limitEnvName: "CLOUDFLARE_WORKERS_SUBREQUESTS_30D_LIMIT",
+    unit: "subrequests",
+    defaultLimit: null,
+    usageMetric: "workers-and-pages",
+    description:
+      "Cloudflare Workers subrequests over 30 days. This has no single monthly account quota, but high volume predicts pressure on per-invocation subrequest limits.",
+    mitigation:
+      "Keep feed fetches and article-page image hydration bounded; raise limits only in the Worker repo after owner approval.",
+    apiValue: (usage) => usage.workersSubrequests30d,
+  },
+  {
+    id: "cloudflare-kv-reads-24h",
+    label: "Workers KV reads, last 24h",
+    envName: "CLOUDFLARE_KV_READS_24H",
+    limitEnvName: "CLOUDFLARE_KV_READS_DAILY_LIMIT",
+    unit: "reads",
+    defaultLimit: 100000,
+    windowDays: 1,
+    usageMetric: "workers-kv",
+    description:
+      "Cloudflare Workers KV reads for Worker state and public feed edge snapshots. Free KV includes 100,000 reads/day.",
+    mitigation:
+      "Cache Worker state reads, keep public feed snapshot TTLs useful, and avoid polling edge-snapshot status too frequently.",
+    apiValue: () => null,
+    persistedEventTypes: ["cloudflare_kv_read", "kv_read"],
+  },
+  {
+    id: "cloudflare-kv-writes-24h",
+    label: "Workers KV writes, last 24h",
+    envName: "CLOUDFLARE_KV_WRITES_24H",
+    limitEnvName: "CLOUDFLARE_KV_WRITES_DAILY_LIMIT",
+    unit: "writes",
+    defaultLimit: 1000,
+    windowDays: 1,
+    usageMetric: "workers-kv",
+    description:
+      "Cloudflare Workers KV writes for dedupe state, run state, and public feed edge snapshots. Free KV includes 1,000 writes/day to different keys.",
+    mitigation:
+      "Skip unchanged snapshot writes, keep idle scheduled runs from writing state, and reduce shard frequency during write spikes.",
+    apiValue: () => null,
+    persistedEventTypes: ["cloudflare_kv_write", "kv_write"],
+  },
+  {
+    id: "cloudflare-kv-list-delete-24h",
+    label: "Workers KV list/delete ops, last 24h",
+    envName: "CLOUDFLARE_KV_LIST_DELETE_24H",
+    limitEnvName: "CLOUDFLARE_KV_LIST_DELETE_24H_LIMIT",
+    unit: "ops",
+    defaultLimit: null,
+    windowDays: 1,
+    usageMetric: "workers-kv",
+    description:
+      "KV list/delete operations. NutsNews hot paths should not list keys; set manual inputs if cleanup tooling starts using list/delete operations.",
+    mitigation:
+      "Keep key cleanup out of runtime hot paths and prefer TTL expiry over manual list/delete sweeps.",
+    apiValue: () => null,
+    persistedEventTypes: ["cloudflare_kv_list", "cloudflare_kv_delete", "kv_list", "kv_delete"],
+  },
+  {
+    id: "cloudflare-kv-storage",
+    label: "Workers KV storage",
+    envName: "CLOUDFLARE_KV_STORAGE_GB",
+    limitEnvName: "CLOUDFLARE_KV_STORAGE_GB_LIMIT",
+    unit: "GB",
+    defaultLimit: 1,
+    usageMetric: "workers-kv",
+    description:
+      "Cloudflare KV account storage for Worker state and edge snapshots. Free KV storage is 1 GB/account.",
+    mitigation:
+      "Keep snapshot payloads compact, expire dedupe/run-state keys aggressively, and archive large fallback data outside KV.",
+    apiValue: () => null,
+  },
+  {
+    id: "cloudflare-cdn-bandwidth-30d",
+    label: "Cloudflare CDN bandwidth, last 30d",
+    envName: "CLOUDFLARE_CDN_BANDWIDTH_30D_GB",
+    limitEnvName: "CLOUDFLARE_CDN_BANDWIDTH_30D_GB_LIMIT",
+    unit: "GB",
+    defaultLimit: 100,
+    usageMetric: "analytics",
+    description:
+      "Cloudflare zone bandwidth/egress for the public site. Cloudflare may not expose a simple hard bandwidth quota, so the limit is an operational threshold.",
+    mitigation:
+      "Keep public routes cacheable, compress payloads, avoid oversized images, and investigate bot traffic when bandwidth spikes.",
+    apiValue: (usage) => usage.cdnBandwidthGb30d,
+    persistedEventTypes: ["cloudflare_cdn_bandwidth_gb", "cloudflare_bandwidth_gb"],
+  },
+  {
+    id: "cloudflare-cdn-requests-30d",
+    label: "Cloudflare CDN requests, last 30d",
+    envName: "CLOUDFLARE_CDN_REQUESTS_30D",
+    limitEnvName: "CLOUDFLARE_CDN_REQUESTS_30D_LIMIT",
+    unit: "requests",
+    defaultLimit: null,
+    usageMetric: "analytics",
+    description:
+      "Cloudflare request volume for the public site. This is operational pressure rather than a normal free-plan request quota.",
+    mitigation:
+      "Route monitors to /healthz, block abusive bots with Cloudflare rules, and preserve cache HITs for public pages/API.",
+    apiValue: (usage) => usage.cdnRequests30d,
+    persistedEventTypes: ["cloudflare_cdn_request", "cloudflare_request"],
+  },
+  {
+    id: "cloudflare-cdn-uncached-bandwidth-30d",
+    label: "Cloudflare uncached bandwidth, last 30d",
+    envName: "CLOUDFLARE_CDN_UNCACHED_BANDWIDTH_30D_GB",
+    limitEnvName: "CLOUDFLARE_CDN_UNCACHED_BANDWIDTH_30D_GB_LIMIT",
+    unit: "GB",
+    defaultLimit: 10,
+    usageMetric: "cache",
+    description:
+      "Estimated Cloudflare bandwidth that was not served from cache. This protects Vercel/Supabase origin usage.",
+    mitigation:
+      "Fix no-store regressions, tune Cloudflare cache rules, and keep bots away from origin-bound API/page routes.",
+    apiValue: (usage) =>
+      usage.cdnBandwidthGb30d === null || usage.cdnCachedBandwidthGb30d === null
+        ? null
+        : Math.max(0, usage.cdnBandwidthGb30d - usage.cdnCachedBandwidthGb30d),
+    persistedEventTypes: ["cloudflare_uncached_bandwidth_gb"],
+  },
+  {
+    id: "cloudflare-turnstile-validations-30d",
+    label: "Turnstile validations, last 30d",
+    envName: "CLOUDFLARE_TURNSTILE_VALIDATIONS_30D",
+    limitEnvName: "CLOUDFLARE_TURNSTILE_VALIDATIONS_30D_LIMIT",
+    unit: "validations",
+    defaultLimit: null,
+    usageMetric: "turnstile",
+    description:
+      "Cloudflare Turnstile Siteverify validations from the contact form. Set manual inputs if contact abuse makes this operationally important.",
+    mitigation:
+      "Tighten contact form throttling, keep honeypot checks enabled, and review Cloudflare Turnstile analytics during spam bursts.",
+    apiValue: () => null,
+    persistedEventTypes: ["cloudflare_turnstile_validation", "turnstile_validation"],
+  },
+];
+
+const CLOUDFLARE_OPTIONAL_SERVICE_METRICS: CloudflareUsageMetricConfig[] = [
+  {
+    id: "cloudflare-r2-storage",
+    label: "R2 storage",
+    envName: "CLOUDFLARE_R2_STORAGE_GB",
+    limitEnvName: "CLOUDFLARE_R2_STORAGE_GB_LIMIT",
+    unit: "GB",
+    defaultLimit: 10,
+    usageMetric: "r2",
+    description:
+      "Cloudflare R2 storage. Hidden unless CLOUDFLARE_ENABLE_R2_GUARDRAILS=true because NutsNews currently uses KV, not R2, for the edge feed snapshot.",
+    mitigation:
+      "Apply lifecycle rules, archive old objects, and keep publisher-image caching scoped before enabling R2-backed delivery.",
+    apiValue: () => null,
+    enabled: () => readBooleanEnv("CLOUDFLARE_ENABLE_R2_GUARDRAILS"),
+  },
+  {
+    id: "cloudflare-r2-class-a-ops",
+    label: "R2 Class A operations",
+    envName: "CLOUDFLARE_R2_CLASS_A_OPS_30D",
+    limitEnvName: "CLOUDFLARE_R2_CLASS_A_OPS_30D_LIMIT",
+    unit: "ops",
+    defaultLimit: 1000000,
+    usageMetric: "r2",
+    description: "Cloudflare R2 Class A write/list operations. Hidden unless R2 guardrails are explicitly enabled.",
+    mitigation: "Batch writes, avoid list-heavy cleanup jobs, and prefer deterministic object keys.",
+    apiValue: () => null,
+    enabled: () => readBooleanEnv("CLOUDFLARE_ENABLE_R2_GUARDRAILS"),
+  },
+  {
+    id: "cloudflare-r2-class-b-ops",
+    label: "R2 Class B operations",
+    envName: "CLOUDFLARE_R2_CLASS_B_OPS_30D",
+    limitEnvName: "CLOUDFLARE_R2_CLASS_B_OPS_30D_LIMIT",
+    unit: "ops",
+    defaultLimit: 10000000,
+    usageMetric: "r2",
+    description: "Cloudflare R2 Class B read/head operations. Hidden unless R2 guardrails are explicitly enabled.",
+    mitigation: "Serve public assets through Cloudflare cache and avoid uncached object reads from bots.",
+    apiValue: () => null,
+    enabled: () => readBooleanEnv("CLOUDFLARE_ENABLE_R2_GUARDRAILS"),
+  },
+  {
+    id: "cloudflare-r2-egress",
+    label: "R2 egress",
+    envName: "CLOUDFLARE_R2_EGRESS_30D_GB",
+    limitEnvName: "CLOUDFLARE_R2_EGRESS_30D_GB_LIMIT",
+    unit: "GB",
+    defaultLimit: null,
+    usageMetric: "r2",
+    description: "Cloudflare R2 egress. Hidden unless R2 guardrails are explicitly enabled.",
+    mitigation: "Put R2 behind cacheable custom domains and avoid r2.dev production delivery.",
+    apiValue: () => null,
+    enabled: () => readBooleanEnv("CLOUDFLARE_ENABLE_R2_GUARDRAILS"),
+  },
+  {
+    id: "cloudflare-d1-reads",
+    label: "D1 reads",
+    envName: "CLOUDFLARE_D1_READS_30D",
+    limitEnvName: "CLOUDFLARE_D1_READS_30D_LIMIT",
+    unit: "reads",
+    defaultLimit: null,
+    usageMetric: "d1",
+    description: "Cloudflare D1 reads. Hidden unless CLOUDFLARE_ENABLE_D1_GUARDRAILS=true because NutsNews uses Supabase Postgres.",
+    mitigation: "Move read-heavy paths to cached snapshots before introducing D1.",
+    apiValue: () => null,
+    enabled: () => readBooleanEnv("CLOUDFLARE_ENABLE_D1_GUARDRAILS"),
+  },
+  {
+    id: "cloudflare-d1-writes",
+    label: "D1 writes",
+    envName: "CLOUDFLARE_D1_WRITES_30D",
+    limitEnvName: "CLOUDFLARE_D1_WRITES_30D_LIMIT",
+    unit: "writes",
+    defaultLimit: null,
+    usageMetric: "d1",
+    description: "Cloudflare D1 writes. Hidden unless D1 guardrails are explicitly enabled.",
+    mitigation: "Batch writes and keep high-volume ingestion in the owning Worker repo.",
+    apiValue: () => null,
+    enabled: () => readBooleanEnv("CLOUDFLARE_ENABLE_D1_GUARDRAILS"),
+  },
+  {
+    id: "cloudflare-d1-storage",
+    label: "D1 storage",
+    envName: "CLOUDFLARE_D1_STORAGE_GB",
+    limitEnvName: "CLOUDFLARE_D1_STORAGE_GB_LIMIT",
+    unit: "GB",
+    defaultLimit: null,
+    usageMetric: "d1",
+    description: "Cloudflare D1 storage. Hidden unless D1 guardrails are explicitly enabled.",
+    mitigation: "Archive old records and keep Supabase as the primary database unless the architecture changes.",
+    apiValue: () => null,
+    enabled: () => readBooleanEnv("CLOUDFLARE_ENABLE_D1_GUARDRAILS"),
+  },
+  {
+    id: "cloudflare-queues-messages",
+    label: "Queues messages",
+    envName: "CLOUDFLARE_QUEUES_MESSAGES_30D",
+    limitEnvName: "CLOUDFLARE_QUEUES_MESSAGES_30D_LIMIT",
+    unit: "messages",
+    defaultLimit: null,
+    usageMetric: "queues",
+    description: "Cloudflare Queues messages. Hidden unless CLOUDFLARE_ENABLE_QUEUES_GUARDRAILS=true.",
+    mitigation: "Tune producer rates and consumer batch sizes in the worker repo if queues are introduced.",
+    apiValue: () => null,
+    enabled: () => readBooleanEnv("CLOUDFLARE_ENABLE_QUEUES_GUARDRAILS"),
+  },
+  {
+    id: "cloudflare-durable-objects-requests",
+    label: "Durable Objects requests",
+    envName: "CLOUDFLARE_DURABLE_OBJECTS_REQUESTS_30D",
+    limitEnvName: "CLOUDFLARE_DURABLE_OBJECTS_REQUESTS_30D_LIMIT",
+    unit: "requests",
+    defaultLimit: null,
+    usageMetric: "durable-objects",
+    description: "Cloudflare Durable Objects requests. Hidden unless CLOUDFLARE_ENABLE_DURABLE_OBJECTS_GUARDRAILS=true.",
+    mitigation: "Shard object IDs carefully and keep hot state small if Durable Objects are introduced.",
+    apiValue: () => null,
+    enabled: () => readBooleanEnv("CLOUDFLARE_ENABLE_DURABLE_OBJECTS_GUARDRAILS"),
+  },
+  {
+    id: "cloudflare-images-transformations",
+    label: "Cloudflare Images transformations",
+    envName: "CLOUDFLARE_IMAGES_TRANSFORMATIONS_30D",
+    limitEnvName: "CLOUDFLARE_IMAGES_TRANSFORMATIONS_30D_LIMIT",
+    unit: "transformations",
+    defaultLimit: null,
+    usageMetric: "images",
+    description: "Cloudflare Images transformations. Hidden unless CLOUDFLARE_ENABLE_IMAGES_GUARDRAILS=true because web currently uses Vercel/Next image optimization.",
+    mitigation: "Limit image variants and cache transformed URLs if Cloudflare Images replaces or supplements Next Image.",
+    apiValue: () => null,
+    enabled: () => readBooleanEnv("CLOUDFLARE_ENABLE_IMAGES_GUARDRAILS"),
+  },
+  {
+    id: "cloudflare-pages-builds",
+    label: "Pages builds/deployments",
+    envName: "CLOUDFLARE_PAGES_BUILDS_30D",
+    limitEnvName: "CLOUDFLARE_PAGES_BUILDS_30D_LIMIT",
+    unit: "builds",
+    defaultLimit: null,
+    usageMetric: "workers-and-pages",
+    description: "Cloudflare Pages builds/deployments. Hidden unless CLOUDFLARE_ENABLE_PAGES_GUARDRAILS=true because NutsNews web deploys on Vercel.",
+    mitigation: "Keep web deployments on Vercel unless Pages is intentionally introduced.",
+    apiValue: () => null,
+    enabled: () => readBooleanEnv("CLOUDFLARE_ENABLE_PAGES_GUARDRAILS"),
+  },
+];
+
+function getCloudflareApiConfig() {
+  return {
+    accountId: readStringEnv("CLOUDFLARE_ACCOUNT_ID", null),
+    zoneId: readStringEnv("CLOUDFLARE_ZONE_ID", null),
+    apiToken: readStringEnv("CLOUDFLARE_API_TOKEN", null),
+    workerScriptNames: readStringListEnv("CLOUDFLARE_WORKER_SCRIPT_NAMES"),
+  };
+}
+
+async function fetchCloudflareGraphQl<T>(
+  query: string,
+  variables: Record<string, unknown>,
+  apiToken: string,
+): Promise<T> {
+  const response = await fetch(CLOUDFLARE_API_ENDPOINT, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiToken}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ query, variables }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Cloudflare GraphQL request failed with HTTP ${response.status}`);
+  }
+
+  const payload = (await response.json()) as {
+    data?: T;
+    errors?: Array<{ message?: string }>;
+  };
+
+  if (payload.errors?.length) {
+    throw new Error(payload.errors.map((error) => error.message || "Unknown GraphQL error").join("; "));
+  }
+
+  if (!payload.data) {
+    throw new Error("Cloudflare GraphQL response did not include data.");
+  }
+
+  return payload.data;
+}
+
+function emptyCloudflareUsage(errorMessage: string | null = null): CloudflareGraphQlUsage {
+  return {
+    workersRequests24h: null,
+    workersRequests30d: null,
+    workersCpuP99Ms: null,
+    workersSubrequests30d: null,
+    cdnRequests30d: null,
+    cdnBandwidthGb30d: null,
+    cdnCachedBandwidthGb30d: null,
+    errorMessage,
+  };
+}
+
+function toGigabytes(bytes: number) {
+  return Math.round((bytes / 1_000_000_000) * 100) / 100;
+}
+
+function average(values: number[]) {
+  if (values.length === 0) {
+    return null;
+  }
+
+  return values.reduce((total, value) => total + value, 0) / values.length;
+}
+
+async function loadCloudflareGraphQlUsage(): Promise<CloudflareGraphQlUsage> {
+  const { accountId, zoneId, apiToken, workerScriptNames } = getCloudflareApiConfig();
+
+  if (!apiToken || (!accountId && !zoneId)) {
+    return emptyCloudflareUsage("Set CLOUDFLARE_API_TOKEN plus CLOUDFLARE_ACCOUNT_ID and/or CLOUDFLARE_ZONE_ID for live Cloudflare Analytics API usage.");
+  }
+
+  const now = new Date();
+  const since24h = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  const since30d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const until = now.toISOString();
+  const usage = emptyCloudflareUsage(null);
+
+  try {
+    if (accountId && workerScriptNames.length > 0) {
+      const workerQuery = `
+        query GetWorkersAnalytics($accountTag: string, $datetimeStart: string, $datetimeEnd: string, $scriptName: string) {
+          viewer {
+            accounts(filter: { accountTag: $accountTag }) {
+              workersInvocationsAdaptive(limit: 10000, filter: {
+                scriptName: $scriptName,
+                datetime_geq: $datetimeStart,
+                datetime_leq: $datetimeEnd
+              }) {
+                sum {
+                  requests
+                  subrequests
+                }
+                quantiles {
+                  cpuTimeP99
+                }
+              }
+            }
+          }
+        }
+      `;
+
+      let requests24h = 0;
+      let requests30d = 0;
+      let subrequests30d = 0;
+      const cpuP99Values: number[] = [];
+
+      for (const scriptName of workerScriptNames) {
+        const [last24h, last30d] = await Promise.all([
+          fetchCloudflareGraphQl<{
+            viewer?: {
+              accounts?: Array<{
+                workersInvocationsAdaptive?: Array<{
+                  sum?: { requests?: number; subrequests?: number };
+                  quantiles?: { cpuTimeP99?: number };
+                }>;
+              }>;
+            };
+          }>(workerQuery, { accountTag: accountId, datetimeStart: since24h, datetimeEnd: until, scriptName }, apiToken),
+          fetchCloudflareGraphQl<{
+            viewer?: {
+              accounts?: Array<{
+                workersInvocationsAdaptive?: Array<{
+                  sum?: { requests?: number; subrequests?: number };
+                  quantiles?: { cpuTimeP99?: number };
+                }>;
+              }>;
+            };
+          }>(workerQuery, { accountTag: accountId, datetimeStart: since30d, datetimeEnd: until, scriptName }, apiToken),
+        ]);
+
+        const last24Rows = last24h.viewer?.accounts?.[0]?.workersInvocationsAdaptive ?? [];
+        const last30Rows = last30d.viewer?.accounts?.[0]?.workersInvocationsAdaptive ?? [];
+
+        requests24h += sum(last24Rows, (row) => toNumber(row.sum?.requests));
+        requests30d += sum(last30Rows, (row) => toNumber(row.sum?.requests));
+        subrequests30d += sum(last30Rows, (row) => toNumber(row.sum?.subrequests));
+
+        for (const row of last30Rows) {
+          const cpuP99 = toNumber(row.quantiles?.cpuTimeP99);
+          if (cpuP99 > 0) {
+            cpuP99Values.push(cpuP99);
+          }
+        }
+      }
+
+      usage.workersRequests24h = requests24h;
+      usage.workersRequests30d = requests30d;
+      usage.workersSubrequests30d = subrequests30d;
+      usage.workersCpuP99Ms = average(cpuP99Values);
+    }
+
+    if (zoneId) {
+      const cdnQuery = `
+        query GetZoneHttpAnalytics($zoneTag: string, $datetimeStart: string, $datetimeEnd: string) {
+          viewer {
+            zones(filter: { zoneTag: $zoneTag }) {
+              httpRequestsAdaptiveGroups(limit: 10000, filter: {
+                datetime_geq: $datetimeStart,
+                datetime_leq: $datetimeEnd
+              }) {
+                sum {
+                  requests
+                  bytes
+                  cachedBytes
+                }
+              }
+            }
+          }
+        }
+      `;
+      const data = await fetchCloudflareGraphQl<{
+        viewer?: {
+          zones?: Array<{
+            httpRequestsAdaptiveGroups?: Array<{
+              sum?: { requests?: number; bytes?: number; cachedBytes?: number };
+            }>;
+          }>;
+        };
+      }>(cdnQuery, { zoneTag: zoneId, datetimeStart: since30d, datetimeEnd: until }, apiToken);
+      const rows = data.viewer?.zones?.[0]?.httpRequestsAdaptiveGroups ?? [];
+      usage.cdnRequests30d = sum(rows, (row) => toNumber(row.sum?.requests));
+      usage.cdnBandwidthGb30d = toGigabytes(sum(rows, (row) => toNumber(row.sum?.bytes)));
+      usage.cdnCachedBandwidthGb30d = toGigabytes(sum(rows, (row) => toNumber(row.sum?.cachedBytes)));
+    }
+
+    if (accountId && workerScriptNames.length === 0) {
+      usage.errorMessage = "Set CLOUDFLARE_WORKER_SCRIPT_NAMES to enable live Workers usage from Cloudflare GraphQL Analytics.";
+    }
+
+    return usage;
+  } catch (error) {
+    return emptyCloudflareUsage(
+      error instanceof Error ? error.message : "Unable to load Cloudflare GraphQL Analytics usage.",
+    );
+  }
+}
+
+function getCloudflareMetricValue({
+  metric,
+  usage,
+  eventRows,
+}: {
+  metric: CloudflareUsageMetricConfig;
+  usage: CloudflareGraphQlUsage;
+  eventRows: QuotaUsageEventRow[];
+}) {
+  const eventWindowRows = metric.windowDays ? filterSince(eventRows, daysAgo(metric.windowDays)) : eventRows;
+  const apiValue = metric.apiValue(usage);
+  const persistedValue = metric.persistedEventTypes
+    ? sumQuotaEventTypes(eventWindowRows, metric.persistedEventTypes)
+    : 0;
+  const fallbackValue =
+    persistedValue > 0 ? persistedValue : apiValue === null ? null : Number(apiValue.toFixed(2));
+
+  return readNumberEnv(metric.envName, fallbackValue);
+}
+
+function getCloudflareDataSource(metric: CloudflareUsageMetricConfig, usage: CloudflareGraphQlUsage) {
+  if (process.env[metric.envName]?.trim()) {
+    return `Cloudflare manual input (${metric.envName})`;
+  }
+
+  if (metric.persistedEventTypes?.some((eventType) => eventType.startsWith("cloudflare_"))) {
+    return `quota_usage_events ${metric.persistedEventTypes.join("/")}, Cloudflare GraphQL Analytics, or ${metric.envName}`;
+  }
+
+  if (!usage.errorMessage && metric.apiValue(usage) !== null) {
+    return "Cloudflare GraphQL Analytics API";
+  }
+
+  return `Manual input required. Set ${metric.envName} and ${metric.limitEnvName}.`;
+}
+
+function buildCloudflareUsageMetrics(usage: CloudflareGraphQlUsage, eventRows: QuotaUsageEventRow[]) {
+  const metrics = [...CLOUDFLARE_USAGE_METRICS, ...CLOUDFLARE_OPTIONAL_SERVICE_METRICS].filter(
+    (metric) => !metric.enabled || metric.enabled(),
+  );
+
+  return metrics.map((metric) => {
+    const value = getCloudflareMetricValue({ metric, usage, eventRows });
+    const limit = readNumberEnv(metric.limitEnvName, metric.defaultLimit);
+    const missingInputs =
+      value === null || limit === null
+        ? ` Set ${metric.envName} and ${metric.limitEnvName} if Cloudflare does not expose this usage through the configured API.`
+        : "";
+
+    return buildMetric({
+      id: metric.id,
+      label: metric.label,
+      group: "Cloudflare",
+      value,
+      limit,
+      unit: metric.unit,
+      warningThresholdPercent: metric.warningThresholdPercent ?? 70,
+      dangerThresholdPercent: metric.dangerThresholdPercent ?? 90,
+      description: `${metric.description}${missingInputs}`,
+      mitigation: metric.mitigation,
+      dataSource: getCloudflareDataSource(metric, usage),
+      sourceUrl: getCloudflareDashboardUrl(metric.usageMetric),
+      sourceLabel: "Cloudflare dashboard",
+      inputNames: [
+        metric.envName,
+        metric.limitEnvName,
+        "CLOUDFLARE_DASHBOARD_URL",
+        "CLOUDFLARE_API_TOKEN",
+        "CLOUDFLARE_ACCOUNT_ID",
+        "CLOUDFLARE_ZONE_ID",
+        "CLOUDFLARE_WORKER_SCRIPT_NAMES",
+      ],
     });
   });
 }
@@ -668,7 +1350,7 @@ export async function getAdminCostGuardrailsDashboardData(): Promise<GuardrailsD
     });
 
     const since30 = daysAgo(30);
-    const [aiRows, workerRows, eventRows, articleCount, summaryCount, feedCount] =
+    const [aiRows, workerRows, eventRows, articleCount, summaryCount, feedCount, cloudflareUsage] =
       await Promise.all([
         loadAiUsageRuns(supabase, since30),
         loadWorkerRuns(supabase, since30),
@@ -676,6 +1358,7 @@ export async function getAdminCostGuardrailsDashboardData(): Promise<GuardrailsD
         getExactCount(supabase, "articles"),
         getExactCount(supabase, "article_summaries"),
         getExactCount(supabase, "rss_feeds"),
+        loadCloudflareGraphQlUsage(),
       ]);
 
     const last24Hours = buildWindowStats({
@@ -896,6 +1579,7 @@ export async function getAdminCostGuardrailsDashboardData(): Promise<GuardrailsD
           "NUTSNEWS_PAGESPEED_USAGE_URL",
         ],
       }),
+      ...buildCloudflareUsageMetrics(cloudflareUsage, eventRows),
       ...buildVercelUsageMetrics(),
     ];
 

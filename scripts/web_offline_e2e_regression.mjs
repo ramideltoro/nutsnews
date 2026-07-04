@@ -662,7 +662,7 @@ async function runBrowserChecks() {
   await expect.poll(async () => page.evaluate(() => window.scrollY), { timeout: 10000 }).toBeGreaterThan(50);
   await footerHomeButton.dispatchEvent("click");
   await expect.poll(async () => page.evaluate(() => window.scrollY), { timeout: 10000 }).toBeLessThanOrEqual(4);
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/(?:#top)?$/);
 
   await openSettingsPanel();
   await page.getByTestId("nutsnews-settings-theme").click();

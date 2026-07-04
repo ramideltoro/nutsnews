@@ -21,9 +21,15 @@ const packageJson = JSON.parse(read("web/package.json"));
 
 for (const token of [
   "VERCEL_USAGE_METRICS",
+  "CLOUDFLARE_USAGE_METRICS",
+  "CLOUDFLARE_OPTIONAL_SERVICE_METRICS",
   "NUTSNEWS_VERCEL_USAGE_URL",
   "buildVercelUsageMetrics",
+  "buildCloudflareUsageMetrics",
+  "loadCloudflareGraphQlUsage",
+  "fetchCloudflareGraphQl",
   "Vercel usage manual input",
+  "Cloudflare GraphQL Analytics API",
   "sourceUrl",
   "sourceLabel",
   "inputNames",
@@ -31,6 +37,10 @@ for (const token of [
   "redis_kv_operation",
   "egress_gb",
   "pagespeed_api_call",
+  "cloudflare_worker_request",
+  "cloudflare_kv_read",
+  "cloudflare_cdn_bandwidth_gb",
+  "cloudflare_turnstile_validation",
 ]) {
   assertIncludes(guardrails, token, "adminCostGuardrails.ts");
 }
@@ -63,6 +73,45 @@ for (const token of vercelMetricTokens) {
   assertIncludes(guardrails, token, "adminCostGuardrails.ts");
 }
 
+const cloudflareMetricTokens = [
+  "CLOUDFLARE_API_TOKEN",
+  "CLOUDFLARE_ACCOUNT_ID",
+  "CLOUDFLARE_ZONE_ID",
+  "CLOUDFLARE_WORKER_SCRIPT_NAMES",
+  "CLOUDFLARE_WORKERS_REQUESTS_24H",
+  "CLOUDFLARE_WORKERS_REQUESTS_DAILY_LIMIT",
+  "CLOUDFLARE_WORKERS_REQUESTS_30D",
+  "CLOUDFLARE_WORKERS_REQUESTS_30D_LIMIT",
+  "CLOUDFLARE_WORKERS_CPU_P99_MS",
+  "CLOUDFLARE_WORKERS_CPU_P99_MS_LIMIT",
+  "CLOUDFLARE_WORKERS_SUBREQUESTS_30D",
+  "CLOUDFLARE_WORKERS_SUBREQUESTS_30D_LIMIT",
+  "CLOUDFLARE_KV_READS_24H",
+  "CLOUDFLARE_KV_READS_DAILY_LIMIT",
+  "CLOUDFLARE_KV_WRITES_24H",
+  "CLOUDFLARE_KV_WRITES_DAILY_LIMIT",
+  "CLOUDFLARE_KV_STORAGE_GB",
+  "CLOUDFLARE_KV_STORAGE_GB_LIMIT",
+  "CLOUDFLARE_CDN_BANDWIDTH_30D_GB",
+  "CLOUDFLARE_CDN_BANDWIDTH_30D_GB_LIMIT",
+  "CLOUDFLARE_CDN_REQUESTS_30D",
+  "CLOUDFLARE_CDN_REQUESTS_30D_LIMIT",
+  "CLOUDFLARE_CDN_UNCACHED_BANDWIDTH_30D_GB",
+  "CLOUDFLARE_CDN_UNCACHED_BANDWIDTH_30D_GB_LIMIT",
+  "CLOUDFLARE_TURNSTILE_VALIDATIONS_30D",
+  "CLOUDFLARE_TURNSTILE_VALIDATIONS_30D_LIMIT",
+  "CLOUDFLARE_ENABLE_R2_GUARDRAILS",
+  "CLOUDFLARE_ENABLE_D1_GUARDRAILS",
+  "CLOUDFLARE_ENABLE_QUEUES_GUARDRAILS",
+  "CLOUDFLARE_ENABLE_DURABLE_OBJECTS_GUARDRAILS",
+  "CLOUDFLARE_ENABLE_IMAGES_GUARDRAILS",
+  "CLOUDFLARE_ENABLE_PAGES_GUARDRAILS",
+];
+
+for (const token of cloudflareMetricTokens) {
+  assertIncludes(guardrails, token, "adminCostGuardrails.ts");
+}
+
 for (const token of [
   "Fluid Active CPU",
   "ISR Writes",
@@ -79,11 +128,27 @@ for (const token of [
 }
 
 for (const token of [
+  "Workers requests, last 24h",
+  "Workers requests, last 30d",
+  "Workers CPU p99",
+  "Workers KV reads, last 24h",
+  "Workers KV writes, last 24h",
+  "Workers KV storage",
+  "Cloudflare CDN bandwidth, last 30d",
+  "Cloudflare CDN requests, last 30d",
+  "Cloudflare uncached bandwidth, last 30d",
+  "Turnstile validations, last 30d",
+]) {
+  assertIncludes(guardrails, token, "adminCostGuardrails.ts");
+}
+
+for (const token of [
   "metric.sourceUrl",
   "metric.sourceLabel",
   "metric.inputNames",
   'unit === "hours"',
   'unit === "GB-Hrs"',
+  'unit === "ms"',
 ]) {
   assertIncludes(page, token, "guardrails page");
 }

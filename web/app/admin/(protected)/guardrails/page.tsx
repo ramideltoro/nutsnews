@@ -48,6 +48,10 @@ function formatValue(value: number | null, unit: string) {
     return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value)} GB-Hrs`;
   }
 
+  if (unit === "ms") {
+    return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(value)} ms`;
+  }
+
   return `${formatNumber(value)} ${unit}`;
 }
 
