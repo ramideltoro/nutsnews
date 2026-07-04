@@ -37,7 +37,7 @@ This is the NutsNews web repository.
 - For cache/CDN work, verify headers and document expected behavior.
 - Avoid routing telemetry tunnels through middleware; prefer direct-to-provider telemetry unless a tunnel is explicitly required.
 - Keep generated OG image routes cacheable and lightweight; avoid remote fetches and unsupported `ImageResponse` CSS.
-- External uptime monitors such as Better Stack or UptimeRobot should hit `/healthz`, not public pages or article APIs.
+- External uptime monitors such as Better Stack or UptimeRobot MUST hit `/healthz`, not public pages or article APIs.
 - Prefer ISR and cached fetch/database helpers for public article pages when freshness allows.
 - For GitHub Actions work, include regression checks when practical.
 - For Vercel/Cloudflare deployment work, include safe dry-run or validation paths when practical.
@@ -62,6 +62,34 @@ STOP before editing until this preflight is complete.
 - MUST explain investigation commands in simple terms when debugging or when commands may affect remote services.
 - MUST use existing project patterns unless there is a clear, task-specific reason not to.
 - MUST keep implementation changes in the owning repo. If a change crosses web, worker, and docs boundaries, make coordinated PRs instead of mixing unrelated ownership into one repository.
+
+## Documentation Requirements
+
+- Every code change MUST include a documentation review.
+- If the change affects users, admins, APIs, configuration, deployment, billing, limits, metrics, caching, security, or operations, Codex MUST update the relevant documentation.
+- Documentation updates for product, operations, deployment, cache, automation, architecture, runbooks, environment variables, billing, limits, metrics, security, and cross-repo behavior MUST go in `ramideltoro/nutsnews-docs` unless the user explicitly requests instruction-only updates in this repository.
+- Documentation updates MUST be specific, not generic.
+- Documentation MUST explain what changed, why it matters, how to use it, and any operational risks, setup steps, configuration, environment variables, rollback notes, or follow-up checks.
+- If no documentation file needs changing, Codex MUST explicitly say why in the final response and in the PR description.
+- Codex MUST NOT claim documentation is complete unless the relevant docs were updated or the no-docs-needed rationale is explicit and tied to the actual change scope.
+
+## Release Notes Requirements
+
+Every PR MUST include release notes with all three REQUIRED audience levels:
+
+- Simple Summary: MUST explain the change like speaking to a 5-year-old. Use plain language and one short paragraph.
+- Intermediate Summary: MUST explain what changed, who it affects, how behavior is different, and what to watch for.
+- Expert Summary: MUST include technical details, files/systems touched, data flow, configuration/environment changes, edge cases, risks, rollback notes, and test coverage.
+
+Release notes MUST be specific to the actual change. Codex MUST NOT use generic filler or repeat the same wording across the three audience levels.
+
+## Graphs And Details
+
+- When a change affects workflows, data flow, caching, metrics, background jobs, APIs, auth, infrastructure, deployment, billing, limits, or operations, Codex MUST include a Mermaid diagram in the PR description or release notes.
+- Mermaid diagrams MUST use flowcharts or sequence diagrams where helpful.
+- The diagram MUST show before/after behavior or the important request, data, operational, or control path.
+- If a graph would not add value, Codex MUST explicitly say why in the PR description.
+- A graph is not REQUIRED for instruction-only, typo-only, or narrowly scoped copy changes when there is no workflow, data flow, or operational path to clarify, but the PR MUST say why it was omitted.
 
 ## Local validation expectations
 
@@ -115,6 +143,23 @@ For normal implementation tasks:
 - If a PR cannot be created, MUST explain the exact blocker and what remains.
 - If the user explicitly asks not to create a PR, MUST follow the user's instruction and document that no PR was created.
 
+## PR Description Contract
+
+Every PR description MUST include all of the following:
+
+- Simple Summary.
+- Intermediate Summary.
+- Expert Summary.
+- User/admin impact.
+- Documentation updated, with links or file paths, or an explicit no-docs-needed rationale.
+- Release notes containing the three required audience levels.
+- Tests/checks run with exact commands and pass/fail results.
+- Risks and mitigations.
+- Rollback plan.
+- Mermaid graph when applicable, or an explicit explanation of why a graph would not add value.
+
+Codex MUST update the PR description before the final response if any required section is missing, stale, or contradicted by the final implementation.
+
 ## Final Response Contract
 
 Codex MUST include all of the following before finishing:
@@ -122,6 +167,8 @@ Codex MUST include all of the following before finishing:
 - AGENTS.md files read.
 - Summary of changes.
 - Files changed.
+- Docs updated, or why no docs were needed.
+- Release notes added.
 - Tests/checks run with exact commands and pass/fail results.
 - PR link, if required.
 - Any blockers or unverified items.
@@ -134,6 +181,9 @@ A task is NOT done until:
 - Applicable AGENTS.md files were read and named.
 - User changes were preserved.
 - Requested code/doc changes were completed.
+- Documentation impact was reviewed and handled with either specific docs updates or an explicit no-docs-needed rationale.
+- Release notes were included with Simple Summary, Intermediate Summary, and Expert Summary.
+- Required PR summary sections were completed, including user/admin impact, documentation status, release notes, tests/checks, risks, rollback, and graph status.
 - Relevant checks/tests were run and reported.
 - Required PR was created and linked.
 - Any skipped REQUIRED step has an explicit blocker.
