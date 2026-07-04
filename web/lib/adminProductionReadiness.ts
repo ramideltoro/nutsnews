@@ -20,10 +20,6 @@ const GITHUB_ACTIONS_REVALIDATE_SECONDS = 300;
 const GITHUB_ACTIONS_STALE_HOURS = 72;
 const GITHUB_ACTIONS_URL = `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/actions`;
 const GITHUB_ACTIONS_RUNS_API_URL = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/actions/runs?branch=${GITHUB_ACTIONS_BRANCH}&per_page=50`;
-const GITHUB_ACTIONS_TOKEN_ENV_KEYS = [
-  "GITHUB_READONLY_TOKEN",
-  "GITHUB_ACTIONS_READ_TOKEN",
-] as const;
 
 const REQUIRED_GITHUB_WORKFLOWS = [
   {
@@ -91,6 +87,8 @@ export type ProductionReadinessWorkflow = {
   statusLabel: string;
   githubStatus: string;
   conclusion: string;
+  branch: string;
+  commitSha: string;
   updatedAt: string | null;
   href: string;
   linkLabel: string;
@@ -164,6 +162,8 @@ type GitHubWorkflowRun = {
   path: string | null;
   status: string | null;
   conclusion: string | null;
+  head_branch: string | null;
+  head_sha: string | null;
   html_url: string | null;
   updated_at: string | null;
   created_at: string | null;
@@ -674,15 +674,7 @@ function buildBackupSignal() {
 }
 
 function getGitHubActionsToken() {
-  for (const envKey of GITHUB_ACTIONS_TOKEN_ENV_KEYS) {
-    const token = process.env[envKey]?.trim();
-
-    if (token) {
-      return token;
-    }
-  }
-
-  return null;
+  return process.env.ACTIONS_READ_TOKEN?.trim() || null;
 }
 
 function normalizeWorkflowValue(value: string | null) {
@@ -751,6 +743,8 @@ function mapWorkflowRunStatus(
       statusLabel: "Missing",
       githubStatus: "missing",
       conclusion: "missing",
+      branch: GITHUB_ACTIONS_BRANCH,
+      commitSha: "unknown",
       updatedAt: null,
       href: getRequiredWorkflowHref(required),
       linkLabel: "Open workflow",
@@ -772,6 +766,8 @@ function mapWorkflowRunStatus(
       statusLabel: status || "Pending",
       githubStatus: status || "unknown",
       conclusion: conclusion || "pending",
+      branch: run.head_branch ?? GITHUB_ACTIONS_BRANCH,
+      commitSha: run.head_sha ?? "unknown",
       updatedAt: run.updated_at,
       href,
       linkLabel: "Open run",
@@ -786,6 +782,8 @@ function mapWorkflowRunStatus(
       statusLabel: "Passing",
       githubStatus: status,
       conclusion,
+      branch: run.head_branch ?? GITHUB_ACTIONS_BRANCH,
+      commitSha: run.head_sha ?? "unknown",
       updatedAt: run.updated_at,
       href,
       linkLabel: "Open run",
@@ -804,6 +802,8 @@ function mapWorkflowRunStatus(
       statusLabel: "Failed",
       githubStatus: status,
       conclusion,
+      branch: run.head_branch ?? GITHUB_ACTIONS_BRANCH,
+      commitSha: run.head_sha ?? "unknown",
       updatedAt: run.updated_at,
       href,
       linkLabel: "Open run",
@@ -817,6 +817,8 @@ function mapWorkflowRunStatus(
     statusLabel: stale ? "Stale" : conclusion || "Verify",
     githubStatus: status,
     conclusion: stale ? `${conclusion || "success"}; stale` : conclusion || "unknown",
+    branch: run.head_branch ?? GITHUB_ACTIONS_BRANCH,
+    commitSha: run.head_sha ?? "unknown",
     updatedAt: run.updated_at,
     href,
     linkLabel: "Open run",
@@ -885,7 +887,7 @@ async function buildCiSignal() {
 
   if (!token) {
     return buildCiFallbackSignal(
-      "GitHub Actions status is not queried from the admin app because GITHUB_READONLY_TOKEN or GITHUB_ACTIONS_READ_TOKEN is not configured.",
+      "GitHub Actions status is not queried from the admin app because ACTIONS_READ_TOKEN is not configured.",
     );
   }
 
@@ -929,9 +931,9 @@ async function buildCiSignal() {
       linkLabel: "Open GitHub Actions",
       workflows,
     });
-  } catch (error) {
+  } catch {
     return buildCiFallbackSignal(
-      `Live GitHub Actions status is unavailable: ${error instanceof Error ? error.message : "unknown GitHub API error"}.`,
+      "Live GitHub Actions status is unavailable because the GitHub API request failed before a response was returned.",
     );
   }
 }

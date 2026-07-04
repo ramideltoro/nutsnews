@@ -79,6 +79,9 @@ function SignalCard({ signal }: { signal: ProductionReadinessSignal }) {
                   <p className="mt-1 text-[11px] leading-4 text-amber-100/55">
                     {workflow.detail}
                   </p>
+                  <p className="mt-1 text-[11px] leading-4 text-amber-100/50">
+                    {workflow.branch} @ {workflow.commitSha.slice(0, 7)}
+                  </p>
                 </div>
                 <div className="text-right sm:text-left">
                   <StatusPill status={workflow.status} label={workflow.statusLabel} />
