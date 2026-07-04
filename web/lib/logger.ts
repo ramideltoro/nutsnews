@@ -4,6 +4,25 @@ type LogFields = Record<string, unknown>;
 
 const SERVICE_NAME = "nutsnews-web";
 const DEFAULT_ENVIRONMENT = process.env.NEXT_PUBLIC_APP_ENV ?? "production";
+const DEFAULT_INFO_SAMPLE_RATE = 0.05;
+
+function getInfoSampleRate() {
+    const configured = Number(process.env.BETTER_STACK_INFO_SAMPLE_RATE ?? DEFAULT_INFO_SAMPLE_RATE);
+
+    if (!Number.isFinite(configured)) {
+        return DEFAULT_INFO_SAMPLE_RATE;
+    }
+
+    return Math.min(Math.max(configured, 0), 1);
+}
+
+export function shouldSampleInfoEvent(
+    sampleRate = getInfoSampleRate(),
+    randomValue = Math.random(),
+) {
+    return sampleRate >= 1 || (sampleRate > 0 && randomValue < sampleRate);
+}
+
 
 function normalizeIngestingHost(host: string) {
     const trimmedHost = host.trim().replace(/\/+$/, "");
@@ -114,6 +133,19 @@ export async function logInfo(
     fields: LogFields = {},
 ) {
     await logEvent("info", event, message, fields);
+}
+
+export async function logInfoSampled(
+    event: string,
+    message: string,
+    fields: LogFields = {},
+) {
+    if (!shouldSampleInfoEvent()) {
+        return false;
+    }
+
+    await logEvent("info", event, message, fields);
+    return true;
 }
 
 export async function logWarn(

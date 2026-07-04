@@ -1,12 +1,13 @@
 import type { NextConfig } from "next";
 import path from "node:path";
 import { withSentryConfig } from "@sentry/nextjs";
+import { getSecurityHeaders } from "./lib/securityHeaders";
 
 const PUBLIC_PAGE_CACHE_CONTROL =
-  "public, max-age=0, must-revalidate";
+  "public, max-age=60, s-maxage=900, stale-while-revalidate=3600";
 
 const PUBLIC_CDN_CACHE_CONTROL =
-  "public, s-maxage=300, stale-while-revalidate=300";
+  "public, s-maxage=900, stale-while-revalidate=3600";
 
 const PUBLIC_LONG_CDN_CACHE_CONTROL =
   "public, s-maxage=3600, stale-while-revalidate=86400";
@@ -18,6 +19,10 @@ const STATIC_ASSET_CACHE_CONTROL =
   "public, max-age=31536000, immutable";
 
 const NO_STORE_CACHE_CONTROL = "no-store, max-age=0";
+
+const GLOBAL_SECURITY_HEADERS = Object.entries(
+  getSecurityHeaders({ isDevelopment: process.env.NODE_ENV !== "production" }),
+).map(([key, value]) => ({ key, value }));
 
 const shouldUploadSentrySourceMaps =
   (process.env.VERCEL === "1" || process.env.SENTRY_ENABLE_SOURCE_MAP_UPLOAD === "1") &&
@@ -120,24 +125,36 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        source: "/:path*",
+        headers: GLOBAL_SECURITY_HEADERS,
+      },
+      {
         source: "/",
-        headers: publicCacheHeaders("public-home-cache-300s"),
+        headers: publicCacheHeaders("public-home-cache-900s"),
       },
       {
         source: "/about",
-        headers: publicCacheHeaders("public-about-cache-300s"),
+        headers: publicCacheHeaders("public-about-cache-900s"),
       },
       {
         source: "/contact",
-        headers: publicCacheHeaders("public-contact-cache-300s"),
+        headers: publicCacheHeaders("public-contact-cache-900s"),
+      },
+      {
+        source: "/privacy",
+        headers: publicCacheHeaders("public-privacy-cache-900s"),
       },
       {
         source: "/articles/:path*",
-        headers: publicCacheHeaders("public-article-cache-300s"),
+        headers: publicCacheHeaders("public-article-cache-900s"),
       },
       {
         source: "/api/articles",
-        headers: publicCacheHeaders("public-api-cache-300s"),
+        headers: publicCacheHeaders("public-api-cache-900s"),
+      },
+      {
+        source: "/api/home-feed",
+        headers: publicCacheHeaders("public-home-feed-cache-900s"),
       },
       {
         source: "/api/contact",

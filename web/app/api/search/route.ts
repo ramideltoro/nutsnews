@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { SEARCH_PAGE_SIZE, searchPublishedArticles } from "@/lib/articles";
 import { BYPASS_CACHE_HEADERS } from "@/lib/cacheHeaders";
 import { normalizeLanguageCode } from "@/lib/languages";
-import { logError, logInfo } from "@/lib/logger";
+import { logError, logInfoSampled } from "@/lib/logger";
 
 export const revalidate = 60;
 
@@ -51,19 +51,11 @@ export async function GET(request: Request) {
   const limit = parseLimit(searchParams.get("limit"));
   const languageCode = normalizeLanguageCode(searchParams.get("lang"));
 
-  await logInfo("api.search.request_started", "Search API request started", {
-    route: "/api/search",
-    method: "GET",
-    queryLength: query.length,
-    page,
-    limit,
-    languageCode,
-  });
 
   try {
     const result = await searchPublishedArticles(query, page, limit, languageCode);
 
-    await logInfo("api.search.request_completed", "Search API request completed", {
+    await logInfoSampled("api.search.request_completed", "Search API request completed", {
       route: "/api/search",
       method: "GET",
       status: 200,

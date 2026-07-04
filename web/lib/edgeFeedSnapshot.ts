@@ -1,9 +1,12 @@
 import {
   CATEGORY_SECTION_SIZE,
+  getHomeFeedFromSnapshot,
   getPublishedArticles,
   getPublishedArticlesForSection,
+  HOME_FEED_SECTIONS,
   PAGE_SIZE,
   type Article,
+  type HomeFeedPayload,
   type PublicFeedEdgeSnapshotMetadata,
   type PublishedArticlesResult,
 } from "@/lib/articles";
@@ -218,6 +221,35 @@ export async function getPublishedArticlesWithEdgeFallback(
     nextCursor: null,
     dataSource: "articles_fallback",
     languageCode,
+  };
+}
+
+export async function getHomeFeedDataWithEdgeFallback(
+  requestedLanguageCode?: string | null,
+): Promise<HomeFeedPayload> {
+  const snapshotResult = await getHomeFeedFromSnapshot(requestedLanguageCode);
+
+  if (snapshotResult) {
+    return snapshotResult;
+  }
+
+  const [mainResult, sections] = await Promise.all([
+    getPublishedArticlesWithEdgeFallback(0, null, requestedLanguageCode),
+    Promise.all(
+      HOME_FEED_SECTIONS.map(async (section) => ({
+        id: section.id,
+        articles: await getPublishedArticlesForSectionWithEdgeFallback(
+          section.query,
+          requestedLanguageCode,
+        ),
+      })),
+    ),
+  ]);
+
+  return {
+    ...mainResult,
+    nextPage: mainResult.nextCursor ? null : mainResult.nextPage,
+    sections,
   };
 }
 

@@ -30,6 +30,10 @@ type ArticlesResponse = {
   error?: string;
 };
 
+type HomeFeedResponse = ArticlesResponse & {
+  sections: ArticleCategorySection[];
+};
+
 type CategoryId =
   | "all"
   | "community"
@@ -433,6 +437,7 @@ export function ArticleFeed({
   const initialEnglishArticlesRef = useRef(initialArticles);
   const initialEnglishNextPageRef = useRef(initialNextPage);
   const initialEnglishNextCursorRef = useRef(initialNextCursor);
+  const initialEnglishCategorySectionsRef = useRef(initialCategorySections);
 
   const copy = copyByLanguage[selectedLanguage];
 
@@ -466,13 +471,11 @@ export function ArticleFeed({
       cursor,
       languageCode,
       categoryId = "all",
-      forceFresh = false,
     }: {
       page: number | null;
       cursor: string | null;
       languageCode: LanguageCode;
       categoryId?: CategoryId;
-      forceFresh?: boolean;
     }) => {
       const query = new URLSearchParams();
       const categoryQuery = getCategoryQuery(categoryId);
@@ -491,20 +494,10 @@ export function ArticleFeed({
         query.set("lang", languageCode);
       }
 
-      if (forceFresh) {
-        query.set("_", String(Date.now()));
-      }
-
       const response = await fetch(`/api/articles?${query.toString()}`, {
-        cache: forceFresh ? "no-store" : "default",
+        cache: "default",
         headers: {
           Accept: "application/json",
-          ...(forceFresh
-            ? {
-                "Cache-Control": "no-cache",
-                Pragma: "no-cache",
-              }
-            : {}),
         },
       });
 
@@ -523,32 +516,52 @@ export function ArticleFeed({
     [],
   );
 
-  const loadFirstPage = useCallback(
-    async ({
-      languageCode,
-      categoryId = "all",
-      forceFresh = false,
-    }: {
-      languageCode: LanguageCode;
-      categoryId?: CategoryId;
-      forceFresh?: boolean;
-    }) => {
+  const loadLocalizedHomeFeed = useCallback(
+    async (languageCode: LanguageCode) => {
       isReloadingFirstPageRef.current = true;
       setIsLoading(true);
       setLoadError(null);
 
       try {
-        const data = await fetchArticles({
-          page: 0,
-          cursor: null,
-          languageCode,
-          categoryId,
-          forceFresh,
+        const homeQuery = new URLSearchParams();
+        homeQuery.set("home", "1");
+
+        if (languageCode !== DEFAULT_LANGUAGE_CODE) {
+          homeQuery.set("lang", languageCode);
+        }
+
+        let response = await fetch(`/api/articles?${homeQuery.toString()}`, {
+          cache: "default",
+          headers: { Accept: "application/json" },
         });
+
+        if (!response.ok) {
+          const fallbackQuery = new URLSearchParams();
+
+          if (languageCode !== DEFAULT_LANGUAGE_CODE) {
+            fallbackQuery.set("lang", languageCode);
+          }
+
+          response = await fetch(`/api/home-feed?${fallbackQuery.toString()}`, {
+            cache: "default",
+            headers: { Accept: "application/json" },
+          });
+        }
+
+        if (!response.ok) {
+          throw new Error(`Home feed API returned ${response.status}`);
+        }
+
+        const data = (await response.json()) as HomeFeedResponse;
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
 
         setArticles(data.articles);
         setNextPage(Number.isFinite(data.nextPage) ? data.nextPage : null);
         setNextCursor(data.nextCursor ?? null);
+        setCategorySections(data.sections);
         document.documentElement.lang = languageCode;
       } catch (error) {
         setLoadError(
@@ -561,40 +574,7 @@ export function ArticleFeed({
         setIsLoading(false);
       }
     },
-    [fetchArticles],
-  );
-
-  const loadCategorySections = useCallback(
-    async ({
-      languageCode,
-      forceFresh = false,
-    }: {
-      languageCode: LanguageCode;
-      forceFresh?: boolean;
-    }) => {
-      const nextSections = await Promise.all(
-        CATEGORY_NAV_ITEMS.filter(
-          (item): item is CategoryNavItem & { id: ArticleCategorySection["id"]; query: string } =>
-            item.id !== "all" && typeof item.query === "string",
-        ).map(async (item) => {
-          const data = await fetchArticles({
-            page: 0,
-            cursor: null,
-            languageCode,
-            categoryId: item.id,
-            forceFresh,
-          });
-
-          return {
-            id: item.id,
-            articles: data.articles,
-          };
-        }),
-      );
-
-      setCategorySections(nextSections);
-    },
-    [fetchArticles],
+    [],
   );
 
   useEffect(() => {
@@ -605,14 +585,7 @@ export function ArticleFeed({
       setSelectedLanguage(storedLanguage);
 
       if (storedLanguage !== DEFAULT_LANGUAGE_CODE) {
-        void loadFirstPage({
-          languageCode: storedLanguage,
-          forceFresh: true,
-        });
-        void loadCategorySections({
-          languageCode: storedLanguage,
-          forceFresh: true,
-        });
+        void loadLocalizedHomeFeed(storedLanguage);
       }
     }, 0);
 
@@ -630,19 +603,13 @@ export function ArticleFeed({
         setArticles(initialEnglishArticlesRef.current);
         setNextPage(initialEnglishNextPageRef.current);
         setNextCursor(initialEnglishNextCursorRef.current);
+        setCategorySections(initialEnglishCategorySectionsRef.current);
+        setLoadError(null);
         document.documentElement.lang = DEFAULT_LANGUAGE_CODE;
-        void loadCategorySections({
-          languageCode: nextLanguage,
-        });
         return;
       }
 
-      void loadFirstPage({
-        languageCode: nextLanguage,
-      });
-      void loadCategorySections({
-        languageCode: nextLanguage,
-      });
+      void loadLocalizedHomeFeed(nextLanguage);
     };
 
     window.addEventListener(LANGUAGE_CHANGE_EVENT, handleLanguageChange);
@@ -651,7 +618,7 @@ export function ArticleFeed({
       window.clearTimeout(initialRefreshTimer);
       window.removeEventListener(LANGUAGE_CHANGE_EVENT, handleLanguageChange);
     };
-  }, [loadCategorySections, loadFirstPage]);
+  }, [loadLocalizedHomeFeed]);
 
   const loadMoreArticles = useCallback(async () => {
     if (

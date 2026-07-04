@@ -1,0 +1,37 @@
+name: Immutable All Tests Guard
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  immutable-all-tests:
+    name: Protect every established test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Validate guard implementation
+        run: node scripts/immutable_all_tests_guard_regression.mjs
+
+      - name: Check immutable tests
+        env:
+          BASE_REF: ${{ github.base_ref || 'main' }}
+          PR_TITLE: ${{ github.event.pull_request.title || '' }}
+          PR_BODY: ${{ github.event.pull_request.body || '' }}
+        run: node scripts/immutable_all_tests_guard.mjs
