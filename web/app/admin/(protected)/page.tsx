@@ -160,6 +160,14 @@ export default async function AdminPage() {
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <DashboardCard
+              eyebrow="Readiness"
+              title="Production Readiness"
+              description="See a green/yellow/red launch scorecard for public API health, Worker freshness, database growth, translations, images, backups, and CI."
+              href="/admin/readiness"
+              status="Live"
+            />
+
+            <DashboardCard
               eyebrow="Content"
               title="Article Reviews"
               description="Review accepted and rejected stories, filter by decision, source, category, positivity score, and investigate why the AI made each decision."
@@ -284,9 +292,9 @@ export default async function AdminPage() {
             <p className="mt-3 text-sm leading-6 text-amber-100/65">
               The `/admin` route should stay lightweight. It links to focused
               dashboards, while detailed monitoring lives under dedicated admin
-              routes like `/admin/articles`, `/admin/ai-usage`,
-              `/admin/local-ai`, `/admin/shards`, `/admin/feed-health`, and
-              `/admin/feeds`.
+              routes like `/admin/readiness`, `/admin/articles`,
+              `/admin/ai-usage`, `/admin/local-ai`, `/admin/shards`,
+              `/admin/feed-health`, and `/admin/feeds`.
             </p>
           </div>
 
