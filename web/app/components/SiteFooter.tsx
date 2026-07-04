@@ -702,17 +702,6 @@ export function SiteFooter() {
   }
 
   function handleHomeClick(event: MouseEvent<HTMLAnchorElement>) {
-    if (
-      event.defaultPrevented ||
-      event.button !== 0 ||
-      event.metaKey ||
-      event.altKey ||
-      event.ctrlKey ||
-      event.shiftKey
-    ) {
-      return;
-    }
-
     pulseHomeButton();
 
     if (pathname === "/") {
@@ -747,7 +736,7 @@ export function SiteFooter() {
             aria-label={copy.shortcuts}
           >
             <Link
-              href="/"
+              href="/#top"
               data-testid="nutsnews-footer-home"
               className={`footer-icon-button ${
                 isHomeButtonAnimating ? "footer-icon-button--home-pulse" : ""

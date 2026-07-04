@@ -61,7 +61,10 @@ export default async function Home() {
   };
 
   return (
-    <main className="newspaper-home-shell min-h-screen text-[var(--theme-text)]">
+    <main
+      id="top"
+      className="newspaper-home-shell min-h-screen text-[var(--theme-text)]"
+    >
       <HomeArrivalAnimation />
       <script
         type="application/ld+json"

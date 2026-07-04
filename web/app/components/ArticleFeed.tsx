@@ -430,6 +430,9 @@ export function ArticleFeed({
   const [loadError, setLoadError] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const isReloadingFirstPageRef = useRef(false);
+  const initialEnglishArticlesRef = useRef(initialArticles);
+  const initialEnglishNextPageRef = useRef(initialNextPage);
+  const initialEnglishNextCursorRef = useRef(initialNextCursor);
 
   const copy = copyByLanguage[selectedLanguage];
 
@@ -600,14 +603,17 @@ export function ArticleFeed({
 
     const initialRefreshTimer = window.setTimeout(() => {
       setSelectedLanguage(storedLanguage);
-      void loadFirstPage({
-        languageCode: storedLanguage,
-        forceFresh: true,
-      });
-      void loadCategorySections({
-        languageCode: storedLanguage,
-        forceFresh: true,
-      });
+
+      if (storedLanguage !== DEFAULT_LANGUAGE_CODE) {
+        void loadFirstPage({
+          languageCode: storedLanguage,
+          forceFresh: true,
+        });
+        void loadCategorySections({
+          languageCode: storedLanguage,
+          forceFresh: true,
+        });
+      }
     }, 0);
 
     const handleLanguageChange = (event: Event) => {
@@ -619,6 +625,18 @@ export function ArticleFeed({
       }
 
       setSelectedLanguage(nextLanguage);
+
+      if (nextLanguage === DEFAULT_LANGUAGE_CODE) {
+        setArticles(initialEnglishArticlesRef.current);
+        setNextPage(initialEnglishNextPageRef.current);
+        setNextCursor(initialEnglishNextCursorRef.current);
+        document.documentElement.lang = DEFAULT_LANGUAGE_CODE;
+        void loadCategorySections({
+          languageCode: nextLanguage,
+        });
+        return;
+      }
+
       void loadFirstPage({
         languageCode: nextLanguage,
       });
