@@ -702,9 +702,9 @@ const CLOUDFLARE_USAGE_METRICS: CloudflareUsageMetricConfig[] = [
     windowDays: 1,
     usageMetric: "workers-and-pages",
     description:
-      "Cloudflare Workers account request pressure for the last 24 hours. The Workers Free plan has a 100,000 requests/day account limit.",
+      "Cloudflare Workers account request pressure for the last 24 hours. The Workers Free plan has a 100,000 requests/day account limit and a 10 ms CPU limit per invocation. An image proxy would share this account pool with existing Worker traffic.",
     mitigation:
-      "Reduce shard schedule frequency, pause low-quality feeds, and confirm uptime monitors are not calling Worker endpoints.",
+      "Alert at 70%, reduce shard schedule frequency or image-proxy traffic slice at 90%, and disable proxy writes or bypass the proxy at 100%. Confirm uptime monitors are not calling Worker endpoints.",
     apiValue: (usage) => usage.workersRequests24h,
     persistedEventTypes: ["cloudflare_worker_request", "cloudflare_workers_request"],
   },
@@ -732,9 +732,9 @@ const CLOUDFLARE_USAGE_METRICS: CloudflareUsageMetricConfig[] = [
     defaultLimit: 10,
     usageMetric: "workers-and-pages",
     description:
-      "Cloudflare Workers p99 CPU time. Waiting on network calls does not count as CPU, but CPU overages can trigger Worker 1102 errors.",
+      "Cloudflare Workers p99 CPU time. Workers Free allows 10 ms CPU per invocation. Waiting on network calls does not count as CPU, but CPU overages can trigger Worker 1102 errors.",
     mitigation:
-      "Move CPU-heavy parsing to smaller batches, lower per-run review limits, and profile worker code before raising paid-plan limits.",
+      "Alert at 70%, simplify image proxy checks and Worker parsing at 90%, and bypass proxy work or disable proxy writes at 100% before considering paid-plan limits.",
     warningThresholdPercent: 70,
     dangerThresholdPercent: 100,
     apiValue: (usage) => usage.workersCpuP99Ms,
@@ -890,9 +890,9 @@ const CLOUDFLARE_OPTIONAL_SERVICE_METRICS: CloudflareUsageMetricConfig[] = [
     defaultLimit: 10,
     usageMetric: "r2",
     description:
-      "Cloudflare R2 storage. Hidden unless CLOUDFLARE_ENABLE_R2_GUARDRAILS=true because NutsNews currently uses KV, not R2, for the edge feed snapshot.",
+      "Cloudflare R2 Standard storage for a future approved-original image cache. The Standard free tier includes 10 GB-month storage/month; the free tier does not apply to Infrequent Access storage. Hidden unless CLOUDFLARE_ENABLE_R2_GUARDRAILS=true.",
     mitigation:
-      "Apply lifecycle rules, archive old objects, and keep publisher-image caching scoped before enabling R2-backed delivery.",
+      "Alert at 70%, stop adding new hosts or variants at 90%, and disable image cache writes at 100%. Apply lifecycle rules, keep publisher-image caching scoped, and do not use Infrequent Access for the free-tier rollout.",
     apiValue: () => null,
     enabled: () => readBooleanEnv("CLOUDFLARE_ENABLE_R2_GUARDRAILS"),
   },
@@ -904,8 +904,10 @@ const CLOUDFLARE_OPTIONAL_SERVICE_METRICS: CloudflareUsageMetricConfig[] = [
     unit: "ops",
     defaultLimit: 1000000,
     usageMetric: "r2",
-    description: "Cloudflare R2 Class A write/list operations. Hidden unless R2 guardrails are explicitly enabled.",
-    mitigation: "Batch writes, avoid list-heavy cleanup jobs, and prefer deterministic object keys.",
+    description:
+      "Cloudflare R2 Standard Class A write/list operations for a future approved-original image cache. The free tier includes 1,000,000 Class A operations/month. Hidden unless R2 guardrails are explicitly enabled.",
+    mitigation:
+      "Alert at 70%, freeze new cache writes at 90%, and disable proxy writes at 100%. Batch writes, avoid list-heavy cleanup jobs, and prefer deterministic object keys.",
     apiValue: () => null,
     enabled: () => readBooleanEnv("CLOUDFLARE_ENABLE_R2_GUARDRAILS"),
   },
@@ -917,8 +919,10 @@ const CLOUDFLARE_OPTIONAL_SERVICE_METRICS: CloudflareUsageMetricConfig[] = [
     unit: "ops",
     defaultLimit: 10000000,
     usageMetric: "r2",
-    description: "Cloudflare R2 Class B read/head operations. Hidden unless R2 guardrails are explicitly enabled.",
-    mitigation: "Serve public assets through Cloudflare cache and avoid uncached object reads from bots.",
+    description:
+      "Cloudflare R2 Standard Class B read/head operations for a future approved-original image cache. The free tier includes 10,000,000 Class B operations/month. Hidden unless R2 guardrails are explicitly enabled.",
+    mitigation:
+      "Alert at 70%, increase CDN TTLs or bypass low-value hosts at 90%, and disable cache reads/writes for risky hosts at 100%. Serve public assets through Cloudflare cache and avoid uncached object reads from bots.",
     apiValue: () => null,
     enabled: () => readBooleanEnv("CLOUDFLARE_ENABLE_R2_GUARDRAILS"),
   },
@@ -930,8 +934,10 @@ const CLOUDFLARE_OPTIONAL_SERVICE_METRICS: CloudflareUsageMetricConfig[] = [
     unit: "GB",
     defaultLimit: null,
     usageMetric: "r2",
-    description: "Cloudflare R2 egress. Hidden unless R2 guardrails are explicitly enabled.",
-    mitigation: "Put R2 behind cacheable custom domains and avoid r2.dev production delivery.",
+    description:
+      "Cloudflare R2 internet egress for a future approved-original image cache. R2 includes free internet egress for Standard storage, but this guardrail can track operational bandwidth pressure. Hidden unless R2 guardrails are explicitly enabled.",
+    mitigation:
+      "Keep R2 behind cacheable custom domains, avoid r2.dev production delivery, and bypass the proxy if origin or CDN bandwidth spikes.",
     apiValue: () => null,
     enabled: () => readBooleanEnv("CLOUDFLARE_ENABLE_R2_GUARDRAILS"),
   },
@@ -1006,10 +1012,14 @@ const CLOUDFLARE_OPTIONAL_SERVICE_METRICS: CloudflareUsageMetricConfig[] = [
     envName: "CLOUDFLARE_IMAGES_TRANSFORMATIONS_30D",
     limitEnvName: "CLOUDFLARE_IMAGES_TRANSFORMATIONS_30D_LIMIT",
     unit: "transformations",
-    defaultLimit: null,
+    defaultLimit: 5000,
     usageMetric: "images",
-    description: "Cloudflare Images transformations. Hidden unless CLOUDFLARE_ENABLE_IMAGES_GUARDRAILS=true because web currently uses Vercel/Next image optimization.",
-    mitigation: "Limit image variants and cache transformed URLs if Cloudflare Images replaces or supplements Next Image.",
+    description:
+      "Cloudflare Images unique transformations for a future limited-variant image path. The Free plan includes 5,000 unique transformations/month; cached existing transformations continue after the limit, but new transformations return error 9422 and the Free plan is not charged for exceeding the limit. Cloudflare Images hosted storage/delivery is paid-only and is not recommended for the initial free-tier rollout.",
+    mitigation:
+      "Alert at 70%, freeze new transform variants at 90%, and disable transforms at 100% while falling back to original images or the existing placeholder.",
+    warningThresholdPercent: 70,
+    dangerThresholdPercent: 90,
     apiValue: () => null,
     enabled: () => readBooleanEnv("CLOUDFLARE_ENABLE_IMAGES_GUARDRAILS"),
   },
