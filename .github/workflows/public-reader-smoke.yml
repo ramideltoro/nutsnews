@@ -1,0 +1,61 @@
+name: Public Reader Smoke Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "web/**"
+      - "scripts/web_public_reader_smoke.mjs"
+      - ".github/workflows/public-reader-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-reader-smoke:
+    name: Public reader Playwright smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: web
+
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_APP_ENV: public-smoke
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run public reader smoke tests
+        run: npm run test:e2e:public-smoke
+
+      - name: Upload Playwright public reader smoke artifacts
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: public-reader-smoke-playwright-artifacts
+          path: |
+            web/playwright-report/public-reader-smoke
+            web/test-results/public-reader-smoke
+          if-no-files-found: ignore
