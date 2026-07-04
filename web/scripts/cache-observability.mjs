@@ -226,8 +226,8 @@ function validateConfig(config) {
       failures.push(`Route ${route.key || "<unknown>"} must include expectedStatuses.`);
     }
 
-    if (route.key === "articles-api" && route.expectedPolicy !== "public-api-cache-300s") {
-      failures.push("The articles API must keep expectedPolicy=public-api-cache-300s.");
+    if (route.key === "articles-api" && route.expectedPolicy !== "public-api-cache-3600s") {
+      failures.push("The articles API must keep expectedPolicy=public-api-cache-3600s.");
     }
 
     if (route.discoverArticleFromApi && route.key !== "article-page") {

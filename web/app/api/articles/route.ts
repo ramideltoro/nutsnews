@@ -12,7 +12,11 @@ import {
   getPublishedArticlesWithEdgeFallback,
 } from "@/lib/edgeFeedSnapshot";
 import { normalizeLanguageCode } from "@/lib/languages";
-import { ARTICLE_API_CACHE_HEADERS, BYPASS_CACHE_HEADERS } from "@/lib/cacheHeaders";
+import {
+  ARTICLE_API_CACHE_HEADERS,
+  BYPASS_CACHE_HEADERS,
+  PUBLIC_CDN_S_MAXAGE_SECONDS,
+} from "@/lib/cacheHeaders";
 import { logError, logInfoSampled } from "@/lib/logger";
 
 export const revalidate = 900;
@@ -128,7 +132,9 @@ export async function GET(request: Request) {
           languageCode,
         }),
         ...(homeMode
-          ? { "X-NutsNews-Cache-Policy": "public-home-feed-cache-900s" }
+          ? {
+              "X-NutsNews-Cache-Policy": `public-home-feed-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`,
+            }
           : {}),
       },
     });

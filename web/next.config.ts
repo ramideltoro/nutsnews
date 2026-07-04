@@ -1,19 +1,16 @@
 import type { NextConfig } from "next";
 import path from "node:path";
 import { withSentryConfig } from "@sentry/nextjs";
+import {
+  PUBLIC_CDN_CACHE_CONTROL,
+  PUBLIC_CDN_S_MAXAGE_SECONDS,
+  PUBLIC_PAGE_CACHE_CONTROL,
+} from "./lib/cacheHeaders";
 import { getSecurityHeaders } from "./lib/securityHeaders";
 
-const PUBLIC_PAGE_CACHE_CONTROL =
-  "public, max-age=60, s-maxage=900, stale-while-revalidate=3600";
+const PUBLIC_LONG_CDN_CACHE_CONTROL = PUBLIC_CDN_CACHE_CONTROL;
 
-const PUBLIC_CDN_CACHE_CONTROL =
-  "public, s-maxage=900, stale-while-revalidate=3600";
-
-const PUBLIC_LONG_CDN_CACHE_CONTROL =
-  "public, s-maxage=3600, stale-while-revalidate=86400";
-
-const PUBLIC_LONG_CACHE_CONTROL =
-  "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400";
+const PUBLIC_LONG_CACHE_CONTROL = PUBLIC_PAGE_CACHE_CONTROL;
 
 const STATIC_ASSET_CACHE_CONTROL =
   "public, max-age=31536000, immutable";
@@ -130,31 +127,31 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/",
-        headers: publicCacheHeaders("public-home-cache-900s"),
+        headers: publicCacheHeaders(`public-home-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`),
       },
       {
         source: "/about",
-        headers: publicCacheHeaders("public-about-cache-900s"),
+        headers: publicCacheHeaders(`public-about-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`),
       },
       {
         source: "/contact",
-        headers: publicCacheHeaders("public-contact-cache-900s"),
+        headers: publicCacheHeaders(`public-contact-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`),
       },
       {
         source: "/privacy",
-        headers: publicCacheHeaders("public-privacy-cache-900s"),
+        headers: publicCacheHeaders(`public-privacy-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`),
       },
       {
         source: "/articles/:path*",
-        headers: publicCacheHeaders("public-article-cache-900s"),
+        headers: publicCacheHeaders(`public-article-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`),
       },
       {
         source: "/api/articles",
-        headers: publicCacheHeaders("public-api-cache-900s"),
+        headers: publicCacheHeaders(`public-api-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`),
       },
       {
         source: "/api/home-feed",
-        headers: publicCacheHeaders("public-home-feed-cache-900s"),
+        headers: publicCacheHeaders(`public-home-feed-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`),
       },
       {
         source: "/api/contact",
