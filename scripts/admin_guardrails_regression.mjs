@@ -106,6 +106,16 @@ const cloudflareMetricTokens = [
   "CLOUDFLARE_ENABLE_DURABLE_OBJECTS_GUARDRAILS",
   "CLOUDFLARE_ENABLE_IMAGES_GUARDRAILS",
   "CLOUDFLARE_ENABLE_PAGES_GUARDRAILS",
+  "10 ms CPU limit per invocation",
+  "approved-original image cache",
+  "free tier does not apply to Infrequent Access storage",
+  "1,000,000 Class A operations/month",
+  "10,000,000 Class B operations/month",
+  "free internet egress",
+  "5,000 unique transformations/month",
+  "error 9422",
+  "Cloudflare Images hosted storage/delivery is paid-only",
+  "freeze new transform variants at 90%",
 ];
 
 for (const token of cloudflareMetricTokens) {
