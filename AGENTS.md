@@ -25,6 +25,7 @@ This is the NutsNews web repository.
 
 - MUST start from an up-to-date main branch unless the user explicitly directs work on the current branch or an existing PR branch.
 - MUST create a feature branch for changes unless already on the user-requested branch.
+- Documentation-only changes are the only exception to the feature-branch requirement: work from the latest repository default branch, commit the documentation update, push directly to the default branch, and report the commit SHA.
 - MUST NOT commit secrets, .env files, API keys, tokens, database dumps, or private credentials.
 - MUST NOT print secret values in logs, docs, PR descriptions, or terminal summaries.
 - MUST prefer the smallest safe change that solves the issue.
@@ -32,6 +33,9 @@ This is the NutsNews web repository.
 - MUST NOT add production dependencies unless clearly needed.
 - MUST update documentation in `ramideltoro/nutsnews-docs` for ANY NutsNews work. There is no "no docs needed" exception.
 - MUST NOT add product, operations, deployment, cache, automation, or environment documentation to this application repository. Documentation-only updates belong in `ramideltoro/nutsnews-docs` so they do not trigger application deployments.
+- Documentation-only updates do not require a pull request. This direct-push rule applies only to documentation-only changes.
+- Application code, runtime behavior, CI workflow, test, dependency, secret/configuration, deployment, cache, Worker, database, and infrastructure changes still require the normal branch and PR flow unless the user explicitly says otherwise.
+- If branch protection blocks a documentation-only direct push, STOP and report the blocker instead of opening a PR automatically.
 - Repository instruction updates to AGENTS.md are allowed in this repository when the user explicitly requests them.
 - MUST preserve existing UI style unless the requested task explicitly changes it.
 - For cache/CDN work, verify headers and document expected behavior.
@@ -125,6 +129,19 @@ Only run commands that exist in this repository.
 
 ## GitHub workflow
 
+For documentation-only changes:
+
+1. MUST confirm clean working tree or explicitly document existing user changes.
+2. MUST checkout the repository default branch.
+3. MUST pull the latest default branch when network access and permissions allow.
+4. MUST make only the requested documentation changes.
+5. MUST run lightweight docs/instruction validation that already exists.
+6. MUST commit directly on the default branch.
+7. MUST push directly to the default branch.
+8. MUST report the pushed commit SHA in the final response.
+9. MUST NOT open a PR unless the user explicitly asks for one.
+10. If branch protection blocks the push, MUST stop and report the blocker.
+
 For normal implementation tasks:
 
 1. MUST confirm clean working tree or explicitly document existing user changes.
@@ -143,6 +160,7 @@ For normal implementation tasks:
 
 ## PR Rules
 
+- Documentation-only changes do not require a PR. Push documentation-only commits directly to the repository default branch and report the commit SHA.
 - If the task requires a PR, or this AGENTS.md says to raise a PR, Codex MUST create the PR before the final response.
 - For NutsNews work, Codex MUST create or update the application repository PR as required by this AGENTS.md.
 - For NutsNews work, Codex MUST create or update a documentation repository PR in `ramideltoro/nutsnews-docs` for the documentation change.
@@ -185,6 +203,7 @@ Codex MUST include all of the following before finishing:
 - Tests/checks run with exact commands and pass/fail results.
 - Application PR link, if created or required.
 - Documentation PR link, if created or required.
+- Documentation-only direct-push commit SHA, if no PR was required.
 - Any blockers or unverified items.
 - Final "AGENTS.md compliance checklist".
 
@@ -200,7 +219,7 @@ A task is NOT done until:
 - Required Mermaid diagrams were included when applicable.
 - Required PR summary sections were completed, including user/admin impact, documentation status, release notes, tests/checks, risks, rollback, and graph status.
 - Relevant checks/tests were run and reported.
-- Required application PR and documentation PR were created and linked.
+- Required application PR and documentation PR were created and linked, or documentation-only changes were pushed directly to the default branch and the commit SHA was reported.
 - Any skipped REQUIRED step has an explicit blocker.
 
 ## Useful commands
