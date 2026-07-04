@@ -60,6 +60,47 @@ function SignalCard({ signal }: { signal: ProductionReadinessSignal }) {
         {signal.detail}
       </p>
 
+      {signal.workflows?.length ? (
+        <div className="mt-4 overflow-hidden rounded-[1rem] border border-amber-300/15 bg-black/20">
+          <div className="grid grid-cols-[1fr_auto] gap-3 border-b border-amber-300/10 px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em] text-amber-300/75 sm:grid-cols-[1fr_8rem_9rem_auto]">
+            <span>Workflow</span>
+            <span className="text-right sm:text-left">State</span>
+            <span className="hidden sm:block">Updated</span>
+            <span className="hidden text-right sm:block">Run</span>
+          </div>
+          <ul className="divide-y divide-amber-300/10">
+            {signal.workflows.map((workflow) => (
+              <li
+                key={workflow.name}
+                className="grid grid-cols-[1fr_auto] gap-3 px-4 py-3 text-xs text-amber-100/75 sm:grid-cols-[1fr_8rem_9rem_auto] sm:items-center"
+              >
+                <div>
+                  <p className="font-bold text-amber-50">{workflow.name}</p>
+                  <p className="mt-1 text-[11px] leading-4 text-amber-100/55">
+                    {workflow.detail}
+                  </p>
+                </div>
+                <div className="text-right sm:text-left">
+                  <StatusPill status={workflow.status} label={workflow.statusLabel} />
+                  <p className="mt-1 text-[11px] text-amber-100/50">
+                    {workflow.githubStatus} / {workflow.conclusion}
+                  </p>
+                </div>
+                <p className="hidden text-[11px] leading-4 text-amber-100/55 sm:block">
+                  {formatAdminDateTime(workflow.updatedAt, "Unknown")}
+                </p>
+                <Link
+                  href={workflow.href}
+                  className="col-span-2 text-right text-[11px] font-black uppercase tracking-[0.12em] text-amber-200 underline-offset-4 transition hover:text-amber-50 hover:underline sm:col-span-1"
+                >
+                  {workflow.linkLabel}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       <div className="mt-4 rounded-[1rem] border border-amber-300/15 bg-black/25 p-4">
         <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300/75">
           Next step

@@ -32,11 +32,43 @@ for (const required of [
 }
 
 for (const required of [
+  'import "server-only"',
+  "GITHUB_READONLY_TOKEN",
+  "GITHUB_ACTIONS_READ_TOKEN",
+  "https://api.github.com/repos/",
+  "actions/runs?branch=${GITHUB_ACTIONS_BRANCH}&per_page=50",
+  'const GITHUB_ACTIONS_BRANCH = "main"',
+  "application/vnd.github+json",
+  "X-GitHub-Api-Version",
+  "2022-11-28",
+  "GITHUB_ACTIONS_REVALIDATE_SECONDS",
+  ".github/workflows/web-ci.yml",
+  ".github/workflows/public-reader-smoke.yml",
+  ".github/workflows/vercel-preview-smoke.yml",
+  ".github/workflows/lighthouse-ci.yml",
+  ".github/workflows/accessibility-ci.yml",
+  ".github/workflows/codeql.yml",
+  ".github/workflows/gitleaks.yml",
+  ".github/workflows/osv-scanner.yml",
+  ".github/workflows/dependency-review.yml",
+  ".github/workflows/openssf-scorecard.yml",
+  ".github/workflows/snyk.yml",
+  "workflow_runs",
+  "conclusion === \"success\"",
+  "rate-limited",
+]) {
+  assertIncludes(lib, required, "adminProductionReadiness.ts GitHub Actions integration");
+}
+
+for (const required of [
   "Production Readiness",
   "green",
   "yellow",
   "red",
   "Next step",
+  "Workflow",
+  "workflow.githubStatus",
+  "workflow.conclusion",
   "formatAdminDateTime",
 ]) {
   assertIncludes(page, required, "readiness page");
