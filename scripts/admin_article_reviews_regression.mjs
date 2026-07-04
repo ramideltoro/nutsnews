@@ -15,6 +15,14 @@ const adminArticlesPage = readFileSync(
   path.join(repoRoot, "web/app/admin/(protected)/articles/page.tsx"),
   "utf8",
 );
+const siteFooter = readFileSync(
+  path.join(repoRoot, "web/app/components/SiteFooter.tsx"),
+  "utf8",
+);
+const articleFeed = readFileSync(
+  path.join(repoRoot, "web/app/components/ArticleFeed.tsx"),
+  "utf8",
+);
 
 assert.match(
   adminReviewLib,
@@ -32,6 +40,36 @@ assert.match(
   adminArticlesPage,
   /Latest Published Articles[\s\S]*Sorted by published_on_site_at/,
   "Admin articles page must expose the latest published article freshness section.",
+);
+
+assert.match(
+  siteFooter,
+  /<button[\s\S]*type="button"[\s\S]*data-testid="nutsnews-footer-home"[\s\S]*onClick=\{handleHomeClick\}/,
+  "Footer home control must be a button so test clicks cannot trigger stale same-page link navigation.",
+);
+
+assert.doesNotMatch(
+  siteFooter,
+  /function handleHomeClick\([^)]*event[\s\S]*event\.button/,
+  "Footer home click handling must not ignore synthetic click events used by the offline E2E check.",
+);
+
+assert.match(
+  articleFeed,
+  /const initialEnglishArticlesRef = useRef\(initialArticles\)/,
+  "Article feed must retain the initial English article order for language reset stability.",
+);
+
+assert.match(
+  articleFeed,
+  /if \(storedLanguage !== DEFAULT_LANGUAGE_CODE\) \{[\s\S]*forceFresh: true/,
+  "Article feed must not force-refresh the initial English feed immediately after hydration.",
+);
+
+assert.match(
+  articleFeed,
+  /if \(nextLanguage === DEFAULT_LANGUAGE_CODE\) \{[\s\S]*setArticles\(initialEnglishArticlesRef\.current\)/,
+  "Article feed must restore the initial English feed when switching back to English.",
 );
 
 console.log("Admin article freshness regression checks passed.");

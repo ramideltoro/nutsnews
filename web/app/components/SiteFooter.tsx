@@ -4,7 +4,6 @@
 
 import {
   type FormEvent,
-  type MouseEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -701,22 +700,10 @@ export function SiteFooter() {
     window.setTimeout(() => setIsHomeButtonAnimating(false), 620);
   }
 
-  function handleHomeClick(event: MouseEvent<HTMLButtonElement>) {
-    if (
-      event.defaultPrevented ||
-      event.button !== 0 ||
-      event.metaKey ||
-      event.altKey ||
-      event.ctrlKey ||
-      event.shiftKey
-    ) {
-      return;
-    }
-
+  function handleHomeClick() {
     pulseHomeButton();
 
     if (pathname === "/") {
-      event.preventDefault();
       scrollHomePageToTop();
       return;
     }
@@ -727,7 +714,6 @@ export function SiteFooter() {
       // Navigation still works if session storage is unavailable.
     }
 
-    event.preventDefault();
     router.push("/");
   }
 
