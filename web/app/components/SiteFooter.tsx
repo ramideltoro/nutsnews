@@ -736,7 +736,7 @@ export function SiteFooter() {
             aria-label={copy.shortcuts}
           >
             <Link
-              href="/#top"
+              href="/"
               data-testid="nutsnews-footer-home"
               className={`footer-icon-button ${
                 isHomeButtonAnimating ? "footer-icon-button--home-pulse" : ""
