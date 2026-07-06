@@ -143,6 +143,10 @@ const nextConfig: NextConfig = {
         headers: noStoreHeaders("bypass-auth-cache"),
       },
       {
+        source: "/api/health",
+        headers: noStoreHeaders("bypass-health-cache"),
+      },
+      {
         source: "/api/log-test",
         headers: noStoreHeaders("bypass-log-test-cache"),
       },
