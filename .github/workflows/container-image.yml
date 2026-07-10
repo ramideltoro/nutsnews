@@ -103,6 +103,7 @@ jobs:
             "$IMAGE_TAG")"
 
           for attempt in $(seq 1 30); do
+            : "$attempt"
             health_status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' "$container_id")"
             if [[ "$health_status" == "healthy" ]]; then
               break
