@@ -1,0 +1,215 @@
+name: Container Image
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "scripts/dual_target_web_smoke.mjs"
+      - ".github/workflows/container-image.yml"
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "scripts/dual_target_web_smoke.mjs"
+      - ".github/workflows/container-image.yml"
+
+concurrency:
+  group: container-image-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Build and smoke-test production image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Build and smoke-test without production services
+        env:
+          BUILD_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          IMAGE_TAG: nutsnews-ci:${{ github.sha }}
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE' &
+          import http from "node:http";
+
+          const server = http.createServer((request, response) => {
+            if (request.method === "OPTIONS") {
+              response.writeHead(204, {
+                "Access-Control-Allow-Headers": "authorization, apikey, content-type",
+                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS, POST",
+                "Access-Control-Allow-Origin": "*",
+              });
+              response.end();
+              return;
+            }
+
+            if (request.url?.startsWith("/rest/v1/")) {
+              response.writeHead(200, {
+                "Access-Control-Allow-Origin": "*",
+                "Content-Range": "0-0/0",
+                "Content-Type": "application/json",
+              });
+              response.end("[]");
+              return;
+            }
+
+            response.writeHead(404, { "Content-Type": "application/json" });
+            response.end('{"error":"fixture route not found"}');
+          });
+
+          server.listen(54321, "0.0.0.0");
+          NODE
+
+          fixture_pid=$!
+          container_id=""
+
+          cleanup() {
+            if [[ -n "$container_id" ]]; then
+              docker rm -f "$container_id" >/dev/null 2>&1 || true
+            fi
+            kill "$fixture_pid" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          docker build \
+            --add-host host.docker.internal:host-gateway \
+            --build-arg SOURCE_REPOSITORY="https://github.com/${GITHUB_REPOSITORY}" \
+            --build-arg NUTSNEWS_SOURCE_COMMIT="$SOURCE_COMMIT" \
+            --build-arg NUTSNEWS_BUILD_ID="$BUILD_ID" \
+            --build-arg NUTSNEWS_DEPLOYMENT_TARGET="ci-container" \
+            --build-arg NEXT_PUBLIC_SUPABASE_URL="http://host.docker.internal:54321" \
+            --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="ci-public-anon-key" \
+            --build-arg NEXT_PUBLIC_APP_ENV="ci" \
+            --tag "$IMAGE_TAG" \
+            web
+
+          container_id="$(docker run --detach \
+            --add-host host.docker.internal:host-gateway \
+            --publish 127.0.0.1:3000:3000 \
+            "$IMAGE_TAG")"
+
+          for attempt in $(seq 1 30); do
+            : "$attempt"
+            health_status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' "$container_id")"
+            if [[ "$health_status" == "healthy" ]]; then
+              break
+            fi
+            if [[ "$health_status" == "unhealthy" ]]; then
+              docker logs "$container_id"
+              exit 1
+            fi
+            sleep 2
+          done
+
+          if [[ "$(docker inspect --format '{{.State.Health.Status}}' "$container_id")" != "healthy" ]]; then
+            docker logs "$container_id"
+            exit 1
+          fi
+
+          node scripts/dual_target_web_smoke.mjs \
+            --base-url http://127.0.0.1:3000 \
+            --expected-source-commit "$SOURCE_COMMIT" \
+            --expected-build-id "$BUILD_ID" \
+            --expected-deployment-target ci-container
+
+          runtime_uid="$(docker exec "$container_id" node -p 'process.getuid()')"
+          if [[ "$runtime_uid" == "0" ]]; then
+            echo "::error::Container runtime user must not be root"
+            exit 1
+          fi
+
+  publish:
+    name: Publish immutable image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.publish.outputs.digest }}
+      image: ghcr.io/ramideltoro/nutsnews@${{ steps.publish.outputs.digest }}
+      source-commit: ${{ github.sha }}
+      build-id: ${{ github.run_id }}-${{ github.run_attempt }}
+
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_APP_ENV: ${{ vars.NEXT_PUBLIC_APP_ENV || 'production-vps' }}
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+      NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
+      NEXT_PUBLIC_GA_ID: ${{ secrets.NEXT_PUBLIC_GA_ID }}
+      NEXT_PUBLIC_NUTSNEWS_IOS_APP_STORE_URL: ${{ vars.NEXT_PUBLIC_NUTSNEWS_IOS_APP_STORE_URL }}
+
+    steps:
+      - name: Require production public build inputs
+        run: |
+          set -euo pipefail
+          if [[ -z "$NEXT_PUBLIC_SUPABASE_URL" || -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]]; then
+            echo "::error::Publishing requires NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish full-commit tag
+        id: publish
+        uses: docker/build-push-action@v6
+        with:
+          context: web
+          file: web/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/ramideltoro/nutsnews:${{ github.sha }}
+          build-args: |
+            SOURCE_REPOSITORY=https://github.com/${{ github.repository }}
+            NUTSNEWS_SOURCE_COMMIT=${{ github.sha }}
+            NUTSNEWS_BUILD_ID=${{ github.run_id }}-${{ github.run_attempt }}
+            NUTSNEWS_DEPLOYMENT_TARGET=vps
+            NEXT_PUBLIC_SUPABASE_URL=${{ env.NEXT_PUBLIC_SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ env.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+            NEXT_PUBLIC_APP_ENV=${{ env.NEXT_PUBLIC_APP_ENV }}
+            NEXT_PUBLIC_TURNSTILE_SITE_KEY=${{ env.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+            NEXT_PUBLIC_SENTRY_DSN=${{ env.NEXT_PUBLIC_SENTRY_DSN }}
+            NEXT_PUBLIC_GA_ID=${{ env.NEXT_PUBLIC_GA_ID }}
+            NEXT_PUBLIC_NUTSNEWS_IOS_APP_STORE_URL=${{ env.NEXT_PUBLIC_NUTSNEWS_IOS_APP_STORE_URL }}
+          provenance: mode=max
+          sbom: true
+
+      - name: Summarize immutable image
+        env:
+          IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
+        run: |
+          {
+            echo "## NutsNews container image"
+            echo
+            echo "Source commit: \`${GITHUB_SHA}\`"
+            echo "Build ID: \`${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}\`"
+            echo "Immutable image: \`ghcr.io/ramideltoro/nutsnews@${IMAGE_DIGEST}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

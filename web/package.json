@@ -15,6 +15,7 @@
     "test:e2e:offline": "node ../scripts/web_offline_e2e_regression.mjs",
     "test:e2e:public-smoke": "node ../scripts/web_public_reader_smoke.mjs",
     "test:e2e:preview": "playwright test --config=playwright.config.ts tests/vercel-preview-smoke.spec.ts",
+    "test:deployment-smoke": "node ../scripts/dual_target_web_smoke.mjs",
     "test:admin-article-reviews": "node ../scripts/admin_article_reviews_regression.mjs",
     "test:security-headers": "node scripts/assert-security-headers.mjs",
     "test:fluid-cpu": "node ../scripts/fluid_active_cpu_regression.mjs",
