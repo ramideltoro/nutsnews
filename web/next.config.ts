@@ -91,6 +91,7 @@ function noStoreHeaders(policy: string) {
 }
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   poweredByHeader: false,
   turbopack: {
     root: path.join(__dirname),
