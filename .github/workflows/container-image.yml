@@ -3,20 +3,12 @@ name: Container Image
 on:
   pull_request:
     branches: [main]
-    paths:
-      - "web/**"
-      - "scripts/dual_target_web_smoke.mjs"
-      - ".github/workflows/container-image.yml"
   push:
     branches: [main]
-    paths:
-      - "web/**"
-      - "scripts/dual_target_web_smoke.mjs"
-      - ".github/workflows/container-image.yml"
 
 concurrency:
   group: container-image-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build-test:
@@ -213,3 +205,52 @@ jobs:
             echo "Build ID: \`${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}\`"
             echo "Immutable image: \`ghcr.io/ramideltoro/nutsnews@${IMAGE_DIGEST}\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Write production release metadata
+        env:
+          IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
+          RELEASE_METADATA_PATH: ${{ runner.temp }}/nutsnews-production-release/metadata.json
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE'
+          import { mkdirSync, writeFileSync } from "node:fs";
+          import { dirname } from "node:path";
+
+          const digest = process.env.IMAGE_DIGEST ?? "";
+          const sourceCommit = process.env.GITHUB_SHA ?? "";
+          const buildId = `${process.env.GITHUB_RUN_ID ?? ""}-${process.env.GITHUB_RUN_ATTEMPT ?? ""}`;
+          const metadataPath = process.env.RELEASE_METADATA_PATH ?? "";
+
+          if (!/^[0-9a-f]{40}$/.test(sourceCommit)) {
+            throw new Error("GITHUB_SHA must be a full commit SHA before release metadata is written.");
+          }
+          if (!/^sha256:[0-9a-f]{64}$/.test(digest)) {
+            throw new Error("Published image digest must be an immutable sha256 digest.");
+          }
+          if (!/^\d+-\d+$/.test(buildId) || !metadataPath) {
+            throw new Error("Release metadata requires a valid build ID and output path.");
+          }
+
+          const imageRepository = "ghcr.io/ramideltoro/nutsnews";
+          const release = {
+            source_commit: sourceCommit,
+            build_id: buildId,
+            deployment_target: "vps",
+            image_repository: imageRepository,
+            image_tag: sourceCommit,
+            image_digest: digest,
+            image: `${imageRepository}@${digest}`,
+          };
+
+          mkdirSync(dirname(metadataPath), { recursive: true });
+          writeFileSync(metadataPath, `${JSON.stringify(release, null, 2)}\n`, "utf8");
+          NODE
+
+      - name: Upload production release metadata
+        uses: actions/upload-artifact@v6
+        with:
+          name: nutsnews-production-release
+          path: ${{ runner.temp }}/nutsnews-production-release/metadata.json
+          if-no-files-found: error
+          retention-days: 7

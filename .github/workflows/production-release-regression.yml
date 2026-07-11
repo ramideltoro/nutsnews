@@ -1,0 +1,38 @@
+name: Production Release Workflow Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/container-image.yml"
+      - ".github/workflows/production-release.yml"
+      - ".github/workflows/production-release-regression.yml"
+      - "scripts/production_release_workflow_regression.mjs"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/container-image.yml"
+      - ".github/workflows/production-release.yml"
+      - ".github/workflows/production-release-regression.yml"
+      - "scripts/production_release_workflow_regression.mjs"
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: Verify production release automation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Run production release workflow regression
+        run: node scripts/production_release_workflow_regression.mjs

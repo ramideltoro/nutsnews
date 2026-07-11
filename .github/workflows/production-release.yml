@@ -1,0 +1,243 @@
+name: Promote Verified Production Release
+
+on:
+  workflow_run:
+    workflows: ["Container Image"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  deployments: read
+
+concurrency:
+  group: nutsnews-production-release
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Verify Vercel and request VPS promotion
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Download immutable release metadata
+        uses: actions/download-artifact@v5
+        with:
+          name: nutsnews-production-release
+          path: ${{ runner.temp }}/nutsnews-production-release
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate release metadata belongs to the completed main build
+        id: release
+        env:
+          METADATA_PATH: ${{ runner.temp }}/nutsnews-production-release/metadata.json
+          SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE'
+          import { readFileSync, appendFileSync } from "node:fs";
+
+          const sourceCommit = process.env.SOURCE_COMMIT ?? "";
+          const metadataPath = process.env.METADATA_PATH ?? "";
+          const release = JSON.parse(readFileSync(metadataPath, "utf8"));
+          const imageRepository = "ghcr.io/ramideltoro/nutsnews";
+
+          if (!/^[0-9a-f]{40}$/.test(sourceCommit)) {
+            throw new Error("The completed workflow run did not provide a full main commit SHA.");
+          }
+          if (release.source_commit !== sourceCommit) {
+            throw new Error("Release metadata source_commit does not match the completed Container Image run.");
+          }
+          if (release.image_repository !== imageRepository || release.image_tag !== sourceCommit) {
+            throw new Error("Release metadata must use the expected repository and full-commit image tag.");
+          }
+          if (!/^sha256:[0-9a-f]{64}$/.test(release.image_digest ?? "")) {
+            throw new Error("Release metadata must contain an immutable sha256 image digest.");
+          }
+          if (release.image !== `${imageRepository}@${release.image_digest}`) {
+            throw new Error("Release metadata image reference must match its immutable digest.");
+          }
+          if (!/^\d+-\d+$/.test(release.build_id ?? "") || release.deployment_target !== "vps") {
+            throw new Error("Release metadata has an invalid build identity or deployment target.");
+          }
+
+          const lines = [
+            `source_commit=${release.source_commit}`,
+            `image_repository=${release.image_repository}`,
+            `image_digest=${release.image_digest}`,
+            `build_id=${release.build_id}`,
+          ];
+          appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join("\n")}\n`, "utf8");
+          NODE
+
+      - name: Wait for the matching Vercel production deployment
+        id: vercel
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_COMMIT: ${{ steps.release.outputs.source_commit }}
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from "node:fs";
+
+          const repository = process.env.GITHUB_REPOSITORY ?? "";
+          const sourceCommit = process.env.SOURCE_COMMIT ?? "";
+          const token = process.env.GH_TOKEN ?? "";
+          const deadline = Date.now() + 20 * 60 * 1000;
+          const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+          if (!repository || !/^[0-9a-f]{40}$/.test(sourceCommit) || !token) {
+            throw new Error("Vercel deployment verification is missing trusted GitHub context.");
+          }
+
+          async function github(path) {
+            const response = await fetch(`https://api.github.com${path}`, {
+              headers: {
+                Accept: "application/vnd.github+json",
+                Authorization: `Bearer ${token}`,
+                "X-GitHub-Api-Version": "2026-03-10",
+              },
+            });
+            if (!response.ok) {
+              throw new Error(`GitHub API ${path} returned ${response.status}.`);
+            }
+            return response.json();
+          }
+
+          while (Date.now() < deadline) {
+            const deployments = await github(
+              `/repos/${repository}/deployments?sha=${sourceCommit}&environment=Production&per_page=100`,
+            );
+            const vercelDeployments = deployments.filter(
+              (deployment) => deployment.environment === "Production" && deployment.creator?.login === "vercel[bot]",
+            );
+
+            let pending = vercelDeployments.length === 0;
+            const failures = [];
+            for (const deployment of vercelDeployments) {
+              const statuses = await github(`/repos/${repository}/deployments/${deployment.id}/statuses?per_page=20`);
+              const latest = [...statuses].sort(
+                (left, right) => Date.parse(right.created_at) - Date.parse(left.created_at),
+              )[0];
+              if (!latest) {
+                pending = true;
+                continue;
+              }
+              if (latest.state === "success") {
+                const deploymentUrl = latest.environment_url || latest.target_url || "";
+                if (!deploymentUrl.startsWith("https://")) {
+                  throw new Error("The successful Vercel production deployment did not provide an HTTPS URL.");
+                }
+                appendFileSync(process.env.GITHUB_OUTPUT, `deployment_url=${deploymentUrl}\n`, "utf8");
+                console.log(`Verified Vercel production deployment ${deployment.id} for ${sourceCommit}.`);
+                process.exit(0);
+              }
+              if (["failure", "error", "inactive"].includes(latest.state)) {
+                failures.push(`${deployment.id}:${latest.state}`);
+              } else {
+                pending = true;
+              }
+            }
+
+            if (!pending && failures.length > 0) {
+              throw new Error(`Vercel production deployment failed for ${sourceCommit}: ${failures.join(", ")}.`);
+            }
+            await delay(15_000);
+          }
+
+          throw new Error(`Timed out waiting for Vercel production to deploy ${sourceCommit}.`);
+          NODE
+
+      - name: Request GitOps VPS release promotion
+        env:
+          NUTSNEWS_INFRA_RELEASE_TOKEN: ${{ secrets.NUTSNEWS_INFRA_RELEASE_TOKEN }}
+          SOURCE_COMMIT: ${{ steps.release.outputs.source_commit }}
+          IMAGE_REPOSITORY: ${{ steps.release.outputs.image_repository }}
+          IMAGE_DIGEST: ${{ steps.release.outputs.image_digest }}
+          BUILD_ID: ${{ steps.release.outputs.build_id }}
+          VERCEL_DEPLOYMENT_URL: ${{ steps.vercel.outputs.deployment_url }}
+          SOURCE_WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE'
+          const token = process.env.NUTSNEWS_INFRA_RELEASE_TOKEN ?? "";
+          const sourceCommit = process.env.SOURCE_COMMIT ?? "";
+          const imageRepository = process.env.IMAGE_REPOSITORY ?? "";
+          const imageDigest = process.env.IMAGE_DIGEST ?? "";
+          const buildId = process.env.BUILD_ID ?? "";
+          const deploymentUrl = process.env.VERCEL_DEPLOYMENT_URL ?? "";
+          const sourceWorkflowRunId = process.env.SOURCE_WORKFLOW_RUN_ID ?? "";
+
+          if (!token) {
+            throw new Error(
+              "NUTSNEWS_INFRA_RELEASE_TOKEN is required to request the GitOps VPS promotion. See the deployment runbook.",
+            );
+          }
+          if (
+            !/^[0-9a-f]{40}$/.test(sourceCommit) ||
+            imageRepository !== "ghcr.io/ramideltoro/nutsnews" ||
+            !/^sha256:[0-9a-f]{64}$/.test(imageDigest) ||
+            !/^\d+-\d+$/.test(buildId) ||
+            !deploymentUrl.startsWith("https://") ||
+            !/^\d+$/.test(sourceWorkflowRunId)
+          ) {
+            throw new Error("Refusing to dispatch an incomplete or incompatible VPS release payload.");
+          }
+
+          const response = await fetch(
+            "https://api.github.com/repos/ramideltoro/nutsnews-infra/dispatches",
+            {
+              method: "POST",
+              headers: {
+                Accept: "application/vnd.github+json",
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+                "X-GitHub-Api-Version": "2026-03-10",
+              },
+              body: JSON.stringify({
+                event_type: "nutsnews-production-release",
+                client_payload: {
+                  source_repository: "ramideltoro/nutsnews",
+                  source_commit: sourceCommit,
+                  image_repository: imageRepository,
+                  image_digest: imageDigest,
+                  build_id: buildId,
+                  vercel_deployment_url: deploymentUrl,
+                  source_workflow_run_id: sourceWorkflowRunId,
+                },
+              }),
+            },
+          );
+
+          if (response.status !== 204) {
+            throw new Error(`VPS promotion dispatch returned ${response.status}.`);
+          }
+          console.log(`Requested GitOps VPS promotion for ${sourceCommit}.`);
+          NODE
+
+      - name: Summarize verified release handoff
+        env:
+          SOURCE_COMMIT: ${{ steps.release.outputs.source_commit }}
+          IMAGE_DIGEST: ${{ steps.release.outputs.image_digest }}
+          BUILD_ID: ${{ steps.release.outputs.build_id }}
+          VERCEL_DEPLOYMENT_URL: ${{ steps.vercel.outputs.deployment_url }}
+        run: |
+          {
+            echo "## Verified NutsNews production release"
+            echo
+            echo "- Source commit: \`${SOURCE_COMMIT}\`"
+            echo "- Vercel deployment: ${VERCEL_DEPLOYMENT_URL}"
+            echo "- VPS image: \`ghcr.io/ramideltoro/nutsnews@${IMAGE_DIGEST}\`"
+            echo "- Build ID: \`${BUILD_ID}\`"
+            echo "- GitOps VPS promotion request: accepted"
+          } >> "$GITHUB_STEP_SUMMARY"
