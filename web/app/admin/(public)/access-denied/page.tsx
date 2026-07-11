@@ -28,11 +28,15 @@ type AccessDeniedPageProps = {
 const SAFE_ERROR_MESSAGES: Record<string, string> = {
   AccessDenied: "This Google account is not approved for NutsNews admin.",
   Configuration: "Sign-in is temporarily unavailable. Please try again in a moment.",
+  OAuthSignin: "We couldn't start your sign-in. Please try again.",
+  OAuthCreateAccount: "We couldn't complete your sign-in. Please try again.",
   OAuthAccountNotLinked: "We couldn't complete your sign-in. Please try again.",
   Callback: "We couldn't complete your sign-in. Please try again.",
   OAuthCallbackError: "We couldn't complete your sign-in. Please try again.",
   OAuthSignInError: "We couldn't complete your sign-in. Please try again.",
   CredentialsSignin: "We couldn't complete your sign-in. Please try again.",
+  Verification: "This sign-in link could not be verified. Please try again.",
+  SessionRequired: "Please sign in to continue.",
 };
 
 function getSingleSearchValue(value: string | string[] | undefined) {

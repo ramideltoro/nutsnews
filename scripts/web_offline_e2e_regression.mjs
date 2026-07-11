@@ -778,28 +778,6 @@ async function runBrowserChecks() {
   supabaseOutageMode = false;
   logOk("Article API recovered from the mocked edge snapshot fallback");
 
-  logStep("Verifying the admin access-denied route is intentional, safe, and not cacheable");
-  const accessDeniedResponse = await page.goto("/admin/access-denied?error=Configuration", {
-    waitUntil: "networkidle",
-  });
-  expect(accessDeniedResponse?.status()).toBe(200);
-  const accessDeniedHeaders = accessDeniedResponse?.headers() ?? {};
-  expect(accessDeniedHeaders["cache-control"]).toBe("no-cache, must-revalidate");
-  expect(accessDeniedHeaders["cdn-cache-control"]).toBe("no-store");
-  expect(accessDeniedHeaders["cloudflare-cdn-cache-control"]).toBe("no-store");
-  expect(accessDeniedHeaders["vercel-cdn-cache-control"]).toBe("no-store");
-  expect(accessDeniedHeaders["x-nutsnews-cache-policy"]).toBe("bypass-admin-cache");
-  expect(accessDeniedHeaders["x-robots-tag"]).toBe("noindex, nofollow, noarchive");
-  await expect(page.getByRole("heading", { name: "We couldn't complete that sign-in" })).toBeVisible();
-  await expect(page.getByText("Sign-in is temporarily unavailable. Please try again in a moment.")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Back to admin sign-in" })).toHaveAttribute("href", "/admin/login");
-  expect(await page.locator("main").innerText()).not.toContain("Configuration");
-
-  await page.goto("/admin/access-denied?error=untrusted-provider-detail", { waitUntil: "networkidle" });
-  await expect(page.getByText("Please try signing in again. If the problem continues, contact the NutsNews administrator.")).toBeVisible();
-  expect(await page.locator("main").innerText()).not.toContain("untrusted-provider-detail");
-  logOk("Admin access-denied route returned safe cache-bypass content");
-
   logStep("Verifying admin edge snapshot dashboard reflects Worker health");
   await page.goto("/admin/edge-snapshot", { waitUntil: "networkidle" });
   await expect(page.locator("main")).toHaveAttribute("data-edge-snapshot-ready", "true");

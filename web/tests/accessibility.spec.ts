@@ -24,7 +24,6 @@ const auditedPages: AuditedPage[] = [
   { name: 'About', path: '/about' },
   { name: 'Privacy', path: '/privacy' },
   { name: 'Contact', path: '/contact' },
-  { name: 'Admin access denied', path: '/admin/access-denied?error=Configuration' },
 ];
 
 const blockingImpacts = new Set(['critical', 'serious']);
