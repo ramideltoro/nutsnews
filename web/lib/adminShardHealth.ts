@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { getServerSupabase, getServerSupabaseConfig } from "@/lib/supabase";
 import {
     getAdminDateKey,
     getAdminTimeZone,
@@ -214,18 +214,11 @@ export type ShardHealthDashboardData = {
 };
 
 function getSupabaseConfig(): SupabaseConfig | null {
-    const url =
-        process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-
-    if (!url || !serviceRoleKey) {
+    try {
+        return getServerSupabaseConfig();
+    } catch {
         return null;
     }
-
-    return {
-        url,
-        serviceRoleKey,
-    };
 }
 
 function getOptionalNumber(value: string | undefined, fallback: number) {
@@ -732,12 +725,7 @@ async function getWorkerRunRows() {
         );
     }
 
-    const supabase = createClient(config.url, config.serviceRoleKey, {
-        auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-        },
-    });
+    const supabase = getServerSupabase();
 
     const { data, error } = await supabase
         .from("worker_runs")

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { isAllowedAdminEmail } from "@/lib/adminAuth";
+import { assertSyntheticTestUser } from "@/lib/runtimeSafety";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -10,9 +11,15 @@ export default async function ProtectedAdminLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const allowTestBypass =
-    process.env.NUTSNEWS_ADMIN_TEST_AUTH_BYPASS === "true" &&
-    process.env.NODE_ENV !== "production";
+  let allowTestBypass = false;
+  if (process.env.NUTSNEWS_ADMIN_TEST_AUTH_BYPASS === "true") {
+    try {
+      assertSyntheticTestUser(process.env.NUTSNEWS_TEST_USER_NAMESPACE ?? "");
+      allowTestBypass = true;
+    } catch {
+      allowTestBypass = false;
+    }
+  }
 
   if (allowTestBypass) {
     return <>{children}</>;

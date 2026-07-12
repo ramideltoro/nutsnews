@@ -11,6 +11,10 @@ test("runtime public configuration differs by runtime environment without serial
   const staging = getRuntimePublicConfig({
     NUTSNEWS_RUNTIME_ENV: "staging",
     NUTSNEWS_SIDE_EFFECTS_MODE: "disabled",
+    NUTSNEWS_DATA_ENVIRONMENT: "staging",
+    NUTSNEWS_SUPABASE_CREDENTIALS_ENV: "staging",
+    NUTSNEWS_SUPABASE_PROJECT_REF: "staging-project",
+    NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: "production-project",
     NUTSNEWS_PUBLIC_SUPABASE_URL: "https://staging-project.supabase.co",
     NUTSNEWS_PUBLIC_SUPABASE_ANON_KEY: "staging-public-anon-key",
     NUTSNEWS_PUBLIC_TURNSTILE_SITE_KEY: "staging-turnstile-site-key",
@@ -28,6 +32,10 @@ test("runtime public configuration differs by runtime environment without serial
   const production = getRuntimePublicConfig({
     NUTSNEWS_RUNTIME_ENV: "production",
     NUTSNEWS_SIDE_EFFECTS_MODE: "live",
+    NUTSNEWS_DATA_ENVIRONMENT: "production",
+    NUTSNEWS_SUPABASE_CREDENTIALS_ENV: "production",
+    NUTSNEWS_SUPABASE_PROJECT_REF: "production-project",
+    NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: "production-project",
     NUTSNEWS_PUBLIC_SUPABASE_URL: "https://production-project.supabase.co",
     NUTSNEWS_PUBLIC_SUPABASE_ANON_KEY: "production-public-anon-key",
     NUTSNEWS_PUBLIC_TURNSTILE_SITE_KEY: "production-turnstile-site-key",
@@ -49,6 +57,9 @@ test("runtime public configuration differs by runtime environment without serial
   assert.equal(production.supabaseUrl, "https://production-project.supabase.co");
   assert.equal(staging.telemetryEnabled, false);
   assert.equal(production.telemetryEnabled, true);
+  assert.equal(staging.turnstileSiteKey, null);
+  assert.equal(staging.sentryDsn, null);
+  assert.equal(staging.gaId, null);
   assert.equal(staging.sourceCommit, production.sourceCommit);
   assert.equal(staging.buildId, production.buildId);
   assert.equal(staging.expectedImageDigest, production.expectedImageDigest);
@@ -63,6 +74,10 @@ test("runtime public configuration rejects invalid URLs and unknown identities",
   const config = getRuntimePublicConfig({
     NUTSNEWS_RUNTIME_ENV: "preview",
     NUTSNEWS_SIDE_EFFECTS_MODE: "live-ish",
+    NUTSNEWS_DATA_ENVIRONMENT: "preview",
+    NUTSNEWS_SUPABASE_CREDENTIALS_ENV: "preview",
+    NUTSNEWS_SUPABASE_PROJECT_REF: "invalid",
+    NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: "invalid",
     NUTSNEWS_PUBLIC_SUPABASE_URL: "javascript:alert(1)",
     NUTSNEWS_PUBLIC_SENTRY_DSN: "not-a-url",
   });
@@ -78,9 +93,14 @@ test("staging configuration fails closed when live side effects are requested", 
   const config = getRuntimePublicConfig({
     NUTSNEWS_RUNTIME_ENV: "staging",
     NUTSNEWS_SIDE_EFFECTS_MODE: "live",
+    NUTSNEWS_DATA_ENVIRONMENT: "staging",
+    NUTSNEWS_SUPABASE_CREDENTIALS_ENV: "staging",
+    NUTSNEWS_SUPABASE_PROJECT_REF: "staging-project",
+    NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: "production-project",
+    NUTSNEWS_PUBLIC_SUPABASE_URL: "https://staging-project.supabase.co",
   });
 
-  assert.equal(config.runtimeEnv, "staging");
+  assert.equal(config.runtimeEnv, "unknown");
   assert.equal(config.sideEffectsMode, "disabled");
   assert.equal(config.telemetryEnabled, false);
 });

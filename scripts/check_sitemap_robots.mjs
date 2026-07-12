@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+import { assertProductionOperation } from '../web/runtimeSafety.mjs';
+
+assertProductionOperation('sitemap-robots-check');
+
 const BASE_URL = String(process.env.NUTSNEWS_BASE_URL || 'https://www.nutsnews.com').replace(/\/+$/, '');
 const TIMEOUT_MS = Number(process.env.HTTP_TIMEOUT_MS || 15000);
 

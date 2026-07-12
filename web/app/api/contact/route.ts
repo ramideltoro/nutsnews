@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { BYPASS_CACHE_HEADERS } from "@/lib/cacheHeaders";
 import { recordQuotaUsageEvent } from "@/lib/quotaUsage";
+import { RuntimeSafetyError, assertExternalSideEffect } from "@/lib/runtimeSafety";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -256,6 +257,19 @@ async function verifyTurnstileToken({
 }
 
 export async function POST(request: NextRequest) {
+  try {
+    assertExternalSideEffect("contact-form-delivery", RESEND_EMAILS_URL);
+    assertExternalSideEffect("contact-form-turnstile", TURNSTILE_VERIFY_URL);
+  } catch (error) {
+    if (error instanceof RuntimeSafetyError) {
+      return jsonResponse(
+        { error: "Contact delivery is disabled in this environment." },
+        503,
+      );
+    }
+    throw error;
+  }
+
   if (!isAllowedOrigin(request)) {
     return jsonResponse({ error: "This contact request is not allowed." }, 403);
   }

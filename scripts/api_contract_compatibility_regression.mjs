@@ -455,7 +455,7 @@ function testInventoryCompleteness() {
   const inventory = readJson("api-contracts/inventory.json");
   assert.equal(inventory.schemaVersion, 1, "API inventory schema version must be explicit");
   assert(Array.isArray(inventory.endpoints), "API inventory endpoints must be an array");
-  assert.equal(inventory.endpoints.length, 13, "API inventory must include every supported custom response endpoint");
+  assert.equal(inventory.endpoints.length, 14, "API inventory must include every supported custom response endpoint");
 
   const inventoryFiles = inventory.endpoints.map((endpoint) => endpoint.routeFile).sort();
   assert.equal(new Set(inventoryFiles).size, inventoryFiles.length, "API inventory route files must be unique");
@@ -934,6 +934,7 @@ function loadContactRoute(recordQuotaUsageEvent = async () => {}) {
     "next/server": nextServerMock(),
     "@/lib/cacheHeaders": cacheHeadersMock,
     "@/lib/quotaUsage": { recordQuotaUsageEvent },
+    "@/lib/runtimeSafety": { assertExternalSideEffect() {} },
   });
 }
 
@@ -1201,6 +1202,34 @@ async function testRuntimePublicConfigContract() {
   assert.equal(response.headers.get("x-nutsnews-cache-policy"), "runtime-public-config-no-store");
 }
 
+async function testReadinessContract() {
+  const readinessRoute = loadModule("web/app/readyz/route.ts", {
+    "next/server": nextServerMock(),
+    "@/lib/cacheHeaders": cacheHeadersMock,
+    "@/lib/runtimeSafety": {
+      getSafeReadiness() {
+        return {
+          ready: false,
+          runtimeEnv: "staging",
+          sideEffectsMode: "disabled",
+          code: "staging_production_project_rejected",
+        };
+      },
+    },
+  });
+  assertMethodExports(readinessRoute, ["GET"], "/readyz");
+  const response = await readinessRoute.GET();
+  assertStatus(response, 503, "/readyz rejected staging identity");
+  assert.match(response.headers.get("cache-control") ?? "", /no-store/);
+  assert.deepEqual(await responseJson(response), {
+    ok: false,
+    service: "nutsnews-web",
+    runtimeEnv: "staging",
+    sideEffectsMode: "disabled",
+    code: "staging_production_project_rejected",
+  });
+}
+
 async function testLogTestContract() {
   const events = [];
   const logRoute = loadModule("web/app/api/log-test/route.ts", {
@@ -1214,6 +1243,7 @@ async function testLogTestContract() {
         events.push(["warn", event, ...rest]);
       },
     },
+    "@/lib/runtimeSafety": { assertProductionOperation() {} },
   });
   assertMethodExports(logRoute, ["GET"], "/api/log-test");
   const response = await logRoute.GET();
@@ -1240,10 +1270,20 @@ async function testAuthContract() {
   const handlerPost = () => new Response("POST");
   const authRoute = loadModule("web/app/api/auth/[...nextauth]/route.ts", {
     "@/auth": { handlers: { GET: handlerGet, POST: handlerPost } },
+    "next/server": nextServerMock(),
+    "@/lib/runtimeSafety": { assertProductionOperation() {} },
   });
   assertMethodExports(authRoute, ["GET", "POST"], "/api/auth/[...nextauth]");
-  assert.equal(authRoute.GET, handlerGet, "Auth GET must delegate directly to NextAuth handlers");
-  assert.equal(authRoute.POST, handlerPost, "Auth POST must delegate directly to NextAuth handlers");
+  assert.equal(
+    await (await authRoute.GET(new Request("https://www.nutsnews.com/api/auth/session"))).text(),
+    "GET",
+    "Auth GET must delegate after the runtime safety guard permits it",
+  );
+  assert.equal(
+    await (await authRoute.POST(new Request("https://www.nutsnews.com/api/auth/session", { method: "POST" }))).text(),
+    "POST",
+    "Auth POST must delegate after the runtime safety guard permits it",
+  );
 
   let capturedConfiguration;
   const googleProvider = { id: "google" };
@@ -1402,6 +1442,7 @@ async function testConfiguredCachePolicies() {
   assert.equal(headerValue("/api/contact", "Cache-Control"), "no-store, max-age=0");
   assert.equal(headerValue("/api/auth/:path*", "Cache-Control"), "no-store, max-age=0");
   assert.equal(headerValue("/api/log-test", "Cache-Control"), "no-store, max-age=0");
+  assert.equal(headerValue("/readyz", "Cache-Control"), "no-store, max-age=0");
   assert.match(headerValue("/healthz", "CDN-Cache-Control"), /s-maxage=60/);
   assert.match(headerValue("/sitemap.xml", "X-NutsNews-Cache-Policy"), /public-sitemap-cache/);
   assert.match(headerValue("/robots.txt", "X-NutsNews-Cache-Policy"), /public-robots-cache/);
@@ -1421,6 +1462,7 @@ try {
   await testContactContract();
   await testHealthContract();
   await testRuntimePublicConfigContract();
+  await testReadinessContract();
   await testLogTestContract();
   await testAuthContract();
   await testMetadataAndOpenGraphContracts();

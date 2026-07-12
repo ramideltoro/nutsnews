@@ -1,5 +1,5 @@
-const RUNTIME_ENVS = new Set(["staging", "production"]);
-const SIDE_EFFECTS_MODES = new Set(["disabled", "sandbox", "live"]);
+import { getRuntimeSafetyPolicy } from "./runtimeSafety.mjs";
+
 const MAX_PUBLIC_VALUE_LENGTH = 2048;
 
 function value(env, ...names) {
@@ -44,33 +44,6 @@ function identityValue(env, fallback, ...names) {
   return fallback;
 }
 
-function runtimeEnv(env) {
-  const candidate = value(
-    env,
-    "NUTSNEWS_RUNTIME_ENV",
-    "NUTSNEWS_PUBLIC_APP_ENV",
-    "NEXT_PUBLIC_APP_ENV",
-  );
-
-  return RUNTIME_ENVS.has(candidate) ? candidate : "unknown";
-}
-
-function sideEffectsMode(env, resolvedRuntimeEnv) {
-  const candidate = value(
-    env,
-    "NUTSNEWS_SIDE_EFFECTS_MODE",
-    "NUTSNEWS_PUBLIC_SIDE_EFFECTS_MODE",
-  );
-
-  if (!SIDE_EFFECTS_MODES.has(candidate)) {
-    return "disabled";
-  }
-
-  return resolvedRuntimeEnv === "production" || candidate !== "live"
-    ? candidate
-    : "disabled";
-}
-
 /**
  * Return the browser-safe, runtime-owned configuration allowlist.
  *
@@ -80,8 +53,17 @@ function sideEffectsMode(env, resolvedRuntimeEnv) {
  * callers must fetch this object at runtime instead of importing env values.
  */
 export function getRuntimePublicConfig(env = process.env) {
-  const resolvedRuntimeEnv = runtimeEnv(env);
-  const resolvedSideEffectsMode = sideEffectsMode(env, resolvedRuntimeEnv);
+  const policy = getRuntimeSafetyPolicy(env);
+  const runtimeReady = policy.ready;
+  const resolvedRuntimeEnv = runtimeReady ? policy.runtimeEnv : "unknown";
+  const resolvedSideEffectsMode = runtimeReady ? policy.sideEffectsMode : "disabled";
+  const sandboxContactEnabled =
+    resolvedRuntimeEnv === "staging" &&
+    resolvedSideEffectsMode === "sandbox" &&
+    value(env, "NUTSNEWS_SANDBOX_CONTACT") === "true";
+  const contactDeliveryEnabled =
+    (resolvedRuntimeEnv === "production" && resolvedSideEffectsMode === "live") ||
+    sandboxContactEnabled;
   const sourceCommit = identityValue(
     env,
     "unknown",
@@ -104,19 +86,24 @@ export function getRuntimePublicConfig(env = process.env) {
   return {
     runtimeEnv: resolvedRuntimeEnv,
     sideEffectsMode: resolvedSideEffectsMode,
-    supabaseUrl: publicUrl(env, "NUTSNEWS_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL"),
-    supabaseAnonKey: value(
-      env,
-      "NUTSNEWS_PUBLIC_SUPABASE_ANON_KEY",
-      "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-    ) || null,
-    turnstileSiteKey: value(
-      env,
-      "NUTSNEWS_PUBLIC_TURNSTILE_SITE_KEY",
-      "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
-    ) || null,
-    sentryDsn: publicUrl(env, "NUTSNEWS_PUBLIC_SENTRY_DSN", "NEXT_PUBLIC_SENTRY_DSN"),
-    gaId: value(env, "NUTSNEWS_PUBLIC_GA_ID", "NEXT_PUBLIC_GA_ID") || null,
+    supabaseUrl: runtimeReady
+      ? publicUrl(env, "NUTSNEWS_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL")
+      : null,
+    supabaseAnonKey: runtimeReady
+      ? value(env, "NUTSNEWS_PUBLIC_SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY") || null
+      : null,
+    turnstileSiteKey:
+      runtimeReady && contactDeliveryEnabled
+        ? value(env, "NUTSNEWS_PUBLIC_TURNSTILE_SITE_KEY", "NEXT_PUBLIC_TURNSTILE_SITE_KEY") || null
+        : null,
+    sentryDsn:
+      runtimeReady && resolvedRuntimeEnv === "production" && resolvedSideEffectsMode === "live"
+        ? publicUrl(env, "NUTSNEWS_PUBLIC_SENTRY_DSN", "NEXT_PUBLIC_SENTRY_DSN")
+        : null,
+    gaId:
+      runtimeReady && resolvedRuntimeEnv === "production" && resolvedSideEffectsMode === "live"
+        ? value(env, "NUTSNEWS_PUBLIC_GA_ID", "NEXT_PUBLIC_GA_ID") || null
+        : null,
     iosAppStoreUrl: publicUrl(
       env,
       "NUTSNEWS_PUBLIC_IOS_APP_STORE_URL",
@@ -127,6 +114,6 @@ export function getRuntimePublicConfig(env = process.env) {
     deploymentTarget,
     expectedImageDigest,
     telemetryEnabled:
-      resolvedRuntimeEnv === "production" && resolvedSideEffectsMode === "live",
+      runtimeReady && resolvedRuntimeEnv === "production" && resolvedSideEffectsMode === "live",
   };
 }

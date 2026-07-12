@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+import { assertProductionOperation } from '../web/runtimeSafety.mjs';
+
+assertProductionOperation('cloudflare-cache-purge');
+
 const apiToken = process.env.CLOUDFLARE_API_TOKEN?.trim();
 const zoneId = process.env.CLOUDFLARE_ZONE_ID?.trim();
 const purgeEverything = String(process.env.CLOUDFLARE_PURGE_EVERYTHING || 'true').toLowerCase() === 'true';

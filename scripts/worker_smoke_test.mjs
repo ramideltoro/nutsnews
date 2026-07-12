@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+import { assertProductionOperation } from '../web/runtimeSafety.mjs';
+
+assertProductionOperation('worker-ingestion-smoke-test');
+
 const BASE_URL = String(process.env.NUTSNEWS_BASE_URL || 'https://www.nutsnews.com').replace(/\/+$/, '');
 const WORKER_URL = process.env.NUTSNEWS_WORKER_URL || '';
 const SHARD_URL = process.env.NUTSNEWS_SHARD_URL || '';

@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
+import { isTelemetryDeliveryAllowed } from "@/lib/runtimeSafety";
 
 export async function register() {
     if (process.env.NEXT_RUNTIME === "nodejs") {
@@ -10,4 +11,8 @@ export async function register() {
     }
 }
 
-export const onRequestError = Sentry.captureRequestError;
+export function onRequestError(...args: Parameters<typeof Sentry.captureRequestError>) {
+    if (isTelemetryDeliveryAllowed()) {
+        return Sentry.captureRequestError(...args);
+    }
+}

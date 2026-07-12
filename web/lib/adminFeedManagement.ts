@@ -1,4 +1,6 @@
 import { formatAdminDateTime } from "@/lib/adminTime";
+import { getServerSupabaseConfig } from "@/lib/supabase";
+import { RuntimeSafetyError, assertDataMutation } from "@/lib/runtimeSafety";
 
 const FEED_QUALITY_SELECT_COLUMNS = [
   "feed_id",
@@ -183,17 +185,11 @@ export type FeedManagementDashboardData = {
 };
 
 function getSupabaseConfig(): SupabaseConfig | null {
-  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-
-  if (!url || !serviceRoleKey) {
+  try {
+    return getServerSupabaseConfig();
+  } catch {
     return null;
   }
-
-  return {
-    url,
-    serviceRoleKey,
-  };
 }
 
 function emptySummary(): FeedManagementSummary {
@@ -628,6 +624,18 @@ export async function setAdminRssFeedActiveStatus({
   feedUrl: string;
   isActive: boolean;
 }) {
+  try {
+    assertDataMutation("admin-feed-management");
+  } catch (error) {
+    if (error instanceof RuntimeSafetyError) {
+      return {
+        ok: false,
+        message: "Feed management mutations are disabled in this environment.",
+      };
+    }
+    throw error;
+  }
+
   const config = getSupabaseConfig();
 
   if (!config) {

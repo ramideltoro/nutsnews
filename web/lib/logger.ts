@@ -2,6 +2,8 @@ type LogLevel = "debug" | "info" | "warn" | "error";
 
 type LogFields = Record<string, unknown>;
 
+import { isTelemetryDeliveryAllowed } from "@/lib/runtimeSafety";
+
 const SERVICE_NAME = "nutsnews-web";
 const DEFAULT_ENVIRONMENT =
     process.env.NUTSNEWS_RUNTIME_ENV ??
@@ -68,6 +70,10 @@ function writeLocalConsole(level: LogLevel, payload: LogFields) {
 }
 
 async function sendToBetterStack(payload: LogFields) {
+    if (!isTelemetryDeliveryAllowed()) {
+        return;
+    }
+
     const sourceToken = process.env.BETTER_STACK_SOURCE_TOKEN;
     const ingestingHost = process.env.BETTER_STACK_INGESTING_HOST;
 

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+node "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/assert_runtime_safety.mjs" github-issue-mutation
+
 OWNER="ramideltoro"
 REPO_NAME="nutsnews"
 REPO="$OWNER/$REPO_NAME"

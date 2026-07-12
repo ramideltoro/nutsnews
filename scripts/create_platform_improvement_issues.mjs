@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
 import process from "node:process";
+import { assertProductionOperation } from "../web/runtimeSafety.mjs";
 
 const DEFAULT_REPO = "ramideltoro/nutsnews";
 
@@ -10,6 +11,10 @@ const repo = repoArgIndex >= 0 ? process.argv[repoArgIndex + 1] : DEFAULT_REPO;
 const shouldCreate = args.has("--create");
 const shouldSkipLabelCreate = args.has("--skip-labels");
 const DRY_RUN = !shouldCreate;
+
+if (shouldCreate) {
+  assertProductionOperation("github-issue-mutation");
+}
 
 const labelDefinitions = [
   ["area:platform", "6f42c1", "Platform architecture, scale, and reliability"],

@@ -1,9 +1,10 @@
 import "server-only";
 
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { type SupabaseClient } from "@supabase/supabase-js";
 
 import { PAGE_SIZE } from "@/lib/articles";
 import { DEFAULT_LANGUAGE_CODE, SUPPORTED_LANGUAGES } from "@/lib/languages";
+import { getServerSupabase, getServerSupabaseConfig } from "@/lib/supabase";
 
 const RECENT_ARTICLE_LIMIT = 100;
 const TRANSLATION_SAMPLE_LIMIT = 60;
@@ -174,14 +175,11 @@ type GitHubWorkflowRunsResponse = {
 };
 
 function getSupabaseConfig(): SupabaseConfig | null {
-  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-
-  if (!url || !serviceRoleKey) {
+  try {
+    return getServerSupabaseConfig();
+  } catch {
     return null;
   }
-
-  return { url, serviceRoleKey };
 }
 
 function percent(part: number, total: number) {
@@ -978,12 +976,7 @@ export async function getAdminProductionReadinessDashboardData(): Promise<Produc
     );
   }
 
-  const client = createClient(config.url, config.serviceRoleKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
+  const client = getServerSupabase();
   const now = new Date();
 
   try {

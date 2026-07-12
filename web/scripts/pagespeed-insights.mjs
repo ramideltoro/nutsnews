@@ -2,6 +2,9 @@
 
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { assertProductionOperation } from '../runtimeSafety.mjs';
+
+assertProductionOperation('pagespeed-insights');
 
 const DEFAULT_URL = 'https://www.nutsnews.com/';
 const DEFAULT_OUTPUT_DIR = 'reports/pagespeed';

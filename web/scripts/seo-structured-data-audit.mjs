@@ -2,6 +2,9 @@
 
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { assertProductionOperation } from '../runtimeSafety.mjs';
+
+assertProductionOperation('seo-structured-data-audit');
 
 const DEFAULT_BASE_URL = 'https://www.nutsnews.com';
 const DEFAULT_ARTICLE_LIMIT = 3;
