@@ -271,6 +271,33 @@
       "testFile": "scripts/api_contract_compatibility_regression.mjs"
     },
     {
+      "id": "runtime-public-config",
+      "method": ["GET"],
+      "path": "/api/runtime-config",
+      "routeFile": "web/app/api/runtime-config/route.ts",
+      "request": {
+        "body": "none",
+        "query": "none"
+      },
+      "auth": "public; the response is a strict browser-safe allowlist and contains no server credentials",
+      "successStatus": [200],
+      "successResponseShape": {
+        "contentType": "application/json",
+        "requiredKeys": ["runtimeEnv", "sideEffectsMode", "supabaseUrl", "supabaseAnonKey", "turnstileSiteKey", "sentryDsn", "gaId", "iosAppStoreUrl", "sourceCommit", "buildId", "deploymentTarget", "expectedImageDigest", "telemetryEnabled"],
+        "fields": {
+          "runtimeEnv": "staging|production|unknown",
+          "telemetryEnabled": "boolean; true only for production with live side effects",
+          "expectedImageDigest": "sanitized reviewed sha256 identity or unknown"
+        }
+      },
+      "errorStatuses": [],
+      "errorShape": "No application-defined error response; unavailable configuration fails closed in clients.",
+      "pagination": "none",
+      "cache": "bypass/no-store; configuration is evaluated by the running container rather than image build inputs",
+      "iosCallSites": [],
+      "testFile": "scripts/api_contract_compatibility_regression.mjs"
+    },
+    {
       "id": "healthz",
       "method": ["GET"],
       "path": "/healthz",

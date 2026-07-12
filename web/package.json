@@ -19,6 +19,7 @@
     "test:production-release": "node ../scripts/production_release_workflow_regression.mjs",
     "test:admin-article-reviews": "node ../scripts/admin_article_reviews_regression.mjs",
     "test:security-headers": "node scripts/assert-security-headers.mjs",
+    "test:runtime-config": "node --test ../tests/runtime-public-config.test.mjs",
     "test:fluid-cpu": "node ../scripts/fluid_active_cpu_regression.mjs",
     "test:public-route-cpu-cache": "node ../scripts/public_route_cpu_cache_regression.mjs",
     "test:public-cache": "node ../scripts/public_cache_policy_regression.mjs",

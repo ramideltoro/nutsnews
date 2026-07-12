@@ -4,6 +4,7 @@ import Script from "next/script";
 import { FormEvent, useEffect, useRef, useState } from "react";
 
 import { type LanguageCode } from "@/lib/languages";
+import { useRuntimePublicConfig } from "@/lib/runtimePublicConfigClient";
 import { useSelectedLanguage } from "../components/useSelectedLanguage";
 
 type FormStatus =
@@ -32,9 +33,6 @@ declare global {
     turnstile?: TurnstileApi;
   }
 }
-
-const turnstileSiteKey =
-  process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "";
 
 const formCopyByLanguage: Record<
   LanguageCode,
@@ -182,10 +180,12 @@ const formCopyByLanguage: Record<
 
 function TurnstileWidget({
   copy,
+  siteKey,
   resetSignal,
   onTokenChange,
 }: {
   copy: (typeof formCopyByLanguage)[LanguageCode];
+  siteKey: string;
   resetSignal: number;
   onTokenChange: (token: string) => void;
 }) {
@@ -194,7 +194,7 @@ function TurnstileWidget({
   const [scriptReady, setScriptReady] = useState(false);
 
   useEffect(() => {
-    if (!turnstileSiteKey || !scriptReady || !containerRef.current) {
+    if (!siteKey || !scriptReady || !containerRef.current) {
       return;
     }
 
@@ -204,13 +204,13 @@ function TurnstileWidget({
 
     widgetIdRef.current =
       window.turnstile?.render(containerRef.current, {
-        sitekey: turnstileSiteKey,
+        sitekey: siteKey,
         theme: "dark",
         callback: (token: string) => onTokenChange(token),
         "expired-callback": () => onTokenChange(""),
         "error-callback": () => onTokenChange(""),
       }) ?? null;
-  }, [onTokenChange, scriptReady]);
+  }, [onTokenChange, scriptReady, siteKey]);
 
   useEffect(() => {
     if (!widgetIdRef.current) {
@@ -229,7 +229,7 @@ function TurnstileWidget({
     };
   }, []);
 
-  if (!turnstileSiteKey) {
+  if (!siteKey) {
     return (
       <p className="mt-4 rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-200">
         {copy.turnstileUnavailable}
@@ -254,7 +254,9 @@ function TurnstileWidget({
 
 export function ContactForm() {
   const selectedLanguage = useSelectedLanguage();
+  const runtimeConfig = useRuntimePublicConfig();
   const copy = formCopyByLanguage[selectedLanguage];
+  const turnstileSiteKey = runtimeConfig?.turnstileSiteKey ?? "";
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [website, setWebsite] = useState("");
@@ -383,6 +385,7 @@ export function ContactForm() {
 
       <TurnstileWidget
         copy={copy}
+        siteKey={turnstileSiteKey}
         resetSignal={turnstileResetSignal}
         onTokenChange={setTurnstileToken}
       />

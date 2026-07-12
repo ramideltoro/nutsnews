@@ -4,7 +4,7 @@ import {
   dedupeArticlesByIdentity,
   getArticleIdentityKey,
 } from "@/lib/articleIdentity";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 import { validateTranslatedSummary } from "@/lib/translationQuality";
 import {
   DEFAULT_LANGUAGE_CODE,
@@ -166,6 +166,7 @@ function decodeArticleCursor(cursor?: string | null): ArticleCursor | null {
 
 function basePublishedArticleQuery(category?: string | null) {
   const selectedCategory = cleanCategory(category);
+  const supabase = getSupabase();
   let query = supabase
     .from("articles")
     .select(ARTICLE_SELECT)
@@ -182,6 +183,7 @@ function basePublishedArticleQuery(category?: string | null) {
 
 function basePublicFeedSnapshotQuery(category?: string | null) {
   const selectedCategory = cleanCategory(category);
+  const supabase = getSupabase();
   let query = supabase.from(PUBLIC_FEED_SNAPSHOT_TABLE).select(ARTICLE_SELECT);
 
   if (selectedCategory) {
@@ -217,7 +219,7 @@ async function applyArticleSummaries(
     }));
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("article_summaries")
     .select("original_url, language_code, title, summary")
     .eq("language_code", requestedLanguageCode)
@@ -667,7 +669,7 @@ export async function searchPublishedArticles(
     };
   }
 
-  const { data, error } = await supabase.rpc("search_articles", {
+  const { data, error } = await getSupabase().rpc("search_articles", {
     search_query: query,
     page_size: safePageSize + 1,
     page_offset: safePage * safePageSize,
@@ -693,6 +695,7 @@ export async function searchPublishedArticles(
 }
 
 export async function getPublishedCategories(limit = 1000) {
+  const supabase = getSupabase();
   const { data: snapshotData, error: snapshotError } = await supabase
     .from(PUBLIC_FEED_SNAPSHOT_TABLE)
     .select("category")
@@ -740,7 +743,7 @@ export async function getPublishedCategories(limit = 1000) {
 
 const getCachedArticleById = unstable_cache(async (id: string, requestedLanguageCode?: string | null) => {
   const languageCode = normalizeLanguageCode(requestedLanguageCode);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("articles")
     .select(ARTICLE_SELECT)
     .eq("status", "published")
@@ -763,7 +766,7 @@ const getCachedArticleById = unstable_cache(async (id: string, requestedLanguage
 export const getArticleById = cache(getCachedArticleById);
 
 export async function getRecentArticleSitemapItems(limit = 1000) {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("articles")
     .select("id, published_on_site_at, published_at")
     .eq("status", "published")

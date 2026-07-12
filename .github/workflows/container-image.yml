@@ -68,6 +68,7 @@ jobs:
 
           fixture_pid=$!
           container_id=""
+          image_id=""
 
           cleanup() {
             if [[ -n "$container_id" ]]; then
@@ -83,15 +84,23 @@ jobs:
             --build-arg NUTSNEWS_SOURCE_COMMIT="$SOURCE_COMMIT" \
             --build-arg NUTSNEWS_BUILD_ID="$BUILD_ID" \
             --build-arg NUTSNEWS_DEPLOYMENT_TARGET="ci-container" \
-            --build-arg NEXT_PUBLIC_SUPABASE_URL="http://host.docker.internal:54321" \
-            --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="ci-public-anon-key" \
-            --build-arg NEXT_PUBLIC_APP_ENV="ci" \
             --tag "$IMAGE_TAG" \
             web
+
+          image_id="$(docker image inspect --format '{{.Id}}' "$IMAGE_TAG")"
+          expected_image_digest="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
           container_id="$(docker run --detach \
             --add-host host.docker.internal:host-gateway \
             --publish 127.0.0.1:3000:3000 \
+            --env NUTSNEWS_RUNTIME_ENV=staging \
+            --env NUTSNEWS_SIDE_EFFECTS_MODE=disabled \
+            --env NUTSNEWS_PUBLIC_SUPABASE_URL=http://host.docker.internal:54321 \
+            --env NUTSNEWS_PUBLIC_SUPABASE_ANON_KEY=staging-public-anon-key \
+            --env NUTSNEWS_PUBLIC_TURNSTILE_SITE_KEY=staging-turnstile-site-key \
+            --env NUTSNEWS_PUBLIC_SENTRY_DSN=https://staging-sentry.invalid/1 \
+            --env NUTSNEWS_PUBLIC_GA_ID=G-STAGINGRUNTIME \
+            --env NUTSNEWS_EXPECTED_IMAGE_DIGEST="$expected_image_digest" \
             "$IMAGE_TAG")"
 
           for attempt in $(seq 1 30); do
@@ -116,7 +125,63 @@ jobs:
             --base-url http://127.0.0.1:3000 \
             --expected-source-commit "$SOURCE_COMMIT" \
             --expected-build-id "$BUILD_ID" \
-            --expected-deployment-target ci-container
+            --expected-deployment-target ci-container \
+            --expected-runtime-env staging \
+            --expected-supabase-url http://host.docker.internal:54321 \
+            --expected-image-digest "$expected_image_digest"
+
+          docker rm -f "$container_id" >/dev/null
+          container_id=""
+
+          container_id="$(docker run --detach \
+            --add-host host.docker.internal:host-gateway \
+            --publish 127.0.0.1:3001:3000 \
+            --env NUTSNEWS_RUNTIME_ENV=production \
+            --env NUTSNEWS_SIDE_EFFECTS_MODE=live \
+            --env NUTSNEWS_PUBLIC_SUPABASE_URL=http://host.docker.internal:54321 \
+            --env NUTSNEWS_PUBLIC_SUPABASE_ANON_KEY=production-public-anon-key \
+            --env NUTSNEWS_PUBLIC_TURNSTILE_SITE_KEY=production-turnstile-site-key \
+            --env NUTSNEWS_PUBLIC_SENTRY_DSN=https://production-sentry.invalid/1 \
+            --env NUTSNEWS_PUBLIC_GA_ID=G-PRODUCTIONRUNTIME \
+            --env NUTSNEWS_EXPECTED_IMAGE_DIGEST="$expected_image_digest" \
+            "$IMAGE_TAG")"
+
+          for attempt in $(seq 1 30); do
+            : "$attempt"
+            health_status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' "$container_id")"
+            if [[ "$health_status" == "healthy" ]]; then
+              break
+            fi
+            if [[ "$health_status" == "unhealthy" ]]; then
+              docker logs "$container_id"
+              exit 1
+            fi
+            sleep 2
+          done
+
+          if [[ "$(docker inspect --format '{{.State.Health.Status}}' "$container_id")" != "healthy" ]]; then
+            docker logs "$container_id"
+            exit 1
+          fi
+
+          if [[ "$(docker image inspect --format '{{.Id}}' "$IMAGE_TAG")" != "$image_id" ]]; then
+            echo "::error::Staging and production fixture containers must use the same image identity."
+            exit 1
+          fi
+
+          node scripts/dual_target_web_smoke.mjs \
+            --base-url http://127.0.0.1:3001 \
+            --expected-source-commit "$SOURCE_COMMIT" \
+            --expected-build-id "$BUILD_ID" \
+            --expected-deployment-target ci-container \
+            --expected-runtime-env production \
+            --expected-supabase-url http://host.docker.internal:54321 \
+            --expected-image-digest "$expected_image_digest"
+
+          if docker run --rm --entrypoint sh "$IMAGE_TAG" -c "grep -R -F -q 'production-sentry.invalid' .next/static || grep -R -F -q 'G-PRODUCTIONRUNTIME' .next/static"; then
+            echo "::error::Runtime fixture identifiers were embedded in public assets."
+            exit 1
+          fi
 
           runtime_uid="$(docker exec "$container_id" node -p 'process.getuid()')"
           if [[ "$runtime_uid" == "0" ]]; then
@@ -195,12 +260,13 @@ jobs:
       - name: Run release-critical web checks
         working-directory: web
         env:
-          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-public-anon-key
-          NEXT_PUBLIC_APP_ENV: ci
+          NUTSNEWS_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NUTSNEWS_PUBLIC_SUPABASE_ANON_KEY: ci-public-anon-key
+          NUTSNEWS_RUNTIME_ENV: staging
+          NUTSNEWS_SIDE_EFFECTS_MODE: disabled
           AUTH_SECRET: ci-only-auth-secret-not-used-in-production
           NEXTAUTH_URL: http://localhost:3000
-          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ci-turnstile-site-key
+          NUTSNEWS_PUBLIC_TURNSTILE_SITE_KEY: ci-turnstile-site-key
           TURNSTILE_SECRET_KEY: ci-turnstile-secret-key
         run: |
           set -euo pipefail
@@ -259,24 +325,7 @@ jobs:
       source-commit: ${{ github.sha }}
       build-id: ${{ github.run_id }}-${{ github.run_attempt }}
 
-    env:
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-      NEXT_PUBLIC_APP_ENV: ${{ vars.NEXT_PUBLIC_APP_ENV || 'production-vps' }}
-      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
-      NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
-      NEXT_PUBLIC_GA_ID: ${{ secrets.NEXT_PUBLIC_GA_ID }}
-      NEXT_PUBLIC_NUTSNEWS_IOS_APP_STORE_URL: ${{ vars.NEXT_PUBLIC_NUTSNEWS_IOS_APP_STORE_URL }}
-
     steps:
-      - name: Require production public build inputs
-        run: |
-          set -euo pipefail
-          if [[ -z "$NEXT_PUBLIC_SUPABASE_URL" || -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]]; then
-            echo "::error::Publishing requires NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."
-            exit 1
-          fi
-
       - name: Checkout repository
         uses: actions/checkout@v5
 
@@ -304,13 +353,6 @@ jobs:
             NUTSNEWS_SOURCE_COMMIT=${{ github.sha }}
             NUTSNEWS_BUILD_ID=${{ github.run_id }}-${{ github.run_attempt }}
             NUTSNEWS_DEPLOYMENT_TARGET=vps
-            NEXT_PUBLIC_SUPABASE_URL=${{ env.NEXT_PUBLIC_SUPABASE_URL }}
-            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ env.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-            NEXT_PUBLIC_APP_ENV=${{ env.NEXT_PUBLIC_APP_ENV }}
-            NEXT_PUBLIC_TURNSTILE_SITE_KEY=${{ env.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
-            NEXT_PUBLIC_SENTRY_DSN=${{ env.NEXT_PUBLIC_SENTRY_DSN }}
-            NEXT_PUBLIC_GA_ID=${{ env.NEXT_PUBLIC_GA_ID }}
-            NEXT_PUBLIC_NUTSNEWS_IOS_APP_STORE_URL=${{ env.NEXT_PUBLIC_NUTSNEWS_IOS_APP_STORE_URL }}
           provenance: mode=max
           sbom: true
 

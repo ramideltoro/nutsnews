@@ -69,6 +69,9 @@ const expectedDeploymentTarget = required(
     process.env.NUTSNEWS_EXPECTED_DEPLOYMENT_TARGET,
   "--expected-deployment-target or NUTSNEWS_EXPECTED_DEPLOYMENT_TARGET",
 );
+const expectedRuntimeEnv = option("--expected-runtime-env") || process.env.NUTSNEWS_EXPECTED_RUNTIME_ENV;
+const expectedSupabaseUrl = option("--expected-supabase-url") || process.env.NUTSNEWS_EXPECTED_SUPABASE_URL;
+const expectedImageDigest = option("--expected-image-digest") || process.env.NUTSNEWS_EXPECTED_IMAGE_DIGEST;
 
 const baseUrl = new URL(baseUrlValue.endsWith("/") ? baseUrlValue : `${baseUrlValue}/`);
 
@@ -101,6 +104,28 @@ assertEqual(
   expectedDeploymentTarget,
   "Health deployment target header",
 );
+
+if (expectedRuntimeEnv || expectedSupabaseUrl || expectedImageDigest) {
+  const runtimeConfigResponse = await fetchOk(
+    endpoint(baseUrl, "/api/runtime-config"),
+    "Runtime public configuration endpoint",
+  );
+  const runtimeConfig = await runtimeConfigResponse.json();
+
+  if (!/no-store/.test(runtimeConfigResponse.headers.get("cache-control") ?? "")) {
+    throw new Error("Runtime public configuration endpoint must be no-store");
+  }
+
+  if (expectedRuntimeEnv) {
+    assertEqual(runtimeConfig.runtimeEnv, expectedRuntimeEnv, "Runtime environment");
+  }
+  if (expectedSupabaseUrl) {
+    assertEqual(runtimeConfig.supabaseUrl, expectedSupabaseUrl, "Runtime Supabase URL");
+  }
+  if (expectedImageDigest) {
+    assertEqual(runtimeConfig.expectedImageDigest, expectedImageDigest, "Runtime expected image digest");
+  }
+}
 
 const homeResponse = await fetchOk(endpoint(baseUrl, "/"), "Homepage");
 const home = await homeResponse.text();

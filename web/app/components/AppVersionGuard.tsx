@@ -2,14 +2,15 @@
 
 import { useEffect } from "react";
 
+import { useRuntimePublicConfig } from "@/lib/runtimePublicConfigClient";
+
 const STORAGE_KEY = "nutsnews-build-version";
 const REFRESHED_KEY = "nutsnews-build-refresh-complete";
 
-type AppVersionGuardProps = {
-  version: string;
-};
+export function AppVersionGuard() {
+  const config = useRuntimePublicConfig();
+  const version = config?.sourceCommit ?? config?.buildId ?? "development";
 
-export function AppVersionGuard({ version }: AppVersionGuardProps) {
   useEffect(() => {
     if (!version || version === "development") {
       return;
