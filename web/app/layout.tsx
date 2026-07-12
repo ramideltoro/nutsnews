@@ -1,16 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AppVersionGuard } from "./components/AppVersionGuard";
+import { RuntimeAnalytics } from "./components/RuntimeAnalytics";
 
 const siteUrl = "https://www.nutsnews.com";
-
-const appVersion =
-  process.env.VERCEL_GIT_COMMIT_SHA ??
-  process.env.NEXT_PUBLIC_NUTSNEWS_BUILD_ID ??
-  process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ??
-  "development";
 
 const themeInitScript = `
 (function () {
@@ -62,11 +56,6 @@ const themeInitScript = `
   }
 })();
 `;
-
-const gaId =
-  process.env.NODE_ENV === "production"
-    ? process.env.NEXT_PUBLIC_GA_ID
-    : undefined;
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -163,24 +152,8 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: themeInitScript }}
         />
 
-        {gaId ? (
-          <>
-            <Script
-              src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
-              strategy="afterInteractive"
-            />
-            <Script id="google-analytics" strategy="afterInteractive">
-              {`
-                window.dataLayer = window.dataLayer || [];
-                function gtag(){dataLayer.push(arguments);}
-                gtag('js', new Date());
-                gtag('config', '${gaId}');
-              `}
-            </Script>
-          </>
-        ) : null}
-
-        <AppVersionGuard version={appVersion} />
+        <RuntimeAnalytics />
+        <AppVersionGuard />
         {children}
       </body>
     </html>

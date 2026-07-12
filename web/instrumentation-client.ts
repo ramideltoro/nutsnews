@@ -1,40 +1,53 @@
 import * as Sentry from "@sentry/nextjs";
 
-const isProduction = process.env.NODE_ENV === "production";
-const release =
-    process.env.NEXT_PUBLIC_NUTSNEWS_SOURCE_COMMIT?.trim() ||
-    process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.trim() ||
-    process.env.NEXT_PUBLIC_NUTSNEWS_BUILD_ID?.trim() ||
-    undefined;
-
-Sentry.init({
-    dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
-
-    environment: process.env.NEXT_PUBLIC_APP_ENV ?? process.env.NODE_ENV,
-    release,
-
-    tracesSampleRate: isProduction ? 0.1 : 1.0,
-
-    replaysSessionSampleRate: 0,
-    replaysOnErrorSampleRate: 1.0,
-
-    enableLogs: true,
-
-    integrations: [
-        Sentry.replayIntegration({
-            maskAllText: true,
-            blockAllMedia: true,
-        }),
-    ],
-
-    beforeSend(event) {
-        if (event.request?.headers) {
-            delete event.request.headers.authorization;
-            delete event.request.headers.cookie;
+void fetch("/api/runtime-config", {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+})
+    .then(async (response) => {
+        if (!response.ok) {
+            return null;
         }
 
-        return event;
-    },
-});
+        return response.json() as Promise<{
+            runtimeEnv?: string;
+            telemetryEnabled?: boolean;
+            sentryDsn?: string | null;
+            sourceCommit?: string;
+            buildId?: string;
+        }>;
+    })
+    .then((config) => {
+        if (!config) {
+            return;
+        }
+
+        Sentry.init({
+            dsn: config.telemetryEnabled ? config.sentryDsn ?? undefined : undefined,
+            environment: config.runtimeEnv ?? "unknown",
+            release: config.sourceCommit || config.buildId || undefined,
+            tracesSampleRate: config.telemetryEnabled ? 0.1 : 0,
+            replaysSessionSampleRate: 0,
+            replaysOnErrorSampleRate: config.telemetryEnabled ? 1.0 : 0,
+            enableLogs: true,
+            integrations: [
+                Sentry.replayIntegration({
+                    maskAllText: true,
+                    blockAllMedia: true,
+                }),
+            ],
+            beforeSend(event) {
+                if (event.request?.headers) {
+                    delete event.request.headers.authorization;
+                    delete event.request.headers.cookie;
+                }
+
+                return config.telemetryEnabled ? event : null;
+            },
+        });
+    })
+    .catch(() => {
+        // Missing runtime configuration must fail closed: no browser telemetry.
+    });
 
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;

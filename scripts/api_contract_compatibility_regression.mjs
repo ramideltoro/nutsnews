@@ -455,7 +455,7 @@ function testInventoryCompleteness() {
   const inventory = readJson("api-contracts/inventory.json");
   assert.equal(inventory.schemaVersion, 1, "API inventory schema version must be explicit");
   assert(Array.isArray(inventory.endpoints), "API inventory endpoints must be an array");
-  assert.equal(inventory.endpoints.length, 12, "API inventory must include every supported custom response endpoint");
+  assert.equal(inventory.endpoints.length, 13, "API inventory must include every supported custom response endpoint");
 
   const inventoryFiles = inventory.endpoints.map((endpoint) => endpoint.routeFile).sort();
   assert.equal(new Set(inventoryFiles).size, inventoryFiles.length, "API inventory route files must be unique");
@@ -1162,6 +1162,45 @@ async function testHealthContract() {
   );
 }
 
+async function testRuntimePublicConfigContract() {
+  let connectionCalls = 0;
+  const runtimeConfig = {
+    runtimeEnv: "staging",
+    sideEffectsMode: "disabled",
+    supabaseUrl: "https://staging-project.supabase.co",
+    supabaseAnonKey: "staging-public-anon-key",
+    turnstileSiteKey: "staging-turnstile-site-key",
+    sentryDsn: "https://staging-sentry.invalid/1",
+    gaId: "G-STAGINGRUNTIME",
+    iosAppStoreUrl: null,
+    sourceCommit: "source-commit",
+    buildId: "build-id",
+    deploymentTarget: "ci-container",
+    expectedImageDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    telemetryEnabled: false,
+  };
+  const runtimeConfigRoute = loadModule("web/app/api/runtime-config/route.ts", {
+    "next/server": {
+      ...nextServerMock(),
+      async connection() {
+        connectionCalls += 1;
+      },
+    },
+    "@/lib/runtimePublicConfig": {
+      getRuntimePublicConfig() {
+        return runtimeConfig;
+      },
+    },
+  });
+  assertMethodExports(runtimeConfigRoute, ["GET"], "/api/runtime-config");
+  const response = await runtimeConfigRoute.GET();
+  assertStatus(response, 200, "/api/runtime-config");
+  assert.equal(connectionCalls, 1, "Runtime configuration must opt into request-time evaluation");
+  assert.deepEqual(await responseJson(response), runtimeConfig);
+  assert.match(response.headers.get("cache-control") ?? "", /no-store/);
+  assert.equal(response.headers.get("x-nutsnews-cache-policy"), "runtime-public-config-no-store");
+}
+
 async function testLogTestContract() {
   const events = [];
   const logRoute = loadModule("web/app/api/log-test/route.ts", {
@@ -1381,6 +1420,7 @@ try {
   await testSearchContract();
   await testContactContract();
   await testHealthContract();
+  await testRuntimePublicConfigContract();
   await testLogTestContract();
   await testAuthContract();
   await testMetadataAndOpenGraphContracts();

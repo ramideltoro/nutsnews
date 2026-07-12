@@ -5,15 +5,14 @@
 import Link from "next/link";
 
 import type { LanguageCode } from "@/lib/languages";
+import { useRuntimePublicConfig } from "@/lib/runtimePublicConfigClient";
 import { SiteFooter } from "../components/SiteFooter";
 import { useSelectedLanguage } from "../components/useSelectedLanguage";
 
 const APP_STORE_BADGE_SRC =
   "https://tools.applemediaservices.com/api/badges/download-on-the-app-store/black/en-us?size=250x83";
 
-const APP_STORE_URL =
-  process.env.NEXT_PUBLIC_NUTSNEWS_IOS_APP_STORE_URL?.trim() ||
-  "https://apps.apple.com/";
+const DEFAULT_APP_STORE_URL = "https://apps.apple.com/";
 
 type RoadmapItem = {
   label: string;
@@ -255,7 +254,9 @@ const appsCopyByLanguage: Record<LanguageCode, AppsCopy> = {
 
 export function LocalizedAppsPage() {
   const selectedLanguage = useSelectedLanguage();
+  const runtimeConfig = useRuntimePublicConfig();
   const copy = appsCopyByLanguage[selectedLanguage] ?? appsCopyByLanguage.en;
+  const appStoreUrl = runtimeConfig?.iosAppStoreUrl ?? DEFAULT_APP_STORE_URL;
 
   return (
     <main
@@ -300,7 +301,7 @@ export function LocalizedAppsPage() {
 
             <div className="rounded-[1.5rem] border border-amber-300/15 bg-neutral-950/70 p-5 text-center shadow-xl shadow-black/30">
               <a
-                href={APP_STORE_URL}
+                href={appStoreUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-200"

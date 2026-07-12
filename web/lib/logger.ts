@@ -3,7 +3,10 @@ type LogLevel = "debug" | "info" | "warn" | "error";
 type LogFields = Record<string, unknown>;
 
 const SERVICE_NAME = "nutsnews-web";
-const DEFAULT_ENVIRONMENT = process.env.NEXT_PUBLIC_APP_ENV ?? "production";
+const DEFAULT_ENVIRONMENT =
+    process.env.NUTSNEWS_RUNTIME_ENV ??
+    process.env.NEXT_PUBLIC_APP_ENV ??
+    "unknown";
 const DEFAULT_INFO_SAMPLE_RATE = 0.05;
 
 function getInfoSampleRate() {
