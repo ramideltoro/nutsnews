@@ -822,6 +822,11 @@ async function testSearchContract() {
     "@/lib/cacheHeaders": cacheHeadersMock,
     "@/lib/languages": languagesMock,
     "@/lib/logger": loggerMock,
+    "@/lib/runtimeFeatureFlags": {
+      async isRuntimeFeatureFlagEnabled() {
+        return true;
+      },
+    },
   });
   assertMethodExports(searchRoute, ["GET"], "/api/search");
 
