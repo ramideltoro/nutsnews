@@ -1,5 +1,9 @@
 import Image from "next/image";
+import { unstable_cache } from "next/cache";
 
+// The immutable image is built with neutral data fixtures, so the page shell
+// must be rendered by the running target instead of being prerendered empty.
+export const dynamic = "force-dynamic";
 export const revalidate = 900;
 
 import { ArticleFeed } from "./components/ArticleFeed";
@@ -9,9 +13,15 @@ import { SiteFooter } from "./components/SiteFooter";
 import { SITE_URL } from "@/lib/articles";
 import { getHomeFeedDataWithEdgeFallback } from "@/lib/edgeFeedSnapshot";
 
+const getCachedHomeFeed = unstable_cache(
+  async () => getHomeFeedDataWithEdgeFallback(),
+  ["homepage-initial-feed"],
+  { revalidate: 900 },
+);
+
 export default async function Home() {
   const { articles, nextPage, nextCursor, sections } =
-    await getHomeFeedDataWithEdgeFallback();
+    await getCachedHomeFeed();
 
   const homeJsonLd = {
     "@context": "https://schema.org",
