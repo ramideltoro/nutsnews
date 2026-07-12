@@ -1,0 +1,376 @@
+name: Container Image
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: container-image-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-test:
+    name: Build and smoke-test production image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Build and smoke-test without production services
+        env:
+          BUILD_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          IMAGE_TAG: nutsnews-ci:${{ github.sha }}
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE' &
+          import http from "node:http";
+
+          const server = http.createServer((request, response) => {
+            if (request.method === "OPTIONS") {
+              response.writeHead(204, {
+                "Access-Control-Allow-Headers": "authorization, apikey, content-type",
+                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS, POST",
+                "Access-Control-Allow-Origin": "*",
+              });
+              response.end();
+              return;
+            }
+
+            if (request.url?.startsWith("/rest/v1/")) {
+              response.writeHead(200, {
+                "Access-Control-Allow-Origin": "*",
+                "Content-Range": "0-0/0",
+                "Content-Type": "application/json",
+              });
+              response.end("[]");
+              return;
+            }
+
+            response.writeHead(404, { "Content-Type": "application/json" });
+            response.end('{"error":"fixture route not found"}');
+          });
+
+          server.listen(54321, "0.0.0.0");
+          NODE
+
+          fixture_pid=$!
+          container_id=""
+
+          cleanup() {
+            if [[ -n "$container_id" ]]; then
+              docker rm -f "$container_id" >/dev/null 2>&1 || true
+            fi
+            kill "$fixture_pid" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          docker build \
+            --add-host host.docker.internal:host-gateway \
+            --build-arg SOURCE_REPOSITORY="https://github.com/${GITHUB_REPOSITORY}" \
+            --build-arg NUTSNEWS_SOURCE_COMMIT="$SOURCE_COMMIT" \
+            --build-arg NUTSNEWS_BUILD_ID="$BUILD_ID" \
+            --build-arg NUTSNEWS_DEPLOYMENT_TARGET="ci-container" \
+            --build-arg NEXT_PUBLIC_SUPABASE_URL="http://host.docker.internal:54321" \
+            --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="ci-public-anon-key" \
+            --build-arg NEXT_PUBLIC_APP_ENV="ci" \
+            --tag "$IMAGE_TAG" \
+            web
+
+          container_id="$(docker run --detach \
+            --add-host host.docker.internal:host-gateway \
+            --publish 127.0.0.1:3000:3000 \
+            "$IMAGE_TAG")"
+
+          for attempt in $(seq 1 30); do
+            : "$attempt"
+            health_status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' "$container_id")"
+            if [[ "$health_status" == "healthy" ]]; then
+              break
+            fi
+            if [[ "$health_status" == "unhealthy" ]]; then
+              docker logs "$container_id"
+              exit 1
+            fi
+            sleep 2
+          done
+
+          if [[ "$(docker inspect --format '{{.State.Health.Status}}' "$container_id")" != "healthy" ]]; then
+            docker logs "$container_id"
+            exit 1
+          fi
+
+          node scripts/dual_target_web_smoke.mjs \
+            --base-url http://127.0.0.1:3000 \
+            --expected-source-commit "$SOURCE_COMMIT" \
+            --expected-build-id "$BUILD_ID" \
+            --expected-deployment-target ci-container
+
+          runtime_uid="$(docker exec "$container_id" node -p 'process.getuid()')"
+          if [[ "$runtime_uid" == "0" ]]; then
+            echo "::error::Container runtime user must not be root"
+            exit 1
+          fi
+
+  release-candidate:
+    name: Release candidate
+    if: always() && github.event_name == 'pull_request'
+    needs: build-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Require a successful image build and smoke test
+        env:
+          BUILD_TEST_RESULT: ${{ needs.build-test.result }}
+        run: |
+          set -euo pipefail
+          if [[ "$BUILD_TEST_RESULT" != "success" ]]; then
+            echo "::error::Build and smoke-test production image concluded $BUILD_TEST_RESULT."
+            exit 1
+          fi
+
+      - name: Checkout the current pull request head
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Verify the checked-out commit is the current pull request head
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          checked_out_sha="$(git rev-parse HEAD)"
+          if [[ "$checked_out_sha" != "$PR_HEAD_SHA" ]]; then
+            echo "::error::Release candidate checked out $checked_out_sha instead of current PR head $PR_HEAD_SHA."
+            exit 1
+          fi
+          echo "Validated release candidate for current PR head $PR_HEAD_SHA."
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Verify release workflow and gate contracts
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          node scripts/production_release_workflow_regression.mjs
+          node scripts/release_candidate_guard.mjs
+          node scripts/main_ruleset_audit_regression.mjs
+          node scripts/immutable_all_tests_guard_regression.mjs
+          node scripts/immutable_all_tests_guard.mjs
+
+      - name: Run actionlint
+        env:
+          ACTIONLINT_VERSION: "1.7.7"
+        run: |
+          set -euo pipefail
+          curl -fsSL -o actionlint.tar.gz "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          tar -xzf actionlint.tar.gz actionlint
+          chmod +x actionlint
+          ./actionlint -color
+
+      - name: Run release-critical web checks
+        working-directory: web
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-public-anon-key
+          NEXT_PUBLIC_APP_ENV: ci
+          AUTH_SECRET: ci-only-auth-secret-not-used-in-production
+          NEXTAUTH_URL: http://localhost:3000
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ci-turnstile-site-key
+          TURNSTILE_SECRET_KEY: ci-turnstile-secret-key
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE' &
+          import http from "node:http";
+
+          const server = http.createServer((request, response) => {
+            if (request.method === "OPTIONS") {
+              response.writeHead(204, {
+                "Access-Control-Allow-Headers": "authorization, apikey, content-type",
+                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS, POST",
+                "Access-Control-Allow-Origin": "*",
+              });
+              response.end();
+              return;
+            }
+
+            if (request.url?.startsWith("/rest/v1/")) {
+              response.writeHead(200, {
+                "Access-Control-Allow-Origin": "*",
+                "Content-Range": "0-0/0",
+                "Content-Type": "application/json",
+              });
+              response.end("[]");
+              return;
+            }
+
+            response.writeHead(404, { "Content-Type": "application/json" });
+            response.end('{"error":"fixture route not found"}');
+          });
+
+          server.listen(54321, "127.0.0.1");
+          NODE
+
+          fixture_pid=$!
+          trap 'kill "$fixture_pid" >/dev/null 2>&1 || true' EXIT
+
+          npm ci
+          npx tsc --noEmit
+          npm run lint
+          npm run test:security-headers
+          npm run build
+
+  publish:
+    name: Publish immutable image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.publish.outputs.digest }}
+      image: ghcr.io/ramideltoro/nutsnews@${{ steps.publish.outputs.digest }}
+      source-commit: ${{ github.sha }}
+      build-id: ${{ github.run_id }}-${{ github.run_attempt }}
+
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_APP_ENV: ${{ vars.NEXT_PUBLIC_APP_ENV || 'production-vps' }}
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+      NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
+      NEXT_PUBLIC_GA_ID: ${{ secrets.NEXT_PUBLIC_GA_ID }}
+      NEXT_PUBLIC_NUTSNEWS_IOS_APP_STORE_URL: ${{ vars.NEXT_PUBLIC_NUTSNEWS_IOS_APP_STORE_URL }}
+
+    steps:
+      - name: Require production public build inputs
+        run: |
+          set -euo pipefail
+          if [[ -z "$NEXT_PUBLIC_SUPABASE_URL" || -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]]; then
+            echo "::error::Publishing requires NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish full-commit tag
+        id: publish
+        uses: docker/build-push-action@v6
+        with:
+          context: web
+          file: web/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/ramideltoro/nutsnews:${{ github.sha }}
+          build-args: |
+            SOURCE_REPOSITORY=https://github.com/${{ github.repository }}
+            NUTSNEWS_SOURCE_COMMIT=${{ github.sha }}
+            NUTSNEWS_BUILD_ID=${{ github.run_id }}-${{ github.run_attempt }}
+            NUTSNEWS_DEPLOYMENT_TARGET=vps
+            NEXT_PUBLIC_SUPABASE_URL=${{ env.NEXT_PUBLIC_SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ env.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+            NEXT_PUBLIC_APP_ENV=${{ env.NEXT_PUBLIC_APP_ENV }}
+            NEXT_PUBLIC_TURNSTILE_SITE_KEY=${{ env.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+            NEXT_PUBLIC_SENTRY_DSN=${{ env.NEXT_PUBLIC_SENTRY_DSN }}
+            NEXT_PUBLIC_GA_ID=${{ env.NEXT_PUBLIC_GA_ID }}
+            NEXT_PUBLIC_NUTSNEWS_IOS_APP_STORE_URL=${{ env.NEXT_PUBLIC_NUTSNEWS_IOS_APP_STORE_URL }}
+          provenance: mode=max
+          sbom: true
+
+      - name: Summarize immutable image
+        env:
+          IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
+        run: |
+          {
+            echo "## NutsNews container image"
+            echo
+            echo "Source commit: \`${GITHUB_SHA}\`"
+            echo "Build ID: \`${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}\`"
+            echo "Immutable image: \`ghcr.io/ramideltoro/nutsnews@${IMAGE_DIGEST}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Write production release metadata
+        env:
+          IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
+          RELEASE_METADATA_PATH: ${{ runner.temp }}/nutsnews-production-release/metadata.json
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE'
+          import { mkdirSync, writeFileSync } from "node:fs";
+          import { dirname } from "node:path";
+
+          const digest = process.env.IMAGE_DIGEST ?? "";
+          const sourceCommit = process.env.GITHUB_SHA ?? "";
+          const buildId = `${process.env.GITHUB_RUN_ID ?? ""}-${process.env.GITHUB_RUN_ATTEMPT ?? ""}`;
+          const metadataPath = process.env.RELEASE_METADATA_PATH ?? "";
+
+          if (!/^[0-9a-f]{40}$/.test(sourceCommit)) {
+            throw new Error("GITHUB_SHA must be a full commit SHA before release metadata is written.");
+          }
+          if (!/^sha256:[0-9a-f]{64}$/.test(digest)) {
+            throw new Error("Published image digest must be an immutable sha256 digest.");
+          }
+          if (!/^\d+-\d+$/.test(buildId) || !metadataPath) {
+            throw new Error("Release metadata requires a valid build ID and output path.");
+          }
+
+          const imageRepository = "ghcr.io/ramideltoro/nutsnews";
+          const release = {
+            source_commit: sourceCommit,
+            build_id: buildId,
+            deployment_target: "vps",
+            image_repository: imageRepository,
+            image_tag: sourceCommit,
+            image_digest: digest,
+            image: `${imageRepository}@${digest}`,
+          };
+
+          mkdirSync(dirname(metadataPath), { recursive: true });
+          writeFileSync(metadataPath, `${JSON.stringify(release, null, 2)}\n`, "utf8");
+          NODE
+
+      - name: Upload production release metadata
+        uses: actions/upload-artifact@v6
+        with:
+          name: nutsnews-production-release
+          path: ${{ runner.temp }}/nutsnews-production-release/metadata.json
+          if-no-files-found: error
+          retention-days: 7

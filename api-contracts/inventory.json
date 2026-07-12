@@ -1,0 +1,429 @@
+{
+  "schemaVersion": 1,
+  "title": "NutsNews API compatibility inventory",
+  "sourceOfTruth": {
+    "server": "web/app custom route handlers and Next.js metadata response modules",
+    "ios": "ramideltoro/nutsnews-ios first-party URLSession call sites",
+    "contractSuite": "scripts/api_contract_compatibility_regression.mjs"
+  },
+  "scope": {
+    "included": [
+      "all custom route.ts handlers",
+      "Next.js sitemap and robots metadata responses",
+      "Next.js generated Open Graph image responses"
+    ],
+    "excluded": [
+      "static files with no application response handler, such as icon.png and apple-icon.png",
+      "admin HTML/RSC pages and Server Actions, which are protected application views rather than custom API endpoints",
+      "external Worker endpoints consumed internally by edgeFeedSnapshot.ts"
+    ]
+  },
+  "endpoints": [
+    {
+      "id": "articles",
+      "method": ["GET"],
+      "path": "/api/articles",
+      "routeFile": "web/app/api/articles/route.ts",
+      "request": {
+        "body": "none",
+        "query": {
+          "page": "optional number; invalid or negative becomes 0; floored and capped at 1000",
+          "cursor": "optional non-empty opaque cursor; selects cursor pagination unless home=1",
+          "home": "optional; only value 1 selects home-feed mode and overrides cursor",
+          "category": "optional string; blank or all means no category filter",
+          "lang": "optional enum en|fr|ja|de-CH|de|el; invalid values normalize to en",
+          "limit": "accepted but intentionally ignored for backward compatibility; the fixed offset page size is 5"
+        }
+      },
+      "auth": "public; no authentication or authorization is required",
+      "successStatus": [200],
+      "successResponseShape": {
+        "contentType": "application/json",
+        "requiredKeys": ["articles", "nextPage", "nextCursor", "dataSource", "languageCode"],
+        "article": {
+          "required": {
+            "id": "string",
+            "source": "string",
+            "title": "string",
+            "original_url": "string",
+            "language_code": "string",
+            "requested_language_code": "string",
+            "translation_available": "boolean"
+          },
+          "nullable": {
+            "image_url": "string|null",
+            "published_at": "string|null",
+            "published_on_site_at": "string|null",
+            "ai_summary": "string|null",
+            "category": "string|null",
+            "positivity_score": "number|null"
+          }
+        },
+        "enums": {
+          "dataSource": ["public_feed_snapshot", "articles_fallback", "edge_feed_snapshot"],
+          "languageCode": ["en", "fr", "ja", "de-CH", "de", "el"]
+        },
+        "homeMode": {
+          "additionalRequiredKey": "sections",
+          "sectionIdsInOrder": ["community", "animals", "science", "wellness", "travel", "culture", "achievements"]
+        }
+      },
+      "errorStatuses": [500],
+      "errorShape": {
+        "requiredKeys": ["articles", "nextPage", "nextCursor", "error"],
+        "articles": "[]",
+        "nextPage": null,
+        "nextCursor": null,
+        "homeModeAdditionalRequiredKey": "sections"
+      },
+      "pagination": {
+        "offset": "nextPage is number|null; offset ordering is source-defined and must remain stable for a response sequence",
+        "cursor": "nextCursor is string|null; cursor requests retain nextPage:null",
+        "home": "home=1 is a non-paginated combined payload; nextCursor may be present for compatibility"
+      },
+      "cache": "public JSON cache; route emits Cache-Control, CDN cache headers, and X-NutsNews article metadata headers",
+      "iosCallSites": [
+        {
+          "consumer": "main feed",
+          "repository": "ramideltoro/nutsnews-ios",
+          "file": "NutsNews/NutsNews/Networking/NutsNewsAPIClient.swift",
+          "lines": "42-73, 121-142",
+          "assumptions": "GET with page and optional category; 2xx JSON; articles array and numeric|null nextPage; 15-minute local cache with stale fallback"
+        },
+        {
+          "consumer": "feed pagination",
+          "repository": "ramideltoro/nutsnews-ios",
+          "file": "NutsNews/NutsNews/Features/Feed/ArticleFeedViewModel.swift",
+          "lines": "40-85",
+          "assumptions": "requests exactly the numeric nextPage returned by the server and ignores nextCursor"
+        },
+        {
+          "consumer": "widget",
+          "repository": "ramideltoro/nutsnews-ios",
+          "file": "NutsNews/NutsNewsWidget/NutsNewsWidget.swift",
+          "lines": "152-202",
+          "assumptions": "GET page=0&limit=5; consumes the first article; 2xx JSON; URLSession cache policy returnCacheDataElseLoad"
+        }
+      ],
+      "testFile": "scripts/api_contract_compatibility_regression.mjs"
+    },
+    {
+      "id": "home-feed",
+      "method": ["GET"],
+      "path": "/api/home-feed",
+      "routeFile": "web/app/api/home-feed/route.ts",
+      "request": {
+        "body": "none",
+        "query": {
+          "lang": "optional enum en|fr|ja|de-CH|de|el; invalid values normalize to en"
+        }
+      },
+      "auth": "public; no authentication or authorization is required",
+      "successStatus": [200],
+      "successResponseShape": {
+        "contentType": "application/json",
+        "requiredKeys": ["articles", "nextPage", "nextCursor", "dataSource", "languageCode", "sections"],
+        "article": "same article shape as /api/articles",
+        "sections": "array of { id: community|animals|science|wellness|travel|culture|achievements, articles: Article[] }"
+      },
+      "errorStatuses": [500],
+      "errorShape": {
+        "requiredKeys": ["articles", "nextPage", "nextCursor", "sections", "error"],
+        "articles": [],
+        "nextPage": null,
+        "nextCursor": null,
+        "sections": []
+      },
+      "pagination": "combined home response; client can use nextCursor/nextPage only as supplied by the underlying feed result",
+      "cache": "public home-feed cache with X-NutsNews-Cache-Policy marker",
+      "iosCallSites": [],
+      "testFile": "scripts/api_contract_compatibility_regression.mjs"
+    },
+    {
+      "id": "search",
+      "method": ["GET"],
+      "path": "/api/search",
+      "routeFile": "web/app/api/search/route.ts",
+      "request": {
+        "body": "none",
+        "query": {
+          "q": "optional string; whitespace normalized and capped at 80 characters; fewer than two characters returns an empty 200 response",
+          "page": "optional number; invalid or negative becomes 0; floored and capped at 1000",
+          "limit": "optional number; default 20, clamped to 1..50",
+          "lang": "optional enum en|fr|ja|de-CH|de|el; invalid values normalize to en"
+        }
+      },
+      "auth": "public; no authentication or authorization is required",
+      "successStatus": [200],
+      "successResponseShape": {
+        "contentType": "application/json",
+        "requiredKeys": ["articles", "nextPage", "query", "page", "pageSize", "languageCode"],
+        "article": "same article shape as /api/articles",
+        "pagination": "nextPage:number|null; page:number; pageSize:number"
+      },
+      "errorStatuses": [500],
+      "errorShape": {
+        "requiredKeys": ["articles", "nextPage", "query", "page", "pageSize", "languageCode", "error"],
+        "articles": [],
+        "nextPage": null
+      },
+      "pagination": "offset only; nextPage is numeric continuation or null",
+      "cache": "public 60-second CDN search cache with X-NutsNews-Search-Fields marker",
+      "iosCallSites": [
+        {
+          "consumer": "archive search",
+          "repository": "ramideltoro/nutsnews-ios",
+          "file": "NutsNews/NutsNews/Networking/NutsNewsAPIClient.swift",
+          "lines": "78-117, 144-160",
+          "assumptions": "GET q/page/limit; 2xx JSON; articles array and numeric|null nextPage; five-minute local cache with stale fallback"
+        },
+        {
+          "consumer": "archive search pagination",
+          "repository": "ramideltoro/nutsnews-ios",
+          "file": "NutsNews/NutsNews/Features/Search/ArchiveSearchView.swift",
+          "lines": "47-85",
+          "assumptions": "uses nextPage as the only continuation signal"
+        }
+      ],
+      "testFile": "scripts/api_contract_compatibility_regression.mjs"
+    },
+    {
+      "id": "contact",
+      "method": ["POST"],
+      "path": "/api/contact",
+      "routeFile": "web/app/api/contact/route.ts",
+      "request": {
+        "headers": {
+          "Content-Type": "must include application/json",
+          "Origin": "when supplied, must be an allowed contact origin",
+          "cf-connecting-ip|x-forwarded-for|x-real-ip": "optional source for contact rate-limit key"
+        },
+        "body": {
+          "email": "required valid email string, maximum 320 characters",
+          "message": "required string, 10..4000 characters",
+          "turnstileToken": "required string, maximum 2048 characters",
+          "website": "optional honeypot string; nonempty returns success without provider requests"
+        }
+      },
+      "auth": "public; anti-abuse uses origin validation, Turnstile, and rate limiting rather than user authentication",
+      "successStatus": [200],
+      "successResponseShape": {
+        "contentType": "application/json",
+        "requiredKeys": ["ok"],
+        "ok": true
+      },
+      "errorStatuses": [400, 403, 413, 415, 429, 502, 503],
+      "errorShape": {
+        "requiredKeys": ["error"],
+        "error": "string",
+        "rateLimitHeaders": {
+          "429": ["Retry-After"]
+        }
+      },
+      "pagination": "none",
+      "cache": "bypass/no-store on every response",
+      "iosCallSites": [],
+      "testFile": "scripts/api_contract_compatibility_regression.mjs"
+    },
+    {
+      "id": "auth",
+      "method": ["GET", "POST"],
+      "path": "/api/auth/[...nextauth]",
+      "routeFile": "web/app/api/auth/[...nextauth]/route.ts",
+      "request": {
+        "pathParameters": "NextAuth catch-all paths such as signin, callback, session, csrf, and signout",
+        "body": "framework-managed by NextAuth for POST flows"
+      },
+      "auth": "Google OAuth; only configured ADMIN_EMAILS (or the default administrator email) may establish an admin session; session strategy is JWT",
+      "successStatus": [200, 302],
+      "successResponseShape": "NextAuth-managed HTML, redirects, and JSON responses; route delegates GET and POST without serialization changes",
+      "errorStatuses": [400, 401, 403],
+      "errorShape": "NextAuth-managed response shape; no-store headers are configured",
+      "pagination": "none",
+      "cache": "bypass/no-store",
+      "iosCallSites": [],
+      "testFile": "scripts/api_contract_compatibility_regression.mjs"
+    },
+    {
+      "id": "log-test",
+      "method": ["GET"],
+      "path": "/api/log-test",
+      "routeFile": "web/app/api/log-test/route.ts",
+      "request": {
+        "body": "none",
+        "query": "none"
+      },
+      "auth": "public; no authentication is currently enforced",
+      "successStatus": [200],
+      "successResponseShape": {
+        "contentType": "application/json",
+        "requiredKeys": ["ok", "message", "searchInBetterStackFor"],
+        "searchInBetterStackFor": {
+          "requiredKeys": ["service", "event", "level"],
+          "fields": "strings"
+        }
+      },
+      "errorStatuses": [],
+      "errorShape": "No application-defined error response; logger failures propagate to the framework.",
+      "pagination": "none",
+      "cache": "bypass/no-store",
+      "iosCallSites": [],
+      "testFile": "scripts/api_contract_compatibility_regression.mjs"
+    },
+    {
+      "id": "healthz",
+      "method": ["GET"],
+      "path": "/healthz",
+      "routeFile": "web/app/healthz/route.ts",
+      "request": {
+        "body": "none",
+        "query": "none"
+      },
+      "auth": "public; intended for external uptime monitoring",
+      "successStatus": [200],
+      "successResponseShape": {
+        "contentType": "application/json",
+        "requiredKeys": ["ok", "service", "sourceCommit", "buildId", "deploymentTarget"],
+        "fields": {
+          "ok": true,
+          "service": "nutsnews-web",
+          "sourceCommit": "sanitized nonempty string",
+          "buildId": "sanitized nonempty string",
+          "deploymentTarget": "sanitized nonempty string"
+        }
+      },
+      "errorStatuses": [],
+      "errorShape": "No application-defined error response.",
+      "pagination": "none",
+      "cache": "public CDN cache, including X-NutsNews-Source-Commit, X-NutsNews-Build-Id, and X-NutsNews-Deployment-Target headers",
+      "iosCallSites": [],
+      "testFile": "scripts/api_contract_compatibility_regression.mjs"
+    },
+    {
+      "id": "sitemap",
+      "method": ["GET"],
+      "path": "/sitemap.xml",
+      "routeFile": "web/app/sitemap.ts",
+      "request": {
+        "body": "none",
+        "query": "none"
+      },
+      "auth": "public",
+      "successStatus": [200],
+      "successResponseShape": {
+        "contentType": "application/xml",
+        "requiredUrls": ["/", "/apps", "/privacy", "/contact", "/articles/:id"],
+        "entryShape": "URL, lastModified, changeFrequency, priority"
+      },
+      "errorStatuses": [500],
+      "errorShape": "framework-generated if sitemap data loading fails",
+      "pagination": "none",
+      "cache": "public sitemap cache",
+      "iosCallSites": [],
+      "testFile": "scripts/api_contract_compatibility_regression.mjs"
+    },
+    {
+      "id": "about-sitemap",
+      "method": ["GET"],
+      "path": "/about/sitemap.xml",
+      "routeFile": "web/app/about/sitemap.ts",
+      "request": {
+        "body": "none",
+        "query": "none"
+      },
+      "auth": "public",
+      "successStatus": [200],
+      "successResponseShape": {
+        "contentType": "application/xml",
+        "requiredUrls": ["/", "/about", "/articles/:id"],
+        "entryShape": "URL, lastModified, changeFrequency, priority"
+      },
+      "errorStatuses": [500],
+      "errorShape": "framework-generated if sitemap data loading fails",
+      "pagination": "none",
+      "cache": "Next.js metadata cache behavior",
+      "iosCallSites": [],
+      "testFile": "scripts/api_contract_compatibility_regression.mjs"
+    },
+    {
+      "id": "robots",
+      "method": ["GET"],
+      "path": "/robots.txt",
+      "routeFile": "web/app/robots.ts",
+      "request": {
+        "body": "none",
+        "query": "none"
+      },
+      "auth": "public",
+      "successStatus": [200],
+      "successResponseShape": {
+        "contentType": "text/plain",
+        "requiredRules": {
+          "userAgent": "*",
+          "allow": "/",
+          "disallow": ["/api/"]
+        },
+        "sitemap": "https://www.nutsnews.com/sitemap.xml"
+      },
+      "errorStatuses": [],
+      "errorShape": "No application-defined error response.",
+      "pagination": "none",
+      "cache": "public robots cache",
+      "iosCallSites": [],
+      "testFile": "scripts/api_contract_compatibility_regression.mjs"
+    },
+    {
+      "id": "site-opengraph-image",
+      "method": ["GET"],
+      "path": "/opengraph-image",
+      "routeFile": "web/app/opengraph-image.tsx",
+      "request": {
+        "body": "none",
+        "query": "none"
+      },
+      "auth": "public",
+      "successStatus": [200],
+      "successResponseShape": {
+        "contentType": "image/png",
+        "metadata": {
+          "alt": "NutsNews social preview image",
+          "size": "OG_IMAGE_SIZE"
+        }
+      },
+      "errorStatuses": [500],
+      "errorShape": "framework-generated if image generation fails",
+      "pagination": "none",
+      "cache": "public Open Graph image cache",
+      "iosCallSites": [],
+      "testFile": "scripts/api_contract_compatibility_regression.mjs"
+    },
+    {
+      "id": "article-opengraph-image",
+      "method": ["GET"],
+      "path": "/articles/:id/opengraph-image",
+      "routeFile": "web/app/articles/[id]/opengraph-image.tsx",
+      "request": {
+        "pathParameters": {
+          "id": "article identifier; current image implementation uses a generic article preview and does not load the record"
+        },
+        "body": "none",
+        "query": "none"
+      },
+      "auth": "public",
+      "successStatus": [200],
+      "successResponseShape": {
+        "contentType": "image/png",
+        "metadata": {
+          "alt": "NutsNews article social preview image",
+          "size": "OG_IMAGE_SIZE"
+        }
+      },
+      "errorStatuses": [500],
+      "errorShape": "framework-generated if image generation fails",
+      "pagination": "none",
+      "cache": "public article Open Graph image cache",
+      "iosCallSites": [],
+      "testFile": "scripts/api_contract_compatibility_regression.mjs"
+    }
+  ]
+}

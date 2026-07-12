@@ -1,0 +1,32 @@
+name: Main ruleset audit
+
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Audit protected main ruleset
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      # Configure this repository secret with a fine-grained token limited to
+      # this repository and Administration: read. It is intentionally not
+      # available to pull-request workflows or application code.
+      - name: Audit live GitHub ruleset settings
+        env:
+          NUTSNEWS_RULESET_AUDIT_TOKEN: ${{ secrets.NUTSNEWS_RULESET_AUDIT_TOKEN }}
+        run: node scripts/main_ruleset_audit.mjs

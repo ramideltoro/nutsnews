@@ -1,0 +1,50 @@
+name: API Contract Compatibility
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "supabase/**"
+      - "scripts/**"
+      - "api-contracts/**"
+      - ".github/workflows/api-contracts.yml"
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "supabase/**"
+      - "scripts/**"
+      - "api-contracts/**"
+      - ".github/workflows/api-contracts.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  api-contracts:
+    name: API compatibility regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run API contract compatibility suite
+        run: npm run test:api-contracts
