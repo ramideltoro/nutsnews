@@ -74,6 +74,17 @@ test("runtime public configuration rejects invalid URLs and unknown identities",
   assert.equal(config.telemetryEnabled, false);
 });
 
+test("staging configuration fails closed when live side effects are requested", () => {
+  const config = getRuntimePublicConfig({
+    NUTSNEWS_RUNTIME_ENV: "staging",
+    NUTSNEWS_SIDE_EFFECTS_MODE: "live",
+  });
+
+  assert.equal(config.runtimeEnv, "staging");
+  assert.equal(config.sideEffectsMode, "disabled");
+  assert.equal(config.telemetryEnabled, false);
+});
+
 test("browser entries and immutable image inputs do not embed runtime public values", async () => {
   const [dockerfile, workflow, contactForm, layout, instrumentation, route] = await Promise.all([
     readFile(resolve(root, "web/Dockerfile"), "utf8"),

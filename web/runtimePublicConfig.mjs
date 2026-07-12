@@ -55,14 +55,20 @@ function runtimeEnv(env) {
   return RUNTIME_ENVS.has(candidate) ? candidate : "unknown";
 }
 
-function sideEffectsMode(env) {
+function sideEffectsMode(env, resolvedRuntimeEnv) {
   const candidate = value(
     env,
     "NUTSNEWS_SIDE_EFFECTS_MODE",
     "NUTSNEWS_PUBLIC_SIDE_EFFECTS_MODE",
   );
 
-  return SIDE_EFFECTS_MODES.has(candidate) ? candidate : "disabled";
+  if (!SIDE_EFFECTS_MODES.has(candidate)) {
+    return "disabled";
+  }
+
+  return resolvedRuntimeEnv === "production" || candidate !== "live"
+    ? candidate
+    : "disabled";
 }
 
 /**
@@ -75,7 +81,7 @@ function sideEffectsMode(env) {
  */
 export function getRuntimePublicConfig(env = process.env) {
   const resolvedRuntimeEnv = runtimeEnv(env);
-  const resolvedSideEffectsMode = sideEffectsMode(env);
+  const resolvedSideEffectsMode = sideEffectsMode(env, resolvedRuntimeEnv);
   const sourceCommit = identityValue(
     env,
     "unknown",
