@@ -319,6 +319,11 @@ async function testSearchApiContract() {
     "@/lib/cacheHeaders": cacheHeadersMock,
     "@/lib/languages": languagesMock,
     "@/lib/logger": loggerMock,
+    "@/lib/runtimeFeatureFlags": {
+      async isRuntimeFeatureFlagEnabled() {
+        return true;
+      },
+    },
   });
 
   const emptyResponse = await searchRoute.GET(

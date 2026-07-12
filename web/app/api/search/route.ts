@@ -4,8 +4,10 @@ import { SEARCH_PAGE_SIZE, searchPublishedArticles } from "@/lib/articles";
 import { BYPASS_CACHE_HEADERS } from "@/lib/cacheHeaders";
 import { normalizeLanguageCode } from "@/lib/languages";
 import { logError, logInfoSampled } from "@/lib/logger";
+import { isRuntimeFeatureFlagEnabled } from "@/lib/runtimeFeatureFlags";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const MAX_SAFE_SEARCH_PAGE = 1000;
 
@@ -51,6 +53,23 @@ export async function GET(request: Request) {
   const limit = parseLimit(searchParams.get("limit"));
   const languageCode = normalizeLanguageCode(searchParams.get("lang"));
 
+  if (!(await isRuntimeFeatureFlagEnabled("reader_archive_search"))) {
+    return NextResponse.json(
+      {
+        articles: [],
+        nextPage: null,
+        query,
+        page,
+        pageSize: limit,
+        languageCode,
+        error: "Archive search is temporarily unavailable",
+      },
+      {
+        status: 503,
+        headers: BYPASS_CACHE_HEADERS,
+      },
+    );
+  }
 
   try {
     const result = await searchPublishedArticles(query, page, limit, languageCode);

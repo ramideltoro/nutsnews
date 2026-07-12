@@ -208,6 +208,14 @@ export default async function AdminPage() {
             />
 
             <DashboardCard
+              eyebrow="Launch Safety"
+              title="Runtime Feature Flags"
+              description="See the read-only state, documented safe default, and purpose of each server-controlled runtime flag."
+              href="/admin/feature-flags"
+              status="Live"
+            />
+
+            <DashboardCard
               eyebrow="Resiliency"
               title="Edge Snapshot"
               description="Check the Cloudflare KV last-known-good public feed fallback, snapshot age, article count, and endpoint readiness."
