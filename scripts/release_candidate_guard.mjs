@@ -34,6 +34,7 @@ assert.doesNotMatch(
 );
 requireText(containerWorkflow, "name: Release candidate", "The required status check must be named exactly Release candidate.");
 requireText(containerWorkflow, "needs: build-test", "Release candidate must depend on the image build and smoke test.");
+requirePattern(candidateJob, /permissions:\n\s+contents: read/, "Release candidate must use only read-only repository contents access.");
 requireText(
   containerWorkflow,
   "if: always() && github.event_name == 'pull_request'",
@@ -71,7 +72,7 @@ requireText(
 );
 requireText(candidateJob, "./actionlint -color", "Release candidate must lint workflow changes.");
 assert.doesNotMatch(candidateJob, /pull_request_target:|workflow_run:/, "Release candidate must not use privileged PR triggers.");
-assert.doesNotMatch(candidateJob, /contents:\s*write|pull-requests:\s*write/, "Release candidate must keep token permissions read-only.");
+assert.doesNotMatch(candidateJob, /pull-requests:|contents:\s*write/, "Release candidate must not request unnecessary token permissions.");
 assert.doesNotMatch(candidateJob, /secrets\./, "Release candidate must not read repository secrets.");
 
 requireText(auditWorkflow, "name: Main ruleset audit", "Ruleset audit workflow must remain identifiable.");
