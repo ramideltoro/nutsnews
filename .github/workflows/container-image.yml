@@ -124,6 +124,127 @@ jobs:
             exit 1
           fi
 
+  release-candidate:
+    name: Release candidate
+    if: always() && github.event_name == 'pull_request'
+    needs: build-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Require a successful image build and smoke test
+        env:
+          BUILD_TEST_RESULT: ${{ needs.build-test.result }}
+        run: |
+          set -euo pipefail
+          if [[ "$BUILD_TEST_RESULT" != "success" ]]; then
+            echo "::error::Build and smoke-test production image concluded $BUILD_TEST_RESULT."
+            exit 1
+          fi
+
+      - name: Checkout the current pull request head
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Verify the checked-out commit is the current pull request head
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          checked_out_sha="$(git rev-parse HEAD)"
+          if [[ "$checked_out_sha" != "$PR_HEAD_SHA" ]]; then
+            echo "::error::Release candidate checked out $checked_out_sha instead of current PR head $PR_HEAD_SHA."
+            exit 1
+          fi
+          echo "Validated release candidate for current PR head $PR_HEAD_SHA."
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Verify release workflow and gate contracts
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          node scripts/production_release_workflow_regression.mjs
+          node scripts/release_candidate_guard.mjs
+          node scripts/main_ruleset_audit_regression.mjs
+          node scripts/immutable_all_tests_guard_regression.mjs
+          node scripts/immutable_all_tests_guard.mjs
+
+      - name: Run actionlint
+        env:
+          ACTIONLINT_VERSION: "1.7.7"
+        run: |
+          set -euo pipefail
+          curl -fsSL -o actionlint.tar.gz "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          tar -xzf actionlint.tar.gz actionlint
+          chmod +x actionlint
+          ./actionlint -color
+
+      - name: Run release-critical web checks
+        working-directory: web
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-public-anon-key
+          NEXT_PUBLIC_APP_ENV: ci
+          AUTH_SECRET: ci-only-auth-secret-not-used-in-production
+          NEXTAUTH_URL: http://localhost:3000
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ci-turnstile-site-key
+          TURNSTILE_SECRET_KEY: ci-turnstile-secret-key
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE' &
+          import http from "node:http";
+
+          const server = http.createServer((request, response) => {
+            if (request.method === "OPTIONS") {
+              response.writeHead(204, {
+                "Access-Control-Allow-Headers": "authorization, apikey, content-type",
+                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS, POST",
+                "Access-Control-Allow-Origin": "*",
+              });
+              response.end();
+              return;
+            }
+
+            if (request.url?.startsWith("/rest/v1/")) {
+              response.writeHead(200, {
+                "Access-Control-Allow-Origin": "*",
+                "Content-Range": "0-0/0",
+                "Content-Type": "application/json",
+              });
+              response.end("[]");
+              return;
+            }
+
+            response.writeHead(404, { "Content-Type": "application/json" });
+            response.end('{"error":"fixture route not found"}');
+          });
+
+          server.listen(54321, "127.0.0.1");
+          NODE
+
+          fixture_pid=$!
+          trap 'kill "$fixture_pid" >/dev/null 2>&1 || true' EXIT
+
+          npm ci
+          npx tsc --noEmit
+          npm run lint
+          npm run test:security-headers
+          npm run build
+
   publish:
     name: Publish immutable image
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
