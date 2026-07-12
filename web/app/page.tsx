@@ -1,4 +1,6 @@
 import Image from "next/image";
+import { unstable_cache } from "next/cache";
+import { connection } from "next/server";
 
 export const revalidate = 900;
 
@@ -9,9 +11,22 @@ import { SiteFooter } from "./components/SiteFooter";
 import { SITE_URL } from "@/lib/articles";
 import { getHomeFeedDataWithEdgeFallback } from "@/lib/edgeFeedSnapshot";
 
+const getCachedHomeFeed = unstable_cache(
+  async () => getHomeFeedDataWithEdgeFallback(),
+  ["homepage-initial-feed"],
+  { revalidate: 900 },
+);
+
 export default async function Home() {
+  // The immutable container image is built with neutral fixtures. Defer this
+  // route only outside Vercel so the running image reads its target's feed,
+  // while Vercel retains its established prerender/ISR behavior.
+  if (process.env.VERCEL !== "1") {
+    await connection();
+  }
+
   const { articles, nextPage, nextCursor, sections } =
-    await getHomeFeedDataWithEdgeFallback();
+    await getCachedHomeFeed();
 
   const homeJsonLd = {
     "@context": "https://schema.org",

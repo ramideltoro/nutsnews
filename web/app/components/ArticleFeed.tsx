@@ -646,7 +646,10 @@ export function ArticleFeed({
     const initialRefreshTimer = window.setTimeout(() => {
       setSelectedLanguage(storedLanguage);
 
-      if (storedLanguage !== DEFAULT_LANGUAGE_CODE) {
+      if (
+        storedLanguage !== DEFAULT_LANGUAGE_CODE ||
+        initialEnglishArticlesRef.current.length === 0
+      ) {
         void loadLocalizedHomeFeed(storedLanguage);
       }
     }, 0);

@@ -86,13 +86,15 @@ test("staging configuration fails closed when live side effects are requested", 
 });
 
 test("browser entries and immutable image inputs do not embed runtime public values", async () => {
-  const [dockerfile, workflow, contactForm, layout, instrumentation, route] = await Promise.all([
+  const [dockerfile, workflow, contactForm, articleFeed, layout, instrumentation, route, homePage] = await Promise.all([
     readFile(resolve(root, "web/Dockerfile"), "utf8"),
     readFile(resolve(root, ".github/workflows/container-image.yml"), "utf8"),
     readFile(resolve(root, "web/app/contact/ContactForm.tsx"), "utf8"),
+    readFile(resolve(root, "web/app/components/ArticleFeed.tsx"), "utf8"),
     readFile(resolve(root, "web/app/layout.tsx"), "utf8"),
     readFile(resolve(root, "web/instrumentation-client.ts"), "utf8"),
     readFile(resolve(root, "web/app/api/runtime-config/route.ts"), "utf8"),
+    readFile(resolve(root, "web/app/page.tsx"), "utf8"),
   ]);
 
   assert.doesNotMatch(dockerfile, /ARG NEXT_PUBLIC_(?:SUPABASE|APP_ENV|TURNSTILE|SENTRY|GA)/);
@@ -102,4 +104,11 @@ test("browser entries and immutable image inputs do not embed runtime public val
   }
   assert.match(route, /force-dynamic/);
   assert.match(route, /no-store/);
+  assert.match(homePage, /process\.env\.VERCEL !== "1"/);
+  assert.match(homePage, /await connection\(\)/);
+  assert.match(homePage, /unstable_cache/);
+  assert.match(homePage, /homepage-initial-feed/);
+  assert.match(homePage, /revalidate: 900/);
+  assert.match(articleFeed, /initialEnglishArticlesRef\.current\.length === 0/);
+  assert.match(articleFeed, /void loadLocalizedHomeFeed\(storedLanguage\)/);
 });
