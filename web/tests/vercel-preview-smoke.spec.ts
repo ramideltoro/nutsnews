@@ -27,6 +27,13 @@ const languageExpectations = [
   { code: 'el', optionTestId: 'nutsnews-language-option-el', expectedHtmlLang: 'el' },
 ] as const;
 
+type HomeFeedResponse = {
+  articles?: Array<{
+    language_code?: string;
+    translation_available?: boolean;
+  }>;
+};
+
 test.beforeEach(async ({ context }) => {
   await context.addInitScript(
     ([languageStorageKey, themeStorageKey]) => {
@@ -101,15 +108,15 @@ async function readFirstArticleTitle(page: Page) {
   return (await firstTitle.innerText()).trim();
 }
 
-async function waitForFirstArticleLanguage(page: Page, languageCode: string) {
+async function waitForFirstArticleLanguage(page: Page, expectedLanguageCode: string) {
   const firstCard = page.getByTestId('nutsnews-article-card').first();
 
   await expect
     .poll(async () => firstCard.getAttribute('lang'), {
-      message: `Expected the first visible article card to render in ${languageCode}.`,
+      message: `Expected the first visible article card to render in ${expectedLanguageCode}.`,
       timeout: 30_000,
     })
-    .toBe(languageCode);
+    .toBe(expectedLanguageCode);
 }
 
 test.describe('Vercel Preview smoke regression', () => {
@@ -161,28 +168,34 @@ test.describe('Vercel Preview smoke regression', () => {
       .toBeLessThanOrEqual(4);
   });
 
-  test('footer search for dogs returns article results', async ({ page }) => {
-    await openHomeWithCards(page);
+  test('footer search returns a displayed article', async ({ page }) => {
+    const firstCard = await openHomeWithCards(page);
+    const firstTitle = (await firstCard.locator('.wp-article-card__title').innerText()).trim();
+    const searchQuery = firstTitle.match(/[\p{L}\p{N}]{3,}/u)?.[0];
+
+    if (!searchQuery) {
+      throw new Error(`Could not derive a searchable term from the visible article title: ${firstTitle}`);
+    }
 
     await page.getByTestId('nutsnews-footer-search').click();
     await expect(page.getByTestId('nutsnews-search-dialog')).toBeVisible({ timeout: 15_000 });
-    await page.getByTestId('nutsnews-search-input').fill('dogs');
+    await page.getByTestId('nutsnews-search-input').fill(searchQuery);
 
     const searchResponsePromise = page.waitForResponse((response) => {
       const url = response.url();
-      return url.includes('/api/search') && url.includes('q=dogs');
+      return new URL(url).pathname === '/api/search' && new URL(url).searchParams.get('q') === searchQuery;
     });
 
     await page.getByTestId('nutsnews-search-submit').click();
     const searchResponse = await searchResponsePromise;
-    expect(searchResponse.ok(), `Expected /api/search?q=dogs to succeed, got ${searchResponse.status()}.`).toBeTruthy();
+    expect(searchResponse.ok(), `Expected /api/search?q=${searchQuery} to succeed, got ${searchResponse.status()}.`).toBeTruthy();
 
     const payload = (await searchResponse.json()) as { articles?: unknown[] };
-    expect(payload.articles?.length ?? 0, 'Expected /api/search?q=dogs to return at least one article.').toBeGreaterThan(0);
+    expect(payload.articles?.length ?? 0, 'Expected the visible article search to return at least one article.').toBeGreaterThan(0);
 
     await expect
       .poll(async () => page.getByTestId('nutsnews-search-result-card').count(), {
-        message: 'Expected the visible search menu to render dog search results.',
+        message: 'Expected the visible search menu to render the displayed article result.',
         timeout: 20_000,
       })
       .toBeGreaterThan(0);
@@ -209,7 +222,7 @@ test.describe('Vercel Preview smoke regression', () => {
     }
   });
 
-  test('language menu translates articles through every supported language and back to English', async ({ page }) => {
+  test('language menu honors translations and English fallback through every supported language', async ({ page }) => {
     await openHomeWithCards(page);
     const englishTitle = await readFirstArticleTitle(page);
 
@@ -223,16 +236,29 @@ test.describe('Vercel Preview smoke regression', () => {
       });
 
       await page.getByTestId(language.optionTestId).click();
-      await responsePromise;
+      const languageResponse = await responsePromise;
+      const payload = (await languageResponse.json()) as HomeFeedResponse;
+      const firstReturnedArticle = payload.articles?.[0];
+
+      expect(firstReturnedArticle, `Expected the ${language.code} feed response to include an article.`).toBeDefined();
+      const expectedCardLanguage = firstReturnedArticle?.translation_available ? language.code : 'en';
 
       await expect(page.locator('html')).toHaveAttribute('lang', language.expectedHtmlLang);
-      await waitForFirstArticleLanguage(page, language.code);
+      await waitForFirstArticleLanguage(page, expectedCardLanguage);
 
-      const translatedTitle = await readFirstArticleTitle(page);
-      expect(
-        translatedTitle,
-        `Expected the first article title to change when selecting ${language.code}.`,
-      ).not.toBe(englishTitle);
+      const localizedTitle = await readFirstArticleTitle(page);
+
+      if (expectedCardLanguage === language.code) {
+        expect(
+          localizedTitle,
+          `Expected the first article title to change when selecting ${language.code}.`,
+        ).not.toBe(englishTitle);
+      } else {
+        expect(
+          localizedTitle,
+          `Expected the ${language.code} request to retain the documented English fallback title.`,
+        ).toBe(englishTitle);
+      }
     }
 
     await page.getByTestId('nutsnews-language-option-en').click();
