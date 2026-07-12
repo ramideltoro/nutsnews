@@ -103,7 +103,8 @@ test("browser entries and immutable image inputs do not embed runtime public val
   }
   assert.match(route, /force-dynamic/);
   assert.match(route, /no-store/);
-  assert.match(homePage, /export const dynamic = "force-dynamic"/);
+  assert.match(homePage, /process\.env\.VERCEL !== "1"/);
+  assert.match(homePage, /await connection\(\)/);
   assert.match(homePage, /unstable_cache/);
   assert.match(homePage, /homepage-initial-feed/);
   assert.match(homePage, /revalidate: 900/);

@@ -1,9 +1,7 @@
 import Image from "next/image";
 import { unstable_cache } from "next/cache";
+import { connection } from "next/server";
 
-// The immutable image is built with neutral data fixtures, so the page shell
-// must be rendered by the running target instead of being prerendered empty.
-export const dynamic = "force-dynamic";
 export const revalidate = 900;
 
 import { ArticleFeed } from "./components/ArticleFeed";
@@ -20,6 +18,13 @@ const getCachedHomeFeed = unstable_cache(
 );
 
 export default async function Home() {
+  // The immutable container image is built with neutral fixtures. Defer this
+  // route only outside Vercel so the running image reads its target's feed,
+  // while Vercel retains its established prerender/ISR behavior.
+  if (process.env.VERCEL !== "1") {
+    await connection();
+  }
+
   const { articles, nextPage, nextCursor, sections } =
     await getCachedHomeFeed();
 
