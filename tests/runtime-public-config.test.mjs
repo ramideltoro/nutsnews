@@ -25,6 +25,7 @@ test("runtime public configuration differs by runtime environment without serial
     NUTSNEWS_DEPLOYMENT_TARGET: "vps",
     NUTSNEWS_EXPECTED_IMAGE_DIGEST:
       "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    NUTSNEWS_CONFIG_GENERATION: "staging-config-generation-1",
     SUPABASE_SERVICE_ROLE_KEY: "server-only-staging-secret",
     RESEND_API_KEY: "server-only-resend-secret",
     AUTH_SECRET: "server-only-auth-secret",
@@ -46,6 +47,7 @@ test("runtime public configuration differs by runtime environment without serial
     NUTSNEWS_DEPLOYMENT_TARGET: "vps",
     NUTSNEWS_EXPECTED_IMAGE_DIGEST:
       "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    NUTSNEWS_CONFIG_GENERATION: "production-config-generation-1",
     SUPABASE_SERVICE_ROLE_KEY: "server-only-production-secret",
     RESEND_API_KEY: "server-only-resend-secret",
     AUTH_SECRET: "server-only-auth-secret",
@@ -63,6 +65,7 @@ test("runtime public configuration differs by runtime environment without serial
   assert.equal(staging.sourceCommit, production.sourceCommit);
   assert.equal(staging.buildId, production.buildId);
   assert.equal(staging.expectedImageDigest, production.expectedImageDigest);
+  assert.notEqual(staging.configGeneration, production.configGeneration);
 
   const serialized = JSON.stringify({ staging, production });
   assert.doesNotMatch(serialized, /server-only-(?:staging|production)-secret/);
@@ -87,6 +90,7 @@ test("runtime public configuration rejects invalid URLs and unknown identities",
   assert.equal(config.supabaseUrl, null);
   assert.equal(config.sentryDsn, null);
   assert.equal(config.expectedImageDigest, "unknown");
+  assert.equal(config.configGeneration, "unknown");
   assert.equal(config.telemetryEnabled, false);
 });
 

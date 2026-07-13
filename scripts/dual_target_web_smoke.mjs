@@ -86,6 +86,7 @@ function assertRuntimeConfigIsPublic(config) {
     "buildId",
     "deploymentTarget",
     "expectedImageDigest",
+    "configGeneration",
     "telemetryEnabled",
   ]);
   const unexpectedKeys = Object.keys(config).filter((key) => !expectedKeys.has(key));
@@ -112,9 +113,17 @@ const expectedDeploymentTarget = required(
     process.env.NUTSNEWS_EXPECTED_DEPLOYMENT_TARGET,
   "--expected-deployment-target or NUTSNEWS_EXPECTED_DEPLOYMENT_TARGET",
 );
+const expectedHealthDeploymentTarget =
+  option("--expected-health-deployment-target") ||
+  process.env.NUTSNEWS_EXPECTED_HEALTH_DEPLOYMENT_TARGET ||
+  expectedDeploymentTarget;
 const expectedRuntimeEnv = option("--expected-runtime-env") || process.env.NUTSNEWS_EXPECTED_RUNTIME_ENV;
 const expectedSupabaseUrl = option("--expected-supabase-url") || process.env.NUTSNEWS_EXPECTED_SUPABASE_URL;
 const expectedImageDigest = option("--expected-image-digest") || process.env.NUTSNEWS_EXPECTED_IMAGE_DIGEST;
+const expectedConfigGeneration = required(
+  option("--expected-config-generation") || process.env.NUTSNEWS_EXPECTED_CONFIG_GENERATION,
+  "--expected-config-generation or NUTSNEWS_EXPECTED_CONFIG_GENERATION",
+);
 const expectedSideEffectsMode =
   option("--expected-side-effects-mode") || process.env.NUTSNEWS_EXPECTED_SIDE_EFFECTS_MODE;
 const expectedTurnstileSiteKey =
@@ -138,7 +147,7 @@ if (health?.ok !== true || health?.service !== "nutsnews-web") {
 
 assertEqual(health.sourceCommit, expectedSourceCommit, "Health source commit");
 assertEqual(health.buildId, expectedBuildId, "Health build ID");
-assertEqual(health.deploymentTarget, expectedDeploymentTarget, "Health deployment target");
+assertEqual(health.deploymentTarget, expectedHealthDeploymentTarget, "Health deployment target");
 assertEqual(
   healthResponse.headers.get("x-nutsnews-source-commit"),
   expectedSourceCommit,
@@ -151,9 +160,33 @@ assertEqual(
 );
 assertEqual(
   healthResponse.headers.get("x-nutsnews-deployment-target"),
-  expectedDeploymentTarget,
+  expectedHealthDeploymentTarget,
   "Health deployment target header",
 );
+
+const readinessResponse = await fetchOk(
+  endpoint(baseUrl, `/readyz?cache-bust=${encodeURIComponent(expectedConfigGeneration)}`),
+  "Readiness endpoint",
+);
+const readiness = await readinessResponse.json();
+
+if (readiness?.ok !== true || readiness?.service !== "nutsnews-web" || readiness?.code !== "ready") {
+  throw new Error("Readiness endpoint did not return a qualified runtime response");
+}
+
+if (!/no-store/.test(readinessResponse.headers.get("cache-control") ?? "")) {
+  throw new Error("Readiness endpoint must be no-store");
+}
+
+assertEqual(readiness.runtimeEnv, expectedRuntimeEnv, "Readiness runtime environment");
+assertEqual(readinessResponse.headers.get("x-nutsnews-source-commit"), expectedSourceCommit, "Readiness source commit header");
+assertEqual(readinessResponse.headers.get("x-nutsnews-build-id"), expectedBuildId, "Readiness build ID header");
+assertEqual(readinessResponse.headers.get("x-nutsnews-deployment-target"), expectedDeploymentTarget, "Readiness deployment target header");
+assertEqual(readinessResponse.headers.get("x-nutsnews-runtime-environment"), expectedRuntimeEnv, "Readiness runtime environment header");
+assertEqual(readinessResponse.headers.get("x-nutsnews-config-generation"), expectedConfigGeneration, "Readiness config generation header");
+if (expectedImageDigest) {
+  assertEqual(readinessResponse.headers.get("x-nutsnews-expected-image-digest"), expectedImageDigest, "Readiness image digest header");
+}
 
 if (
   expectedRuntimeEnv ||
@@ -186,6 +219,7 @@ if (
   if (expectedImageDigest) {
     assertEqual(runtimeConfig.expectedImageDigest, expectedImageDigest, "Runtime expected image digest");
   }
+  assertEqual(runtimeConfig.configGeneration, expectedConfigGeneration, "Runtime config generation");
   if (expectedSideEffectsMode) {
     assertEqual(runtimeConfig.sideEffectsMode, expectedSideEffectsMode, "Runtime side-effects mode");
   }
