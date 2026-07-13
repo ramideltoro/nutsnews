@@ -91,7 +91,7 @@ test("migration automation can use approved source files without executing sourc
   assert.equal(getMigrationSourceRoot({ NUTSNEWS_MIGRATION_SOURCE_ROOT: "/tmp/approved-source" }), "/tmp/approved-source");
 });
 
-test("lock failures classify malformed credentials without exposing a connection URL", () => {
+test("lock failures classify malformed connection URLs without exposing a connection URL", () => {
   const protectedUrl = "postgresql://postgres.example:do-not-log-me@pooler.example:5432/postgres";
   const diagnosis = classifyPostgresLockFailure(`psql: error: invalid percent-encoded token in ${protectedUrl}`);
 
