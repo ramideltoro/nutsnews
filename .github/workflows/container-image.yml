@@ -337,6 +337,8 @@ jobs:
 
       - name: Use Supabase CLI
         uses: supabase/setup-cli@v1
+        with:
+          version: 2.105.0
 
       - name: Install disposable database client
         run: |
