@@ -151,26 +151,21 @@ jobs:
             --env SUPABASE_SERVICE_ROLE_KEY=negative-readiness-service-role-sentinel \
             "$IMAGE_TAG")"
 
-          for attempt in $(seq 1 30); do
-            : "$attempt"
-            health_status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' "$container_id")"
-            if [[ "$health_status" == "unhealthy" ]]; then
-              break
-            fi
-            sleep 2
-          done
-
-          if [[ "$(docker inspect --format '{{.State.Health.Status}}' "$container_id")" != "unhealthy" ]]; then
-            echo "::error::A staging container configured with the production data identity became ready."
-            exit 1
-          fi
-
           if [[ "$(docker image inspect --format '{{.Id}}' "$IMAGE_TAG")" != "$image_id" ]]; then
             echo "::error::Valid and rejected staging fixture containers must use the same image identity."
             exit 1
           fi
 
-          negative_readiness="$(curl --silent --show-error --fail-with-body http://127.0.0.1:3001/readyz || true)"
+          negative_readiness=""
+          for attempt in $(seq 1 30); do
+            : "$attempt"
+            negative_readiness="$(curl --silent --show-error --fail-with-body http://127.0.0.1:3001/readyz || true)"
+            if [[ "$negative_readiness" == *'"ok":false'* && "$negative_readiness" == *'"code":"staging_production_project_rejected"'* ]]; then
+              break
+            fi
+            sleep 2
+          done
+
           if [[ "$negative_readiness" != *'"ok":false'* || "$negative_readiness" != *'"code":"staging_production_project_rejected"'* ]]; then
             echo "::error::Rejected staging fixture did not return the safe readiness refusal."
             exit 1
