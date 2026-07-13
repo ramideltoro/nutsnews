@@ -85,6 +85,46 @@ function dedupePageSections(sections, pageArticles) {
   });
 }
 
+function backfillEmptySections(sections, pageArticles, backfillsBySection) {
+  const seenArticleKeys = new Set(
+    pageArticles.map(articleIdentityKey).filter(Boolean),
+  );
+
+  for (const section of sections) {
+    for (const article of section.articles) {
+      const articleKey = articleIdentityKey(article);
+
+      if (articleKey) {
+        seenArticleKeys.add(articleKey);
+      }
+    }
+  }
+
+  return sections.map((section) => {
+    if (section.articles.length > 0) {
+      return section;
+    }
+
+    const uniqueArticles = [];
+
+    for (const article of backfillsBySection.get(section.id) ?? []) {
+      const articleKey = articleIdentityKey(article);
+
+      if (articleKey && seenArticleKeys.has(articleKey)) {
+        continue;
+      }
+
+      uniqueArticles.push(article);
+
+      if (articleKey) {
+        seenArticleKeys.add(articleKey);
+      }
+    }
+
+    return { ...section, articles: uniqueArticles };
+  });
+}
+
 const multiCategoryArticle = {
   id: "story-1",
   original_url: "https://publisher.example/story-1",
@@ -127,6 +167,39 @@ assert.deepEqual(
     "https://publisher.example/story-3",
   ],
   "Dedupe must prefer id, fall back to original_url, and keep legitimate different articles with similar titles.",
+);
+
+const animalArticleOutsideGlobalSnapshotScan = {
+  id: "animal-story-1",
+  original_url: "https://publisher.example/animal-story-1",
+  source: "Publisher",
+  title: "Volunteers reunite a lost dog with its family",
+  published_on_site_at: "2026-07-04T03:00:00Z",
+  category: "Animals | Uplifting",
+};
+
+assert.deepEqual(
+  backfillEmptySections(
+    [
+      { id: "community", articles: [multiCategoryArticle] },
+      { id: "animals", articles: [] },
+    ],
+    [sameUrlWithoutId],
+    new Map([
+      [
+        "animals",
+        [
+          sameUrlDuplicate,
+          animalArticleOutsideGlobalSnapshotScan,
+        ],
+      ],
+    ]),
+  ).map((section) => ({ id: section.id, articleIds: section.articles.map((article) => article.id) })),
+  [
+    { id: "community", articleIds: ["story-1"] },
+    { id: "animals", articleIds: ["animal-story-1"] },
+  ],
+  "An empty category must be backfilled from its filtered snapshot query without duplicating a story already on the page.",
 );
 
 const dedupedSections = dedupePageSections(
@@ -202,6 +275,21 @@ assert.match(
   articlesLib,
   /if \(articleKey && seenArticleKeys\.has\(articleKey\)\) \{[\s\S]*continue;/,
   "Homepage category sections must skip articles already rendered elsewhere on the page.",
+);
+assert.match(
+  articlesLib,
+  /async function backfillEmptyHomeFeedSections\([\s\S]*emptySectionIds\.size === 0/,
+  "Homepage assembly must avoid additional category reads when every bounded snapshot section is populated.",
+);
+assert.match(
+  articlesLib,
+  /getPublishedArticlesForSection\(section\.query, requestedLanguageCode\)/,
+  "An empty homepage category must be backfilled by its filtered snapshot query.",
+);
+assert.match(
+  articlesLib,
+  /const completedSections = await backfillEmptyHomeFeedSections\([\s\S]*sections: completedSections\.map/,
+  "Homepage output must render the backfilled category sections.",
 );
 
 assert.match(

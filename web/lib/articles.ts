@@ -476,6 +476,64 @@ function articleMatchesSection(article: Article, query: string) {
   return article.category?.toLowerCase().includes(query.toLowerCase()) ?? false;
 }
 
+async function backfillEmptyHomeFeedSections(
+  sections: HomeFeedSection[],
+  seenArticleKeys: Set<string>,
+  requestedLanguageCode?: string | null,
+): Promise<HomeFeedSection[]> {
+  const emptySectionIds = new Set(
+    sections
+      .filter((section) => section.articles.length === 0)
+      .map((section) => section.id),
+  );
+
+  if (emptySectionIds.size === 0) {
+    return sections;
+  }
+
+  // The global homepage snapshot scan is deliberately bounded. A category can
+  // still have matching rows outside that window, so query only empty sections
+  // before presenting an empty state to readers.
+  const backfills = await Promise.all(
+    HOME_FEED_SECTIONS.filter((section) => emptySectionIds.has(section.id)).map(
+      async (section) => [
+        section.id,
+        await getPublishedArticlesForSection(section.query, requestedLanguageCode),
+      ] as const,
+    ),
+  );
+  const backfillBySectionId = new Map(backfills);
+
+  return sections.map((section) => {
+    const backfillArticles = backfillBySectionId.get(section.id);
+
+    if (!backfillArticles) {
+      return section;
+    }
+
+    const uniqueArticles: Article[] = [];
+
+    for (const article of backfillArticles) {
+      const articleKey = getArticleIdentityKey(article);
+
+      if (articleKey && seenArticleKeys.has(articleKey)) {
+        continue;
+      }
+
+      uniqueArticles.push(article);
+
+      if (articleKey) {
+        seenArticleKeys.add(articleKey);
+      }
+    }
+
+    return {
+      ...section,
+      articles: uniqueArticles,
+    };
+  });
+}
+
 export async function getHomeFeedFromSnapshot(
   requestedLanguageCode?: string | null,
 ): Promise<HomeFeedPayload | null> {
@@ -532,6 +590,11 @@ export async function getHomeFeedFromSnapshot(
     };
   });
 
+  const completedSections = await backfillEmptyHomeFeedSections(
+    sectionBaseArticles,
+    seenArticleKeys,
+    requestedLanguageCode,
+  );
   const uniqueArticlesByKey = new Map<string, Article>();
 
   for (const article of mainBaseArticles) {
@@ -542,7 +605,7 @@ export async function getHomeFeedFromSnapshot(
     }
   }
 
-  for (const section of sectionBaseArticles) {
+  for (const section of completedSections) {
     for (const article of section.articles) {
       const articleKey = getArticleIdentityKey(article);
 
@@ -578,7 +641,7 @@ export async function getHomeFeedFromSnapshot(
         : null,
     dataSource: "public_feed_snapshot",
     languageCode,
-    sections: sectionBaseArticles.map((section) => ({
+    sections: completedSections.map((section) => ({
       id: section.id,
       articles: section.articles.map(
         (article) => {
