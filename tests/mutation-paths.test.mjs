@@ -63,7 +63,7 @@ test("service-role clients are centralized behind the runtime-validated Supabase
   }
 });
 
-test("the web image has no ingestion schedule and CI fixtures remain non-production", async () => {
+test("the web image has no ingestion schedule, startup migration, and CI fixtures remain non-production", async () => {
   const [dockerfile, webCi, publicSmoke] = await Promise.all([
     readFile(resolve(root, "web/Dockerfile"), "utf8"),
     readFile(resolve(root, ".github/workflows/web-ci.yml"), "utf8"),
@@ -73,20 +73,23 @@ test("the web image has no ingestion schedule and CI fixtures remain non-product
   assert.match(dockerfile, /NUTSNEWS_RUNTIME_ENV=staging/);
   assert.match(dockerfile, /NUTSNEWS_SIDE_EFFECTS_MODE=disabled/);
   assert.doesNotMatch(dockerfile, /(?:cron|crond|supervisord)/i);
+  assert.doesNotMatch(dockerfile, /supabase\s+db\s+(?:push|reset)|locked_migration_workflow/i);
   assert.match(webCi, /NUTSNEWS_RUNTIME_ENV: staging/);
   assert.match(webCi, /NUTSNEWS_SIDE_EFFECTS_MODE: disabled/);
   assert.doesNotMatch(webCi, /secrets\.NEXT_PUBLIC_SUPABASE_URL/);
   assert.match(publicSmoke, /NUTSNEWS_SIDE_EFFECTS_MODE: "disabled"/);
 });
 
-test("the opt-in staging fixture test requires a namespace, TTL, and independent cleanup failure", async () => {
-  const fixture = await readFile(resolve(root, "scripts/staging_fixture_integration.mjs"), "utf8");
+test("the staging fixture commands require synthetic namespaces, bounded TTL, and resettable cleanup", async () => {
+  const fixture = await readFile(resolve(root, "scripts/staging_fixtures.mjs"), "utf8");
 
-  assert.match(fixture, /RUN_STAGING_FIXTURE_INTEGRATION/);
+  assert.match(fixture, /nutsnews-test-/);
   assert.match(fixture, /assertSyntheticFixtureMutation/);
   assert.match(fixture, /fixture_namespace/);
   assert.match(fixture, /expires_at/);
-  assert.match(fixture, /method: "DELETE"/);
+  assert.match(fixture, /fixture\.invalid/);
+  assert.match(fixture, /nutsnews_reset_staging_fixture/);
+  assert.match(fixture, /auth\/v1\/admin\/users/);
   assert.match(fixture, /cleanupFailure/);
   assert.match(fixture, /cleanup failed and requires manual follow-up/);
 });

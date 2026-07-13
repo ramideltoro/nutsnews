@@ -14,7 +14,14 @@ export type RuntimeReadiness = {
 
 type RuntimeReadinessOptions = {
   env?: NodeJS.ProcessEnv;
-  readSchemaVersion?: () => Promise<string | null | undefined> | string | null | undefined;
+  readSchemaContract?: () => Promise<SchemaContract | null | undefined> | SchemaContract | null | undefined;
+};
+
+type SchemaContract = {
+  legacySchemaVersion: string;
+  migrationHead: string;
+  expectedSchemaFingerprint: string;
+  actualSchemaFingerprint: string;
 };
 
 const typedRuntimeReadiness = runtimeReadiness as unknown as {

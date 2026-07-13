@@ -33,7 +33,7 @@ assert.doesNotMatch(
   "Container Image must not path-filter Release candidate away from a pull request.",
 );
 requireText(containerWorkflow, "name: Release candidate", "The required status check must be named exactly Release candidate.");
-requireText(containerWorkflow, "needs: build-test", "Release candidate must depend on the image build and smoke test.");
+requireText(containerWorkflow, "needs: [build-test, migration-gate]", "Release candidate must depend on image and migration gates.");
 requirePattern(candidateJob, /permissions:\n\s+contents: read/, "Release candidate must use only read-only repository contents access.");
 requireText(
   containerWorkflow,
@@ -47,8 +47,18 @@ requireText(
 );
 requireText(
   candidateJob,
+  "MIGRATION_GATE_RESULT: ${{ needs.migration-gate.result }}",
+  "Release candidate must read the migration-gate result from this pull request run.",
+);
+requireText(
+  candidateJob,
   'if [[ "$BUILD_TEST_RESULT" != "success" ]]',
   "Release candidate must fail when its image prerequisite is failed, cancelled, skipped, or missing.",
+);
+requireText(
+  candidateJob,
+  'if [[ "$MIGRATION_GATE_RESULT" != "success" ]]',
+  "Release candidate must fail when migration validation is failed, cancelled, skipped, or missing.",
 );
 requireText(
   candidateJob,
