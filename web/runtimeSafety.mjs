@@ -20,6 +20,7 @@ function isLocalOrTestHost(hostname) {
     hostname === "localhost" ||
     hostname === "127.0.0.1" ||
     hostname === "::1" ||
+    hostname === "host.docker.internal" ||
     hostname.endsWith(".test")
   );
 }

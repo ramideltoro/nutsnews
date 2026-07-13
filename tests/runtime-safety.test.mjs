@@ -114,6 +114,15 @@ test("sandbox permits only isolated endpoints and isolated staging writes", () =
   assert.doesNotThrow(() => assertSyntheticFixtureMutation("nutsnews-test-sandbox-fixture", environment));
 });
 
+test("staging recognizes Docker's isolated fixture hostname without allowing production access", () => {
+  const environment = stagingEnvironment({
+    NUTSNEWS_PUBLIC_SUPABASE_URL: "http://host.docker.internal:54321",
+  });
+
+  assert.equal(getRuntimeSafetyPolicy(environment).ready, true);
+  assert.doesNotThrow(() => assertDataRead("container-fixture-reader", environment));
+});
+
 test("only live production can perform production mutations", () => {
   assert.doesNotThrow(() => assertDataMutation("admin-feed", productionEnvironment()));
   assert.throws(
