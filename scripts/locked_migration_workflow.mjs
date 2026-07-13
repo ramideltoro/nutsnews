@@ -7,6 +7,7 @@ import { getMigrationContract } from "./migration_contract.mjs";
 
 const LOCK_SQL = "SELECT pg_catalog.pg_advisory_lock(pg_catalog.hashtext('nutsnews:migration-workflow')); SELECT 'LOCK_ACQUIRED'; SELECT pg_catalog.pg_sleep(3600);";
 const MAX_PRODUCTION_BACKUP_AGE_MS = 60 * 60 * 1000;
+const MAX_LOCK_CLIENT_STDERR_BYTES = 8_192;
 
 function environmentValue(env, name) {
   return String(env[name] ?? "").trim();
@@ -46,9 +47,34 @@ export function getMigrationWorkflowPolicy(env = process.env, now = Date.now()) 
   return Object.freeze({ target, databaseUrl });
 }
 
+export function classifyPostgresLockFailure(stderr) {
+  const output = String(stderr ?? "");
+
+  if (/invalid percent-encoded token|invalid connection option|could not parse connection string/i.test(output)) {
+    return "the protected staging database URL is malformed; use the complete Session Pooler URL and percent-encode password special characters";
+  }
+  if (/password authentication failed|authentication failed|tenant or user not found/i.test(output)) {
+    return "staging database authentication was rejected; verify the protected URL username and password";
+  }
+  if (/could not translate host name|name or service not known|nodename nor servname provided/i.test(output)) {
+    return "the staging database host could not be resolved; verify the protected Session Pooler host";
+  }
+  if (/network is unreachable|connection timed out|timeout expired|could not connect to server|connection refused/i.test(output)) {
+    return "the staging database could not be reached; verify the protected Session Pooler host and port";
+  }
+  if (/database .* does not exist/i.test(output)) {
+    return "the configured staging database does not exist; verify the database name in the protected URL";
+  }
+  if (/no pg_hba\.conf entry|ssl.*(?:required|disabled)|server does not support ssl/i.test(output)) {
+    return "the staging database TLS or access policy rejected the connection; verify the protected Session Pooler URL";
+  }
+  return "the protected staging database connection failed before the advisory lock was acquired";
+}
+
 function waitForLock(process) {
   return new Promise((resolve, reject) => {
     let settled = false;
+    let stderr = "";
     const finish = (callback, value) => {
       if (settled) return;
       settled = true;
@@ -65,12 +91,17 @@ function waitForLock(process) {
         finish(resolve);
       }
     });
+    process.stderr.on("data", (chunk) => {
+      if (stderr.length >= MAX_LOCK_CLIENT_STDERR_BYTES) return;
+      stderr += chunk.toString().slice(0, MAX_LOCK_CLIENT_STDERR_BYTES - stderr.length);
+    });
     process.once("error", () => {
       finish(reject, new Error("Unable to start the database migration lock client."));
     });
     process.once("exit", (code) => {
-      if (!settled && code !== 0) {
-        finish(reject, new Error("Database migration lock client exited before acquiring the lock."));
+      if (!settled) {
+        const reason = classifyPostgresLockFailure(stderr);
+        finish(reject, new Error(`Database migration lock client exited before acquiring the lock: ${reason}.`));
       }
     });
   });
