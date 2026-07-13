@@ -3,6 +3,7 @@ import test from "node:test";
 import { resolve } from "node:path";
 
 import {
+  classifyPostgresLockFailure,
   getMigrationSourceRoot,
   getMigrationWorkflowPolicy,
   runWithMigrationLock,
@@ -88,4 +89,12 @@ test("the fixed-purpose migration policy blocks reverse and unprotected producti
 test("migration automation can use approved source files without executing source scripts", () => {
   assert.equal(getMigrationSourceRoot({}), resolve(import.meta.dirname, ".."));
   assert.equal(getMigrationSourceRoot({ NUTSNEWS_MIGRATION_SOURCE_ROOT: "/tmp/approved-source" }), "/tmp/approved-source");
+});
+
+test("lock failures classify malformed connection URLs without exposing a connection URL", () => {
+  const protectedUrl = "postgresql://postgres.example:do-not-log-me@pooler.example:5432/postgres";
+  const diagnosis = classifyPostgresLockFailure(`psql: error: invalid percent-encoded token in ${protectedUrl}`);
+
+  assert.match(diagnosis, /malformed/i);
+  assert.doesNotMatch(diagnosis, /do-not-log-me|pooler\.example|postgresql:/i);
 });
