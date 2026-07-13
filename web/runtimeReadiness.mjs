@@ -1,8 +1,10 @@
 import { getRuntimeSafetyPolicy } from "./runtimeSafety.mjs";
+import { MIGRATION_HEAD } from "./migrationContract.mjs";
 
 const IDENTITY_VALUE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:@/-]{2,127}$/;
 const IMAGE_DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/;
 const SCHEMA_VERSION_PATTERN = /^[0-9]{14}$/;
+const SCHEMA_FINGERPRINT_PATTERN = /^[a-f0-9]{32}$/;
 const MIN_TIMEOUT_MS = 25;
 const MAX_TIMEOUT_MS = 5000;
 const DEFAULT_TIMEOUT_MS = 2000;
@@ -164,12 +166,13 @@ function result(policy, identity, ready, code) {
 
 /**
  * Evaluate the server-side qualification gate. The supplied reader must be a
- * single read-only Supabase query that returns the deployed schema version.
- * Public callers receive only the stable code and safe identity above.
+ * single read-only Supabase query that returns the legacy marker, migration
+ * head, recorded schema fingerprint, and current schema fingerprint. Public
+ * callers receive only the stable code and safe identity above.
  */
 export async function evaluateRuntimeReadiness({
   env = process.env,
-  readSchemaVersion,
+  readSchemaContract,
 } = {}) {
   const policy = getRuntimeSafetyPolicy(env);
   const identity = getRuntimeIdentity(env);
@@ -190,18 +193,37 @@ export async function evaluateRuntimeReadiness({
     return result(policy, identity, false, identityCode);
   }
 
-  if (typeof readSchemaVersion !== "function") {
+  if (typeof readSchemaContract !== "function") {
     return result(policy, identity, false, "supabase_dependency_failed");
   }
 
   try {
-    const schemaVersion = await withinTimeout(
-      Promise.resolve().then(() => readSchemaVersion()),
+    const schemaContract = await withinTimeout(
+      Promise.resolve().then(() => readSchemaContract()),
       identity.timeoutMs,
     );
 
-    if (schemaVersion !== identity.expectedSchemaVersion) {
+    if (!schemaContract || typeof schemaContract !== "object") {
+      return result(policy, identity, false, "migration_contract_invalid");
+    }
+
+    if (schemaContract.legacySchemaVersion !== identity.expectedSchemaVersion) {
       return result(policy, identity, false, "schema_version_mismatch");
+    }
+
+    if (schemaContract.migrationHead !== MIGRATION_HEAD) {
+      return result(policy, identity, false, "migration_head_mismatch");
+    }
+
+    if (
+      !SCHEMA_FINGERPRINT_PATTERN.test(schemaContract.expectedSchemaFingerprint) ||
+      !SCHEMA_FINGERPRINT_PATTERN.test(schemaContract.actualSchemaFingerprint)
+    ) {
+      return result(policy, identity, false, "migration_contract_invalid");
+    }
+
+    if (schemaContract.expectedSchemaFingerprint !== schemaContract.actualSchemaFingerprint) {
+      return result(policy, identity, false, "schema_drift_detected");
     }
   } catch (error) {
     return result(

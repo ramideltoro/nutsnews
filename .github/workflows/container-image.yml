@@ -49,12 +49,12 @@ jobs:
               return;
             }
 
-            if (request.url?.startsWith("/rest/v1/release_readiness")) {
+            if (request.url?.startsWith("/rest/v1/rpc/nutsnews_migration_schema_contract")) {
               response.writeHead(200, {
                 "Access-Control-Allow-Origin": "*",
                 "Content-Type": "application/json",
               });
-              response.end('[{"schema_version":"20260712170000"}]');
+              response.end('[{"legacy_schema_version":"20260712170000","migration_head":"20260713000000","expected_schema_fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","actual_schema_fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]');
               return;
             }
 
@@ -310,10 +310,81 @@ jobs:
             exit 1
           fi
 
+  migration-gate:
+    name: Migration order, drift, fixtures, and compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      NUTSNEWS_RUNTIME_ENV: staging
+      NUTSNEWS_SIDE_EFFECTS_MODE: sandbox
+      NUTSNEWS_DATA_ENVIRONMENT: staging
+      NUTSNEWS_SUPABASE_CREDENTIALS_ENV: staging
+      NUTSNEWS_SUPABASE_PROJECT_REF: ci-staging-fixture
+      NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: ci-production-fixture
+      NUTSNEWS_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NUTSNEWS_PUBLIC_SUPABASE_ANON_KEY: ci-public-anon-key
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Use Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.105.0
+
+      - name: Install disposable database client
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Validate migration naming and the compiled migration contract
+        run: node scripts/assert_migration_contract.mjs
+
+      - name: Reset a disposable database through the complete migration set
+        run: |
+          set -euo pipefail
+          supabase start -x studio,imgproxy,logflare,vector
+          supabase db reset --local
+
+      - name: Verify migration head, catalog drift, and advisory-lock serialization
+        run: |
+          set -euo pipefail
+          node scripts/verify_migration_schema.mjs --negative-drift
+          node scripts/verify_migration_lock.mjs
+          node scripts/verify_old_digest_compatibility.mjs
+
+      - name: Seed and reset deterministic synthetic staging fixtures
+        run: |
+          set -euo pipefail
+          node scripts/staging_fixtures.mjs exercise --local --namespace nutsnews-test-ci-fixture-run-123456
+
+      - name: Run migration, old-digest, lock, and fixture regressions
+        run: |
+          set -euo pipefail
+          node --test \
+            tests/migration-contract.test.mjs \
+            tests/migration-workflow.test.mjs \
+            tests/old-digest-compatibility.test.mjs \
+            tests/staging-fixtures.test.mjs \
+            tests/runtime-readiness.test.mjs
+
+      - name: Stop disposable Supabase services
+        if: always()
+        run: supabase stop --no-backup
+
   release-candidate:
     name: Release candidate
     if: always() && github.event_name == 'pull_request'
-    needs: build-test
+    needs: [build-test, migration-gate]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -323,10 +394,15 @@ jobs:
       - name: Require a successful image build and smoke test
         env:
           BUILD_TEST_RESULT: ${{ needs.build-test.result }}
+          MIGRATION_GATE_RESULT: ${{ needs.migration-gate.result }}
         run: |
           set -euo pipefail
           if [[ "$BUILD_TEST_RESULT" != "success" ]]; then
             echo "::error::Build and smoke-test production image concluded $BUILD_TEST_RESULT."
+            exit 1
+          fi
+          if [[ "$MIGRATION_GATE_RESULT" != "success" ]]; then
+            echo "::error::Migration order, drift, fixture, compatibility, or lock gate concluded $MIGRATION_GATE_RESULT."
             exit 1
           fi
 
@@ -438,7 +514,7 @@ jobs:
   publish:
     name: Publish immutable image
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: build-test
+    needs: [build-test, migration-gate]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

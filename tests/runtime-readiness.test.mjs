@@ -2,9 +2,21 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { evaluateRuntimeReadiness } from "../web/runtimeReadiness.mjs";
+import { LEGACY_COMPATIBLE_SCHEMA_VERSION, MIGRATION_HEAD } from "../web/migrationContract.mjs";
 
 const digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const schemaVersion = "20260712170000";
+const schemaVersion = LEGACY_COMPATIBLE_SCHEMA_VERSION;
+const schemaFingerprint = "a".repeat(32);
+
+function validSchemaContract(overrides = {}) {
+  return {
+    legacySchemaVersion: schemaVersion,
+    migrationHead: MIGRATION_HEAD,
+    expectedSchemaFingerprint: schemaFingerprint,
+    actualSchemaFingerprint: schemaFingerprint,
+    ...overrides,
+  };
+}
 
 function stagingEnvironment(overrides = {}) {
   return {
@@ -44,8 +56,8 @@ function productionEnvironment(overrides = {}) {
   });
 }
 
-async function evaluate(env, readSchemaVersion = async () => schemaVersion) {
-  return evaluateRuntimeReadiness({ env, readSchemaVersion });
+async function evaluate(env, readSchemaContract = async () => validSchemaContract()) {
+  return evaluateRuntimeReadiness({ env, readSchemaContract });
 }
 
 test("readiness accepts staging and production configurations for the same immutable digest", async () => {
@@ -78,9 +90,9 @@ test("Vercel retains the existing runtime-safety readiness contract without OCI-
       NUTSNEWS_CONFIG_GENERATION: undefined,
       NUTSNEWS_EXPECTED_SCHEMA_VERSION: undefined,
     }),
-    async readSchemaVersion() {
+    async readSchemaContract() {
       dependencyReads += 1;
-      return schemaVersion;
+      return validSchemaContract();
     },
   });
 
@@ -136,8 +148,11 @@ test("readiness rejects deployment and release identity mismatches", async () =>
   assert.equal(releaseMismatch.code, "release_identity_mismatch");
 });
 
-test("readiness rejects schema mismatch, dependency failure, and a bounded dependency timeout", async () => {
-  const schemaMismatch = await evaluate(stagingEnvironment(), async () => "20260712160000");
+test("readiness rejects legacy schema mismatch, dependency failure, and a bounded dependency timeout", async () => {
+  const schemaMismatch = await evaluate(
+    stagingEnvironment(),
+    async () => validSchemaContract({ legacySchemaVersion: "20260712160000" }),
+  );
   const dependencyFailure = await evaluate(stagingEnvironment(), async () => {
     throw new Error("synthetic dependency details must not be exposed");
   });
@@ -149,6 +164,22 @@ test("readiness rejects schema mismatch, dependency failure, and a bounded depen
   assert.equal(dependencyFailure.code, "supabase_dependency_failed");
   assert.equal(timeout.ready, false);
   assert.equal(timeout.code, "supabase_dependency_timeout");
+});
+
+test("readiness fails closed when staging is not at migration head or catalog drift is detected", async () => {
+  const staleHead = await evaluate(
+    stagingEnvironment(),
+    async () => validSchemaContract({ migrationHead: "20260712170000" }),
+  );
+  const schemaDrift = await evaluate(
+    stagingEnvironment(),
+    async () => validSchemaContract({ actualSchemaFingerprint: "b".repeat(32) }),
+  );
+
+  assert.equal(staleHead.ready, false);
+  assert.equal(staleHead.code, "migration_head_mismatch");
+  assert.equal(schemaDrift.ready, false);
+  assert.equal(schemaDrift.code, "schema_drift_detected");
 });
 
 test("a staging production-data sentinel is refused without leaking its identity or secret", async () => {
