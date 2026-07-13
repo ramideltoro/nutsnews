@@ -1,7 +1,7 @@
 import { getRuntimeSafetyPolicy } from "./runtimeSafety.mjs";
+import { getRuntimeIdentity } from "./runtimeReadiness.mjs";
 
 const MAX_PUBLIC_VALUE_LENGTH = 2048;
-const IMAGE_DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/;
 
 function value(env, ...names) {
   for (const name of names) {
@@ -35,21 +35,6 @@ function publicUrl(env, ...names) {
   }
 }
 
-function identityValue(env, fallback, ...names) {
-  const candidate = value(env, ...names);
-
-  if (candidate && /^[A-Za-z0-9._:@/-]+$/.test(candidate)) {
-    return candidate.slice(0, 128);
-  }
-
-  return fallback;
-}
-
-function imageDigest(env) {
-  const candidate = value(env, "NUTSNEWS_EXPECTED_IMAGE_DIGEST");
-
-  return IMAGE_DIGEST_PATTERN.test(candidate) ? candidate : "unknown";
-}
 /**
  * Return the browser-safe, runtime-owned configuration allowlist.
  *
@@ -60,6 +45,7 @@ function imageDigest(env) {
  */
 export function getRuntimePublicConfig(env = process.env) {
   const policy = getRuntimeSafetyPolicy(env);
+  const identity = getRuntimeIdentity(env);
   const runtimeReady = policy.ready;
   const resolvedRuntimeEnv = runtimeReady ? policy.runtimeEnv : "unknown";
   const resolvedSideEffectsMode = runtimeReady ? policy.sideEffectsMode : "disabled";
@@ -70,21 +56,6 @@ export function getRuntimePublicConfig(env = process.env) {
   const contactDeliveryEnabled =
     (resolvedRuntimeEnv === "production" && resolvedSideEffectsMode === "live") ||
     sandboxContactEnabled;
-  const sourceCommit = identityValue(
-    env,
-    "unknown",
-    "NUTSNEWS_SOURCE_COMMIT",
-    "VERCEL_GIT_COMMIT_SHA",
-  );
-  const buildId = identityValue(env, sourceCommit, "NUTSNEWS_BUILD_ID", "VERCEL_DEPLOYMENT_ID");
-  const deploymentTarget = identityValue(
-    env,
-    env.VERCEL === "1" ? "vercel" : "unknown",
-    "NUTSNEWS_DEPLOYMENT_TARGET",
-    "VERCEL_ENV",
-  );
-  const expectedImageDigest = imageDigest(env);
-
   return {
     runtimeEnv: resolvedRuntimeEnv,
     sideEffectsMode: resolvedSideEffectsMode,
@@ -111,10 +82,11 @@ export function getRuntimePublicConfig(env = process.env) {
       "NUTSNEWS_PUBLIC_IOS_APP_STORE_URL",
       "NEXT_PUBLIC_NUTSNEWS_IOS_APP_STORE_URL",
     ),
-    sourceCommit,
-    buildId,
-    deploymentTarget,
-    expectedImageDigest,
+    sourceCommit: identity.sourceCommit,
+    buildId: identity.buildId,
+    deploymentTarget: identity.deploymentTarget,
+    expectedImageDigest: identity.expectedImageDigest,
+    configGeneration: identity.configGeneration,
     telemetryEnabled:
       runtimeReady && resolvedRuntimeEnv === "production" && resolvedSideEffectsMode === "live",
   };

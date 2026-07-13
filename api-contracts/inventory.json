@@ -283,11 +283,12 @@
       "successStatus": [200],
       "successResponseShape": {
         "contentType": "application/json",
-        "requiredKeys": ["runtimeEnv", "sideEffectsMode", "supabaseUrl", "supabaseAnonKey", "turnstileSiteKey", "sentryDsn", "gaId", "iosAppStoreUrl", "sourceCommit", "buildId", "deploymentTarget", "expectedImageDigest", "telemetryEnabled"],
+        "requiredKeys": ["runtimeEnv", "sideEffectsMode", "supabaseUrl", "supabaseAnonKey", "turnstileSiteKey", "sentryDsn", "gaId", "iosAppStoreUrl", "sourceCommit", "buildId", "deploymentTarget", "expectedImageDigest", "configGeneration", "telemetryEnabled"],
         "fields": {
           "runtimeEnv": "staging|production|unknown",
           "telemetryEnabled": "boolean; true only for production with live side effects",
-          "expectedImageDigest": "sanitized reviewed sha256 identity or unknown"
+          "expectedImageDigest": "sanitized reviewed sha256 identity or unknown",
+          "configGeneration": "sanitized runtime configuration generation or unknown"
         }
       },
       "errorStatuses": [],
@@ -335,7 +336,7 @@
         "body": "none",
         "query": "none"
       },
-      "auth": "public; reports only a sanitized runtime safety decision and never configuration values or credentials",
+      "auth": "public; reports only sanitized status codes and release-identity headers, never configuration values or credentials",
       "successStatus": [200],
       "successResponseShape": {
         "contentType": "application/json",
@@ -347,10 +348,10 @@
       "errorShape": {
         "requiredKeys": ["ok", "service", "runtimeEnv", "sideEffectsMode", "code"],
         "ok": false,
-        "code": "sanitized policy refusal code without environment values or credentials"
+        "code": "sanitized readiness refusal code without environment values, project identities, or credentials"
       },
       "pagination": "none",
-      "cache": "bypass/no-store; Docker and platform readiness probes use this endpoint",
+      "cache": "request-time bypass/no-store; Docker and platform readiness probes use this endpoint and read X-NutsNews-Source-Commit, X-NutsNews-Build-Id, X-NutsNews-Deployment-Target, X-NutsNews-Runtime-Environment, X-NutsNews-Config-Generation, and X-NutsNews-Expected-Image-Digest",
       "iosCallSites": [],
       "testFile": "scripts/api_contract_compatibility_regression.mjs"
     },

@@ -1178,6 +1178,7 @@ async function testRuntimePublicConfigContract() {
     buildId: "build-id",
     deploymentTarget: "ci-container",
     expectedImageDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    configGeneration: "ci-config-generation-1",
     telemetryEnabled: false,
   };
   const runtimeConfigRoute = loadModule("web/app/api/runtime-config/route.ts", {
@@ -1203,24 +1204,52 @@ async function testRuntimePublicConfigContract() {
 }
 
 async function testReadinessContract() {
+  let connectionCalls = 0;
+  let readinessCalls = 0;
   const readinessRoute = loadModule("web/app/readyz/route.ts", {
-    "next/server": nextServerMock(),
+    "next/server": {
+      ...nextServerMock(),
+      async connection() {
+        connectionCalls += 1;
+      },
+    },
     "@/lib/cacheHeaders": cacheHeadersMock,
-    "@/lib/runtimeSafety": {
-      getSafeReadiness() {
+    "@/lib/runtimeReadiness": {
+      async evaluateRuntimeReadiness() {
+        readinessCalls += 1;
         return {
-          ready: false,
+          ready: readinessCalls === 2,
           runtimeEnv: "staging",
           sideEffectsMode: "disabled",
-          code: "staging_production_project_rejected",
+          code: readinessCalls === 2 ? "ready" : "staging_production_project_rejected",
+          sourceCommit: "source-commit",
+          buildId: "build-id",
+          deploymentTarget: "vps-staging",
+          expectedImageDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          configGeneration: `config-generation-${readinessCalls}`,
         };
+      },
+    },
+    "@/lib/supabase": {
+      getSupabase() {
+        throw new Error("readiness route must use its evaluator-provided dependency reader");
       },
     },
   });
   assertMethodExports(readinessRoute, ["GET"], "/readyz");
-  const response = await readinessRoute.GET();
+  const response = await readinessRoute.GET(new Request("https://nutsnews.test/readyz?cache-bust=one"));
   assertStatus(response, 503, "/readyz rejected staging identity");
   assert.match(response.headers.get("cache-control") ?? "", /no-store/);
+  assert.equal(connectionCalls, 1, "/readyz must evaluate at request time");
+  assert.equal(response.headers.get("x-nutsnews-source-commit"), "source-commit");
+  assert.equal(response.headers.get("x-nutsnews-build-id"), "build-id");
+  assert.equal(response.headers.get("x-nutsnews-deployment-target"), "vps-staging");
+  assert.equal(response.headers.get("x-nutsnews-runtime-environment"), "staging");
+  assert.equal(response.headers.get("x-nutsnews-config-generation"), "config-generation-1");
+  assert.equal(
+    response.headers.get("x-nutsnews-expected-image-digest"),
+    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  );
   assert.deepEqual(await responseJson(response), {
     ok: false,
     service: "nutsnews-web",
@@ -1228,6 +1257,19 @@ async function testReadinessContract() {
     sideEffectsMode: "disabled",
     code: "staging_production_project_rejected",
   });
+
+  const secondResponse = await readinessRoute.GET(
+    new Request("https://nutsnews.test/readyz?cache-bust=two", {
+      headers: { "x-nutsnews-deployment-target": "production-vps" },
+    }),
+  );
+  assertStatus(secondResponse, 200, "/readyz qualified second request");
+  assert.equal(connectionCalls, 2, "/readyz must not serve a cached route result");
+  assert.equal(
+    secondResponse.headers.get("x-nutsnews-config-generation"),
+    "config-generation-2",
+    "/readyz must not retain a previous readiness identity",
+  );
 }
 
 async function testLogTestContract() {

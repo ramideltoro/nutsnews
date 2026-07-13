@@ -49,6 +49,15 @@ jobs:
               return;
             }
 
+            if (request.url?.startsWith("/rest/v1/release_readiness")) {
+              response.writeHead(200, {
+                "Access-Control-Allow-Origin": "*",
+                "Content-Type": "application/json",
+              });
+              response.end('[{"schema_version":"20260712170000"}]');
+              return;
+            }
+
             if (request.url?.startsWith("/rest/v1/")) {
               response.writeHead(200, {
                 "Access-Control-Allow-Origin": "*",
@@ -131,7 +140,13 @@ jobs:
             --env NUTSNEWS_PUBLIC_TURNSTILE_SITE_KEY=staging-turnstile-site-key \
             --env NUTSNEWS_PUBLIC_SENTRY_DSN=https://staging-sentry.invalid/1 \
             --env NUTSNEWS_PUBLIC_GA_ID=G-STAGINGRUNTIME \
+            --env NUTSNEWS_DEPLOYMENT_TARGET=vps-staging \
+            --env NUTSNEWS_EXPECTED_SOURCE_COMMIT="$SOURCE_COMMIT" \
+            --env NUTSNEWS_EXPECTED_BUILD_ID="$BUILD_ID" \
             --env NUTSNEWS_EXPECTED_IMAGE_DIGEST="$expected_image_digest" \
+            --env NUTSNEWS_DEPLOYED_IMAGE_DIGEST="$expected_image_digest" \
+            --env NUTSNEWS_CONFIG_GENERATION=ci-staging-config-1 \
+            --env NUTSNEWS_EXPECTED_SCHEMA_VERSION=20260712170000 \
             "$image_reference")"
 
           for attempt in $(seq 1 30); do
@@ -156,11 +171,13 @@ jobs:
             --base-url http://127.0.0.1:3000 \
             --expected-source-commit "$SOURCE_COMMIT" \
             --expected-build-id "$BUILD_ID" \
-            --expected-deployment-target ci-container \
+            --expected-deployment-target vps-staging \
+            --expected-health-deployment-target ci-container \
             --expected-runtime-env staging \
             --expected-supabase-url http://staging-fixture.supabase.test:54321 \
             --expected-side-effects-mode disabled \
             --expected-image-digest "$expected_image_digest" \
+            --expected-config-generation ci-staging-config-1 \
             --forbidden-runtime-config-token ci-production-fixture.supabase.co \
             --forbidden-runtime-config-token production-telemetry.invalid \
             --forbidden-runtime-config-token G-PRODUCTIONRUNTIME
@@ -229,7 +246,13 @@ jobs:
             --env NUTSNEWS_PUBLIC_TURNSTILE_SITE_KEY=production-turnstile-site-key \
             --env NUTSNEWS_PUBLIC_SENTRY_DSN=https://production-telemetry.invalid/1 \
             --env NUTSNEWS_PUBLIC_GA_ID=G-PRODUCTIONRUNTIME \
+            --env NUTSNEWS_DEPLOYMENT_TARGET=production-vps \
+            --env NUTSNEWS_EXPECTED_SOURCE_COMMIT="$SOURCE_COMMIT" \
+            --env NUTSNEWS_EXPECTED_BUILD_ID="$BUILD_ID" \
             --env NUTSNEWS_EXPECTED_IMAGE_DIGEST="$expected_image_digest" \
+            --env NUTSNEWS_DEPLOYED_IMAGE_DIGEST="$expected_image_digest" \
+            --env NUTSNEWS_CONFIG_GENERATION=ci-production-config-1 \
+            --env NUTSNEWS_EXPECTED_SCHEMA_VERSION=20260712170000 \
             "$image_reference")"
 
           for attempt in $(seq 1 30); do
@@ -259,14 +282,16 @@ jobs:
             --base-url http://127.0.0.1:3001 \
             --expected-source-commit "$SOURCE_COMMIT" \
             --expected-build-id "$BUILD_ID" \
-            --expected-deployment-target ci-container \
+            --expected-deployment-target production-vps \
+            --expected-health-deployment-target ci-container \
             --expected-runtime-env production \
             --expected-supabase-url http://ci-production-fixture.supabase.co:54322 \
             --expected-side-effects-mode live \
             --expected-turnstile-site-key production-turnstile-site-key \
             --expected-sentry-dsn https://production-telemetry.invalid/1 \
             --expected-ga-id G-PRODUCTIONRUNTIME \
-            --expected-image-digest "$expected_image_digest"
+            --expected-image-digest "$expected_image_digest" \
+            --expected-config-generation ci-production-config-1
 
           if ! docker run --rm --entrypoint sh "$image_reference" -c '
             for marker in ci-production-fixture.supabase.co production-telemetry.invalid G-PRODUCTIONRUNTIME; do

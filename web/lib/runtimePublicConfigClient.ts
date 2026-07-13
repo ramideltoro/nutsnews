@@ -15,6 +15,7 @@ export type RuntimePublicConfig = {
   buildId: string;
   deploymentTarget: string;
   expectedImageDigest: string;
+  configGeneration: string;
   telemetryEnabled: boolean;
 };
 
