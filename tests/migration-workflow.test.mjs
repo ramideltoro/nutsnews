@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { resolve } from "node:path";
 
 import {
+  getMigrationSourceRoot,
   getMigrationWorkflowPolicy,
   runWithMigrationLock,
 } from "../scripts/locked_migration_workflow.mjs";
@@ -81,4 +83,9 @@ test("the fixed-purpose migration policy blocks reverse and unprotected producti
     }),
     /current backup freshness preflight/,
   );
+});
+
+test("migration automation can use approved source files without executing source scripts", () => {
+  assert.equal(getMigrationSourceRoot({}), resolve(import.meta.dirname, ".."));
+  assert.equal(getMigrationSourceRoot({ NUTSNEWS_MIGRATION_SOURCE_ROOT: "/tmp/approved-source" }), "/tmp/approved-source");
 });
