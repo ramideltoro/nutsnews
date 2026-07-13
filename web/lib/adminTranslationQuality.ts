@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { getServerSupabase } from "@/lib/supabase";
 import {
   DEFAULT_LANGUAGE_CODE,
   normalizeLanguageCode,
@@ -90,16 +90,7 @@ function clampNumber(value: string | undefined, fallback: number, min: number, m
 }
 
 function getSupabaseConfig() {
-  const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/+$/, "");
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-
-  if (!url || !serviceRoleKey) {
-    throw new Error(
-      "Missing SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for translation quality dashboard.",
-    );
-  }
-
-  return { url, serviceRoleKey };
+  return getServerSupabase();
 }
 
 function summaryKey(originalUrl: string, languageCode: string) {
@@ -145,12 +136,7 @@ function warningToIssueRow({
 
 export async function getTranslationQualityDashboardData(): Promise<TranslationQualityDashboardData> {
   const auditLimit = clampNumber(process.env.TRANSLATION_QUALITY_AUDIT_LIMIT, DEFAULT_AUDIT_LIMIT, 1, 500);
-  const { url, serviceRoleKey } = getSupabaseConfig();
-  const supabase = createClient(url, serviceRoleKey, {
-    auth: {
-      persistSession: false,
-    },
-  });
+  const supabase = getSupabaseConfig();
 
   const { data: articleData, error: articleError } = await supabase
     .from("public_feed_snapshot")

@@ -1,6 +1,7 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { type SupabaseClient } from "@supabase/supabase-js";
 
 import { formatAdminDateTime } from "@/lib/adminTime";
+import { getServerSupabase, getServerSupabaseConfig } from "@/lib/supabase";
 
 type RiskLevel = "ok" | "watch" | "danger" | "unknown";
 type ForecastStatus = "safe" | "approaching_limit" | "projected_to_breach" | "insufficient_trend_data";
@@ -1424,10 +1425,12 @@ function buildCloudflareUsageMetrics(usage: CloudflareGraphQlUsage, eventRows: Q
 }
 
 function getSupabaseAdminConfig() {
-  return {
-    supabaseUrl: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL,
-    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-  };
+  try {
+    const { url, serviceRoleKey } = getServerSupabaseConfig();
+    return { supabaseUrl: url, supabaseServiceRoleKey: serviceRoleKey };
+  } catch {
+    return { supabaseUrl: undefined, supabaseServiceRoleKey: undefined };
+  }
 }
 
 async function getExactCount(
@@ -1618,12 +1621,7 @@ export async function getAdminCostGuardrailsDashboardData(): Promise<GuardrailsD
   }
 
   try {
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    });
+    const supabase = getServerSupabase();
 
     const since30 = daysAgo(30);
     const [aiRows, workerRows, eventRows, articleCount, summaryCount, feedCount, cloudflareUsage] =

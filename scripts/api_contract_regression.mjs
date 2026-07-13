@@ -420,6 +420,9 @@ async function testContactApiValidationWithoutEmail() {
           throw new Error("Quota usage should only record after a successful email send.");
         },
       },
+      "@/lib/runtimeSafety": {
+        assertExternalSideEffect() {},
+      },
     });
 
     const badEmailResponse = await contactRoute.POST(

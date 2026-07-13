@@ -2,6 +2,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { assertProductionOperation } from "../runtimeSafety.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(scriptDir, "..");
@@ -644,6 +645,10 @@ async function writeReports(report, outputDir) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+
+  if (args.mode === "live") {
+    assertProductionOperation("cache-observability");
+  }
   const config = await readConfig();
   const validation = validateConfig(config);
 

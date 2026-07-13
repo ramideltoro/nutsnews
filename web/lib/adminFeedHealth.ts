@@ -1,5 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
 import { formatAdminDateTime } from "@/lib/adminTime";
+import { getServerSupabase, getServerSupabaseConfig } from "@/lib/supabase";
 
 const STALE_FEED_HOURS = 24;
 
@@ -152,18 +152,11 @@ export type FeedHealthDashboardData = {
 };
 
 function getSupabaseConfig(): SupabaseConfig | null {
-    const url =
-        process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-
-    if (!url || !serviceRoleKey) {
+    try {
+        return getServerSupabaseConfig();
+    } catch {
         return null;
     }
-
-    return {
-        url,
-        serviceRoleKey,
-    };
 }
 
 function emptySummary(): FeedHealthSummary {
@@ -426,12 +419,7 @@ export async function getAdminFeedHealthDashboardData(): Promise<FeedHealthDashb
         );
     }
 
-    const supabase = createClient(config.url, config.serviceRoleKey, {
-        auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-        },
-    });
+    const supabase = getServerSupabase();
 
     const [feedsResult, healthResult] = await Promise.all([
         supabase

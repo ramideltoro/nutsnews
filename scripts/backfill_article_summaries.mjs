@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { assertProductionOperation } from '../web/runtimeSafety.mjs';
+
+assertProductionOperation('ai-backfill');
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';

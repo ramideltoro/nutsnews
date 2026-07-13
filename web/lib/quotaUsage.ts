@@ -1,4 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
+import { getServerSupabase } from "@/lib/supabase";
+import { RuntimeSafetyError, assertIsolatedDataMutation } from "@/lib/runtimeSafety";
 
 export async function recordQuotaUsageEvent({
   eventType,
@@ -13,20 +14,9 @@ export async function recordQuotaUsageEvent({
   quantity?: number;
   metadata?: Record<string, unknown>;
 }) {
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    return false;
-  }
-
   try {
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    });
+    assertIsolatedDataMutation("quota-usage-event");
+    const supabase = getServerSupabase();
 
     const { error } = await supabase.from("quota_usage_events").insert({
       event_type: eventType,
@@ -43,6 +33,9 @@ export async function recordQuotaUsageEvent({
 
     return true;
   } catch (error) {
+    if (error instanceof RuntimeSafetyError) {
+      return false;
+    }
     console.warn("Quota usage event recording failed", error);
     return false;
   }

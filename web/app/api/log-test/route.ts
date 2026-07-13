@@ -2,11 +2,24 @@ import { NextResponse } from "next/server";
 
 import { BYPASS_CACHE_HEADERS } from "@/lib/cacheHeaders";
 import { logInfo, logWarn } from "@/lib/logger";
+import { RuntimeSafetyError, assertProductionOperation } from "@/lib/runtimeSafety";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function GET() {
+    try {
+        assertProductionOperation("better-stack-log-test");
+    } catch (error) {
+        if (error instanceof RuntimeSafetyError) {
+            return NextResponse.json(
+                { error: "Telemetry delivery is disabled in this environment." },
+                { status: 503, headers: BYPASS_CACHE_HEADERS },
+            );
+        }
+        throw error;
+    }
+
     const startedAt = Date.now();
 
     await logInfo("api.log_test.started", "Better Stack log test started", {

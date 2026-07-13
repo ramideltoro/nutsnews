@@ -30,9 +30,17 @@ permissions:
 jobs:
   sitemap-robots:
     name: Check sitemap.xml and robots.txt
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
+      NUTSNEWS_RUNTIME_ENV: production
+      NUTSNEWS_SIDE_EFFECTS_MODE: live
+      NUTSNEWS_DATA_ENVIRONMENT: production
+      NUTSNEWS_SUPABASE_CREDENTIALS_ENV: production
+      NUTSNEWS_SUPABASE_PROJECT_REF: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF }}
+      NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF }}
+      NUTSNEWS_PUBLIC_SUPABASE_URL: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_URL }}
       NUTSNEWS_BASE_URL: ${{ github.event.inputs.base_url || 'https://www.nutsnews.com' }}
     steps:
       - name: Checkout repository

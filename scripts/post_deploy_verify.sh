@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+node "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/assert_runtime_safety.mjs" post-deploy-verification
+
 SITE_URL="${1:-https://www.nutsnews.com}"
 ARTICLE_PATH="${2:-}"
 CONTROLLER_URL="${CONTROLLER_URL:-https://nutsnews-controller.nutsnews.workers.dev}"

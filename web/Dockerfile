@@ -30,6 +30,10 @@ ENV NODE_ENV=production \
     NUTSNEWS_DEPLOYMENT_TARGET=${NUTSNEWS_DEPLOYMENT_TARGET} \
     NUTSNEWS_RUNTIME_ENV=staging \
     NUTSNEWS_SIDE_EFFECTS_MODE=disabled \
+    NUTSNEWS_DATA_ENVIRONMENT=staging \
+    NUTSNEWS_SUPABASE_CREDENTIALS_ENV=staging \
+    NUTSNEWS_SUPABASE_PROJECT_REF=build-fixture-stage \
+    NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF=build-fixture-production \
     NUTSNEWS_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 \
     NUTSNEWS_PUBLIC_SUPABASE_ANON_KEY=build-time-fixture-anon-key
 
@@ -73,6 +77,6 @@ USER node
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD ["node", "-e", "fetch('http://127.0.0.1:3000/healthz',{signal:AbortSignal.timeout(4000)}).then(async(response)=>{const body=await response.json();if(!response.ok||body.ok!==true){process.exit(1)}}).catch(()=>process.exit(1))"]
+  CMD ["node", "-e", "fetch('http://127.0.0.1:3000/readyz',{signal:AbortSignal.timeout(4000)}).then(async(response)=>{const body=await response.json();if(!response.ok||body.ok!==true){process.exit(1)}}).catch(()=>process.exit(1))"]
 
 CMD ["node", "server.js"]

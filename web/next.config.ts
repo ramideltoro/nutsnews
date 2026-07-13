@@ -166,6 +166,10 @@ const nextConfig: NextConfig = {
         headers: publicCacheHeaders("public-healthz-cache-60s", PUBLIC_PAGE_CACHE_CONTROL, "public, s-maxage=60, stale-while-revalidate=300"),
       },
       {
+        source: "/readyz",
+        headers: noStoreHeaders("bypass-readiness-cache"),
+      },
+      {
         source: "/api/contact",
         headers: noStoreHeaders("bypass-contact-api-cache"),
       },

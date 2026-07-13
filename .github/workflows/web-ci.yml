@@ -27,13 +27,17 @@ jobs:
         working-directory: web
 
     env:
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-      NEXT_PUBLIC_APP_ENV: ci
+      NUTSNEWS_RUNTIME_ENV: staging
+      NUTSNEWS_SIDE_EFFECTS_MODE: disabled
+      NUTSNEWS_DATA_ENVIRONMENT: staging
+      NUTSNEWS_SUPABASE_CREDENTIALS_ENV: staging
+      NUTSNEWS_SUPABASE_PROJECT_REF: ci-staging-fixture
+      NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: ci-production-fixture
+      NUTSNEWS_PUBLIC_SUPABASE_URL: http://127.0.0.1:65535
+      NUTSNEWS_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+      NEXT_PUBLIC_APP_ENV: staging
       AUTH_SECRET: ${{ secrets.AUTH_SECRET || 'ci-only-auth-secret-not-used-in-production' }}
       NEXTAUTH_URL: http://localhost:3000
-      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
-      TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
 
     steps:
       - name: Checkout repository
@@ -51,6 +55,9 @@ jobs:
 
       - name: TypeScript check
         run: npx tsc --noEmit
+
+      - name: Runtime safety regression tests
+        run: npm run test:runtime-safety
 
       - name: Lint
         run: npm run lint

@@ -34,6 +34,13 @@ jobs:
         working-directory: web
 
     env:
+      NUTSNEWS_RUNTIME_ENV: production
+      NUTSNEWS_SIDE_EFFECTS_MODE: live
+      NUTSNEWS_DATA_ENVIRONMENT: production
+      NUTSNEWS_SUPABASE_CREDENTIALS_ENV: production
+      NUTSNEWS_SUPABASE_PROJECT_REF: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF }}
+      NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF }}
+      NUTSNEWS_PUBLIC_SUPABASE_URL: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_URL }}
       SEO_AUDIT_BASE_URL: ${{ github.event.inputs.base_url || 'https://www.nutsnews.com' }}
       SEO_AUDIT_ARTICLE_LIMIT: ${{ github.event.inputs.article_limit || '3' }}
       SEO_AUDIT_EXTRA_PATHS: ${{ github.event.inputs.extra_paths || '' }}

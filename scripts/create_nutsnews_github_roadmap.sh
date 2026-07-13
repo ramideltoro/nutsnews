@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+node "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/assert_runtime_safety.mjs" github-roadmap-mutation
+
 # create_nutsnews_github_roadmap.sh
 # Creates GitHub labels, milestones, issues, and a GitHub Projects roadmap for NutsNews.
 #

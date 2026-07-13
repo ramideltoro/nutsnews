@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createClient } from "@supabase/supabase-js";
+import { getServerSupabase } from "@/lib/supabase";
 
 import {
   resolveRuntimeFeatureFlags,
@@ -10,30 +10,8 @@ import {
 
 type RuntimeFeatureFlagReader = () => Promise<unknown>;
 
-function getServerSupabaseConfig() {
-  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !serviceRoleKey) {
-    return null;
-  }
-
-  return { url, serviceRoleKey };
-}
-
 async function readRuntimeFeatureFlagRows() {
-  const config = getServerSupabaseConfig();
-
-  if (!config) {
-    throw new Error("Runtime feature-flag storage is not configured.");
-  }
-
-  const client = createClient(config.url, config.serviceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
+  const client = getServerSupabase();
   const { data, error } = await client
     .from("runtime_feature_flags")
     .select("key, enabled");

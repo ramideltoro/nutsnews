@@ -20,6 +20,8 @@
     "test:admin-article-reviews": "node ../scripts/admin_article_reviews_regression.mjs",
     "test:security-headers": "node scripts/assert-security-headers.mjs",
     "test:runtime-config": "node --test ../tests/runtime-public-config.test.mjs",
+    "test:runtime-safety": "node --test ../tests/runtime-safety.test.mjs ../tests/mutation-paths.test.mjs ../tests/runtime-public-config.test.mjs",
+    "test:staging-fixture": "node ../scripts/staging_fixture_integration.mjs",
     "test:fluid-cpu": "node ../scripts/fluid_active_cpu_regression.mjs",
     "test:public-route-cpu-cache": "node ../scripts/public_route_cpu_cache_regression.mjs",
     "test:public-cache": "node ../scripts/public_cache_policy_regression.mjs",

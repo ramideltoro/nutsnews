@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { assertProductionOperation } from '../web/runtimeSafety.mjs';
+
 /**
  * Audit NutsNews translated article titles/summaries for coverage and quality.
  *
@@ -17,6 +19,8 @@
 
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+
+assertProductionOperation('translation-audit');
 
 const SUPABASE_URL = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/+$/, '');
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || '';

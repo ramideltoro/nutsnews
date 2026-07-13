@@ -327,6 +327,34 @@
       "testFile": "scripts/api_contract_compatibility_regression.mjs"
     },
     {
+      "id": "readyz",
+      "method": ["GET"],
+      "path": "/readyz",
+      "routeFile": "web/app/readyz/route.ts",
+      "request": {
+        "body": "none",
+        "query": "none"
+      },
+      "auth": "public; reports only a sanitized runtime safety decision and never configuration values or credentials",
+      "successStatus": [200],
+      "successResponseShape": {
+        "contentType": "application/json",
+        "requiredKeys": ["ok", "service", "runtimeEnv", "sideEffectsMode", "code"],
+        "ok": true,
+        "service": "nutsnews-web"
+      },
+      "errorStatuses": [503],
+      "errorShape": {
+        "requiredKeys": ["ok", "service", "runtimeEnv", "sideEffectsMode", "code"],
+        "ok": false,
+        "code": "sanitized policy refusal code without environment values or credentials"
+      },
+      "pagination": "none",
+      "cache": "bypass/no-store; Docker and platform readiness probes use this endpoint",
+      "iosCallSites": [],
+      "testFile": "scripts/api_contract_compatibility_regression.mjs"
+    },
+    {
       "id": "sitemap",
       "method": ["GET"],
       "path": "/sitemap.xml",

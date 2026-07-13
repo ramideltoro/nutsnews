@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { assertProductionOperation } from '../web/runtimeSafety.mjs';
+
+assertProductionOperation('ai-backfill');
 
 /**
  * Backfill French NutsNews article summaries.

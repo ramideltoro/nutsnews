@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { getServerSupabase } from "@/lib/supabase";
 import {
   getAdminDateKey,
   getAdminTimeZone,
@@ -361,36 +361,8 @@ function buildRecentReviews(rows: LocalAiReviewDbRow[]): LocalAiRecentReview[] {
   }));
 }
 
-function getSupabaseAdminConfig() {
-  const supabaseUrl =
-    process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  return {
-    supabaseUrl,
-    supabaseServiceRoleKey,
-  };
-}
-
 function createSupabaseAdminClient() {
-  const { supabaseUrl, supabaseServiceRoleKey } = getSupabaseAdminConfig();
-
-  if (!supabaseUrl) {
-    throw new Error(
-      "Missing SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL environment variable.",
-    );
-  }
-
-  if (!supabaseServiceRoleKey) {
-    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY environment variable.");
-  }
-
-  return createClient(supabaseUrl, supabaseServiceRoleKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
+  return getServerSupabase();
 }
 
 async function loadLocalAiRunsSince(since: Date) {

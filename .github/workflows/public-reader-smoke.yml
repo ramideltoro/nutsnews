@@ -28,7 +28,13 @@ jobs:
 
     env:
       NEXT_TELEMETRY_DISABLED: "1"
-      NEXT_PUBLIC_APP_ENV: public-smoke
+      NUTSNEWS_RUNTIME_ENV: staging
+      NUTSNEWS_SIDE_EFFECTS_MODE: disabled
+      NUTSNEWS_DATA_ENVIRONMENT: staging
+      NUTSNEWS_SUPABASE_CREDENTIALS_ENV: staging
+      NUTSNEWS_SUPABASE_PROJECT_REF: public-smoke-fixture
+      NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: ci-production-fixture
+      NEXT_PUBLIC_APP_ENV: staging
 
     steps:
       - name: Checkout repository

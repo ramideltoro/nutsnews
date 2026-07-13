@@ -65,7 +65,7 @@ async function testDefinitionsAndFailureFallback() {
   const definitions = loadTypeScriptModule("web/lib/runtimeFeatureFlagDefinitions.ts");
   const serverFlags = loadTypeScriptModule("web/lib/runtimeFeatureFlags.ts", {
     "server-only": {},
-    "@supabase/supabase-js": { createClient() {} },
+    "@/lib/supabase": { getServerSupabase() {} },
     "@/lib/runtimeFeatureFlagDefinitions": definitions,
   });
 
