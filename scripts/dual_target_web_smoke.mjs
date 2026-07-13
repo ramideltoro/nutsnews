@@ -18,6 +18,26 @@ function option(name) {
   return value.trim();
 }
 
+function options(name) {
+  const values = [];
+
+  for (let index = 0; index < process.argv.length; index += 1) {
+    if (process.argv[index] !== name) {
+      continue;
+    }
+
+    const value = process.argv[index + 1];
+
+    if (!value || value.startsWith("--")) {
+      throw new Error(`${name} requires a value`);
+    }
+
+    values.push(value.trim());
+  }
+
+  return values;
+}
+
 function required(value, label) {
   if (!value) {
     throw new Error(`${label} is required`);
@@ -52,6 +72,29 @@ function assertEqual(actual, expected, label) {
   }
 }
 
+function assertRuntimeConfigIsPublic(config) {
+  const expectedKeys = new Set([
+    "runtimeEnv",
+    "sideEffectsMode",
+    "supabaseUrl",
+    "supabaseAnonKey",
+    "turnstileSiteKey",
+    "sentryDsn",
+    "gaId",
+    "iosAppStoreUrl",
+    "sourceCommit",
+    "buildId",
+    "deploymentTarget",
+    "expectedImageDigest",
+    "telemetryEnabled",
+  ]);
+  const unexpectedKeys = Object.keys(config).filter((key) => !expectedKeys.has(key));
+
+  if (unexpectedKeys.length > 0) {
+    throw new Error("Runtime public configuration returned keys outside its allowlist");
+  }
+}
+
 const baseUrlValue = required(
   option("--base-url") || process.env.NUTSNEWS_SMOKE_BASE_URL,
   "--base-url or NUTSNEWS_SMOKE_BASE_URL",
@@ -72,6 +115,13 @@ const expectedDeploymentTarget = required(
 const expectedRuntimeEnv = option("--expected-runtime-env") || process.env.NUTSNEWS_EXPECTED_RUNTIME_ENV;
 const expectedSupabaseUrl = option("--expected-supabase-url") || process.env.NUTSNEWS_EXPECTED_SUPABASE_URL;
 const expectedImageDigest = option("--expected-image-digest") || process.env.NUTSNEWS_EXPECTED_IMAGE_DIGEST;
+const expectedSideEffectsMode =
+  option("--expected-side-effects-mode") || process.env.NUTSNEWS_EXPECTED_SIDE_EFFECTS_MODE;
+const expectedTurnstileSiteKey =
+  option("--expected-turnstile-site-key") || process.env.NUTSNEWS_EXPECTED_TURNSTILE_SITE_KEY;
+const expectedSentryDsn = option("--expected-sentry-dsn") || process.env.NUTSNEWS_EXPECTED_SENTRY_DSN;
+const expectedGaId = option("--expected-ga-id") || process.env.NUTSNEWS_EXPECTED_GA_ID;
+const forbiddenRuntimeConfigTokens = options("--forbidden-runtime-config-token");
 
 const baseUrl = new URL(baseUrlValue.endsWith("/") ? baseUrlValue : `${baseUrlValue}/`);
 
@@ -105,7 +155,16 @@ assertEqual(
   "Health deployment target header",
 );
 
-if (expectedRuntimeEnv || expectedSupabaseUrl || expectedImageDigest) {
+if (
+  expectedRuntimeEnv ||
+  expectedSupabaseUrl ||
+  expectedImageDigest ||
+  expectedSideEffectsMode ||
+  expectedTurnstileSiteKey ||
+  expectedSentryDsn ||
+  expectedGaId ||
+  forbiddenRuntimeConfigTokens.length > 0
+) {
   const runtimeConfigResponse = await fetchOk(
     endpoint(baseUrl, "/api/runtime-config"),
     "Runtime public configuration endpoint",
@@ -116,6 +175,8 @@ if (expectedRuntimeEnv || expectedSupabaseUrl || expectedImageDigest) {
     throw new Error("Runtime public configuration endpoint must be no-store");
   }
 
+  assertRuntimeConfigIsPublic(runtimeConfig);
+
   if (expectedRuntimeEnv) {
     assertEqual(runtimeConfig.runtimeEnv, expectedRuntimeEnv, "Runtime environment");
   }
@@ -124,6 +185,25 @@ if (expectedRuntimeEnv || expectedSupabaseUrl || expectedImageDigest) {
   }
   if (expectedImageDigest) {
     assertEqual(runtimeConfig.expectedImageDigest, expectedImageDigest, "Runtime expected image digest");
+  }
+  if (expectedSideEffectsMode) {
+    assertEqual(runtimeConfig.sideEffectsMode, expectedSideEffectsMode, "Runtime side-effects mode");
+  }
+  if (expectedTurnstileSiteKey) {
+    assertEqual(runtimeConfig.turnstileSiteKey, expectedTurnstileSiteKey, "Runtime Turnstile site key");
+  }
+  if (expectedSentryDsn) {
+    assertEqual(runtimeConfig.sentryDsn, expectedSentryDsn, "Runtime Sentry DSN");
+  }
+  if (expectedGaId) {
+    assertEqual(runtimeConfig.gaId, expectedGaId, "Runtime analytics ID");
+  }
+
+  const serializedRuntimeConfig = JSON.stringify(runtimeConfig);
+  for (const token of forbiddenRuntimeConfigTokens) {
+    if (serializedRuntimeConfig.includes(token)) {
+      throw new Error("Runtime public configuration included a forbidden fixture marker");
+    }
   }
 }
 

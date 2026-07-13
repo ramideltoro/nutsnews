@@ -86,6 +86,7 @@ test("runtime public configuration rejects invalid URLs and unknown identities",
   assert.equal(config.sideEffectsMode, "disabled");
   assert.equal(config.supabaseUrl, null);
   assert.equal(config.sentryDsn, null);
+  assert.equal(config.expectedImageDigest, "unknown");
   assert.equal(config.telemetryEnabled, false);
 });
 
@@ -105,8 +106,33 @@ test("staging configuration fails closed when live side effects are requested", 
   assert.equal(config.telemetryEnabled, false);
 });
 
+test("unknown environments and malformed image digests fail closed", () => {
+  const config = getRuntimePublicConfig({
+    NUTSNEWS_RUNTIME_ENV: "preview",
+    NUTSNEWS_SIDE_EFFECTS_MODE: "sandbox",
+    NUTSNEWS_EXPECTED_IMAGE_DIGEST: "sha256:not-a-real-digest",
+  });
+
+  assert.equal(config.runtimeEnv, "unknown");
+  assert.equal(config.sideEffectsMode, "disabled");
+  assert.equal(config.expectedImageDigest, "unknown");
+});
+
 test("browser entries and immutable image inputs do not embed runtime public values", async () => {
-  const [dockerfile, workflow, contactForm, articleFeed, layout, instrumentation, route, homePage] = await Promise.all([
+  const [
+    dockerfile,
+    workflow,
+    contactForm,
+    articleFeed,
+    layout,
+    instrumentation,
+    route,
+    homePage,
+    runtimeConfig,
+    sentryServer,
+    sentryEdge,
+    logger,
+  ] = await Promise.all([
     readFile(resolve(root, "web/Dockerfile"), "utf8"),
     readFile(resolve(root, ".github/workflows/container-image.yml"), "utf8"),
     readFile(resolve(root, "web/app/contact/ContactForm.tsx"), "utf8"),
@@ -115,6 +141,10 @@ test("browser entries and immutable image inputs do not embed runtime public val
     readFile(resolve(root, "web/instrumentation-client.ts"), "utf8"),
     readFile(resolve(root, "web/app/api/runtime-config/route.ts"), "utf8"),
     readFile(resolve(root, "web/app/page.tsx"), "utf8"),
+    readFile(resolve(root, "web/runtimePublicConfig.mjs"), "utf8"),
+    readFile(resolve(root, "web/sentry.server.config.ts"), "utf8"),
+    readFile(resolve(root, "web/sentry.edge.config.ts"), "utf8"),
+    readFile(resolve(root, "web/lib/logger.ts"), "utf8"),
   ]);
 
   assert.doesNotMatch(dockerfile, /ARG NEXT_PUBLIC_(?:SUPABASE|APP_ENV|TURNSTILE|SENTRY|GA)/);
@@ -131,4 +161,21 @@ test("browser entries and immutable image inputs do not embed runtime public val
   assert.match(homePage, /revalidate: 900/);
   assert.match(articleFeed, /initialEnglishArticlesRef\.current\.length === 0/);
   assert.match(articleFeed, /void loadLocalizedHomeFeed\(storedLanguage\)/);
+  assert.match(workflow, /@sha256/);
+  for (const source of [sentryServer, sentryEdge, logger]) {
+    assert.match(source, /getRuntimePublicConfig/);
+    assert.match(source, /runtimeEnv/);
+  }
+  assert.match(logger, /isTelemetryDeliveryAllowed/);
+  for (const serverSecretName of [
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "TURNSTILE_SECRET_KEY",
+    "RESEND_API_KEY",
+    "AUTH_SECRET",
+    "SENTRY_AUTH_TOKEN",
+    "BETTER_STACK_SOURCE_TOKEN",
+  ]) {
+    assert.doesNotMatch(runtimeConfig, new RegExp(serverSecretName));
+    assert.doesNotMatch(route, new RegExp(serverSecretName));
+  }
 });
