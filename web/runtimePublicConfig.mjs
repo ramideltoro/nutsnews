@@ -1,6 +1,7 @@
 import { getRuntimeSafetyPolicy } from "./runtimeSafety.mjs";
 
 const MAX_PUBLIC_VALUE_LENGTH = 2048;
+const IMAGE_DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/;
 
 function value(env, ...names) {
   for (const name of names) {
@@ -44,6 +45,11 @@ function identityValue(env, fallback, ...names) {
   return fallback;
 }
 
+function imageDigest(env) {
+  const candidate = value(env, "NUTSNEWS_EXPECTED_IMAGE_DIGEST");
+
+  return IMAGE_DIGEST_PATTERN.test(candidate) ? candidate : "unknown";
+}
 /**
  * Return the browser-safe, runtime-owned configuration allowlist.
  *
@@ -77,11 +83,7 @@ export function getRuntimePublicConfig(env = process.env) {
     "NUTSNEWS_DEPLOYMENT_TARGET",
     "VERCEL_ENV",
   );
-  const expectedImageDigest = identityValue(
-    env,
-    "unknown",
-    "NUTSNEWS_EXPECTED_IMAGE_DIGEST",
-  );
+  const expectedImageDigest = imageDigest(env);
 
   return {
     runtimeEnv: resolvedRuntimeEnv,

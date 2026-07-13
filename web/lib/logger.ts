@@ -1,14 +1,13 @@
+import { getRuntimePublicConfig } from "@/lib/runtimePublicConfig";
+import { isTelemetryDeliveryAllowed } from "@/lib/runtimeSafety";
+
 type LogLevel = "debug" | "info" | "warn" | "error";
 
 type LogFields = Record<string, unknown>;
 
-import { isTelemetryDeliveryAllowed } from "@/lib/runtimeSafety";
-
 const SERVICE_NAME = "nutsnews-web";
-const DEFAULT_ENVIRONMENT =
-    process.env.NUTSNEWS_RUNTIME_ENV ??
-    process.env.NEXT_PUBLIC_APP_ENV ??
-    "unknown";
+const runtimePublicConfig = getRuntimePublicConfig();
+const DEFAULT_ENVIRONMENT = runtimePublicConfig.runtimeEnv;
 const DEFAULT_INFO_SAMPLE_RATE = 0.05;
 
 function getInfoSampleRate() {
