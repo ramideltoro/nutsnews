@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync, spawn } from "node:child_process";
+import { resolve } from "node:path";
 
 import { getMigrationContract } from "./migration_contract.mjs";
 
@@ -9,6 +10,11 @@ const MAX_PRODUCTION_BACKUP_AGE_MS = 60 * 60 * 1000;
 
 function environmentValue(env, name) {
   return String(env[name] ?? "").trim();
+}
+
+export function getMigrationSourceRoot(env = process.env) {
+  const configuredRoot = environmentValue(env, "NUTSNEWS_MIGRATION_SOURCE_ROOT");
+  return configuredRoot ? resolve(configuredRoot) : resolve(import.meta.dirname, "..");
 }
 
 export function getMigrationWorkflowPolicy(env = process.env, now = Date.now()) {
@@ -94,9 +100,9 @@ export async function runWithMigrationLock({ acquireLock, applyMigrations, recor
   }
 }
 
-function runCommand(command, args) {
+function runCommand(command, args, options = {}) {
   try {
-    execFileSync(command, args, { stdio: "inherit" });
+    execFileSync(command, args, { stdio: "inherit", ...options });
   } catch {
     throw new Error("Locked migration workflow command failed.");
   }
@@ -104,12 +110,13 @@ function runCommand(command, args) {
 
 export async function runLockedMigrationWorkflow(env = process.env) {
   const policy = getMigrationWorkflowPolicy(env);
-  const contract = await getMigrationContract();
+  const migrationSourceRoot = getMigrationSourceRoot(env);
+  const contract = await getMigrationContract(migrationSourceRoot);
 
   await runWithMigrationLock({
     acquireLock: () => acquirePostgresMigrationLock(policy.databaseUrl),
     applyMigrations: async () => {
-      runCommand("supabase", ["db", "push", "--db-url", policy.databaseUrl, "--include-all"]);
+      runCommand("supabase", ["db", "push", "--db-url", policy.databaseUrl, "--include-all"], { cwd: migrationSourceRoot });
     },
     recordContract: async () => {
       runCommand("psql", [
@@ -118,7 +125,7 @@ export async function runLockedMigrationWorkflow(env = process.env) {
         "ON_ERROR_STOP=1",
         policy.databaseUrl,
         "--command",
-        `SELECT public.nutsnews_record_migration_head('${contract.head}');`,
+        `SELECT public.nutsnews_record_migration_head('${contract.head}'); NOTIFY pgrst, 'reload schema';`,
       ]);
     },
   });

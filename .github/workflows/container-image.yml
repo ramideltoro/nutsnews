@@ -375,6 +375,7 @@ jobs:
             tests/migration-workflow.test.mjs \
             tests/old-digest-compatibility.test.mjs \
             tests/staging-fixtures.test.mjs \
+            tests/staging-migration-request.test.mjs \
             tests/runtime-readiness.test.mjs
 
       - name: Stop disposable Supabase services

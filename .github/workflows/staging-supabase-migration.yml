@@ -1,0 +1,179 @@
+name: Apply Verified NutsNews Staging Supabase Migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_commit:
+        description: Full SHA already reachable from ramideltoro/nutsnews main.
+        required: true
+        type: string
+      migration_head:
+        description: Expected 14-digit head from that source commit's supabase/migrations directory.
+        required: true
+        type: string
+      confirmation:
+        description: Type apply-staging-supabase-migrations to permit this staging-only forward migration.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nutsnews-staging-supabase-migration
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Validate trusted main source and migration request
+    if: github.repository == 'ramideltoro/nutsnews' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      source_commit: ${{ steps.request.outputs.source_commit }}
+      migration_head: ${{ steps.request.outputs.migration_head }}
+
+    steps:
+      - name: Checkout the reviewed automation revision with history
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: automation
+
+      - name: Validate the fixed staging-only migration request
+        id: request
+        working-directory: automation
+        env:
+          NUTSNEWS_STAGING_MIGRATION_SOURCE_COMMIT: ${{ inputs.source_commit }}
+          NUTSNEWS_STAGING_MIGRATION_HEAD: ${{ inputs.migration_head }}
+          NUTSNEWS_STAGING_MIGRATION_CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          node scripts/staging_migration_request.mjs
+
+      - name: Checkout the reviewed automation revision
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.request.outputs.source_commit }}
+          persist-credentials: false
+          path: approved-source
+
+      - name: Verify the checked-out source declares the approved migration head
+        env:
+          NUTSNEWS_EXPECTED_MIGRATION_HEAD: ${{ steps.request.outputs.migration_head }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { getMigrationContract, readApplicationMigrationContract } from "./automation/scripts/migration_contract.mjs";
+
+          const sourceRoot = `${process.env.GITHUB_WORKSPACE}/approved-source`;
+          const [contract, applicationContract] = await Promise.all([
+            getMigrationContract(sourceRoot),
+            readApplicationMigrationContract(sourceRoot),
+          ]);
+          if (contract.head !== process.env.NUTSNEWS_EXPECTED_MIGRATION_HEAD || applicationContract.migrationHead !== contract.head) {
+            throw new Error("Checked-out migrations do not match the approved staging migration head.");
+          }
+          console.log(`Approved staging migration source declares head ${contract.head}.`);
+          NODE
+
+      - name: Summarize safe preflight result
+        env:
+          SOURCE_COMMIT: ${{ steps.request.outputs.source_commit }}
+          MIGRATION_HEAD: ${{ steps.request.outputs.migration_head }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## Verified staging Supabase migration request"
+            echo
+            echo "- Source commit: \`${SOURCE_COMMIT}\`"
+            echo "- Migration head: \`${MIGRATION_HEAD}\`"
+            echo "- The staging-supabase environment and database credential were not available to this job."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  migrate:
+    name: Apply verified staging-only forward migrations
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: staging-supabase
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout the reviewed automation revision
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          path: automation
+
+      - name: Checkout the approved migration source files
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.preflight.outputs.source_commit }}
+          persist-credentials: false
+          path: approved-source
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Use the reviewed Supabase CLI version
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.105.0
+
+      - name: Install PostgreSQL client
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Validate protected staging database credential is present
+        env:
+          NUTSNEWS_STAGING_MIGRATION_DATABASE_URL: ${{ secrets.NUTSNEWS_STAGING_MIGRATION_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$NUTSNEWS_STAGING_MIGRATION_DATABASE_URL" ]]; then
+            echo "Missing required staging-supabase environment secret: NUTSNEWS_STAGING_MIGRATION_DATABASE_URL" >&2
+            exit 1
+          fi
+
+      - name: Apply only forward migrations under the staging database advisory lock
+        env:
+          NUTSNEWS_MIGRATION_TARGET: staging
+          NUTSNEWS_MIGRATION_PURPOSE: staging-qualification
+          NUTSNEWS_MIGRATION_DIRECTION: up
+          NUTSNEWS_MIGRATION_DATABASE_URL: ${{ secrets.NUTSNEWS_STAGING_MIGRATION_DATABASE_URL }}
+          NUTSNEWS_MIGRATION_SOURCE_ROOT: ${{ github.workspace }}/approved-source
+        run: |
+          set -euo pipefail
+          node automation/scripts/locked_migration_workflow.mjs
+
+      - name: Verify the database reports the requested schema contract
+        env:
+          NUTSNEWS_MIGRATION_DATABASE_URL: ${{ secrets.NUTSNEWS_STAGING_MIGRATION_DATABASE_URL }}
+          NUTSNEWS_EXPECTED_MIGRATION_HEAD: ${{ needs.preflight.outputs.migration_head }}
+          NUTSNEWS_MIGRATION_SOURCE_ROOT: ${{ github.workspace }}/approved-source
+        run: |
+          set -euo pipefail
+          node automation/scripts/verify_staging_migration_contract.mjs
+
+      - name: Summarize the completed staging-only migration
+        env:
+          SOURCE_COMMIT: ${{ needs.preflight.outputs.source_commit }}
+          MIGRATION_HEAD: ${{ needs.preflight.outputs.migration_head }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## Staging Supabase migration complete"
+            echo
+            echo "- Source commit: \`${SOURCE_COMMIT}\`"
+            echo "- Migration head: \`${MIGRATION_HEAD}\`"
+            echo "- Applied only forward migrations to the protected staging-supabase environment."
+            echo "- No VPS deployment or production migration was requested."
+          } >> "$GITHUB_STEP_SUMMARY"
