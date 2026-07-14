@@ -7,8 +7,9 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path) => readFile(resolve(root, path), "utf8");
-const [workflow, request, runner, verifier, regressionWorkflow] = await Promise.all([
+const [workflow, backupWorkflow, request, runner, verifier, regressionWorkflow] = await Promise.all([
   read(".github/workflows/production-supabase-migration.yml"),
+  read(".github/workflows/supabase-backup.yml"),
   read("scripts/production_migration_request.mjs"),
   read("scripts/locked_migration_workflow.mjs"),
   read("scripts/verify_production_migration_contract.mjs"),
@@ -51,6 +52,17 @@ assert.ok(
 );
 assert.doesNotMatch(workflow, /supabase db reset|migration_direction:\s*down/i, "Production workflow must never reset or reverse the database.");
 assert.doesNotMatch(workflow, /echo\s+\"?\$SUPABASE_ACCESS_TOKEN|cat\s+.*database/i, "Production workflow must not print protected credentials.");
+
+requireText(
+  backupWorkflow,
+  "SUPABASE_URL: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_URL }}",
+  "Production backup must use the explicit production Supabase endpoint.",
+);
+assert.doesNotMatch(
+  backupWorkflow,
+  /SUPABASE_URL:\s*\$\{\{\s*secrets\.(?:SUPABASE_URL|NEXT_PUBLIC_SUPABASE_URL)/,
+  "Production backup must not fall back to a legacy generic Supabase endpoint.",
+);
 
 for (const fragment of ["backupRunId", "Supabase Backup", "workflow_dispatch", "MAX_BACKUP_AGE_MS", "origin/main"]) {
   requireText(request, fragment, `Production request validation is missing ${fragment}.`);
