@@ -43,6 +43,11 @@ requireText(releaseWorkflow, "nutsnews_migration_schema_contract", "Release prom
 requireText(releaseWorkflow, "expected_schema_fingerprint", "Release promotion must reject live catalog drift.");
 requireText(
   releaseWorkflow,
+  'url !== `https://${projectRef}.supabase.co`',
+  "Release promotion must bind its database check to the reviewed production project reference.",
+);
+requireText(
+  releaseWorkflow,
   "SUPABASE_ANON_KEY: ${{ secrets.NUTSNEWS_PRODUCTION_SUPABASE_ANON_KEY }}",
   "Release promotion must use the production-specific Supabase anon credential.",
 );
@@ -53,5 +58,6 @@ assert.doesNotMatch(
 );
 requireText(releaseWorkflow, "migration_head: migrationHead", "Promotion payload must include the verified migration head.");
 requireText(releaseWorkflow, "schema_version: schemaVersion", "Promotion payload must include the rollback-compatible schema marker.");
+requireText(releaseWorkflow, "supabase_project_ref: supabaseProjectRef", "Promotion payload must include the verified Supabase project identity.");
 
 console.log("Production release workflow regression checks passed.");
