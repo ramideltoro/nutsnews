@@ -41,16 +41,25 @@ export async function listMigrations(root = resolve(import.meta.dirname, "..")) 
 export async function getMigrationContract(root = resolve(import.meta.dirname, "..")) {
   const migrations = await listMigrations(root);
   const hash = createHash("sha256");
+  let headSource = "";
 
   for (const migration of migrations) {
+    const source = await readFile(migration.path);
     hash.update(migration.filename);
     hash.update("\0");
-    hash.update(await readFile(migration.path));
+    hash.update(source);
     hash.update("\0");
+    if (migration === migrations.at(-1)) headSource = source.toString("utf8");
+  }
+
+  const head = migrations.at(-1).version;
+  const escapedHead = head.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (!new RegExp(`select\\s+public\\.nutsnews_record_migration_head\\(\\s*'${escapedHead}'\\s*\\)\\s*;`, "i").test(headSource)) {
+    throw new Error(`Head migration ${head} must atomically record its migration contract.`);
   }
 
   return Object.freeze({
-    head: migrations.at(-1).version,
+    head,
     sourceFingerprint: hash.digest("hex"),
     migrations,
   });

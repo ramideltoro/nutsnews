@@ -49,3 +49,12 @@ test("migration validation rejects duplicate versions before a database is touch
 
   await assert.rejects(() => listMigrations(root), /strictly increasing/);
 });
+
+test("migration validation requires the head migration to record its own contract atomically", async () => {
+  const root = await mkdtemp(resolve(tmpdir(), "nutsnews-migration-head-contract-"));
+  const migrations = resolve(root, "supabase/migrations");
+  await mkdir(migrations, { recursive: true });
+  await writeFile(resolve(migrations, "20260713000000_missing_contract.sql"), "select 1;\n");
+
+  await assert.rejects(() => getMigrationContract(root), /must atomically record its migration contract/);
+});

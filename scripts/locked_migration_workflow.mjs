@@ -230,6 +230,10 @@ export async function runLockedMigrationWorkflow(env = process.env) {
       runCommand("supabase", args, { cwd: migrationSourceRoot });
     },
     recordContract: async () => {
+      if (policy.useLinkedProject) {
+        console.log("Linked production migration head was recorded atomically by its head migration.");
+        return;
+      }
       runCommand("psql", [
         "--no-psqlrc",
         "--set",
