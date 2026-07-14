@@ -7,6 +7,7 @@ import {
   assertDataRead,
   assertExternalSideEffect,
   assertIsolatedDataMutation,
+  assertOAuthCallback,
   assertSyntheticFixtureMutation,
   getRuntimeSafetyPolicy,
   getSafeReadiness,
@@ -38,6 +39,16 @@ function productionEnvironment(overrides = {}) {
     NUTSNEWS_PUBLIC_SUPABASE_ANON_KEY: "test-anon-key",
     ...overrides,
   };
+}
+
+function stagingOAuthEnvironment(overrides = {}) {
+  return stagingEnvironment({
+    NUTSNEWS_OAUTH_CREDENTIALS_ENV: "staging",
+    AUTH_URL: "https://staging.nutsnews.com",
+    AUTH_GOOGLE_ID: "staging-google-client-id",
+    AUTH_GOOGLE_SECRET: "staging-google-client-secret",
+    ...overrides,
+  });
 }
 
 test("valid staging keeps read-only access available while side effects are disabled", () => {
@@ -128,5 +139,62 @@ test("only live production can perform production mutations", () => {
   assert.throws(
     () => assertSyntheticFixtureMutation("nutsnews-test-production-fixture", productionEnvironment()),
     RuntimeSafetyError,
+  );
+});
+
+test("OAuth callbacks preserve production behavior and allow only the isolated staging identity", () => {
+  assert.doesNotThrow(() =>
+    assertOAuthCallback(
+      "oauth-callback",
+      "https://www.nutsnews.com/api/auth/callback/google",
+      productionEnvironment(),
+    ),
+  );
+  assert.doesNotThrow(() =>
+    assertOAuthCallback(
+      "oauth-callback",
+      "https://staging.nutsnews.com/api/auth/callback/google",
+      stagingOAuthEnvironment(),
+    ),
+  );
+});
+
+test("staging OAuth callbacks fail closed for missing, mixed, or ambiguous identities", () => {
+  const refusedEnvironments = [
+    stagingOAuthEnvironment({ NUTSNEWS_OAUTH_CREDENTIALS_ENV: "" }),
+    stagingOAuthEnvironment({ NUTSNEWS_OAUTH_CREDENTIALS_ENV: "production" }),
+    stagingOAuthEnvironment({ AUTH_GOOGLE_ID: "" }),
+    stagingOAuthEnvironment({ AUTH_GOOGLE_SECRET: "" }),
+    stagingOAuthEnvironment({ AUTH_URL: "https://www.nutsnews.com" }),
+    stagingOAuthEnvironment({ AUTH_URL: "http://staging.nutsnews.com" }),
+    stagingOAuthEnvironment({ AUTH_URL: "https://staging.nutsnews.com/unexpected" }),
+    stagingOAuthEnvironment({ NEXTAUTH_URL: "https://different.example.test" }),
+    stagingOAuthEnvironment({ NUTSNEWS_SIDE_EFFECTS_MODE: "sandbox" }),
+  ];
+
+  for (const environment of refusedEnvironments) {
+    assert.throws(
+      () =>
+        assertOAuthCallback(
+          "oauth-callback",
+          "https://staging.nutsnews.com/api/auth/callback/google",
+          environment,
+        ),
+      (error) =>
+        error instanceof RuntimeSafetyError &&
+        error.code === "oauth_callback_identity_required",
+    );
+  }
+
+  assert.throws(
+    () =>
+      assertOAuthCallback(
+        "oauth-callback",
+        "https://origin.example.test/api/auth/callback/google",
+        stagingOAuthEnvironment(),
+      ),
+    (error) =>
+      error instanceof RuntimeSafetyError &&
+      error.code === "oauth_callback_identity_required",
   );
 });

@@ -4,6 +4,7 @@ export {
   assertDataRead,
   assertExternalSideEffect,
   assertIsolatedDataMutation,
+  assertOAuthCallback,
   assertProductionOperation,
   assertRuntimeReady,
   assertSyntheticFixtureMutation,

@@ -1,6 +1,6 @@
 import { handlers } from "@/auth";
 import { NextRequest, NextResponse } from "next/server";
-import { RuntimeSafetyError, assertProductionOperation } from "@/lib/runtimeSafety";
+import { RuntimeSafetyError, assertOAuthCallback } from "@/lib/runtimeSafety";
 
 function oauthDisabledResponse() {
   return NextResponse.json(
@@ -9,9 +9,9 @@ function oauthDisabledResponse() {
   );
 }
 
-function allowOAuthCallbacks() {
+function allowOAuthCallbacks(request: NextRequest) {
   try {
-    assertProductionOperation("oauth-callback");
+    assertOAuthCallback("oauth-callback", request.url);
     return true;
   } catch (error) {
     if (error instanceof RuntimeSafetyError) {
@@ -22,9 +22,9 @@ function allowOAuthCallbacks() {
 }
 
 export async function GET(request: NextRequest) {
-  return allowOAuthCallbacks() ? handlers.GET(request) : oauthDisabledResponse();
+  return allowOAuthCallbacks(request) ? handlers.GET(request) : oauthDisabledResponse();
 }
 
 export async function POST(request: NextRequest) {
-  return allowOAuthCallbacks() ? handlers.POST(request) : oauthDisabledResponse();
+  return allowOAuthCallbacks(request) ? handlers.POST(request) : oauthDisabledResponse();
 }
