@@ -39,7 +39,7 @@ const result = execFileSync(
     "--no-align",
     databaseUrl,
     "--command",
-    `SET ROLE postgres; SELECT migration_head = '${contract.head}' AND legacy_schema_version = '${applicationContract.legacyVersion}' AND expected_schema_fingerprint = actual_schema_fingerprint FROM public.nutsnews_migration_schema_contract();`,
+    `SET ROLE postgres; NOTIFY pgrst, 'reload schema'; SELECT migration_head = '${contract.head}' AND legacy_schema_version = '${applicationContract.legacyVersion}' AND expected_schema_fingerprint = actual_schema_fingerprint FROM public.nutsnews_migration_schema_contract();`,
   ],
   { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] },
 ).trim();
