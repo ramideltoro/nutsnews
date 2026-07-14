@@ -23,7 +23,7 @@
     "test:runtime-safety": "node --test ../tests/runtime-safety.test.mjs ../tests/mutation-paths.test.mjs ../tests/runtime-public-config.test.mjs ../tests/runtime-readiness.test.mjs",
     "test:readyz": "node --test ../tests/runtime-readiness.test.mjs",
     "test:staging-fixture": "node ../scripts/staging_fixture_integration.mjs",
-    "test:migrations": "node --test ../tests/migration-contract.test.mjs ../tests/migration-workflow.test.mjs ../tests/old-digest-compatibility.test.mjs ../tests/staging-fixtures.test.mjs ../tests/staging-migration-request.test.mjs",
+    "test:migrations": "node --test ../tests/migration-contract.test.mjs ../tests/migration-workflow.test.mjs ../tests/old-digest-compatibility.test.mjs ../tests/staging-fixtures.test.mjs ../tests/staging-migration-request.test.mjs ../tests/production-migration-request.test.mjs",
     "fixtures:staging": "node ../scripts/staging_fixtures.mjs exercise",
     "migrate:locked": "node ../scripts/locked_migration_workflow.mjs",
     "test:fluid-cpu": "node ../scripts/fluid_active_cpu_regression.mjs",

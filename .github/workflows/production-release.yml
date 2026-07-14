@@ -68,14 +68,59 @@ jobs:
           if (!/^\d+-\d+$/.test(release.build_id ?? "") || release.deployment_target !== "vps") {
             throw new Error("Release metadata has an invalid build identity or deployment target.");
           }
+          if (!/^[0-9]{14}$/.test(release.migration_head ?? "") || !/^[0-9]{14}$/.test(release.schema_version ?? "")) {
+            throw new Error("Release metadata must contain immutable migration compatibility versions.");
+          }
 
           const lines = [
             `source_commit=${release.source_commit}`,
             `image_repository=${release.image_repository}`,
             `image_digest=${release.image_digest}`,
             `build_id=${release.build_id}`,
+            `migration_head=${release.migration_head}`,
+            `schema_version=${release.schema_version}`,
           ];
           appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join("\n")}\n`, "utf8");
+          NODE
+
+      - name: Verify production Supabase satisfies the image schema contract
+        env:
+          SUPABASE_URL: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          MIGRATION_HEAD: ${{ steps.release.outputs.migration_head }}
+          SCHEMA_VERSION: ${{ steps.release.outputs.schema_version }}
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE'
+          const url = String(process.env.SUPABASE_URL ?? "").replace(/\/$/, "");
+          const key = String(process.env.SUPABASE_ANON_KEY ?? "");
+          const migrationHead = String(process.env.MIGRATION_HEAD ?? "");
+          const schemaVersion = String(process.env.SCHEMA_VERSION ?? "");
+          if (!url.startsWith("https://") || !key || !/^[0-9]{14}$/.test(migrationHead) || !/^[0-9]{14}$/.test(schemaVersion)) {
+            throw new Error("Production schema verification is missing trusted runtime inputs.");
+          }
+          const response = await fetch(`${url}/rest/v1/rpc/nutsnews_migration_schema_contract`, {
+            method: "POST",
+            headers: {
+              apikey: key,
+              Authorization: `Bearer ${key}`,
+              "Content-Type": "application/json",
+            },
+            body: "{}",
+          });
+          if (!response.ok) throw new Error(`Production migration contract returned ${response.status}.`);
+          const payload = await response.json();
+          const row = Array.isArray(payload) ? payload[0] : payload;
+          if (
+            row?.migration_head !== migrationHead ||
+            row?.legacy_schema_version !== schemaVersion ||
+            !/^[a-f0-9]{32}$/.test(row?.expected_schema_fingerprint ?? "") ||
+            row.expected_schema_fingerprint !== row.actual_schema_fingerprint
+          ) {
+            throw new Error("Production database is incompatible with this image release contract.");
+          }
+          console.log(`Verified production migration head ${migrationHead} and rollback-compatible schema ${schemaVersion}.`);
           NODE
 
       - name: Wait for the matching Vercel production deployment
@@ -164,6 +209,8 @@ jobs:
           IMAGE_REPOSITORY: ${{ steps.release.outputs.image_repository }}
           IMAGE_DIGEST: ${{ steps.release.outputs.image_digest }}
           BUILD_ID: ${{ steps.release.outputs.build_id }}
+          MIGRATION_HEAD: ${{ steps.release.outputs.migration_head }}
+          SCHEMA_VERSION: ${{ steps.release.outputs.schema_version }}
           VERCEL_DEPLOYMENT_URL: ${{ steps.vercel.outputs.deployment_url }}
           SOURCE_WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
@@ -175,6 +222,8 @@ jobs:
           const imageRepository = process.env.IMAGE_REPOSITORY ?? "";
           const imageDigest = process.env.IMAGE_DIGEST ?? "";
           const buildId = process.env.BUILD_ID ?? "";
+          const migrationHead = process.env.MIGRATION_HEAD ?? "";
+          const schemaVersion = process.env.SCHEMA_VERSION ?? "";
           const deploymentUrl = process.env.VERCEL_DEPLOYMENT_URL ?? "";
           const sourceWorkflowRunId = process.env.SOURCE_WORKFLOW_RUN_ID ?? "";
 
@@ -188,6 +237,8 @@ jobs:
             imageRepository !== "ghcr.io/ramideltoro/nutsnews" ||
             !/^sha256:[0-9a-f]{64}$/.test(imageDigest) ||
             !/^\d+-\d+$/.test(buildId) ||
+            !/^[0-9]{14}$/.test(migrationHead) ||
+            !/^[0-9]{14}$/.test(schemaVersion) ||
             !deploymentUrl.startsWith("https://") ||
             !/^\d+$/.test(sourceWorkflowRunId)
           ) {
@@ -212,6 +263,8 @@ jobs:
                   image_repository: imageRepository,
                   image_digest: imageDigest,
                   build_id: buildId,
+                  migration_head: migrationHead,
+                  schema_version: schemaVersion,
                   vercel_deployment_url: deploymentUrl,
                   source_workflow_run_id: sourceWorkflowRunId,
                 },
@@ -230,6 +283,8 @@ jobs:
           SOURCE_COMMIT: ${{ steps.release.outputs.source_commit }}
           IMAGE_DIGEST: ${{ steps.release.outputs.image_digest }}
           BUILD_ID: ${{ steps.release.outputs.build_id }}
+          MIGRATION_HEAD: ${{ steps.release.outputs.migration_head }}
+          SCHEMA_VERSION: ${{ steps.release.outputs.schema_version }}
           VERCEL_DEPLOYMENT_URL: ${{ steps.vercel.outputs.deployment_url }}
         run: |
           {
@@ -239,5 +294,7 @@ jobs:
             echo "- Vercel deployment: ${VERCEL_DEPLOYMENT_URL}"
             echo "- VPS image: \`ghcr.io/ramideltoro/nutsnews@${IMAGE_DIGEST}\`"
             echo "- Build ID: \`${BUILD_ID}\`"
+            echo "- Migration head: \`${MIGRATION_HEAD}\`"
+            echo "- Rollback-compatible schema: \`${SCHEMA_VERSION}\`"
             echo "- GitOps VPS promotion request: accepted"
           } >> "$GITHUB_STEP_SUMMARY"

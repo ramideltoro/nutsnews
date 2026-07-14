@@ -1,0 +1,265 @@
+name: Apply Verified NutsNews Production Supabase Migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_commit:
+        description: Full SHA already reachable from ramideltoro/nutsnews main.
+        required: true
+        type: string
+      migration_head:
+        description: Expected 14-digit head from that source commit's supabase/migrations directory.
+        required: true
+        type: string
+      backup_run_id:
+        description: Fresh successful manual Supabase Backup workflow run ID.
+        required: true
+        type: string
+      confirmation:
+        description: Type apply-production-supabase-migrations to permit this protected forward migration.
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: nutsnews-production-supabase-migration
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Validate main source, schema contract, and fresh backup
+    if: github.repository == 'ramideltoro/nutsnews' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      source_commit: ${{ steps.request.outputs.source_commit }}
+      migration_head: ${{ steps.request.outputs.migration_head }}
+      backup_run_id: ${{ steps.request.outputs.backup_run_id }}
+      backup_completed_at: ${{ steps.request.outputs.backup_completed_at }}
+      schema_version: ${{ steps.contract.outputs.schema_version }}
+
+    steps:
+      - name: Checkout the reviewed automation revision with history
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: automation
+
+      - name: Validate immutable production migration request and backup run
+        id: request
+        working-directory: automation
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NUTSNEWS_PRODUCTION_MIGRATION_SOURCE_COMMIT: ${{ inputs.source_commit }}
+          NUTSNEWS_PRODUCTION_MIGRATION_HEAD: ${{ inputs.migration_head }}
+          NUTSNEWS_PRODUCTION_BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
+          NUTSNEWS_PRODUCTION_MIGRATION_CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          node scripts/production_migration_request.mjs
+
+      - name: Checkout the approved migration source
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.request.outputs.source_commit }}
+          persist-credentials: false
+          path: approved-source
+
+      - name: Verify approved migration and application schema versions
+        id: contract
+        env:
+          NUTSNEWS_EXPECTED_MIGRATION_HEAD: ${{ steps.request.outputs.migration_head }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from "node:fs";
+          import { getMigrationContract, readApplicationMigrationContract } from "./automation/scripts/migration_contract.mjs";
+
+          const sourceRoot = `${process.env.GITHUB_WORKSPACE}/approved-source`;
+          const [contract, applicationContract] = await Promise.all([
+            getMigrationContract(sourceRoot),
+            readApplicationMigrationContract(sourceRoot),
+          ]);
+          if (contract.head !== process.env.NUTSNEWS_EXPECTED_MIGRATION_HEAD || applicationContract.migrationHead !== contract.head) {
+            throw new Error("Checked-out migrations do not match the approved production migration head.");
+          }
+          appendFileSync(process.env.GITHUB_OUTPUT, `schema_version=${applicationContract.legacyVersion}\n`, "utf8");
+          console.log(`Approved production migration source declares head ${contract.head}.`);
+          NODE
+
+      - name: Summarize protected preflight
+        env:
+          SOURCE_COMMIT: ${{ steps.request.outputs.source_commit }}
+          MIGRATION_HEAD: ${{ steps.request.outputs.migration_head }}
+          BACKUP_RUN_ID: ${{ steps.request.outputs.backup_run_id }}
+        run: |
+          {
+            echo "## Verified production Supabase migration request"
+            echo
+            echo "- Source commit: \`${SOURCE_COMMIT}\`"
+            echo "- Migration head: \`${MIGRATION_HEAD}\`"
+            echo "- Fresh successful backup run: \`${BACKUP_RUN_ID}\`"
+            echo "- The production-supabase environment and access token were unavailable to this preflight job."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  migrate:
+    name: Apply verified production forward migrations
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production-supabase
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout the reviewed automation revision
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          path: automation
+
+      - name: Checkout the approved migration source files
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.preflight.outputs.source_commit }}
+          persist-credentials: false
+          path: approved-source
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Use the reviewed Supabase CLI version
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.105.0
+
+      - name: Install PostgreSQL client
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Link the protected production project and derive a temporary database connection
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.NUTSNEWS_PRODUCTION_SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$SUPABASE_ACCESS_TOKEN" || ! "$PROJECT_REF" =~ ^[a-z0-9]{20}$ ]]; then
+            echo "The production-supabase access token or reviewed project reference is missing." >&2
+            exit 1
+          fi
+
+          supabase link --project-ref "$PROJECT_REF" --workdir "$GITHUB_WORKSPACE/approved-source"
+          credentials="$RUNNER_TEMP/nutsnews-production-database-plan.sh"
+          connection_file="$RUNNER_TEMP/nutsnews-production-database-url"
+          umask 077
+          supabase db dump --linked --dry-run --workdir "$GITHUB_WORKSPACE/approved-source" > "$credentials"
+          exports="$(grep -E '^export PG(HOST|PORT|USER|PASSWORD|DATABASE)=' "$credentials")"
+          if [[ "$(printf '%s\n' "$exports" | wc -l | tr -d ' ')" != "5" ]]; then
+            echo "Refusing to use an unexpected linked database credential plan." >&2
+            exit 1
+          fi
+          eval "$exports"
+          echo "::add-mask::$PGPASSWORD"
+          export PGHOST PGPORT PGUSER PGPASSWORD PGDATABASE
+          node --input-type=module > "$connection_file" <<'NODE'
+          const required = ["PGHOST", "PGPORT", "PGUSER", "PGPASSWORD", "PGDATABASE"];
+          if (required.some((name) => !process.env[name])) throw new Error("Temporary database connection is incomplete.");
+          if (
+            !/^[0-9]+$/.test(process.env.PGPORT) ||
+            !process.env.PGHOST.endsWith(".supabase.com") ||
+            !process.env.PGUSER.startsWith("cli_login_postgres.") ||
+            process.env.PGDATABASE !== "postgres"
+          ) {
+            throw new Error("Temporary database connection does not target an approved Supabase host.");
+          }
+          const user = encodeURIComponent(process.env.PGUSER);
+          const password = encodeURIComponent(process.env.PGPASSWORD);
+          const database = encodeURIComponent(process.env.PGDATABASE);
+          process.stdout.write(`postgresql://${user}:${password}@${process.env.PGHOST}:${process.env.PGPORT}/${database}?sslmode=require`);
+          NODE
+          database_url="$(<"$connection_file")"
+          echo "::add-mask::$database_url"
+          printf 'NUTSNEWS_MIGRATION_DATABASE_URL=%s\n' "$database_url" >> "$GITHUB_ENV"
+
+      - name: Capture a pre-migration production schema snapshot
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.NUTSNEWS_PRODUCTION_SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/nutsnews-production-schema-backup"
+          supabase db dump \
+            --linked \
+            --schema public \
+            --file "$RUNNER_TEMP/nutsnews-production-schema-backup/public-schema.sql" \
+            --workdir "$GITHUB_WORKSPACE/approved-source"
+
+      - name: Upload pre-migration schema snapshot
+        uses: actions/upload-artifact@v6
+        with:
+          name: production-supabase-schema-before-${{ github.run_id }}
+          path: ${{ runner.temp }}/nutsnews-production-schema-backup/public-schema.sql
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Apply only forward migrations under the production database advisory lock
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.NUTSNEWS_PRODUCTION_SUPABASE_ACCESS_TOKEN }}
+          NUTSNEWS_MIGRATION_TARGET: production
+          NUTSNEWS_MIGRATION_PURPOSE: production-protected
+          NUTSNEWS_MIGRATION_DIRECTION: up
+          NUTSNEWS_MIGRATION_SOURCE_ROOT: ${{ github.workspace }}/approved-source
+          NUTSNEWS_MIGRATION_USE_LINKED_PROJECT: "true"
+          NUTSNEWS_PRODUCTION_MIGRATION_APPROVAL: approved
+          NUTSNEWS_PRODUCTION_BACKUP_COMPLETED_AT: ${{ needs.preflight.outputs.backup_completed_at }}
+        run: |
+          set -euo pipefail
+          node automation/scripts/locked_migration_workflow.mjs
+
+      - name: Verify production reports the approved schema contract
+        env:
+          NUTSNEWS_EXPECTED_MIGRATION_HEAD: ${{ needs.preflight.outputs.migration_head }}
+          NUTSNEWS_EXPECTED_SCHEMA_VERSION: ${{ needs.preflight.outputs.schema_version }}
+          NUTSNEWS_MIGRATION_SOURCE_ROOT: ${{ github.workspace }}/approved-source
+        run: |
+          set -euo pipefail
+          node automation/scripts/verify_production_migration_contract.mjs
+
+      - name: Summarize completed protected production migration
+        env:
+          SOURCE_COMMIT: ${{ needs.preflight.outputs.source_commit }}
+          MIGRATION_HEAD: ${{ needs.preflight.outputs.migration_head }}
+          SCHEMA_VERSION: ${{ needs.preflight.outputs.schema_version }}
+          BACKUP_RUN_ID: ${{ needs.preflight.outputs.backup_run_id }}
+        run: |
+          {
+            echo "## Production Supabase migration complete"
+            echo
+            echo "- Source commit: \`${SOURCE_COMMIT}\`"
+            echo "- Migration head: \`${MIGRATION_HEAD}\`"
+            echo "- Legacy-compatible schema marker: \`${SCHEMA_VERSION}\`"
+            echo "- Backup run: \`${BACKUP_RUN_ID}\`"
+            echo "- Applied only forward migrations through the protected production-supabase environment."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove temporary database credentials
+        if: always()
+        run: |
+          set +e
+          for path in \
+            "$RUNNER_TEMP/nutsnews-production-database-plan.sh" \
+            "$RUNNER_TEMP/nutsnews-production-database-url"
+          do
+            if [[ -e "$path" ]]; then
+              shred -u "$path" 2>/dev/null || rm -f "$path"
+            fi
+          done

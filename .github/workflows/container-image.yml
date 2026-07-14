@@ -376,6 +376,7 @@ jobs:
             tests/old-digest-compatibility.test.mjs \
             tests/staging-fixtures.test.mjs \
             tests/staging-migration-request.test.mjs \
+            tests/production-migration-request.test.mjs \
             tests/runtime-readiness.test.mjs
 
       - name: Stop disposable Supabase services
@@ -580,6 +581,7 @@ jobs:
           node --input-type=module <<'NODE'
           import { mkdirSync, writeFileSync } from "node:fs";
           import { dirname } from "node:path";
+          import { getMigrationContract, readApplicationMigrationContract } from "./scripts/migration_contract.mjs";
 
           const digest = process.env.IMAGE_DIGEST ?? "";
           const sourceCommit = process.env.GITHUB_SHA ?? "";
@@ -596,6 +598,14 @@ jobs:
             throw new Error("Release metadata requires a valid build ID and output path.");
           }
 
+          const [migrationContract, applicationContract] = await Promise.all([
+            getMigrationContract(),
+            readApplicationMigrationContract(),
+          ]);
+          if (migrationContract.head !== applicationContract.migrationHead) {
+            throw new Error("Release metadata requires matching repository and application migration heads.");
+          }
+
           const imageRepository = "ghcr.io/ramideltoro/nutsnews";
           const release = {
             source_commit: sourceCommit,
@@ -605,6 +615,8 @@ jobs:
             image_tag: sourceCommit,
             image_digest: digest,
             image: `${imageRepository}@${digest}`,
+            migration_head: migrationContract.head,
+            schema_version: applicationContract.legacyVersion,
           };
 
           mkdirSync(dirname(metadataPath), { recursive: true });

@@ -35,7 +35,7 @@ export function getMigrationWorkflowPolicy(env = process.env, now = Date.now()) 
     throw new Error("Only forward migrations are supported; automatic reverse migrations are prohibited.");
   }
   if (target === "staging" && purpose === "staging-qualification") {
-    return Object.freeze({ target, databaseUrl });
+    return Object.freeze({ target, databaseUrl, useLinkedProject: false });
   }
   if (target !== "production" || purpose !== "production-protected") {
     throw new Error("Migration target must be staging-qualification or production-protected.");
@@ -48,7 +48,8 @@ export function getMigrationWorkflowPolicy(env = process.env, now = Date.now()) 
   if (!Number.isFinite(backupAt) || backupAt > now || now - backupAt > MAX_PRODUCTION_BACKUP_AGE_MS) {
     throw new Error("Production migration requires a current backup freshness preflight.");
   }
-  return Object.freeze({ target, databaseUrl });
+  const useLinkedProject = environmentValue(env, "NUTSNEWS_MIGRATION_USE_LINKED_PROJECT") === "true";
+  return Object.freeze({ target, databaseUrl, useLinkedProject });
 }
 
 export function classifyPostgresLockFailure(stderr) {
@@ -78,6 +79,7 @@ export function classifyPostgresLockFailure(stderr) {
 export function getPostgresLockScript(markerPath) {
   return [
     "\\set ON_ERROR_STOP on",
+    "SET ROLE postgres;",
     `SELECT pg_catalog.pg_advisory_lock(pg_catalog.hashtext('${LOCK_NAME}'));`,
     `\\o ${markerPath}`,
     "SELECT 'LOCK_ACQUIRED';",
@@ -222,7 +224,10 @@ export async function runLockedMigrationWorkflow(env = process.env) {
   await runWithMigrationLock({
     acquireLock: () => acquirePostgresMigrationLock(policy.databaseUrl),
     applyMigrations: async () => {
-      runCommand("supabase", ["db", "push", "--db-url", policy.databaseUrl, "--include-all"], { cwd: migrationSourceRoot });
+      const args = policy.useLinkedProject
+        ? ["db", "push", "--linked", "--include-all"]
+        : ["db", "push", "--db-url", policy.databaseUrl, "--include-all"];
+      runCommand("supabase", args, { cwd: migrationSourceRoot });
     },
     recordContract: async () => {
       runCommand("psql", [
@@ -231,7 +236,7 @@ export async function runLockedMigrationWorkflow(env = process.env) {
         "ON_ERROR_STOP=1",
         policy.databaseUrl,
         "--command",
-        `SELECT public.nutsnews_record_migration_head('${contract.head}'); NOTIFY pgrst, 'reload schema';`,
+        `SET ROLE postgres; SELECT public.nutsnews_record_migration_head('${contract.head}'); NOTIFY pgrst, 'reload schema';`,
       ]);
     },
   });

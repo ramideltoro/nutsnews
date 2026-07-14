@@ -16,6 +16,8 @@ requireText(containerWorkflow, "cancel-in-progress: false", "Container Image mus
 requireText(containerWorkflow, "name: nutsnews-production-release", "Container Image must publish release metadata.");
 requireText(containerWorkflow, "image_digest", "Release metadata must include the immutable image digest.");
 requireText(containerWorkflow, "image_tag: sourceCommit", "Release metadata must use the full commit tag.");
+requireText(containerWorkflow, "migration_head: migrationContract.head", "Release metadata must include the repository migration head.");
+requireText(containerWorkflow, "schema_version: applicationContract.legacyVersion", "Release metadata must include the rollback-compatible schema marker.");
 requireText(containerWorkflow, "uses: actions/upload-artifact@v6", "Release metadata must be retained as an artifact.");
 
 requireText(releaseWorkflow, "workflow_run:", "Release promotion must wait for Container Image completion.");
@@ -37,5 +39,9 @@ requireText(releaseWorkflow, "NUTSNEWS_INFRA_RELEASE_TOKEN", "Cross-repository p
 requireText(releaseWorkflow, "nutsnews-production-release", "The dispatch event must be narrowly named.");
 requireText(releaseWorkflow, "https://api.github.com/repos/ramideltoro/nutsnews-infra/dispatches", "Promotion must target only nutsnews-infra.");
 requireText(releaseWorkflow, "image_digest", "Promotion payload must include the immutable image digest.");
+requireText(releaseWorkflow, "nutsnews_migration_schema_contract", "Release promotion must verify the live production database contract.");
+requireText(releaseWorkflow, "expected_schema_fingerprint", "Release promotion must reject live catalog drift.");
+requireText(releaseWorkflow, "migration_head: migrationHead", "Promotion payload must include the verified migration head.");
+requireText(releaseWorkflow, "schema_version: schemaVersion", "Promotion payload must include the rollback-compatible schema marker.");
 
 console.log("Production release workflow regression checks passed.");
