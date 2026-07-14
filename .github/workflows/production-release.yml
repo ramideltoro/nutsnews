@@ -87,6 +87,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.NUTSNEWS_PRODUCTION_SUPABASE_ANON_KEY }}
+          SUPABASE_PROJECT_REF: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF }}
           MIGRATION_HEAD: ${{ steps.release.outputs.migration_head }}
           SCHEMA_VERSION: ${{ steps.release.outputs.schema_version }}
         run: |
@@ -95,9 +96,16 @@ jobs:
           node --input-type=module <<'NODE'
           const url = String(process.env.SUPABASE_URL ?? "").replace(/\/$/, "");
           const key = String(process.env.SUPABASE_ANON_KEY ?? "");
+          const projectRef = String(process.env.SUPABASE_PROJECT_REF ?? "");
           const migrationHead = String(process.env.MIGRATION_HEAD ?? "");
           const schemaVersion = String(process.env.SCHEMA_VERSION ?? "");
-          if (!url.startsWith("https://") || !key || !/^[0-9]{14}$/.test(migrationHead) || !/^[0-9]{14}$/.test(schemaVersion)) {
+          if (
+            !/^[a-z0-9]{20}$/.test(projectRef) ||
+            url !== `https://${projectRef}.supabase.co` ||
+            !key ||
+            !/^[0-9]{14}$/.test(migrationHead) ||
+            !/^[0-9]{14}$/.test(schemaVersion)
+          ) {
             throw new Error("Production schema verification is missing trusted runtime inputs.");
           }
           const response = await fetch(`${url}/rest/v1/rpc/nutsnews_migration_schema_contract`, {
@@ -211,6 +219,7 @@ jobs:
           BUILD_ID: ${{ steps.release.outputs.build_id }}
           MIGRATION_HEAD: ${{ steps.release.outputs.migration_head }}
           SCHEMA_VERSION: ${{ steps.release.outputs.schema_version }}
+          SUPABASE_PROJECT_REF: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF }}
           VERCEL_DEPLOYMENT_URL: ${{ steps.vercel.outputs.deployment_url }}
           SOURCE_WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
@@ -224,6 +233,7 @@ jobs:
           const buildId = process.env.BUILD_ID ?? "";
           const migrationHead = process.env.MIGRATION_HEAD ?? "";
           const schemaVersion = process.env.SCHEMA_VERSION ?? "";
+          const supabaseProjectRef = process.env.SUPABASE_PROJECT_REF ?? "";
           const deploymentUrl = process.env.VERCEL_DEPLOYMENT_URL ?? "";
           const sourceWorkflowRunId = process.env.SOURCE_WORKFLOW_RUN_ID ?? "";
 
@@ -239,6 +249,7 @@ jobs:
             !/^\d+-\d+$/.test(buildId) ||
             !/^[0-9]{14}$/.test(migrationHead) ||
             !/^[0-9]{14}$/.test(schemaVersion) ||
+            !/^[a-z0-9]{20}$/.test(supabaseProjectRef) ||
             !deploymentUrl.startsWith("https://") ||
             !/^\d+$/.test(sourceWorkflowRunId)
           ) {
@@ -265,6 +276,7 @@ jobs:
                   build_id: buildId,
                   migration_head: migrationHead,
                   schema_version: schemaVersion,
+                  supabase_project_ref: supabaseProjectRef,
                   vercel_deployment_url: deploymentUrl,
                   source_workflow_run_id: sourceWorkflowRunId,
                 },
