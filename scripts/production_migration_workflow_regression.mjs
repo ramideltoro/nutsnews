@@ -58,10 +58,15 @@ requireText(
   "SUPABASE_URL: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_URL }}",
   "Production backup must use the explicit production Supabase endpoint.",
 );
+requireText(
+  backupWorkflow,
+  "SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NUTSNEWS_PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}",
+  "Production backup must use the explicit production Supabase service credential.",
+);
 assert.doesNotMatch(
   backupWorkflow,
-  /SUPABASE_URL:\s*\$\{\{\s*secrets\.(?:SUPABASE_URL|NEXT_PUBLIC_SUPABASE_URL)/,
-  "Production backup must not fall back to a legacy generic Supabase endpoint.",
+  /(?:SUPABASE_URL|SUPABASE_SERVICE_ROLE_KEY):\s*\$\{\{\s*secrets\.(?:SUPABASE_URL|NEXT_PUBLIC_SUPABASE_URL|SUPABASE_SERVICE_ROLE_KEY)(?:\s|\})/,
+  "Production backup must not fall back to a legacy generic Supabase endpoint or credential.",
 );
 
 for (const fragment of ["backupRunId", "Supabase Backup", "workflow_dispatch", "MAX_BACKUP_AGE_MS", "origin/main"]) {
