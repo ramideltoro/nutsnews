@@ -55,6 +55,7 @@ for (const fragment of [
 
 requireText(migrationRunner, "NOTIFY pgrst, 'reload schema'", "Migration runner must reload the PostgREST schema cache after a staging migration.");
 requireText(migrationRunner, "NUTSNEWS_MIGRATION_SOURCE_ROOT", "Migration runner must use only the approved source migration files.");
+requireText(migrationRunner, "--output=L", "The Linux migration lock client must line-buffer its lock-acquired marker.");
 requireText(verifier, "nutsnews_migration_schema_contract", "Staging migration verifier must query the migration contract.");
 requireText(regressionWorkflow, "node scripts/staging_migration_workflow_regression.mjs", "Regression workflow must run the staging migration workflow guard.");
 requireText(containerWorkflow, "tests/staging-migration-request.test.mjs", "The container-image migration gate must run staging migration request tests.");

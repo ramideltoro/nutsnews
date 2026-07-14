@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 
 import {
   classifyPostgresLockFailure,
+  getPostgresLockClient,
   getMigrationSourceRoot,
   getMigrationWorkflowPolicy,
   runWithMigrationLock,
@@ -97,4 +98,16 @@ test("lock failures classify malformed connection URLs without exposing a connec
 
   assert.match(diagnosis, /malformed/i);
   assert.doesNotMatch(diagnosis, /do-not-log-me|pooler\.example|postgresql:/i);
+});
+
+test("the Linux lock client line-buffers the advisory-lock marker without changing the psql request", () => {
+  const databaseUrl = "postgresql://synthetic";
+  const linuxClient = getPostgresLockClient(databaseUrl, "linux");
+  const darwinClient = getPostgresLockClient(databaseUrl, "darwin");
+
+  assert.equal(linuxClient.command, "stdbuf");
+  assert.deepEqual(linuxClient.args.slice(0, 3), ["--output=L", "psql", "--no-psqlrc"]);
+  assert.equal(linuxClient.args.at(-1), "SELECT pg_catalog.pg_advisory_lock(pg_catalog.hashtext('nutsnews:migration-workflow')); SELECT 'LOCK_ACQUIRED'; SELECT pg_catalog.pg_sleep(3600);");
+  assert.equal(darwinClient.command, "psql");
+  assert.deepEqual(darwinClient.args, linuxClient.args.slice(2));
 });
