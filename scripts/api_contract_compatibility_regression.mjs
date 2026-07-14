@@ -1310,10 +1310,17 @@ async function testLogTestContract() {
 async function testAuthContract() {
   const handlerGet = () => new Response("GET");
   const handlerPost = () => new Response("POST");
+  class RuntimeSafetyError extends Error {}
+  const guardedRequests = [];
   const authRoute = loadModule("web/app/api/auth/[...nextauth]/route.ts", {
     "@/auth": { handlers: { GET: handlerGet, POST: handlerPost } },
     "next/server": nextServerMock(),
-    "@/lib/runtimeSafety": { assertProductionOperation() {} },
+    "@/lib/runtimeSafety": {
+      RuntimeSafetyError,
+      assertOAuthCallback(operation, requestUrl) {
+        guardedRequests.push([operation, requestUrl]);
+      },
+    },
   });
   assertMethodExports(authRoute, ["GET", "POST"], "/api/auth/[...nextauth]");
   assert.equal(
@@ -1326,6 +1333,33 @@ async function testAuthContract() {
     "POST",
     "Auth POST must delegate after the runtime safety guard permits it",
   );
+  assert.deepEqual(
+    guardedRequests,
+    [
+      ["oauth-callback", "https://www.nutsnews.com/api/auth/session"],
+      ["oauth-callback", "https://www.nutsnews.com/api/auth/session"],
+    ],
+    "Auth GET and POST must pass their request URL to the callback identity guard",
+  );
+
+  const blockedAuthRoute = loadModule("web/app/api/auth/[...nextauth]/route.ts", {
+    "@/auth": { handlers: { GET: handlerGet, POST: handlerPost } },
+    "next/server": nextServerMock(),
+    "@/lib/runtimeSafety": {
+      RuntimeSafetyError,
+      assertOAuthCallback() {
+        throw new RuntimeSafetyError("blocked");
+      },
+    },
+  });
+
+  for (const method of ["GET", "POST"]) {
+    const response = await blockedAuthRoute[method](
+      new Request("https://staging.nutsnews.com/api/auth/session", { method }),
+    );
+    assertStatus(response, 503, `Auth ${method} blocked identity`);
+    assert.match(response.headers.get("cache-control") ?? "", /no-store/);
+  }
 
   let capturedConfiguration;
   const googleProvider = { id: "google" };
