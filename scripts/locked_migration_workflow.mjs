@@ -71,6 +71,15 @@ export function classifyPostgresLockFailure(stderr) {
   return "the protected staging database connection failed before the advisory lock was acquired";
 }
 
+export function getPostgresLockClient(databaseUrl, platform = process.platform) {
+  const psqlArgs = ["--no-psqlrc", "--set", "ON_ERROR_STOP=1", "--tuples-only", "--no-align", databaseUrl, "--command", LOCK_SQL];
+
+  if (platform === "linux") {
+    return Object.freeze({ command: "stdbuf", args: ["--output=L", "psql", ...psqlArgs] });
+  }
+  return Object.freeze({ command: "psql", args: psqlArgs });
+}
+
 function waitForLock(process) {
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -108,11 +117,8 @@ function waitForLock(process) {
 }
 
 export async function acquirePostgresMigrationLock(databaseUrl) {
-  const lockProcess = spawn(
-    "psql",
-    ["--no-psqlrc", "--set", "ON_ERROR_STOP=1", "--tuples-only", "--no-align", databaseUrl, "--command", LOCK_SQL],
-    { stdio: ["ignore", "pipe", "pipe"] },
-  );
+  const lockClient = getPostgresLockClient(databaseUrl);
+  const lockProcess = spawn(lockClient.command, lockClient.args, { stdio: ["ignore", "pipe", "pipe"] });
   await waitForLock(lockProcess);
 
   return async () => {
