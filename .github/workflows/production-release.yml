@@ -86,7 +86,7 @@ jobs:
       - name: Verify production Supabase satisfies the image schema contract
         env:
           SUPABASE_URL: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.NUTSNEWS_PRODUCTION_SUPABASE_ANON_KEY }}
           MIGRATION_HEAD: ${{ steps.release.outputs.migration_head }}
           SCHEMA_VERSION: ${{ steps.release.outputs.schema_version }}
         run: |

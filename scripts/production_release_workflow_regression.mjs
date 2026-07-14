@@ -41,6 +41,16 @@ requireText(releaseWorkflow, "https://api.github.com/repos/ramideltoro/nutsnews-
 requireText(releaseWorkflow, "image_digest", "Promotion payload must include the immutable image digest.");
 requireText(releaseWorkflow, "nutsnews_migration_schema_contract", "Release promotion must verify the live production database contract.");
 requireText(releaseWorkflow, "expected_schema_fingerprint", "Release promotion must reject live catalog drift.");
+requireText(
+  releaseWorkflow,
+  "SUPABASE_ANON_KEY: ${{ secrets.NUTSNEWS_PRODUCTION_SUPABASE_ANON_KEY }}",
+  "Release promotion must use the production-specific Supabase anon credential.",
+);
+assert.doesNotMatch(
+  releaseWorkflow,
+  /SUPABASE_ANON_KEY:\s*\$\{\{[^\n]*(?:secrets\.SUPABASE_ANON_KEY|secrets\.NEXT_PUBLIC_SUPABASE_ANON_KEY)/,
+  "Release promotion must not fall back to legacy generic Supabase anon credentials.",
+);
 requireText(releaseWorkflow, "migration_head: migrationHead", "Promotion payload must include the verified migration head.");
 requireText(releaseWorkflow, "schema_version: schemaVersion", "Promotion payload must include the rollback-compatible schema marker.");
 
