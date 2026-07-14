@@ -1,0 +1,47 @@
+name: Production Supabase Migration Workflow Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/production-supabase-migration.yml"
+      - ".github/workflows/production-supabase-migration-regression.yml"
+      - "scripts/locked_migration_workflow.mjs"
+      - "scripts/production_migration_request.mjs"
+      - "scripts/production_migration_workflow_regression.mjs"
+      - "scripts/verify_production_migration_contract.mjs"
+      - "tests/production-migration-request.test.mjs"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/production-supabase-migration.yml"
+      - ".github/workflows/production-supabase-migration-regression.yml"
+      - "scripts/locked_migration_workflow.mjs"
+      - "scripts/production_migration_request.mjs"
+      - "scripts/production_migration_workflow_regression.mjs"
+      - "scripts/verify_production_migration_contract.mjs"
+      - "tests/production-migration-request.test.mjs"
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: Verify production Supabase migration automation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Run production migration request tests and workflow guard
+        run: |
+          set -euo pipefail
+          node --test tests/production-migration-request.test.mjs
+          node scripts/production_migration_workflow_regression.mjs

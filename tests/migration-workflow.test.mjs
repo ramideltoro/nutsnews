@@ -57,6 +57,17 @@ test("the fixed-purpose migration policy blocks reverse and unprotected producti
   });
 
   assert.equal(staging.target, "staging");
+  assert.equal(staging.useLinkedProject, false);
+  const production = getMigrationWorkflowPolicy({
+    NUTSNEWS_MIGRATION_TARGET: "production",
+    NUTSNEWS_MIGRATION_PURPOSE: "production-protected",
+    NUTSNEWS_MIGRATION_DIRECTION: "up",
+    NUTSNEWS_MIGRATION_DATABASE_URL: "postgresql://synthetic",
+    NUTSNEWS_MIGRATION_USE_LINKED_PROJECT: "true",
+    NUTSNEWS_PRODUCTION_MIGRATION_APPROVAL: "approved",
+    NUTSNEWS_PRODUCTION_BACKUP_COMPLETED_AT: new Date().toISOString(),
+  });
+  assert.equal(production.useLinkedProject, true);
   assert.throws(
     () => getMigrationWorkflowPolicy({
       NUTSNEWS_MIGRATION_TARGET: "production",
@@ -111,6 +122,7 @@ test("the lock client writes a flushed local marker after acquiring the advisory
   assert.equal(client.command, "psql");
   assert.deepEqual(client.args, ["--no-psqlrc", "--tuples-only", "--no-align", databaseUrl, "--file", lockScriptPath]);
   assert.ok(lockScript.indexOf("pg_advisory_lock") < lockScript.indexOf(`\\o ${markerPath}`));
+  assert.ok(lockScript.indexOf("SET ROLE postgres") < lockScript.indexOf("pg_advisory_lock"));
   assert.ok(lockScript.indexOf(`\\o ${markerPath}`) < lockScript.indexOf("LOCK_ACQUIRED"));
   assert.ok(lockScript.indexOf("LOCK_ACQUIRED") < lockScript.indexOf("\\o\n"));
   assert.match(lockScript, /pg_sleep\(600\)/);
