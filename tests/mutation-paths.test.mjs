@@ -11,7 +11,7 @@ const guardedPaths = {
   "web/lib/adminFeedManagement.ts": "assertDataMutation",
   "web/lib/logger.ts": "isTelemetryDeliveryAllowed",
   "web/app/api/log-test/route.ts": "assertProductionOperation",
-  "web/app/api/auth/[...nextauth]/route.ts": "assertProductionOperation",
+  "web/app/api/auth/[...nextauth]/route.ts": "assertOAuthCallback",
   "scripts/backfill_article_summaries.mjs": "assertProductionOperation",
   "scripts/backfill_french_summaries.mjs": "assertProductionOperation",
   "scripts/backfill_japanese_summaries.mjs": "assertProductionOperation",

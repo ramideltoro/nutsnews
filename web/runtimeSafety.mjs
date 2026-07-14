@@ -54,6 +54,30 @@ function hasContradictoryLegacyValue(env, explicitName, legacyNames) {
   });
 }
 
+function exactOrigin(value, expectedOrigin) {
+  try {
+    const url = new URL(value);
+    return (
+      url.origin === expectedOrigin &&
+      url.username === "" &&
+      url.password === "" &&
+      (url.pathname === "" || url.pathname === "/") &&
+      url.search === "" &&
+      url.hash === ""
+    );
+  } catch {
+    return false;
+  }
+}
+
+function requestUsesOrigin(value, expectedOrigin) {
+  try {
+    return new URL(value).origin === expectedOrigin;
+  } catch {
+    return false;
+  }
+}
+
 function basePolicy(env) {
   const reasons = [];
   const runtimeEnv = envValue(env, "NUTSNEWS_RUNTIME_ENV");
@@ -212,6 +236,45 @@ export function assertProductionOperation(operation = "production-operation", en
     );
   }
   return policy;
+}
+
+export function assertOAuthCallback(
+  operation = "oauth-callback",
+  requestUrl = "",
+  env = process.env,
+) {
+  void operation;
+  const policy = assertRuntimeReady(env);
+
+  if (policy.runtimeEnv === "production" && policy.sideEffectsMode === "live") {
+    return policy;
+  }
+
+  const expectedOrigin = "https://staging.nutsnews.com";
+  const authUrl = envValue(env, "AUTH_URL");
+  const legacyAuthUrl = envValue(env, "NEXTAUTH_URL");
+  const configuredAuthUrl = authUrl || legacyAuthUrl;
+  const authUrlsConflict = authUrl && legacyAuthUrl && authUrl !== legacyAuthUrl;
+  const stagingCredentials =
+    envValue(env, "NUTSNEWS_OAUTH_CREDENTIALS_ENV") === "staging" &&
+    envValue(env, "AUTH_GOOGLE_ID") !== "" &&
+    envValue(env, "AUTH_GOOGLE_SECRET") !== "";
+
+  if (
+    policy.runtimeEnv === "staging" &&
+    policy.sideEffectsMode === "disabled" &&
+    stagingCredentials &&
+    !authUrlsConflict &&
+    exactOrigin(configuredAuthUrl, expectedOrigin) &&
+    requestUsesOrigin(requestUrl, expectedOrigin)
+  ) {
+    return policy;
+  }
+
+  refuse(
+    "oauth_callback_identity_required",
+    "OAuth callbacks are disabled for this runtime identity.",
+  );
 }
 
 export function assertDataMutation(operation = "data-mutation", env = process.env) {
