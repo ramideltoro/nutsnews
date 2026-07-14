@@ -1,11 +1,15 @@
 #!/usr/bin/env node
 
 import { execFileSync, spawn } from "node:child_process";
-import { resolve } from "node:path";
+import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 
 import { getMigrationContract } from "./migration_contract.mjs";
 
-const LOCK_SQL = "SELECT pg_catalog.pg_advisory_lock(pg_catalog.hashtext('nutsnews:migration-workflow')); SELECT 'LOCK_ACQUIRED'; SELECT pg_catalog.pg_sleep(3600);";
+const LOCK_NAME = "nutsnews:migration-workflow";
+const LOCK_CLIENT_SLEEP_SECONDS = 600;
+const LOCK_MARKER_POLL_MS = 100;
 const MAX_PRODUCTION_BACKUP_AGE_MS = 60 * 60 * 1000;
 const MAX_LOCK_CLIENT_STDERR_BYTES = 8_192;
 
@@ -71,59 +75,124 @@ export function classifyPostgresLockFailure(stderr) {
   return "the protected staging database connection failed before the advisory lock was acquired";
 }
 
-export function getPostgresLockClient(databaseUrl, platform = process.platform) {
-  const psqlArgs = ["--no-psqlrc", "--set", "ON_ERROR_STOP=1", "--tuples-only", "--no-align", databaseUrl, "--command", LOCK_SQL];
-
-  if (platform === "linux") {
-    return Object.freeze({ command: "stdbuf", args: ["--output=L", "psql", ...psqlArgs] });
-  }
-  return Object.freeze({ command: "psql", args: psqlArgs });
+export function getPostgresLockScript(markerPath) {
+  return [
+    "\\set ON_ERROR_STOP on",
+    `SELECT pg_catalog.pg_advisory_lock(pg_catalog.hashtext('${LOCK_NAME}'));`,
+    `\\o ${markerPath}`,
+    "SELECT 'LOCK_ACQUIRED';",
+    "\\o",
+    `SELECT pg_catalog.pg_sleep(${LOCK_CLIENT_SLEEP_SECONDS});`,
+    "",
+  ].join("\n");
 }
 
-function waitForLock(process) {
+export function getPostgresLockClient(databaseUrl, lockScriptPath) {
+  return Object.freeze({
+    command: "psql",
+    args: ["--no-psqlrc", "--tuples-only", "--no-align", databaseUrl, "--file", lockScriptPath],
+  });
+}
+
+async function createMigrationLockFiles() {
+  const directory = await mkdtemp(join(tmpdir(), "nutsnews-migration-lock-"));
+  const markerPath = join(directory, "acquired");
+  const lockScriptPath = join(directory, "lock.sql");
+  try {
+    await chmod(directory, 0o700);
+    await writeFile(lockScriptPath, getPostgresLockScript(markerPath), { mode: 0o600 });
+    return Object.freeze({ directory, markerPath, lockScriptPath });
+  } catch (error) {
+    await removeMigrationLockFiles(directory);
+    throw error;
+  }
+}
+
+async function removeMigrationLockFiles(directory) {
+  await rm(directory, { recursive: true, force: true });
+}
+
+function waitForLock(lockProcess, markerPath) {
   return new Promise((resolve, reject) => {
     let settled = false;
     let stderr = "";
+    let markerPoll;
     const finish = (callback, value) => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
+      clearTimeout(markerPoll);
       callback(value);
     };
     const timeout = setTimeout(() => {
-      process.kill("SIGTERM");
+      lockProcess.kill("SIGTERM");
       finish(reject, new Error("Timed out waiting for the database migration lock."));
     }, 30_000);
 
-    process.stdout.on("data", (chunk) => {
-      if (chunk.toString().includes("LOCK_ACQUIRED")) {
-        finish(resolve);
+    const pollMarker = async () => {
+      try {
+        const marker = await readFile(markerPath, "utf8");
+        if (marker.includes("LOCK_ACQUIRED")) {
+          finish(resolve);
+          return;
+        }
+      } catch (error) {
+        if (error?.code !== "ENOENT") {
+          finish(reject, new Error("Unable to read the database migration lock marker."));
+          return;
+        }
       }
-    });
-    process.stderr.on("data", (chunk) => {
+      if (!settled) markerPoll = setTimeout(pollMarker, LOCK_MARKER_POLL_MS);
+    };
+
+    lockProcess.stderr.on("data", (chunk) => {
       if (stderr.length >= MAX_LOCK_CLIENT_STDERR_BYTES) return;
       stderr += chunk.toString().slice(0, MAX_LOCK_CLIENT_STDERR_BYTES - stderr.length);
     });
-    process.once("error", () => {
+    lockProcess.once("error", () => {
       finish(reject, new Error("Unable to start the database migration lock client."));
     });
-    process.once("exit", (code) => {
+    lockProcess.once("exit", () => {
       if (!settled) {
         const reason = classifyPostgresLockFailure(stderr);
         finish(reject, new Error(`Database migration lock client exited before acquiring the lock: ${reason}.`));
       }
     });
+    pollMarker();
+  });
+}
+
+async function stopLockClient(lockProcess) {
+  if (lockProcess.exitCode !== null || lockProcess.signalCode !== null) return;
+  lockProcess.kill("SIGTERM");
+  await new Promise((resolve) => {
+    const onExit = () => resolve();
+    lockProcess.once("exit", onExit);
+    if (lockProcess.exitCode !== null || lockProcess.signalCode !== null) {
+      lockProcess.off("exit", onExit);
+      resolve();
+    }
   });
 }
 
 export async function acquirePostgresMigrationLock(databaseUrl) {
-  const lockClient = getPostgresLockClient(databaseUrl);
+  const lockFiles = await createMigrationLockFiles();
+  const lockClient = getPostgresLockClient(databaseUrl, lockFiles.lockScriptPath);
   const lockProcess = spawn(lockClient.command, lockClient.args, { stdio: ["ignore", "pipe", "pipe"] });
-  await waitForLock(lockProcess);
+  try {
+    await waitForLock(lockProcess, lockFiles.markerPath);
+  } catch (error) {
+    await stopLockClient(lockProcess);
+    await removeMigrationLockFiles(lockFiles.directory);
+    throw error;
+  }
 
+  let released = false;
   return async () => {
-    if (!lockProcess.killed) lockProcess.kill("SIGTERM");
-    await new Promise((resolve) => lockProcess.once("exit", resolve));
+    if (released) return;
+    released = true;
+    await stopLockClient(lockProcess);
+    await removeMigrationLockFiles(lockFiles.directory);
   };
 }
 
