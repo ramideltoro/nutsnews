@@ -68,6 +68,7 @@ test("seed and reset cover synthetic articles, translations, feeds, users, contr
     "/rest/v1/staging_fixture_users",
     "/rest/v1/rpc/nutsnews_reset_staging_fixture",
     "/rest/v1/rpc/nutsnews_cleanup_expired_staging_fixtures",
+    "/rest/v1/rpc/refresh_public_feed_snapshot",
   ]) {
     assert.ok(targets.includes(target), `missing fixture operation for ${target}`);
   }

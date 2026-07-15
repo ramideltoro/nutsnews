@@ -17,7 +17,27 @@ const getCachedHomeFeed = unstable_cache(
   { revalidate: 900 },
 );
 
-export default async function Home() {
+type HomePageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+function getStringSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function shouldBypassHomeFeedCacheForQualification(
+  searchParams: Record<string, string | string[] | undefined> | undefined,
+) {
+  const qualification = getStringSearchParam(searchParams?.qualification)?.trim();
+
+  return (
+    process.env.NUTSNEWS_RUNTIME_ENV === "staging" &&
+    typeof qualification === "string" &&
+    /^nutsnews-test-[a-z0-9-]+$/i.test(qualification)
+  );
+}
+
+export default async function Home({ searchParams }: HomePageProps) {
   // The immutable container image is built with neutral fixtures. Defer this
   // route only outside Vercel so the running image reads its target's feed,
   // while Vercel retains its established prerender/ISR behavior.
@@ -25,8 +45,11 @@ export default async function Home() {
     await connection();
   }
 
+  const resolvedSearchParams = await searchParams;
   const { articles, nextPage, nextCursor, sections } =
-    await getCachedHomeFeed();
+    shouldBypassHomeFeedCacheForQualification(resolvedSearchParams)
+      ? await getHomeFeedDataWithEdgeFallback()
+      : await getCachedHomeFeed();
 
   const homeJsonLd = {
     "@context": "https://schema.org",

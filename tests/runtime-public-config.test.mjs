@@ -163,6 +163,9 @@ test("browser entries and immutable image inputs do not embed runtime public val
   assert.match(homePage, /unstable_cache/);
   assert.match(homePage, /homepage-initial-feed/);
   assert.match(homePage, /revalidate: 900/);
+  assert.match(homePage, /shouldBypassHomeFeedCacheForQualification/);
+  assert.match(homePage, /process\.env\.NUTSNEWS_RUNTIME_ENV === "staging"/);
+  assert.match(homePage, /\^nutsnews-test-\[a-z0-9-\]\+\$/);
   assert.match(articleFeed, /initialEnglishArticlesRef\.current\.length === 0/);
   assert.match(articleFeed, /void loadLocalizedHomeFeed\(storedLanguage\)/);
   assert.match(workflow, /@sha256/);
