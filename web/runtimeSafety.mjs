@@ -71,6 +71,18 @@ function exactOrigin(value, expectedOrigin) {
 }
 
 function requestUsesOrigin(value, expectedOrigin) {
+  if (value && typeof value === "object") {
+    try {
+      const expected = new URL(expectedOrigin);
+      return (
+        value.host === expected.host &&
+        value.forwardedProto === expected.protocol.slice(0, -1)
+      );
+    } catch {
+      return false;
+    }
+  }
+
   try {
     return new URL(value).origin === expectedOrigin;
   } catch {
@@ -238,9 +250,14 @@ export function assertProductionOperation(operation = "production-operation", en
   return policy;
 }
 
+/**
+ * @param {string} [operation]
+ * @param {string | { url: string, host: string, forwardedProto: string }} [requestIdentity]
+ * @param {NodeJS.ProcessEnv} [env]
+ */
 export function assertOAuthCallback(
   operation = "oauth-callback",
-  requestUrl = "",
+  requestIdentity = "",
   env = process.env,
 ) {
   void operation;
@@ -266,7 +283,7 @@ export function assertOAuthCallback(
     stagingCredentials &&
     !authUrlsConflict &&
     exactOrigin(configuredAuthUrl, expectedOrigin) &&
-    requestUsesOrigin(requestUrl, expectedOrigin)
+    requestUsesOrigin(requestIdentity, expectedOrigin)
   ) {
     return policy;
   }

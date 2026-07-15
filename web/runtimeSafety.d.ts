@@ -10,6 +10,12 @@ export interface RuntimeSafetyPolicy {
   code: string;
 }
 
+export interface OAuthCallbackRequestIdentity {
+  url: string;
+  host: string;
+  forwardedProto: string;
+}
+
 export class RuntimeSafetyError extends Error {
   code: string;
 }
@@ -24,7 +30,11 @@ export function getSafeReadiness(env?: NodeJS.ProcessEnv): Readonly<{
 }>;
 export function assertDataRead(operation?: string, env?: NodeJS.ProcessEnv): RuntimeSafetyPolicy;
 export function assertProductionOperation(operation?: string, env?: NodeJS.ProcessEnv): RuntimeSafetyPolicy;
-export function assertOAuthCallback(operation?: string, requestUrl?: string, env?: NodeJS.ProcessEnv): RuntimeSafetyPolicy;
+export function assertOAuthCallback(
+  operation?: string,
+  requestIdentity?: string | OAuthCallbackRequestIdentity,
+  env?: NodeJS.ProcessEnv,
+): RuntimeSafetyPolicy;
 export function assertDataMutation(operation?: string, env?: NodeJS.ProcessEnv): RuntimeSafetyPolicy;
 export function assertIsolatedDataMutation(operation?: string, env?: NodeJS.ProcessEnv): RuntimeSafetyPolicy;
 export function assertSyntheticFixtureMutation(namespace: string, env?: NodeJS.ProcessEnv): RuntimeSafetyPolicy;
