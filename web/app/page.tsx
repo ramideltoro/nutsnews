@@ -73,6 +73,7 @@ export default async function Home() {
                   width={96}
                   height={96}
                   priority
+                  unoptimized
                   className="h-full w-full object-contain"
                 />
               </span>

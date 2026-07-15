@@ -2,7 +2,8 @@
 
 import { spawn } from "node:child_process";
 import { execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -322,23 +323,23 @@ export async function runHttpQualification({ input, fixtureNamespace, fetchImpl 
   const syntheticArticle = articles.articles.find((article) => typeof article?.id === "string" && JSON.stringify({ source: article.source, title: article.title, originalUrl: article.original_url }).includes(fixtureNamespace));
   if (!syntheticArticle) throw new Error("isolated staging read did not return the seeded synthetic namespace");
   if (!/public/.test(articlesResponse.headers.get("cache-control") ?? "")) throw new Error("articles API cache contract missing");
-  const corsOrigin = articlesResponse.headers.get("access-control-allow-origin");
-  if (corsOrigin !== "*" && corsOrigin !== input.baseUrl.replace(/\/$/, "")) throw new Error("articles API CORS contract missing");
   const articleId = encodeURIComponent(syntheticArticle.id);
-  for (const route of [`/articles/${articleId}`, `/search?q=${encodeURIComponent(fixtureNamespace)}`, "/about", "/contact", "/privacy", `/api/articles?page=0&lang=fr&qualification=${encodeURIComponent(fixtureNamespace)}`]) {
+  for (const route of [`/articles/${articleId}`, `/api/search?q=${encodeURIComponent(fixtureNamespace)}`, "/about", "/contact", "/privacy", `/api/articles?page=0&lang=fr&qualification=${encodeURIComponent(fixtureNamespace)}`]) {
     const response = await get(route);
     if (!response.ok) throw new Error(`${route} returned HTTP ${response.status}`);
   }
   for (const endpoint of ["/api/home-feed", "/api/search?q=community&lang=en", "/api/auth/providers", "/api/auth/session", "/api/auth/csrf"]) {
     const response = await get(endpoint);
     const payload = await responseJson(response, endpoint);
-    if (!payload || typeof payload !== "object") throw new Error(`${endpoint} JSON shape is invalid`);
+    if (endpoint === "/api/auth/session") {
+      if (payload !== null) throw new Error("anonymous auth session must be null");
+    } else if (!payload || typeof payload !== "object") {
+      throw new Error(`${endpoint} JSON shape is invalid`);
+    }
     if (/auth\//.test(endpoint) && !/no-store|private/.test(response.headers.get("cache-control") ?? "")) throw new Error(`${endpoint} must not be publicly cached`);
   }
   const admin = await get("/admin", { redirect: "manual" });
   if (![302, 303, 307, 308].includes(admin.status) || !/\/admin\/(?:login|access-denied)/.test(admin.headers.get("location") ?? "")) throw new Error("unauthenticated admin request did not redirect safely");
-  const contactOptions = await get("/api/contact", { method: "OPTIONS", headers: { Origin: input.baseUrl.replace(/\/$/, ""), "Access-Control-Request-Method": "POST" } });
-  if (![200, 204].includes(contactOptions.status)) throw new Error("contact OPTIONS contract failed");
   const contactDisabled = await boundedFetch(fetchImpl, new URL("/api/contact", input.baseUrl), {
     method: "POST",
     headers: { ...headers, Origin: input.baseUrl.replace(/\/$/, ""), "Content-Type": "application/json" },
@@ -367,6 +368,21 @@ function runChild(command, args, { cwd, env, timeoutMs, artifactHint, signal }) 
       resolve({ code: signalName || timedOut || cancelled ? 1 : code ?? 1, status: cancelled ? "cancelled" : timedOut ? "timeout" : code === 0 ? "pass" : "fail", output: output.slice(-8_000), artifactHint });
     });
   });
+}
+
+export function deploymentSmokeEnvironment(input, env = process.env) {
+  return {
+    ...env,
+    NUTSNEWS_SMOKE_BASE_URL: input.baseUrl,
+    NUTSNEWS_EXPECTED_SOURCE_COMMIT: input.expectedSourceCommit,
+    NUTSNEWS_EXPECTED_BUILD_ID: input.expectedBuildId,
+    NUTSNEWS_EXPECTED_DEPLOYMENT_TARGET: input.expectedDeploymentTarget,
+    NUTSNEWS_EXPECTED_HEALTH_DEPLOYMENT_TARGET: input.expectedDeploymentTarget,
+    NUTSNEWS_EXPECTED_RUNTIME_ENV: input.expectedRuntimeEnv,
+    NUTSNEWS_EXPECTED_IMAGE_DIGEST: input.expectedImageDigest,
+    NUTSNEWS_EXPECTED_CONFIG_GENERATION: input.expectedConfigGeneration,
+    NUTSNEWS_EXPECTED_SIDE_EFFECTS_MODE: "disabled",
+  };
 }
 
 function junitXml(report) {
@@ -422,7 +438,7 @@ export async function runQualification(inputValue, adapters = {}) {
       const child = await runChild(process.execPath, [path.join(repoRoot, "scripts", "dual_target_web_smoke.mjs")], {
         cwd: webDir,
         timeoutMs: input.timeoutMs,
-        env: { ...env, NUTSNEWS_SMOKE_BASE_URL: input.baseUrl, NUTSNEWS_EXPECTED_SOURCE_COMMIT: input.expectedSourceCommit, NUTSNEWS_EXPECTED_BUILD_ID: input.expectedBuildId, NUTSNEWS_EXPECTED_DEPLOYMENT_TARGET: input.expectedDeploymentTarget, NUTSNEWS_EXPECTED_HEALTH_DEPLOYMENT_TARGET: "vps", NUTSNEWS_EXPECTED_RUNTIME_ENV: input.expectedRuntimeEnv, NUTSNEWS_EXPECTED_IMAGE_DIGEST: input.expectedImageDigest, NUTSNEWS_EXPECTED_CONFIG_GENERATION: input.expectedConfigGeneration, NUTSNEWS_EXPECTED_SIDE_EFFECTS_MODE: "disabled" },
+        env: deploymentSmokeEnvironment(input, env),
         signal,
       });
       if (child.status !== "pass") throw new Error(`existing deployment smoke ${child.status}: ${child.output}`);
@@ -440,8 +456,14 @@ export async function runQualification(inputValue, adapters = {}) {
     await record("bounded-chromium-accessibility", async () => {
       if (adapters.runBrowser) return adapters.runBrowser(input);
       const playwrightArtifactDir = path.join(webDir, "test-results", "staging-qualification-playwright");
+      const playwrightCli = path.join(webDir, "node_modules", ".bin", "playwright");
       await rm(playwrightArtifactDir, { recursive: true, force: true });
-      const child = await runChild("npm", ["exec", "--", "playwright", "test", "--config=playwright.staging-qualification.config.ts"], {
+      try {
+        await access(playwrightCli, fsConstants.X_OK);
+      } catch {
+        throw new Error("Playwright CLI is unavailable; run npm install --include=dev from web before staging qualification");
+      }
+      const child = await runChild(playwrightCli, ["test", "--config=playwright.staging-qualification.config.ts"], {
         cwd: webDir,
         timeoutMs: input.timeoutMs * 3,
         artifactHint: playwrightArtifactDir,

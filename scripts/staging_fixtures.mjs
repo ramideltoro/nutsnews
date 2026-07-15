@@ -64,7 +64,7 @@ export function createFixtureRecords(namespace, expiresAt) {
       source,
       title: `Synthetic article for ${namespace}`,
       original_url: articleUrl,
-      image_url: `${fixturePath}/images/seed.png`,
+      image_url: "/nutsnews-logo.png",
       published_at: "2026-01-01T00:00:00.000Z",
       published_on_site_at: "2026-01-01T00:00:00.000Z",
       original_excerpt: "Synthetic staging fixture only.",

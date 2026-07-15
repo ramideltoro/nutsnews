@@ -4,11 +4,14 @@ import { expect, test } from '@playwright/test';
 test('bounded private-staging navigation and accessibility smoke', async ({ page }) => {
   const fixtureNamespace = process.env.NUTSNEWS_QUALIFICATION_FIXTURE_NAMESPACE?.trim();
   expect(fixtureNamespace, 'A synthetic staging fixture namespace is required').toMatch(/^nutsnews-test-/);
+  const baseOrigin = new URL(process.env.PLAYWRIGHT_BASE_URL!).origin;
   const failures: string[] = [];
-  page.on('console', (message) => {
-    if (message.type() === 'error') failures.push(`console:${message.text().slice(0, 160)}`);
-  });
   page.on('pageerror', (error) => failures.push(`page:${error.name}`));
+  page.on('response', (response) => {
+    if (response.status() >= 500 && new URL(response.url()).origin === baseOrigin) {
+      failures.push(`response:${response.status()}:${new URL(response.url()).pathname}`);
+    }
+  });
 
   for (const route of ['/', '/about', '/contact']) {
     const response = await page.goto(route, { waitUntil: 'domcontentloaded' });

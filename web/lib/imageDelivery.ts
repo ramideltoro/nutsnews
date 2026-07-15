@@ -38,6 +38,10 @@ export function normalizeArticleImageUrl(imageUrl?: string | null) {
 }
 
 export function shouldBypassNextImageOptimization(imageUrl: string) {
+  if (imageUrl.startsWith("/") && !imageUrl.startsWith("//")) {
+    return true;
+  }
+
   try {
     const parsedUrl = new URL(imageUrl, "https://www.nutsnews.com");
     const pathname = parsedUrl.pathname.toLowerCase();

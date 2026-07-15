@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { execFileSync } from "node:child_process";
 
-import { assertFixtureTargetMatchesRuntime, assertRequiredPlaywrightReport, qualificationPasses, redact, runQualification, sanitizePlaywrightArtifacts } from "../scripts/staging_qualification.mjs";
+import { assertFixtureTargetMatchesRuntime, assertRequiredPlaywrightReport, deploymentSmokeEnvironment, qualificationPasses, redact, runQualification, sanitizePlaywrightArtifacts } from "../scripts/staging_qualification.mjs";
 
 const commit = "a".repeat(40);
 const digest = `sha256:${"b".repeat(64)}`;
@@ -52,11 +52,12 @@ function mockFetch() {
     if (url.pathname === "/api/runtime-config") return json({ sourceCommit: commit, buildId: "123456789-1", expectedImageDigest: digest, runtimeEnv: "staging", deploymentTarget: "vps-staging", configGeneration, sideEffectsMode: "disabled", telemetryEnabled: false, supabaseUrl: "https://staging-fixture.supabase.co" }, { headers: { "cache-control": "no-store" } });
     if (url.pathname === "/") return new Response('<html><body>NutsNews<footer><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a></footer><script src="/_next/static/test.js"></script></body></html>', { status: 200, headers: { "content-type": "text/html", ...security } });
     if (url.pathname === "/_next/static/test.js") return new Response("ok", { status: 200 });
-    if (url.pathname === "/api/articles") return json({ articles: [{ id: "synthetic-article", source: "nutsnews-test-deterministic-177" }], nextPage: null }, { headers: { "cache-control": "public, s-maxage=60", "access-control-allow-origin": "*" } });
+    if (url.pathname === "/api/articles") return json({ articles: [{ id: "synthetic-article", source: "nutsnews-test-deterministic-177" }], nextPage: null }, { headers: { "cache-control": "public, s-maxage=60" } });
+    if (url.pathname === "/search") return new Response("not found", { status: 404, headers: security });
     if (url.pathname === "/admin") return new Response("", { status: 307, headers: { location: "/admin/login" } });
-    if (url.pathname === "/api/contact" && init.method === "OPTIONS") return new Response(null, { status: 204 });
     if (url.pathname === "/api/contact" && init.method === "POST") return json({ error: "disabled" }, { status: 503, headers: { "cache-control": "no-store" } });
-    if (["/api/home-feed", "/api/search", "/api/auth/providers", "/api/auth/session", "/api/auth/csrf"].includes(url.pathname)) return json({ ok: true }, { headers: { "cache-control": url.pathname.includes("auth/") ? "no-store" : "public, s-maxage=60" } });
+    if (url.pathname === "/api/auth/session") return json(null, { headers: { "cache-control": "no-store" } });
+    if (["/api/home-feed", "/api/search", "/api/auth/providers", "/api/auth/csrf"].includes(url.pathname)) return json({ ok: true }, { headers: { "cache-control": url.pathname.includes("auth/") ? "no-store" : "public, s-maxage=60" } });
     return new Response("ok", { status: 200, headers: security });
   };
 }
@@ -111,6 +112,32 @@ test("fixture database target must exactly match the verified staging runtime", 
     "not-a-url",
   ]) {
     assert.throws(() => assertFixtureTargetMatchesRuntime(candidate, "https://staging-fixture.supabase.co"), /SAFETY/);
+  }
+});
+
+test("deployment smoke expects the verified staging target from health and readiness", () => {
+  const smokeEnv = deploymentSmokeEnvironment(input("unused"), { EXISTING_VALUE: "preserved" });
+
+  assert.equal(smokeEnv.EXISTING_VALUE, "preserved");
+  assert.equal(smokeEnv.NUTSNEWS_EXPECTED_DEPLOYMENT_TARGET, "vps-staging");
+  assert.equal(smokeEnv.NUTSNEWS_EXPECTED_HEALTH_DEPLOYMENT_TARGET, "vps-staging");
+});
+
+test("anonymous auth session must be null", async () => {
+  const base = mockFetch();
+  const run = await fixtureRun({
+    fetchImpl: async (url, init) => {
+      if (new URL(url).pathname === "/api/auth/session") {
+        return json({ user: { id: "unexpected-session" } }, { headers: { "cache-control": "no-store" } });
+      }
+      return base(url, init);
+    },
+  });
+  try {
+    assert.equal(run.report.result, "fail");
+    assert.equal(run.report.originalFailure, "anonymous auth session must be null");
+  } finally {
+    await rm(run.artifactDir, { recursive: true, force: true });
   }
 });
 

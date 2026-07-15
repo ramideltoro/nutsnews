@@ -43,11 +43,12 @@ async function fetchFixture(value, init = {}) {
   if (url.pathname === "/readyz") return json({ ok: true, code: "ready" }, { ...security, "cache-control": "no-store", "x-nutsnews-expected-image-digest": digest, "x-nutsnews-runtime-environment": "staging", "x-nutsnews-deployment-target": "vps-staging", "x-nutsnews-config-generation": configGeneration });
   if (url.pathname === "/api/runtime-config") return json({ sourceCommit: commit, buildId: "123456789-1", expectedImageDigest: digest, runtimeEnv: "staging", deploymentTarget: "vps-staging", configGeneration, sideEffectsMode: "disabled", telemetryEnabled: false, supabaseUrl: "https://staging-fixture.supabase.co" }, { "cache-control": "no-store" });
   if (url.pathname === "/") return new Response('<title>NutsNews</title><footer><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a></footer><script src="/_next/static/test.js"></script>', { status: 200, headers: security });
-  if (url.pathname === "/api/articles") return json({ articles: [{ id: "synthetic", source: "nutsnews-test-cli-fixture-177" }] }, { "cache-control": "public", "access-control-allow-origin": "*" });
+  if (url.pathname === "/api/articles") return json({ articles: [{ id: "synthetic", source: "nutsnews-test-cli-fixture-177" }] }, { "cache-control": "public" });
+  if (url.pathname === "/search") return new Response("not found", { status: 404, headers: security });
   if (url.pathname === "/admin") return new Response("", { status: 307, headers: { location: "/admin/login" } });
-  if (url.pathname === "/api/contact" && init.method === "OPTIONS") return new Response(null, { status: 204 });
   if (url.pathname === "/api/contact" && init.method === "POST") return json({ error: "disabled" }, { "cache-control": "no-store" }, 503);
-  if (["/api/home-feed", "/api/search", "/api/auth/providers", "/api/auth/session", "/api/auth/csrf"].includes(url.pathname)) return json({ ok: true }, { "cache-control": url.pathname.includes("auth/") ? "no-store" : "public" });
+  if (url.pathname === "/api/auth/session") return json(null, { "cache-control": "no-store" });
+  if (["/api/home-feed", "/api/search", "/api/auth/providers", "/api/auth/csrf"].includes(url.pathname)) return json({ ok: true }, { "cache-control": url.pathname.includes("auth/") ? "no-store" : "public" });
   return new Response("ok", { status: 200, headers: security });
 }
 
