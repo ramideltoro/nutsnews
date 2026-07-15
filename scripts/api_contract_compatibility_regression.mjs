@@ -1323,23 +1323,42 @@ async function testAuthContract() {
     },
   });
   assertMethodExports(authRoute, ["GET", "POST"], "/api/auth/[...nextauth]");
+  const callbackUrl = "https://0.0.0.0:3000/api/auth/session";
+  const callbackHeaders = {
+    host: "staging.nutsnews.com",
+    "x-forwarded-proto": "https",
+  };
   assert.equal(
-    await (await authRoute.GET(new Request("https://www.nutsnews.com/api/auth/session"))).text(),
+    await (await authRoute.GET(new Request(callbackUrl, { headers: callbackHeaders }))).text(),
     "GET",
     "Auth GET must delegate after the runtime safety guard permits it",
   );
   assert.equal(
-    await (await authRoute.POST(new Request("https://www.nutsnews.com/api/auth/session", { method: "POST" }))).text(),
+    await (await authRoute.POST(new Request(callbackUrl, { method: "POST", headers: callbackHeaders }))).text(),
     "POST",
     "Auth POST must delegate after the runtime safety guard permits it",
   );
   assert.deepEqual(
     guardedRequests,
     [
-      ["oauth-callback", "https://www.nutsnews.com/api/auth/session"],
-      ["oauth-callback", "https://www.nutsnews.com/api/auth/session"],
+      [
+        "oauth-callback",
+        {
+          url: callbackUrl,
+          host: "staging.nutsnews.com",
+          forwardedProto: "https",
+        },
+      ],
+      [
+        "oauth-callback",
+        {
+          url: callbackUrl,
+          host: "staging.nutsnews.com",
+          forwardedProto: "https",
+        },
+      ],
     ],
-    "Auth GET and POST must pass their request URL to the callback identity guard",
+    "Auth GET and POST must pass exact proxy request identity to the callback guard",
   );
 
   const blockedAuthRoute = loadModule("web/app/api/auth/[...nextauth]/route.ts", {
