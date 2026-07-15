@@ -20,6 +20,7 @@ test("synthetic fixture seed data is deterministic, namespaced, and has a bounde
 
   assert.deepEqual(first, second);
   assert.match(first.article.original_url, new RegExp(`^https://fixture\\.invalid/${namespace}/`));
+  assert.equal(first.article.image_url, "/nutsnews-logo.png");
   assert.match(first.feed.url, new RegExp(`^https://fixture\\.invalid/${namespace}/`));
   assert.match(first.user.email, /@fixture\.invalid$/);
   assert.equal(first.writeEvent.metadata.fixture_namespace, namespace);

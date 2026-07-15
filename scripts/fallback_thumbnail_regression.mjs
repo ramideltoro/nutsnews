@@ -5,16 +5,20 @@ import path from "node:path";
 const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 
 const helperPath = path.join(repoRoot, "web", "lib", "fallbackThumbnails.ts");
+const imageDeliveryPath = path.join(repoRoot, "web", "lib", "imageDelivery.ts");
 const imagePath = path.join(repoRoot, "web", "app", "components", "OptimizedArticleImage.tsx");
 const feedPath = path.join(repoRoot, "web", "app", "components", "ArticleFeed.tsx");
 const footerPath = path.join(repoRoot, "web", "app", "components", "SiteFooter.tsx");
+const homePath = path.join(repoRoot, "web", "app", "page.tsx");
 const adminArticlesPath = path.join(repoRoot, "web", "app", "admin", "(protected)", "articles", "page.tsx");
 
 const files = {
   helper: fs.readFileSync(helperPath, "utf8"),
+  imageDelivery: fs.readFileSync(imageDeliveryPath, "utf8"),
   image: fs.readFileSync(imagePath, "utf8"),
   feed: fs.readFileSync(feedPath, "utf8"),
   footer: fs.readFileSync(footerPath, "utf8"),
+  home: fs.readFileSync(homePath, "utf8"),
   adminArticles: fs.readFileSync(adminArticlesPath, "utf8"),
 };
 
@@ -56,6 +60,8 @@ try {
   assertIncludes(files.feed, "category={article.category}", "Homepage/category cards must pass article category to fallback thumbnails.");
   assertIncludes(files.footer, "<OptimizedArticleImage", "Footer search cards must use the centralized image/fallback component.");
   assertIncludes(files.footer, "category={article.category}", "Footer search fallback must be category-aware.");
+  assertIncludes(files.imageDelivery, 'imageUrl.startsWith("/")', "Local article assets must bypass server-side image optimization.");
+  assertIncludes(files.home, "unoptimized", "The static masthead logo must not require an optimizer self-fetch.");
   console.log("✓ Reader-facing cards use centralized category-aware fallbacks");
 
   console.log("▶ Checking admin no-image publication warning");

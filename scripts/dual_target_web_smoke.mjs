@@ -2,6 +2,24 @@
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 
+function accessHeaders(env = process.env) {
+  const clientId = String(env.CF_ACCESS_CLIENT_ID ?? "").trim();
+  const clientSecret = String(env.CF_ACCESS_CLIENT_SECRET ?? "").trim();
+
+  if (Boolean(clientId) !== Boolean(clientSecret)) {
+    throw new Error("Cloudflare Access service-token inputs must be provided together");
+  }
+
+  return clientId
+    ? {
+        "CF-Access-Client-Id": clientId,
+        "CF-Access-Client-Secret": clientSecret,
+      }
+    : {};
+}
+
+const protectedHeaders = accessHeaders();
+
 function option(name) {
   const index = process.argv.indexOf(name);
 
@@ -54,6 +72,7 @@ async function fetchOk(url, label) {
   const response = await fetch(url, {
     headers: {
       Accept: "application/json, text/html;q=0.9, */*;q=0.8",
+      ...protectedHeaders,
     },
     redirect: "follow",
     signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
