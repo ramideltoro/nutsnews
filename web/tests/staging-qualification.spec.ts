@@ -6,6 +6,7 @@ test('bounded private-staging navigation and accessibility smoke', async ({ page
   expect(fixtureNamespace, 'A synthetic staging fixture namespace is required').toMatch(/^nutsnews-test-/);
   const baseOrigin = new URL(process.env.PLAYWRIGHT_BASE_URL!).origin;
   const failures: string[] = [];
+  await page.setExtraHTTPHeaders({ 'Cache-Control': 'no-cache' });
   page.on('pageerror', (error) => failures.push(`page:${error.name}`));
   page.on('response', (response) => {
     if (response.status() >= 500 && new URL(response.url()).origin === baseOrigin) {
@@ -13,7 +14,7 @@ test('bounded private-staging navigation and accessibility smoke', async ({ page
     }
   });
 
-  for (const route of ['/', '/about', '/contact']) {
+  for (const route of [`/?qualification=${encodeURIComponent(fixtureNamespace!)}`, '/about', '/contact']) {
     const response = await page.goto(route, { waitUntil: 'domcontentloaded' });
     expect(response?.ok(), `${route} returned ${response?.status() ?? 'no response'}`).toBeTruthy();
     await expect(page.locator('body')).toBeVisible();

@@ -143,21 +143,33 @@ function createClient({ url, serviceRoleKey, fetchImpl = fetch }) {
   return Object.freeze({ request });
 }
 
-export async function resetStagingFixture(namespace, options) {
-  assertFixtureNamespace(namespace);
+export async function refreshPublicFeedSnapshot(options) {
   const client = createClient(options);
-  return client.request("/rest/v1/rpc/nutsnews_reset_staging_fixture", {
-    body: { p_namespace: namespace },
+  return client.request("/rest/v1/rpc/refresh_public_feed_snapshot", {
+    body: {},
     prefer: "return=representation",
   });
 }
 
-export async function cleanupExpiredStagingFixtures(options) {
+export async function resetStagingFixture(namespace, options, { refresh = true } = {}) {
+  assertFixtureNamespace(namespace);
   const client = createClient(options);
-  return client.request("/rest/v1/rpc/nutsnews_cleanup_expired_staging_fixtures", {
+  const result = await client.request("/rest/v1/rpc/nutsnews_reset_staging_fixture", {
+    body: { p_namespace: namespace },
+    prefer: "return=representation",
+  });
+  if (refresh) await refreshPublicFeedSnapshot(options);
+  return result;
+}
+
+export async function cleanupExpiredStagingFixtures(options, { refresh = true } = {}) {
+  const client = createClient(options);
+  const result = await client.request("/rest/v1/rpc/nutsnews_cleanup_expired_staging_fixtures", {
     body: {},
     prefer: "return=representation",
   });
+  if (refresh) await refreshPublicFeedSnapshot(options);
+  return result;
 }
 
 async function deleteAuthUser(userId, options) {
@@ -175,8 +187,8 @@ export async function seedStagingFixture(namespace, expiresAt, options) {
   const client = createClient(options);
   let createdUserId = null;
 
-  await cleanupExpiredStagingFixtures(options);
-  await resetStagingFixture(namespace, options);
+  await cleanupExpiredStagingFixtures(options, { refresh: false });
+  await resetStagingFixture(namespace, options, { refresh: false });
 
   try {
     await client.request("/rest/v1/staging_fixture_runs", { body: records.run });
@@ -197,6 +209,7 @@ export async function seedStagingFixture(namespace, expiresAt, options) {
     await client.request("/rest/v1/staging_fixture_users", {
       body: { namespace, user_id: createdUserId },
     });
+    await refreshPublicFeedSnapshot(options);
   } catch (error) {
     try {
       await deleteAuthUser(createdUserId, options);
