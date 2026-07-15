@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { execFileSync } from "node:child_process";
 
-import { assertRequiredPlaywrightReport, qualificationPasses, redact, runQualification, sanitizePlaywrightArtifacts } from "../scripts/staging_qualification.mjs";
+import { assertFixtureTargetMatchesRuntime, assertRequiredPlaywrightReport, qualificationPasses, redact, runQualification, sanitizePlaywrightArtifacts } from "../scripts/staging_qualification.mjs";
 
 const commit = "a".repeat(40);
 const digest = `sha256:${"b".repeat(64)}`;
@@ -49,7 +49,7 @@ function mockFetch() {
     const security = { "content-security-policy": "default-src 'self'", "referrer-policy": "same-origin", "x-content-type-options": "nosniff", "x-frame-options": "DENY", "x-robots-tag": "noindex, nofollow" };
     if (url.pathname === "/healthz") return json({ ok: true }, { headers: { ...security, "x-nutsnews-source-commit": commit, "x-nutsnews-build-id": "123456789-1", "x-nutsnews-deployment-target": "vps-staging" } });
     if (url.pathname === "/readyz") return json({ ok: true, code: "ready" }, { headers: { ...security, "cache-control": "no-store", "x-nutsnews-source-commit": commit, "x-nutsnews-build-id": "123456789-1", "x-nutsnews-deployment-target": "vps-staging", "x-nutsnews-runtime-environment": "staging", "x-nutsnews-config-generation": configGeneration, "x-nutsnews-expected-image-digest": digest } });
-    if (url.pathname === "/api/runtime-config") return json({ sourceCommit: commit, buildId: "123456789-1", expectedImageDigest: digest, runtimeEnv: "staging", deploymentTarget: "vps-staging", configGeneration, sideEffectsMode: "disabled", telemetryEnabled: false }, { headers: { "cache-control": "no-store" } });
+    if (url.pathname === "/api/runtime-config") return json({ sourceCommit: commit, buildId: "123456789-1", expectedImageDigest: digest, runtimeEnv: "staging", deploymentTarget: "vps-staging", configGeneration, sideEffectsMode: "disabled", telemetryEnabled: false, supabaseUrl: "https://staging-fixture.supabase.co" }, { headers: { "cache-control": "no-store" } });
     if (url.pathname === "/") return new Response('<html><body>NutsNews<footer><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a></footer><script src="/_next/static/test.js"></script></body></html>', { status: 200, headers: { "content-type": "text/html", ...security } });
     if (url.pathname === "/_next/static/test.js") return new Response("ok", { status: 200 });
     if (url.pathname === "/api/articles") return json({ articles: [{ id: "synthetic-article", source: "nutsnews-test-deterministic-177" }], nextPage: null }, { headers: { "cache-control": "public, s-maxage=60", "access-control-allow-origin": "*" } });
@@ -97,6 +97,21 @@ test("production-looking target is rejected before request or mutation", async (
     /before outbound request or mutation/,
   );
   assert.equal(touched, false);
+});
+
+test("fixture database target must exactly match the verified staging runtime", () => {
+  assert.equal(
+    assertFixtureTargetMatchesRuntime("https://staging-fixture.supabase.co/", "https://staging-fixture.supabase.co"),
+    "https://staging-fixture.supabase.co",
+  );
+  for (const candidate of [
+    "https://production-fixture.supabase.co",
+    "http://staging-fixture.supabase.co",
+    "https://user:password@staging-fixture.supabase.co",
+    "not-a-url",
+  ]) {
+    assert.throws(() => assertFixtureTargetMatchesRuntime(candidate, "https://staging-fixture.supabase.co"), /SAFETY/);
+  }
 });
 
 test("deployed source, build, digest, runtime, config, and deployment mismatches stop before mutation", async () => {

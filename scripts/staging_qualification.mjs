@@ -120,6 +120,30 @@ export function redact(value, secrets = []) {
   return visit(value);
 }
 
+export function assertFixtureTargetMatchesRuntime(configuredUrl, runtimeUrl) {
+  let configured;
+  let runtime;
+  try {
+    configured = new URL(String(configuredUrl ?? ""));
+    runtime = new URL(String(runtimeUrl ?? ""));
+  } catch {
+    throw new Error("SAFETY: isolated staging fixture URL is missing or malformed");
+  }
+  if (
+    configured.protocol !== "https:" ||
+    runtime.protocol !== "https:" ||
+    configured.username ||
+    configured.password ||
+    configured.search ||
+    configured.hash ||
+    configured.origin !== runtime.origin ||
+    configured.pathname.replace(/\/+$/, "") !== runtime.pathname.replace(/\/+$/, "")
+  ) {
+    throw new Error("SAFETY: fixture database target does not match the verified staging runtime");
+  }
+  return configured.toString().replace(/\/+$/, "");
+}
+
 async function filesUnder(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
   const nested = await Promise.all(entries.map(async (entry) => {
@@ -238,7 +262,8 @@ export async function verifyAccessAndIdentity({ input, fetchImpl = fetch, env = 
   expectEqual(config.configGeneration, input.expectedConfigGeneration, "runtime-config generation");
   if (config.sideEffectsMode !== "disabled") throw new Error("This non-destructive qualification profile requires staging side effects to be disabled");
   if (config.telemetryEnabled !== false) throw new Error("Production telemetry must be disabled in staging");
-  return { identity, sideEffectsMode: config.sideEffectsMode };
+  if (typeof config.supabaseUrl !== "string") throw new Error("Verified staging runtime did not expose its public database target");
+  return { identity, sideEffectsMode: config.sideEffectsMode, supabaseUrl: config.supabaseUrl };
 }
 
 export async function verifyGitHubDeployment({ input, fetchImpl = fetch, env = process.env, signal }) {
@@ -370,6 +395,7 @@ export async function runQualification(inputValue, adapters = {}) {
   const input = validateQualificationInput(inputValue);
   const results = [];
   let fixtureNamespace = null;
+  let runtimePreflight = null;
   let originalFailure = null;
   let cleanupFailure = null;
   const record = async (name, operation) => {
@@ -389,7 +415,7 @@ export async function runQualification(inputValue, adapters = {}) {
   };
 
   try {
-    await record("cloudflare-access-and-runtime-identity", () => verifyAccessAndIdentity({ input, fetchImpl, env, signal }));
+    runtimePreflight = await record("cloudflare-access-and-runtime-identity", () => verifyAccessAndIdentity({ input, fetchImpl, env, signal }));
     await record("github-staging-deployment-identity", () => verifyGitHubDeployment({ input, fetchImpl, env, signal }));
     await record("existing-deployment-smoke", async () => {
       if (adapters.runDeploymentSmoke) return adapters.runDeploymentSmoke(input);
@@ -405,7 +431,7 @@ export async function runQualification(inputValue, adapters = {}) {
     await record("isolated-staging-synthetic-write", async () => {
       fixtureNamespace = adapters.fixtureNamespace ?? createFixtureNamespace();
       if (adapters.seedFixture) return adapters.seedFixture(fixtureNamespace);
-      const url = String(env.NUTSNEWS_SUPABASE_URL ?? env.SUPABASE_URL ?? "").replace(/\/+$/, "");
+      const url = assertFixtureTargetMatchesRuntime(env.NUTSNEWS_SUPABASE_URL ?? env.SUPABASE_URL, runtimePreflight?.supabaseUrl);
       const serviceRoleKey = String(env.SUPABASE_SERVICE_ROLE_KEY ?? "").trim();
       await seedStagingFixture(fixtureNamespace, getFixtureExpiry(), { url, serviceRoleKey });
       return { namespace: fixtureNamespace, synthetic: true, ttlMinutes: 60 };
