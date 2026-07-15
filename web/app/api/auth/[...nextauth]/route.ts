@@ -11,7 +11,11 @@ function oauthDisabledResponse() {
 
 function allowOAuthCallbacks(request: NextRequest) {
   try {
-    assertOAuthCallback("oauth-callback", request.url);
+    assertOAuthCallback("oauth-callback", {
+      url: request.url,
+      host: request.headers.get("host") ?? "",
+      forwardedProto: request.headers.get("x-forwarded-proto") ?? "",
+    });
     return true;
   } catch (error) {
     if (error instanceof RuntimeSafetyError) {

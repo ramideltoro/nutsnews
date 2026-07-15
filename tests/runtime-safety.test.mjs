@@ -153,7 +153,29 @@ test("OAuth callbacks preserve production behavior and allow only the isolated s
   assert.doesNotThrow(() =>
     assertOAuthCallback(
       "oauth-callback",
+      {
+        url: "http://0.0.0.0:3000/api/auth/callback/google",
+        host: "unexpected.example.test",
+        forwardedProto: "http",
+      },
+      productionEnvironment(),
+    ),
+  );
+  assert.doesNotThrow(() =>
+    assertOAuthCallback(
+      "oauth-callback",
       "https://staging.nutsnews.com/api/auth/callback/google",
+      stagingOAuthEnvironment(),
+    ),
+  );
+  assert.doesNotThrow(() =>
+    assertOAuthCallback(
+      "oauth-callback",
+      {
+        url: "https://0.0.0.0:3000/api/auth/callback/google",
+        host: "staging.nutsnews.com",
+        forwardedProto: "https",
+      },
       stagingOAuthEnvironment(),
     ),
   );
@@ -197,4 +219,34 @@ test("staging OAuth callbacks fail closed for missing, mixed, or ambiguous ident
       error instanceof RuntimeSafetyError &&
       error.code === "oauth_callback_identity_required",
   );
+
+  for (const requestIdentity of [
+    {
+      url: "https://0.0.0.0:3000/api/auth/callback/google",
+      host: "www.nutsnews.com",
+      forwardedProto: "https",
+    },
+    {
+      url: "https://0.0.0.0:3000/api/auth/callback/google",
+      host: "staging.nutsnews.com",
+      forwardedProto: "http",
+    },
+    {
+      url: "https://0.0.0.0:3000/api/auth/callback/google",
+      host: "staging.nutsnews.com:443",
+      forwardedProto: "https",
+    },
+  ]) {
+    assert.throws(
+      () =>
+        assertOAuthCallback(
+          "oauth-callback",
+          requestIdentity,
+          stagingOAuthEnvironment(),
+        ),
+      (error) =>
+        error instanceof RuntimeSafetyError &&
+        error.code === "oauth_callback_identity_required",
+    );
+  }
 });

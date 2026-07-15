@@ -23,4 +23,6 @@ test("GET and POST OAuth paths both enforce the callback identity guard", async 
 
   assert.match(source, /Cache-Control": "no-store"/);
   assert.match(source, /status: 503/);
+  assert.match(source, /host: request\.headers\.get\("host"\)/);
+  assert.match(source, /forwardedProto: request\.headers\.get\("x-forwarded-proto"\)/);
 });
