@@ -21,6 +21,7 @@
     "test:deployment-smoke": "node ../scripts/dual_target_web_smoke.mjs",
     "test:production-release": "node ../scripts/production_release_workflow_regression.mjs",
     "test:admin-article-reviews": "node ../scripts/admin_article_reviews_regression.mjs",
+    "test:security-regression": "node ../scripts/security_regression.mjs",
     "test:security-headers": "node scripts/assert-security-headers.mjs",
     "test:runtime-config": "node --test ../tests/runtime-public-config.test.mjs",
     "test:runtime-safety": "node --test ../tests/runtime-safety.test.mjs ../tests/mutation-paths.test.mjs ../tests/oauth-callback-route.test.mjs ../tests/runtime-public-config.test.mjs ../tests/runtime-readiness.test.mjs",
