@@ -185,6 +185,15 @@ export type FeedManagementDashboardData = {
   rankingSql: string;
 };
 
+type FeedToggleRpcRow = {
+  feed_id: number;
+  feed_source: string;
+  feed_url: string;
+  previous_is_active: boolean | string | null;
+  next_is_active: boolean | string | null;
+  audit_event_id: string;
+};
+
 function getSupabaseConfig(): SupabaseConfig | null {
   try {
     return getServerSupabaseConfig();
@@ -619,9 +628,11 @@ export async function getAdminFeedManagementDashboardData(): Promise<FeedManagem
 }
 
 export async function setAdminRssFeedActiveStatus({
+  actorEmail,
   feedUrl,
   isActive,
 }: {
+  actorEmail: string | null | undefined;
   feedUrl: string;
   isActive: boolean;
 }) {
@@ -660,22 +671,29 @@ export async function setAdminRssFeedActiveStatus({
     };
   }
 
-  const response = await fetch(
-    `${config.url}/rest/v1/rss_feeds?url=eq.${encodeURIComponent(safeFeedUrl)}`,
-    {
-      method: "PATCH",
-      cache: "no-store",
-      headers: {
-        apikey: config.serviceRoleKey,
-        Authorization: `Bearer ${config.serviceRoleKey}`,
-        "Content-Type": "application/json",
-        Prefer: "return=minimal",
-      },
-      body: JSON.stringify({
-        is_active: isActive,
-      }),
+  const normalizedActorEmail = actorEmail?.trim().toLowerCase();
+
+  if (!normalizedActorEmail) {
+    return {
+      ok: false,
+      message: "Admin session is required before changing a feed.",
+    };
+  }
+
+  const response = await fetch(`${config.url}/rest/v1/rpc/set_rss_feed_active_with_audit`, {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      apikey: config.serviceRoleKey,
+      Authorization: `Bearer ${config.serviceRoleKey}`,
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify({
+      p_actor_email: normalizedActorEmail,
+      p_feed_url: safeFeedUrl,
+      p_is_active: isActive,
+    }),
+  });
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -686,9 +704,20 @@ export async function setAdminRssFeedActiveStatus({
     };
   }
 
+  const rows = (await response.json()) as FeedToggleRpcRow[];
+  const updatedFeed = rows[0];
+
+  if (!updatedFeed?.audit_event_id) {
+    return {
+      ok: false,
+      message: "Feed status changed, but the audit event was not returned.",
+    };
+  }
+
   return {
     ok: true,
     message: isActive ? "Feed enabled." : "Feed disabled.",
+    auditEventId: updatedFeed.audit_event_id,
   };
 }
 

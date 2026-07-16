@@ -262,6 +262,14 @@ export default async function AdminPage() {
               href="/admin/feeds"
               status="Live"
             />
+
+            <DashboardCard
+              eyebrow="Traceability"
+              title="Audit Log"
+              description="Review recent sensitive admin changes with actor, action, target, timestamp, and before/after values."
+              href="/admin/audit"
+              status="Live"
+            />
           </div>
         </section>
 
@@ -302,7 +310,7 @@ export default async function AdminPage() {
               dashboards, while detailed monitoring lives under dedicated admin
               routes like `/admin/readiness`, `/admin/articles`,
               `/admin/ai-usage`, `/admin/local-ai`, `/admin/shards`,
-              `/admin/feed-health`, and `/admin/feeds`.
+              `/admin/feed-health`, `/admin/feeds`, and `/admin/audit`.
             </p>
           </div>
 

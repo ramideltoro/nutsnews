@@ -160,7 +160,16 @@ async function testAdminFeedMutationUrlBoundary() {
   try {
     globalThis.fetch = async () => {
       fetchCalls += 1;
-      return new Response(null, { status: 204 });
+      return Response.json([
+        {
+          feed_id: 1,
+          feed_source: "Publisher",
+          feed_url: "https://publisher.example/feed.xml",
+          previous_is_active: true,
+          next_is_active: false,
+          audit_event_id: "00000000-0000-4000-8000-000000000001",
+        },
+      ]);
     };
 
     const { setAdminRssFeedActiveStatus } = loadTsModule("web/lib/adminFeedManagement.ts", {
@@ -192,10 +201,19 @@ async function testAdminFeedMutationUrlBoundary() {
     assert.equal(fetchCalls, 0, "private feed URL denial does not reach fetch");
 
     const allowed = await setAdminRssFeedActiveStatus({
+      actorEmail: "admin@example.com",
       feedUrl: "https://publisher.example/feed.xml",
       isActive: false,
     });
-    assert.deepEqual(allowed, { ok: true, message: "Feed disabled." }, "public feed URL can reach the mutation path");
+    assert.deepEqual(
+      allowed,
+      {
+        ok: true,
+        message: "Feed disabled.",
+        auditEventId: "00000000-0000-4000-8000-000000000001",
+      },
+      "public feed URL can reach the audited mutation path",
+    );
     assert.equal(fetchCalls, 1, "public feed URL reaches exactly one mutation request");
   } finally {
     globalThis.fetch = originalFetch;
