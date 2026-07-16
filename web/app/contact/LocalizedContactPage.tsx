@@ -22,7 +22,7 @@ export const contactCopyByLanguage: Record<
     eyebrow: "Contact NutsNews",
     title: "Send a message",
     intro:
-      "Share feedback, report a site issue, suggest an uplifting source, or send a note about NutsNews. The message will be sent directly to the NutsNews inbox.",
+      "Share feedback, report a site issue, suggest an uplifting source, or send a publisher correction, attribution concern, or source removal request. The message will be sent directly to the NutsNews inbox.",
     backTitle: "Back to the feed",
     backBody:
       "Continue browsing positive stories while your message is on its way.",
@@ -32,7 +32,7 @@ export const contactCopyByLanguage: Record<
     eyebrow: "Contacter NutsNews",
     title: "Envoyer un message",
     intro:
-      "Partagez un commentaire, signalez un problème du site, suggérez une source positive ou envoyez simplement un mot à propos de NutsNews. Le message sera envoyé directement à la boîte de réception NutsNews.",
+      "Partagez un commentaire, signalez un problème du site, suggérez une source positive ou envoyez une correction d’éditeur, une question d’attribution ou une demande de retrait de source. Le message sera envoyé directement à la boîte de réception NutsNews.",
     backTitle: "Retour au fil",
     backBody:
       "Continuez à parcourir des histoires positives pendant que votre message est en route.",
@@ -42,7 +42,7 @@ export const contactCopyByLanguage: Record<
     eyebrow: "NutsNewsに連絡する",
     title: "メッセージを送る",
     intro:
-      "フィードバック、サイトの問題、前向きなニュースソースの提案、またはNutsNewsへのメッセージを送れます。内容はNutsNewsの受信箱へ直接届きます。",
+      "フィードバック、サイトの問題、前向きなニュースソースの提案、出版社の訂正、出典表示の相談、ソース削除の依頼を送れます。内容はNutsNewsの受信箱へ直接届きます。",
     backTitle: "フィードに戻る",
     backBody:
       "メッセージを送っている間も、ポジティブなストーリーを続けて読めます。",
@@ -53,7 +53,7 @@ export const contactCopyByLanguage: Record<
     eyebrow: "NutsNews kontaktieren",
     title: "Eine Nachricht senden",
     intro:
-      "Teile Feedback, melde ein Problem auf der Website, schlage eine positive Quelle vor oder sende eine Notiz zu NutsNews. Die Nachricht geht direkt an den NutsNews-Posteingang.",
+      "Teile Feedback, melde ein Problem auf der Website, schlage eine positive Quelle vor oder sende eine Verlagskorrektur, einen Hinweis zur Attribution oder eine Anfrage zur Quellenentfernung. Die Nachricht geht direkt an den NutsNews-Posteingang.",
     backTitle: "Zurück zum Feed",
     backBody:
       "Stöbere weiter in positiven Geschichten, während deine Nachricht unterwegs ist.",
@@ -63,7 +63,7 @@ export const contactCopyByLanguage: Record<
     eyebrow: "NutsNews kontaktieren",
     title: "Eine Nachricht senden",
     intro:
-      "Teile Feedback, melde ein Problem auf der Website, schlage eine positive Quelle vor oder sende eine Notiz zu NutsNews. Die Nachricht geht direkt an den NutsNews-Posteingang.",
+      "Teile Feedback, melde ein Problem auf der Website, schlage eine positive Quelle vor oder sende eine Verlagskorrektur, einen Hinweis zur Attribution oder eine Anfrage zur Quellenentfernung. Die Nachricht geht direkt an den NutsNews-Posteingang.",
     backTitle: "Zurück zum Feed",
     backBody:
       "Stöbere weiter in positiven Geschichten, während deine Nachricht unterwegs ist.",
@@ -73,7 +73,7 @@ export const contactCopyByLanguage: Record<
     eyebrow: "Επικοινωνία με το NutsNews",
     title: "Στείλτε ένα μήνυμα",
     intro:
-      "Μοιραστείτε σχόλια, αναφέρετε ένα πρόβλημα στον ιστότοπο, προτείνετε μια θετική πηγή ή στείλτε ένα σημείωμα για το NutsNews. Το μήνυμα θα σταλεί απευθείας στα εισερχόμενα του NutsNews.",
+      "Μοιραστείτε σχόλια, αναφέρετε πρόβλημα στον ιστότοπο, προτείνετε θετική πηγή ή στείλτε διόρθωση εκδότη, ζήτημα απόδοσης ή αίτημα αφαίρεσης πηγής. Το μήνυμα θα σταλεί απευθείας στα εισερχόμενα του NutsNews.",
     backTitle: "Πίσω στη ροή",
     backBody:
       "Συνεχίστε να διαβάζετε θετικές ιστορίες όσο το μήνυμά σας είναι καθ’ οδόν.",

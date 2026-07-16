@@ -5,14 +5,14 @@ import { LocalizedContactPage } from "./LocalizedContactPage";
 export const metadata: Metadata = {
   title: "Contact",
   description:
-    "Contact NutsNews with questions, feedback, story ideas, or site issues.",
+    "Contact NutsNews with questions, feedback, story ideas, site issues, publisher corrections, or source removal requests.",
   alternates: {
     canonical: "/contact",
   },
   openGraph: {
     title: "Contact | NutsNews",
     description:
-      "Send a message to NutsNews with questions, feedback, story ideas, or site issues.",
+      "Send a message to NutsNews with questions, feedback, story ideas, site issues, publisher corrections, or source removal requests.",
     url: "/contact",
     type: "website",
   },
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Contact | NutsNews",
     description:
-      "Send a message to NutsNews with questions, feedback, story ideas, or site issues.",
+      "Send a message to NutsNews with questions, feedback, story ideas, site issues, publisher corrections, or source removal requests.",
   },
 };
 

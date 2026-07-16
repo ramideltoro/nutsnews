@@ -12,8 +12,9 @@ export default function Image() {
       eyebrow: "Uplifting story preview",
       title: "NutsNews",
       description:
-        "A calm mobile feed of uplifting stories from trusted original publishers.",
-      badge: "Positive news",
+        "Positive news summaries that keep original publishers visible and send readers to the complete story.",
+      badge: "Publisher credited",
+      footer: "Short summary with source attribution · nutsnews.com",
     }),
     OG_IMAGE_SIZE,
   );

@@ -71,7 +71,9 @@ try {
   ]) {
     assertIncludes(immutableGuard, `'${file}'`, 'immutable_preview_smoke_guard.mjs');
   }
-  assertIncludes(immutableGuard, 'IMMUTABLE TEST CHANGE APPROVED BY RAMI', 'immutable_preview_smoke_guard.mjs');
+  assertIncludes(immutableGuard, 'Immutable test guard notice', 'immutable_preview_smoke_guard.mjs');
+  assertIncludes(immutableGuard, 'Manual approval phrases are no longer required', 'immutable_preview_smoke_guard.mjs');
+  assert(!immutableGuard.includes('IMMUTABLE TEST CHANGE APPROVED BY RAMI'), 'Immutable guard must not require a manual approval phrase.');
 
   console.log('Cloudflare production cache purge regression passed.');
 } catch (error) {
