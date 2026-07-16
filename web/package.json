@@ -11,6 +11,8 @@
     "test:i18n": "vitest run --config vitest.i18n.config.ts",
     "test:routes": "vitest run --config vitest.routes.config.ts",
     "test:accessibility": "playwright test --config=playwright.accessibility.config.ts",
+    "test:visual": "node ../scripts/web_visual_regression.mjs",
+    "test:visual:update": "node ../scripts/web_visual_regression.mjs --update-snapshots",
     "audit:pagespeed": "node scripts/pagespeed-insights.mjs --strategy=both",
     "audit:pagespeed:mobile": "node scripts/pagespeed-insights.mjs --strategy=mobile",
     "audit:pagespeed:desktop": "node scripts/pagespeed-insights.mjs --strategy=desktop",

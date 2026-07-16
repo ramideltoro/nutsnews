@@ -449,6 +449,16 @@ web/lighthouse-budget.json
 
 See [Homepage Performance Budget](https://github.com/ramideltoro/nutsnews-docs/blob/main/HOMEPAGE_PERFORMANCE_BUDGET.md) for the full review policy and common fixes.
 
+### Visual regression snapshots
+
+Public page layout snapshots run with deterministic offline data:
+
+```bash
+npm run test:visual
+```
+
+The suite covers desktop and mobile homepage and article detail pages, plus desktop settings, search, and localized states. Snapshot diffs and traces are written under `web/test-results/visual-regression` and `web/playwright-report/visual-regression`.
+
 ### Cloudflare CDN
 
 Cloudflare sits in front of the public site and caches eligible public pages and API responses.

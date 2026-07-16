@@ -1,0 +1,68 @@
+name: Visual Regression
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "web/**"
+      - "scripts/web_public_reader_smoke.mjs"
+      - "scripts/web_visual_regression.mjs"
+      - ".github/workflows/visual-regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  visual-regression:
+    name: Playwright visual regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: web
+
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NUTSNEWS_RUNTIME_ENV: staging
+      NUTSNEWS_SIDE_EFFECTS_MODE: disabled
+      NUTSNEWS_DATA_ENVIRONMENT: staging
+      NUTSNEWS_SUPABASE_CREDENTIALS_ENV: staging
+      NUTSNEWS_SUPABASE_PROJECT_REF: public-smoke-fixture
+      NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: ci-production-fixture
+      NEXT_PUBLIC_APP_ENV: staging
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run visual regression tests
+        run: npm run test:visual
+
+      - name: Upload Playwright visual artifacts
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: visual-regression-playwright-artifacts
+          path: |
+            web/playwright-report/visual-regression
+            web/test-results/visual-regression
+          if-no-files-found: ignore
