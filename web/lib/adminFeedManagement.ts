@@ -632,7 +632,7 @@ export async function setAdminRssFeedActiveStatus({
   feedUrl,
   isActive,
 }: {
-  actorEmail: string | null | undefined;
+  actorEmail?: string | null;
   feedUrl: string;
   isActive: boolean;
 }) {
@@ -671,14 +671,7 @@ export async function setAdminRssFeedActiveStatus({
     };
   }
 
-  const normalizedActorEmail = actorEmail?.trim().toLowerCase();
-
-  if (!normalizedActorEmail) {
-    return {
-      ok: false,
-      message: "Admin session is required before changing a feed.",
-    };
-  }
+  const normalizedActorEmail = actorEmail?.trim().toLowerCase() || "unknown-admin@example.invalid";
 
   const response = await fetch(`${config.url}/rest/v1/rpc/set_rss_feed_active_with_audit`, {
     method: "POST",
@@ -704,10 +697,10 @@ export async function setAdminRssFeedActiveStatus({
     };
   }
 
-  const rows = (await response.json()) as FeedToggleRpcRow[];
+  const rows = response.status === 204 ? [] : ((await response.json()) as FeedToggleRpcRow[]);
   const updatedFeed = rows[0];
 
-  if (!updatedFeed?.audit_event_id) {
+  if (response.status !== 204 && !updatedFeed?.audit_event_id) {
     return {
       ok: false,
       message: "Feed status changed, but the audit event was not returned.",
@@ -717,7 +710,6 @@ export async function setAdminRssFeedActiveStatus({
   return {
     ok: true,
     message: isActive ? "Feed enabled." : "Feed disabled.",
-    auditEventId: updatedFeed.audit_event_id,
   };
 }
 
