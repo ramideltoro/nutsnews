@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -354,6 +355,18 @@ function runPsql({ databaseUrl, input, args = [] }) {
   };
 }
 
+function runPsqlSqlFile({ databaseUrl, sql }) {
+  const dir = mkdtempSync(join(tmpdir(), "nutsnews-restore-sql-"));
+  const sqlPath = join(dir, "restore.sql");
+
+  try {
+    writeFileSync(sqlPath, sql, { encoding: "utf8", mode: 0o600 });
+    return runPsql({ databaseUrl, input: "", args: ["--file", sqlPath] });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 function dollarQuote(value, baseTag) {
   let suffix = 0;
   let tag = `$${baseTag}$`;
@@ -508,7 +521,7 @@ export async function runRestoreFireDrill(options = {}) {
   if (!options.skipDatabaseRestore) {
     ensureDisposableDatabase(databaseUrl, options.allowRemoteDatabase);
     const restoreSql = buildRestoreSql(validation.tables);
-    runPsql({ databaseUrl, input: restoreSql });
+    runPsqlSqlFile({ databaseUrl, sql: restoreSql });
     databaseRestore = "restored exported rows into disposable database";
     validationOutput = runRestoreValidationSql(databaseUrl).stdout;
   }
