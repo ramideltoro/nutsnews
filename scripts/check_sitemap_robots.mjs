@@ -37,4 +37,23 @@ assertIncludes(sitemap.text, `${BASE_URL}/contact`, 'sitemap.xml');
 const urlCount = (sitemap.text.match(/<url>/g) || []).length;
 console.log(`Sitemap URL count: ${urlCount}`);
 if (urlCount < 3) throw new Error('Sitemap has fewer than 3 URLs.');
+
+if (robots.text.includes(`${BASE_URL}/sitemap-index.xml`)) {
+  const sitemapIndex = await fetchText(`${BASE_URL}/sitemap-index.xml`);
+  assertIncludes(sitemapIndex.text, '<sitemapindex', 'sitemap-index.xml');
+  assertIncludes(sitemapIndex.text, `${BASE_URL}/sitemap.xml`, 'sitemap-index.xml');
+
+  const sitemapLocations = [...sitemapIndex.text.matchAll(/<loc>\s*([^<]+?)\s*<\/loc>/gi)]
+    .map((match) => match[1].trim());
+  const articleSitemap = sitemapLocations.find((location) => location.includes('/articles/sitemap/'));
+
+  if (articleSitemap) {
+    const articleSitemapResponse = await fetchText(articleSitemap);
+    assertIncludes(articleSitemapResponse.text, '<urlset', 'article sitemap shard');
+    console.log(`Checked article sitemap shard: ${articleSitemap}`);
+  }
+} else {
+  console.warn('robots.txt does not advertise sitemap-index.xml yet; legacy sitemap mode accepted.');
+}
+
 console.log('Sitemap and robots checks passed.');

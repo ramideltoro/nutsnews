@@ -9,6 +9,7 @@ assertProductionOperation('seo-structured-data-audit');
 const DEFAULT_BASE_URL = 'https://www.nutsnews.com';
 const DEFAULT_ARTICLE_LIMIT = 3;
 const DEFAULT_OUTPUT_DIR = 'reports/seo';
+const MAX_SITEMAP_FETCHES = 25;
 
 function parseArgs(argv) {
   const args = {
@@ -485,10 +486,70 @@ function extractSitemapUrls(xml, baseUrl) {
   return [...new Set(urls)];
 }
 
-async function getArticleUrls(baseUrl, articleLimit) {
-  const sitemapUrl = `${baseUrl}/sitemap.xml`;
+function isSitemapIndex(xml) {
+  return /<sitemapindex(?:\s|>)/i.test(xml);
+}
+
+function isSameOriginUrl(url, baseUrl) {
+  try {
+    return new URL(url).origin === new URL(baseUrl).origin;
+  } catch {
+    return false;
+  }
+}
+
+async function collectSitemapUrls({ sitemapUrl, baseUrl, seen = new Set() }) {
+  if (seen.has(sitemapUrl)) {
+    return [];
+  }
+
+  if (seen.size >= MAX_SITEMAP_FETCHES) {
+    throw new Error(`Sitemap traversal exceeded ${MAX_SITEMAP_FETCHES} files. Last URL: ${sitemapUrl}`);
+  }
+
+  seen.add(sitemapUrl);
   const sitemapXml = await fetchText(sitemapUrl);
   const urls = extractSitemapUrls(sitemapXml, baseUrl);
+
+  if (!isSitemapIndex(sitemapXml)) {
+    return urls;
+  }
+
+  const nestedSitemapUrls = urls.filter((url) => isSameOriginUrl(url, baseUrl));
+  const nestedUrls = [];
+
+  for (const nestedSitemapUrl of nestedSitemapUrls) {
+    nestedUrls.push(
+      ...(await collectSitemapUrls({
+        sitemapUrl: nestedSitemapUrl,
+        baseUrl,
+        seen,
+      })),
+    );
+  }
+
+  return [...new Set(nestedUrls)];
+}
+
+async function getArticleUrls(baseUrl, articleLimit) {
+  const sitemapCandidates = [`${baseUrl}/sitemap-index.xml`, `${baseUrl}/sitemap.xml`];
+  let urls = [];
+  let lastError = null;
+
+  for (const sitemapUrl of sitemapCandidates) {
+    try {
+      urls = await collectSitemapUrls({ sitemapUrl, baseUrl });
+      if (urls.length > 0) {
+        break;
+      }
+    } catch (error) {
+      lastError = error;
+      if (sitemapUrl.endsWith('/sitemap.xml')) {
+        throw error;
+      }
+    }
+  }
+
   const articleUrls = urls.filter((url) => {
     try {
       const parsed = new URL(url);
@@ -499,7 +560,8 @@ async function getArticleUrls(baseUrl, articleLimit) {
   });
 
   if (articleUrls.length === 0) {
-    throw new Error(`No article URLs found in ${sitemapUrl}.`);
+    const errorSuffix = lastError instanceof Error ? ` Last sitemap error: ${lastError.message}` : '';
+    throw new Error(`No article URLs found in sitemap index or root sitemap.${errorSuffix}`);
   }
 
   return articleUrls.slice(0, articleLimit);

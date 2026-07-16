@@ -11,6 +11,11 @@ import {
   type LanguageCode,
   normalizeLanguageCode,
 } from "@/lib/languages";
+import {
+  ARTICLE_SITEMAP_PAGE_SIZE,
+  ROOT_SITEMAP_RECENT_ARTICLE_LIMIT,
+  getArticleSitemapRange,
+} from "@/lib/sitemapConfig";
 
 export const PAGE_SIZE = 5;
 export const CURSOR_PAGE_SIZE = 15;
@@ -828,7 +833,11 @@ const getCachedArticleById = unstable_cache(async (id: string, requestedLanguage
 
 export const getArticleById = cache(getCachedArticleById);
 
-export async function getRecentArticleSitemapItems(limit = 1000) {
+export async function getRecentArticleSitemapItems(limit = ROOT_SITEMAP_RECENT_ARTICLE_LIMIT) {
+  const safeLimit = Number.isFinite(limit)
+    ? Math.min(Math.max(Math.floor(limit), 1), ARTICLE_SITEMAP_PAGE_SIZE)
+    : ROOT_SITEMAP_RECENT_ARTICLE_LIMIT;
+
   const { data, error } = await getSupabase()
     .from("articles")
     .select("id, published_on_site_at, published_at")
@@ -836,10 +845,52 @@ export async function getRecentArticleSitemapItems(limit = 1000) {
     .not("image_url", "is", null)
     .neq("image_url", "")
     .order("published_on_site_at", { ascending: false })
-    .limit(limit);
+    .order("id", { ascending: false })
+    .limit(safeLimit);
 
   if (error) {
     console.error("Failed to load sitemap articles:", error);
+    return [];
+  }
+
+  return data ?? [];
+}
+
+export async function getPublishedArticleSitemapCount() {
+  const { count, error } = await getSupabase()
+    .from("articles")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "published")
+    .not("image_url", "is", null)
+    .neq("image_url", "");
+
+  if (error) {
+    console.error("Failed to count sitemap articles:", error);
+    return 0;
+  }
+
+  return count ?? 0;
+}
+
+export async function getArticleSitemapItemsPage(shardId: number) {
+  const { from, to } = getArticleSitemapRange(shardId);
+  const { data, error } = await getSupabase()
+    .from("articles")
+    .select("id, published_on_site_at, published_at")
+    .eq("status", "published")
+    .not("image_url", "is", null)
+    .neq("image_url", "")
+    .order("published_on_site_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(from, to);
+
+  if (error) {
+    console.error("Failed to load sitemap article shard:", {
+      shardId,
+      from,
+      to,
+      error,
+    });
     return [];
   }
 

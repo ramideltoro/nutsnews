@@ -5,14 +5,20 @@ on:
     branches: [main]
     paths:
       - "web/app/sitemap.ts"
+      - "web/app/articles/sitemap.ts"
+      - "web/app/sitemap-index.xml/route.ts"
       - "web/app/robots.ts"
+      - "web/lib/sitemapConfig.ts"
       - "scripts/check_sitemap_robots.mjs"
       - ".github/workflows/sitemap-robots-check.yml"
   pull_request:
     branches: [main]
     paths:
       - "web/app/sitemap.ts"
+      - "web/app/articles/sitemap.ts"
+      - "web/app/sitemap-index.xml/route.ts"
       - "web/app/robots.ts"
+      - "web/lib/sitemapConfig.ts"
       - "scripts/check_sitemap_robots.mjs"
       - ".github/workflows/sitemap-robots-check.yml"
   schedule:
