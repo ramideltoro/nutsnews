@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const containerWorkflow = await readFile(resolve(root, ".github/workflows/container-image.yml"), "utf8");
 const releaseWorkflow = await readFile(resolve(root, ".github/workflows/production-release.yml"), "utf8");
+const dualTargetSmoke = await readFile(resolve(root, "scripts/dual_target_web_smoke.mjs"), "utf8");
 
 function requireText(text, fragment, message) {
   assert.ok(text.includes(fragment), message);
@@ -59,5 +60,11 @@ assert.doesNotMatch(
 requireText(releaseWorkflow, "migration_head: migrationHead", "Promotion payload must include the verified migration head.");
 requireText(releaseWorkflow, "schema_version: schemaVersion", "Promotion payload must include the rollback-compatible schema marker.");
 requireText(releaseWorkflow, "supabase_project_ref: supabaseProjectRef", "Promotion payload must include the verified Supabase project identity.");
+
+requireText(dualTargetSmoke, "--production-safe-surfaces", "Post-production smoke must expose the safe production surface option.");
+requireText(dualTargetSmoke, "Contact validation probe", "Post-production smoke must include non-mutating contact validation.");
+requireText(dualTargetSmoke, "Auth session probe", "Post-production smoke must include an auth surface probe.");
+requireText(dualTargetSmoke, "Next.js static asset", "Post-production smoke must include a public asset probe.");
+requireText(dualTargetSmoke, "Public articles CORS probe", "Post-production smoke must include a CORS-shape probe.");
 
 console.log("Production release workflow regression checks passed.");
