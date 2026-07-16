@@ -12,6 +12,7 @@ const webPort = Number(process.env.WEB_PUBLIC_SMOKE_WEB_PORT || 3021);
 const supabaseUrl = `http://127.0.0.1:${supabasePort}`;
 const mockExternalUrl = `http://127.0.0.1:${mockExternalPort}`;
 const webUrl = `http://127.0.0.1:${webPort}`;
+const defaultPlaywrightConfig = process.env.WEB_PUBLIC_SMOKE_PLAYWRIGHT_CONFIG || "playwright.public-smoke.config.ts";
 
 const categories = [
   "Community | Uplifting",
@@ -327,9 +328,9 @@ function closeServer(server) {
   });
 }
 
-function runPlaywright() {
+function runPlaywright(playwrightConfig = defaultPlaywrightConfig, extraArgs = []) {
   return new Promise((resolve, reject) => {
-    const child = spawn(npmCommand, ["exec", "--", "playwright", "test", "--config=playwright.public-smoke.config.ts"], {
+    const child = spawn(npmCommand, ["exec", "--", "playwright", "test", `--config=${playwrightConfig}`, ...extraArgs], {
       cwd: webDir,
       stdio: "inherit",
       env: {
@@ -371,21 +372,25 @@ function runPlaywright() {
   });
 }
 
-async function run() {
+async function run(playwrightConfig = defaultPlaywrightConfig, extraArgs = []) {
   const supabaseServer = createSupabaseMockServer();
   const externalServer = createExternalMockServer();
 
   try {
     await listen(supabaseServer, supabasePort, "Public smoke mock Supabase/PostgREST");
     await listen(externalServer, mockExternalPort, "Public smoke mock external services");
-    await runPlaywright();
+    await runPlaywright(playwrightConfig, extraArgs);
   } finally {
     await closeServer(supabaseServer);
     await closeServer(externalServer);
   }
 }
 
-run().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  run(defaultPlaywrightConfig, process.argv.slice(2)).catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}
+
+export { run };
