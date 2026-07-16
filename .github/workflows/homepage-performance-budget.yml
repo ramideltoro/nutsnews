@@ -83,7 +83,7 @@ jobs:
         run: npm run build
 
       - name: Generate homepage performance budget report
-        run: npm run analyze:homepage
+        run: npm run test:performance-budget
 
       - name: Upload homepage performance report
         if: always()

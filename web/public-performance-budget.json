@@ -1,0 +1,66 @@
+{
+  "$schema": "https://nutsnews.com/schemas/public-performance-budget.v1.json",
+  "description": "Public page performance budgets for NutsNews. Run after a production build with npm run test:performance-budget.",
+  "routes": [
+    {
+      "id": "homepage",
+      "label": "Homepage",
+      "manifestKeys": ["/", "/page", "app/page"],
+      "initialJavaScriptGzipBytes": {
+        "target": 307200,
+        "warn": 337920,
+        "fail": 389120
+      },
+      "initialCssGzipBytes": {
+        "target": 30720,
+        "warn": 46080,
+        "fail": 61440
+      },
+      "totalInitialTransferGzipBytes": {
+        "target": 368640,
+        "warn": 460800,
+        "fail": 563200
+      }
+    },
+    {
+      "id": "articleDetail",
+      "label": "Article detail page",
+      "manifestKeys": ["/articles/[id]/page", "app/articles/[id]/page", "/articles/[id]"],
+      "initialJavaScriptGzipBytes": {
+        "target": 307200,
+        "warn": 348160,
+        "fail": 409600
+      },
+      "initialCssGzipBytes": {
+        "target": 40960,
+        "warn": 57344,
+        "fail": 73728
+      },
+      "totalInitialTransferGzipBytes": {
+        "target": 409600,
+        "warn": 512000,
+        "fail": 614400
+      }
+    }
+  ],
+  "imageOptimizer": {
+    "formats": ["image/avif", "image/webp"],
+    "maximumQuality": 75,
+    "maximumResponseBodyBytes": 8000000,
+    "minimumCacheTtlSeconds": 86400,
+    "maximumDeviceSizeCount": 6,
+    "maximumImageSizeCount": 5
+  },
+  "lighthouse": {
+    "requiredUrls": [
+      "http://localhost:3000/",
+      "http://localhost:3000/privacy",
+      "http://localhost:3000/contact"
+    ],
+    "performanceWarnScore": 0.6,
+    "largestContentfulPaintWarnMs": 4000,
+    "totalBlockingTimeWarnMs": 600,
+    "cumulativeLayoutShiftWarn": 0.15,
+    "serverResponseTimeWarnMs": 800
+  }
+}

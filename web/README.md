@@ -436,13 +436,14 @@ Run it locally after a production build:
 
 ```bash
 npm run build
-npm run analyze:homepage
+npm run test:performance-budget
 ```
 
 Budget source files:
 
 ```text
 web/performance-budget.json
+web/public-performance-budget.json
 web/lighthouse-budget.json
 ```
 

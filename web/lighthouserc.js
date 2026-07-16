@@ -25,6 +25,7 @@ module.exports = {
 
         'largest-contentful-paint': ['warn', { maxNumericValue: 4000 }],
         'cumulative-layout-shift': ['warn', { maxNumericValue: 0.15 }],
+        'server-response-time': ['warn', { maxNumericValue: 800 }],
         'total-blocking-time': ['warn', { maxNumericValue: 600 }]
       }
     },
