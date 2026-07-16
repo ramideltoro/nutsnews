@@ -54,7 +54,7 @@ jobs:
                 "Access-Control-Allow-Origin": "*",
                 "Content-Type": "application/json",
               });
-              response.end('[{"legacy_schema_version":"20260712170000","migration_head":"20260713000000","expected_schema_fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","actual_schema_fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]');
+              response.end('[{"legacy_schema_version":"20260712170000","migration_head":"20260716090000","expected_schema_fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","actual_schema_fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]');
               return;
             }
 
@@ -366,6 +366,11 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/staging_fixtures.mjs exercise --local --namespace nutsnews-test-ci-fixture-run-123456
+
+      - name: Verify Supabase RLS and database access policies
+        run: |
+          set -euo pipefail
+          node scripts/supabase_rls_regression.mjs --namespace=nutsnews-test-ci-rls-policy-123456
 
       - name: Run migration, old-digest, lock, and fixture regressions
         run: |

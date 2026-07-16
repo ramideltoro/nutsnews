@@ -15,7 +15,7 @@ function parseEnvironment(output) {
 }
 
 /** Read local Supabase connection values without printing them. */
-export function getLocalSupabaseStatus() {
+export function getLocalSupabaseStatus({ requireAnonKey = false } = {}) {
   let output;
   try {
     output = execFileSync("supabase", ["status", "--output", "env"], {
@@ -27,12 +27,13 @@ export function getLocalSupabaseStatus() {
   }
 
   const values = parseEnvironment(output);
-  if (!values.API_URL || !values.SERVICE_ROLE_KEY || !values.DB_URL) {
+  if (!values.API_URL || !values.SERVICE_ROLE_KEY || !values.DB_URL || (requireAnonKey && !values.ANON_KEY)) {
     throw new Error("Local Supabase status did not provide the required disposable-database values.");
   }
 
   return Object.freeze({
     apiUrl: values.API_URL.replace(/\/+$/, ""),
+    anonKey: values.ANON_KEY,
     serviceRoleKey: values.SERVICE_ROLE_KEY,
     databaseUrl: values.DB_URL,
   });
