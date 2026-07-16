@@ -1,0 +1,31 @@
+{
+  "source": "Fixture API publisher",
+  "items": [
+    {
+      "title": "Neighbors restore a community garden",
+      "url": "https://publisher.example/community-garden/",
+      "publishedAt": "2026-07-16T10:00:00.000Z",
+      "summary": "Duplicate of the RSS story with a canonical URL variant.",
+      "imageUrl": "https://cdn.publisher.example/community-garden-alt.jpg"
+    },
+    {
+      "title": "Library opens a free tool-lending desk",
+      "url": "https://api-publisher.example/tool-library",
+      "publishedAt": "2026-07-16T12:00:00.000Z",
+      "summary": "Neighbors can borrow repair tools for free.",
+      "imageUrl": "https://api-publisher.example/tool-library.jpg"
+    },
+    {
+      "title": "",
+      "url": "https://api-publisher.example/missing-title",
+      "publishedAt": "2026-07-16T13:00:00.000Z",
+      "summary": "This row is rejected because title is required."
+    },
+    {
+      "title": "Malformed date row",
+      "url": "https://api-publisher.example/malformed-date",
+      "publishedAt": "Thursday-ish",
+      "summary": "This row is rejected because date parsing must be deterministic."
+    }
+  ]
+}

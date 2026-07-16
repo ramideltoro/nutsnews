@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>NutsNews malformed fixture publisher</title>
+    <item>
+      <title>Broken item without a safe ending
+      <link>https://broken.example/bad-item</link>
+      <pubDate>not-a-date</pubDate>
+  </channel>
+</rss>

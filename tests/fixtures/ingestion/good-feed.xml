@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>NutsNews fixture publisher</title>
+    <item>
+      <title>Neighbors restore a community garden</title>
+      <link>https://publisher.example/community-garden?utm_source=newsletter</link>
+      <guid>fixture-good-1</guid>
+      <pubDate>Thu, 16 Jul 2026 10:00:00 GMT</pubDate>
+      <description>Volunteers reopened a small public garden.</description>
+      <enclosure url="https://cdn.publisher.example/community-garden.jpg" type="image/jpeg" />
+    </item>
+    <item>
+      <title>Students build low-cost weather sensors</title>
+      <link>https://publisher.example/weather-sensors</link>
+      <guid>fixture-good-2</guid>
+      <pubDate>2026-07-16T11:00:00.000Z</pubDate>
+      <description>A student club shared its sensor plans for free.</description>
+    </item>
+  </channel>
+</rss>
