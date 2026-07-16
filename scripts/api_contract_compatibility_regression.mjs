@@ -455,7 +455,7 @@ function testInventoryCompleteness() {
   const inventory = readJson("api-contracts/inventory.json");
   assert.equal(inventory.schemaVersion, 1, "API inventory schema version must be explicit");
   assert(Array.isArray(inventory.endpoints), "API inventory endpoints must be an array");
-  assert.equal(inventory.endpoints.length, 14, "API inventory must include every supported custom response endpoint");
+  assert.equal(inventory.endpoints.length, 16, "API inventory must include every supported custom response endpoint");
 
   const inventoryFiles = inventory.endpoints.map((endpoint) => endpoint.routeFile).sort();
   assert.equal(new Set(inventoryFiles).size, inventoryFiles.length, "API inventory route files must be unique");
@@ -1433,14 +1433,56 @@ async function testMetadataAndOpenGraphContracts() {
         },
       ];
     },
+    async getPublishedArticleSitemapCount() {
+      return 1501;
+    },
+    async getArticleSitemapItemsPage(shardId) {
+      return [
+        {
+          id: `article-page-${shardId}`,
+          published_on_site_at: "2026-07-03T10:00:00.000Z",
+          published_at: "2026-07-02T10:00:00.000Z",
+        },
+      ];
+    },
   };
-  const sitemapModule = loadModule("web/app/sitemap.ts", { "@/lib/articles": articlesMock });
+  const sitemapConfigMock = {
+    ARTICLE_SITEMAP_PAGE_SIZE: 1000,
+    ROOT_SITEMAP_RECENT_ARTICLE_LIMIT: 100,
+    ROOT_SITEMAP_PATH: "/sitemap.xml",
+    SITEMAP_INDEX_PATH: "/sitemap-index.xml",
+    getArticleSitemapShardIds(articleCount) {
+      return Array.from({ length: Math.ceil(articleCount / 1000) }, (_value, index) => index);
+    },
+    parseArticleSitemapShardId(value) {
+      const numericValue = Number(value);
+      return Number.isInteger(numericValue) && numericValue >= 0 && numericValue < 50 ? numericValue : null;
+    },
+    getArticleSitemapUrl(siteUrl, shardId) {
+      return `${siteUrl}/articles/sitemap/${shardId}.xml`;
+    },
+  };
+  const sitemapModule = loadModule("web/app/sitemap.ts", {
+    "@/lib/articles": articlesMock,
+    "@/lib/sitemapConfig": sitemapConfigMock,
+  });
   const aboutSitemapModule = loadModule("web/app/about/sitemap.ts", { "@/lib/articles": articlesMock });
-  const robotsModule = loadModule("web/app/robots.ts", { "@/lib/articles": articlesMock });
+  const articleSitemapModule = loadModule("web/app/articles/sitemap.ts", {
+    "@/lib/articles": articlesMock,
+    "@/lib/sitemapConfig": sitemapConfigMock,
+  });
+  const sitemapIndexModule = loadModule("web/app/sitemap-index.xml/route.ts", {
+    "@/lib/articles": articlesMock,
+    "@/lib/sitemapConfig": sitemapConfigMock,
+  });
+  const robotsModule = loadModule("web/app/robots.ts", {
+    "@/lib/articles": articlesMock,
+    "@/lib/sitemapConfig": sitemapConfigMock,
+  });
 
   const sitemap = await sitemapModule.default();
   assert(Array.isArray(sitemap), "Root sitemap must generate an array for framework XML serialization");
-  assert.deepEqual(sitemapCalls, [1000]);
+  assert.deepEqual(sitemapCalls, [100], "Root sitemap must retain a bounded recent article window");
   const rootSitemapUrls = sitemap.map((entry) => entry.url);
   for (const suffix of ["", "/apps", "/privacy", "/contact", "/articles/article-1"]) {
     assert(rootSitemapUrls.includes(`https://www.nutsnews.com${suffix}`), `Root sitemap is missing ${suffix || "/"}`);
@@ -1459,12 +1501,35 @@ async function testMetadataAndOpenGraphContracts() {
   }
   assert.equal(sitemapCalls.at(-1), undefined, "About sitemap must retain its default item-limit behavior");
 
+  assert.deepEqual(await articleSitemapModule.generateSitemaps(), [{ id: 0 }, { id: 1 }]);
+  const articleShard = await articleSitemapModule.default({ id: Promise.resolve("1") });
+  assert.equal(articleShard[0].url, "https://www.nutsnews.com/articles/article-page-1");
+  assert.deepEqual(await articleSitemapModule.default({ id: Promise.resolve("50") }), []);
+
+  const sitemapIndexResponse = await sitemapIndexModule.GET();
+  assert.equal(sitemapIndexResponse.status, 200);
+  assert.match(sitemapIndexResponse.headers.get("content-type"), /application\/xml/);
+  const sitemapIndex = await sitemapIndexResponse.text();
+  assert(sitemapIndex.includes("<sitemapindex"), "Sitemap index route must return sitemapindex XML");
+  assert(sitemapIndex.includes("https://www.nutsnews.com/sitemap.xml"), "Sitemap index must include root sitemap");
+  assert(
+    sitemapIndex.includes("https://www.nutsnews.com/articles/sitemap/0.xml"),
+    "Sitemap index must include article shard 0",
+  );
+  assert(
+    sitemapIndex.includes("https://www.nutsnews.com/articles/sitemap/1.xml"),
+    "Sitemap index must include article shard 1",
+  );
+
   const robots = robotsModule.default();
   assert(Array.isArray(robots.rules), "robots rules must be an array");
   assert.equal(robots.rules[0].userAgent, "*");
   assert.equal(robots.rules[0].allow, "/");
   assert(robots.rules[0].disallow.includes("/api/"), "robots must disallow API crawling");
-  assert.equal(robots.sitemap, "https://www.nutsnews.com/sitemap.xml");
+  assert.deepEqual(robots.sitemap, [
+    "https://www.nutsnews.com/sitemap-index.xml",
+    "https://www.nutsnews.com/sitemap.xml",
+  ]);
 
   const imageCalls = [];
   class ImageResponse {
@@ -1540,6 +1605,11 @@ async function testConfiguredCachePolicies() {
   assert.equal(headerValue("/readyz", "Cache-Control"), "no-store, max-age=0");
   assert.match(headerValue("/healthz", "CDN-Cache-Control"), /s-maxage=60/);
   assert.match(headerValue("/sitemap.xml", "X-NutsNews-Cache-Policy"), /public-sitemap-cache/);
+  assert.match(headerValue("/sitemap-index.xml", "X-NutsNews-Cache-Policy"), /public-sitemap-index-cache/);
+  assert.match(
+    headerValue("/articles/sitemap/:path*", "X-NutsNews-Cache-Policy"),
+    /public-article-sitemap-cache/,
+  );
   assert.match(headerValue("/robots.txt", "X-NutsNews-Cache-Policy"), /public-robots-cache/);
   assert.match(headerValue("/opengraph-image", "X-NutsNews-Cache-Policy"), /public-og-image-cache/);
   assert.match(

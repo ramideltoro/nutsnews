@@ -115,6 +115,42 @@
       "method": "HEAD"
     },
     {
+      "key": "sitemap-index",
+      "label": "Sitemap index",
+      "path": "/sitemap-index.xml",
+      "expectedStatuses": [
+        200
+      ],
+      "expectedPolicy": "public-sitemap-index-cache-3600s",
+      "expectedCacheIncludes": [
+        "public",
+        "s-maxage=3600"
+      ],
+      "expectedCdnIncludes": [
+        "s-maxage=3600"
+      ],
+      "description": "Search-engine sitemap index that advertises the root sitemap and article sitemap shards.",
+      "method": "HEAD"
+    },
+    {
+      "key": "article-sitemap",
+      "label": "Article sitemap shard",
+      "path": "/articles/sitemap/0.xml",
+      "expectedStatuses": [
+        200
+      ],
+      "expectedPolicy": "public-article-sitemap-cache-3600s",
+      "expectedCacheIncludes": [
+        "public",
+        "s-maxage=3600"
+      ],
+      "expectedCdnIncludes": [
+        "s-maxage=3600"
+      ],
+      "description": "First article sitemap shard. Should stay cacheable and fast as the archive grows.",
+      "method": "HEAD"
+    },
+    {
       "key": "robots",
       "label": "Robots",
       "path": "/robots.txt",

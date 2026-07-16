@@ -67,6 +67,8 @@ for (const policy of [
   "public-article-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s",
   "public-api-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s",
   "public-home-feed-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s",
+  "public-sitemap-index-cache-3600s",
+  "public-article-sitemap-cache-3600s",
 ]) {
   assertIncludes(nextConfig, policy, "next.config.ts");
 }
@@ -81,6 +83,8 @@ for (const route of [
   '"/api/articles"',
   '"/api/home-feed"',
   '"/healthz"',
+  '"/sitemap-index.xml"',
+  '"/articles/sitemap/:path*"',
 ]) {
   assertIncludes(nextConfig, `source: ${route}`, "next.config.ts");
 }
@@ -95,6 +99,8 @@ assertExcludes(middleware, '"/monitoring', "middleware.ts");
 assertIncludes(cacheObservability, '"expectedPolicy": "public-home-cache-3600s"', "cache-observability.config.json");
 assertIncludes(cacheObservability, '"expectedPolicy": "public-article-cache-3600s"', "cache-observability.config.json");
 assertIncludes(cacheObservability, '"expectedPolicy": "public-api-cache-3600s"', "cache-observability.config.json");
+assertIncludes(cacheObservability, '"expectedPolicy": "public-sitemap-index-cache-3600s"', "cache-observability.config.json");
+assertIncludes(cacheObservability, '"expectedPolicy": "public-article-sitemap-cache-3600s"', "cache-observability.config.json");
 assertIncludes(cacheObservability, '"s-maxage=3600"', "cache-observability.config.json");
 assertExcludes(cacheObservability, '"s-maxage=300"', "cache-observability.config.json");
 

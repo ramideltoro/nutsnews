@@ -265,6 +265,14 @@ const nextConfig: NextConfig = {
         headers: publicCacheHeaders("public-sitemap-cache-3600s", PUBLIC_LONG_CACHE_CONTROL, PUBLIC_LONG_CDN_CACHE_CONTROL),
       },
       {
+        source: "/sitemap-index.xml",
+        headers: publicCacheHeaders("public-sitemap-index-cache-3600s", PUBLIC_LONG_CACHE_CONTROL, PUBLIC_LONG_CDN_CACHE_CONTROL),
+      },
+      {
+        source: "/articles/sitemap/:path*",
+        headers: publicCacheHeaders("public-article-sitemap-cache-3600s", PUBLIC_LONG_CACHE_CONTROL, PUBLIC_LONG_CDN_CACHE_CONTROL),
+      },
+      {
         source: "/admin/:path*",
         headers: noStoreHeaders("bypass-admin-cache"),
       },
