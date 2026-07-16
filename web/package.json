@@ -50,6 +50,7 @@
     "test:admin-production-readiness": "node ../scripts/admin_production_readiness_regression.mjs",
     "test:admin-readiness-actions-token": "node ../scripts/admin_readiness_actions_token_contract.mjs",
     "test:admin-access-denied": "node ../scripts/admin_access_denied_regression.mjs",
+    "test:privacy-analytics": "node ../scripts/privacy_analytics_regression.mjs",
     "test:feature-flags": "node ../scripts/feature_flags_regression.mjs",
     "analyze:homepage": "node scripts/homepage-performance-budget.mjs",
     "analyze:homepage:warn": "node scripts/homepage-performance-budget.mjs --warn-only",
