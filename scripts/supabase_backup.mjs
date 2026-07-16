@@ -27,6 +27,7 @@ const TABLES = String(process.env.BACKUP_TABLES || DEFAULT_BACKUP_TABLES.join(',
   .filter(Boolean);
 const LIMIT = Math.max(1, Math.min(Number(process.env.BACKUP_LIMIT_PER_TABLE || 5000), 50000));
 const OUT_DIR = path.join(process.cwd(), 'backups', 'supabase');
+const exportedRowsByTable = new Map();
 
 if (!SUPABASE_URL || !SERVICE_KEY) {
   console.log('Skipping Supabase backup because SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not set.');
@@ -54,6 +55,25 @@ async function fetchTable(table) {
   return { rows: text ? JSON.parse(text) : [], contentRange: response.headers.get('content-range') || '' };
 }
 
+function filterRowsForReferentialClosure(table, rows) {
+  if (table !== 'article_summaries') {
+    return rows;
+  }
+
+  const articleRows = exportedRowsByTable.get('articles');
+  if (!Array.isArray(articleRows)) {
+    return rows;
+  }
+
+  const articleUrls = new Set(
+    articleRows
+      .map((row) => String(row?.original_url ?? '').trim())
+      .filter(Boolean),
+  );
+
+  return rows.filter((row) => articleUrls.has(String(row?.original_url ?? '').trim()));
+}
+
 const now = new Date().toISOString().replace(/[:.]/g, '-');
 const manifest = {
   schemaVersion: 2,
@@ -67,7 +87,12 @@ const manifest = {
 for (const table of TABLES) {
   console.log(`Exporting ${table}...`);
   try {
-    const { rows, contentRange } = await fetchTable(table);
+    const fetched = await fetchTable(table);
+    const sourceRowCount = fetched.rows.length;
+    const rows = filterRowsForReferentialClosure(table, fetched.rows);
+    if (rows.length !== sourceRowCount) {
+      console.log(`Filtered ${sourceRowCount - rows.length} ${table} row(s) without exported parent articles.`);
+    }
     const json = JSON.stringify(rows, null, 2);
     const jsonBuffer = Buffer.from(json, 'utf8');
     const gzipBuffer = gzipSync(jsonBuffer);
@@ -79,13 +104,15 @@ for (const table of TABLES) {
     manifest.tables.push({
       table,
       rowCount: rows.length,
-      contentRange,
+      sourceRowCount,
+      contentRange: fetched.contentRange,
       file: path.basename(gzipPath),
       jsonFile: path.basename(jsonPath),
       byteSize: jsonBuffer.byteLength,
       gzipByteSize: gzipBuffer.byteLength,
       sha256: sha256(gzipBuffer),
     });
+    exportedRowsByTable.set(table, rows);
     console.log(`Exported ${rows.length} row(s) from ${table}.`);
   } catch (error) {
     manifest.tables.push({ table, error: error.message });
