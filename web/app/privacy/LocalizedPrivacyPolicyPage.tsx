@@ -5,6 +5,10 @@ import Link from "next/link";
 import { type LanguageCode } from "@/lib/languages";
 import { SiteFooter } from "../components/SiteFooter";
 import { useSelectedLanguage } from "../components/useSelectedLanguage";
+import {
+  AnalyticsConsentControls,
+  type AnalyticsConsentControlCopy,
+} from "./AnalyticsConsentControls";
 
 type PolicySectionCopy = {
   id: string;
@@ -27,6 +31,7 @@ type PrivacyCopy = {
   returnTitle: string;
   returnBody: string;
   returnButton: string;
+  analyticsConsent: AnalyticsConsentControlCopy;
 };
 
 
@@ -34,7 +39,7 @@ const germanPrivacyCopy: PrivacyCopy = {
   eyebrow: "Datenschutzrichtlinie",
   title: "NutsNews Datenschutzrichtlinie",
   lastUpdatedLabel: "Zuletzt aktualisiert",
-  lastUpdated: "19. Juni 2026",
+  lastUpdated: "16. Juli 2026",
   intro:
     "NutsNews ist bewusst einfach und datenschutzfreundlich gebaut: Es ist kein Konto erforderlich, App-Einstellungen werden lokal gespeichert, und die App zeigt positive Zusammenfassungen mit Links zurück zu den Originalverlagen.",
   highlightsEyebrow: "Datenschutz auf einen Blick",
@@ -97,7 +102,10 @@ const germanPrivacyCopy: PrivacyCopy = {
       id: "analytics-diagnostics",
       title: "Website-Analyse und Diagnostik",
       body: [
-        "Die NutsNews-Website kann Analyse- und Diagnosetools nutzen, um Traffic, Zuverlässigkeit und Fehler zu verstehen. Diese Tools helfen, die Website zu verbessern und den Dienst funktionsfähig zu halten.",
+        "Die NutsNews-Website nutzt Google Analytics 4 nur, wenn Production-Telemetrie live ist, eine Mess-ID konfiguriert ist, der Browser kein Do Not Track oder Global Privacy Control sendet und der Leser minimale Analyse auf dieser Seite erlaubt hat. Standardmäßig ist diese Analyse aus.",
+        "Die erlaubte Taxonomie ist absichtlich klein: Standard-Seitenaufrufe, grundlegende Engagement-Signale, grobe Geräte-/Browserklasse, Referrer, ungefährer Standort und Performance-Timing. NutsNews definiert derzeit keine benutzerdefinierten Analyse-Events für Artikelklicks, Likes, Suchanfragen, Kategorien oder persönliche Profile.",
+        "NutsNews sendet keine Namen, E-Mail-Adressen, Konto-IDs, Zahlungsdaten, präzisen Standortdaten, gelikten Geschichten oder KI-Prompts an Analysewerkzeuge. Anzeigenpersonalisierung und Google Signals sind deaktiviert.",
+        "Sentry kann Produktionsfehler und Diagnostik erfassen, wenn Production-Telemetrie live ist. Ereignisse werden vor dem Senden bereinigt, damit Cookies, Autorisierungs-Header und andere sensible Header nicht weitergegeben werden.",
         "Die iOS-App ist eine separate native App-Erfahrung. Die aktuelle iOS-App enthält keine Werbe-SDKs, Konto-Login-SDKs oder Social-Login-SDKs Dritter.",
       ],
     },
@@ -130,6 +138,7 @@ const germanPrivacyCopy: PrivacyCopy = {
       title: "Deine Wahlmöglichkeiten",
       body: [
         "Du kannst NutsNews ohne Konto verwenden. Du kannst Likes durch erneutes Tippen entfernen, lokale Einstellungen in den Einstellungen ändern und die App löschen, um lokale App-Daten vom Gerät zu entfernen.",
+        "Du kannst die Analyse auf der Website über die Kontrolle auf dieser Seite ausgeschaltet lassen oder minimale Analyse erlauben. Do Not Track und Global Privacy Control werden respektiert und blockieren Analyse weiterhin, selbst wenn die lokale Einstellung Analyse erlaubt.",
         "Du kannst selbst entscheiden, ob du Originalverlagslinks öffnest. Publisher-Websites sind von NutsNews getrennt und können eigene Datenschutzkontrollen haben.",
       ],
     },
@@ -155,13 +164,23 @@ const germanPrivacyCopy: PrivacyCopy = {
   returnBody:
     "Lies weiter die neuesten positiven Geschichten im NutsNews-Home-Feed.",
   returnButton: "Zurück zur Startseite",
+  analyticsConsent: {
+    title: "Analyse-Einstellung",
+    body: "NutsNews lädt Google Analytics 4 erst, wenn du minimale Analyse erlaubst. Diese Einstellung wird nur in diesem Browser gespeichert.",
+    statusLabel: "Aktueller Status",
+    statusAllowed: "Minimale Analyse ist erlaubt",
+    statusDenied: "Analyse ist ausgeschaltet",
+    statusBlocked: "Analyse ist durch Browser-Datenschutzsignale blockiert",
+    allowButton: "Minimale Analyse erlauben",
+    denyButton: "Analyse ausgeschaltet lassen",
+  },
 };
 
 const greekPrivacyCopy: PrivacyCopy = {
   eyebrow: "Πολιτική απορρήτου",
   title: "Πολιτική απορρήτου NutsNews",
   lastUpdatedLabel: "Τελευταία ενημέρωση",
-  lastUpdated: "19 Ιουνίου 2026",
+  lastUpdated: "16 Ιουλίου 2026",
   intro:
     "Το NutsNews είναι φτιαγμένο ώστε να είναι απλό και προσεκτικό με το απόρρητο: δεν απαιτείται λογαριασμός, οι προτιμήσεις της εφαρμογής αποθηκεύονται τοπικά και η εφαρμογή εστιάζει σε θετικές περιλήψεις ιστοριών με συνδέσμους προς τους αρχικούς εκδότες.",
   highlightsEyebrow: "Σημεία απορρήτου",
@@ -224,7 +243,10 @@ const greekPrivacyCopy: PrivacyCopy = {
       id: "analytics-diagnostics",
       title: "Analytics και diagnostics ιστότοπου",
       body: [
-        "Ο ιστότοπος NutsNews μπορεί να χρησιμοποιεί εργαλεία analytics και diagnostics για να κατανοεί την επισκεψιμότητα, την αξιοπιστία και τα σφάλματα. Αυτά τα εργαλεία βοηθούν στη βελτίωση του site και στη σωστή λειτουργία της υπηρεσίας.",
+        "Ο ιστότοπος NutsNews χρησιμοποιεί Google Analytics 4 μόνο όταν η παραγωγική τηλεμετρία είναι live, υπάρχει ρυθμισμένο measurement ID, ο browser δεν στέλνει Do Not Track ή Global Privacy Control και ο αναγνώστης έχει επιτρέψει ελάχιστα analytics σε αυτή τη σελίδα. Η προεπιλογή είναι off.",
+        "Η επιτρεπόμενη ταξινόμηση είναι σκόπιμα μικρή: τυπικά page views, βασικά engagement signals, χονδρική κατηγορία συσκευής/browser, referrer, κατά προσέγγιση περιοχή και performance timing. Το NutsNews δεν ορίζει προς το παρόν custom analytics events για κλικ άρθρων, likes, αναζητήσεις, κατηγορίες ή προσωπικά profiles.",
+        "Το NutsNews δεν στέλνει ονόματα, email, account IDs, στοιχεία πληρωμής, ακριβή τοποθεσία, αγαπημένες ιστορίες ή AI prompts σε analytics tools. Το ad personalization και τα Google Signals είναι απενεργοποιημένα.",
+        "Το Sentry μπορεί να συλλέγει production errors και diagnostics όταν η παραγωγική τηλεμετρία είναι live. Τα events καθαρίζονται πριν την αποστολή ώστε cookies, authorization headers και άλλα ευαίσθητα headers να μην αποστέλλονται.",
         "Η iOS εφαρμογή είναι ξεχωριστή native εμπειρία. Η τρέχουσα iOS εφαρμογή δεν περιλαμβάνει διαφημιστικά SDK, account login SDKs ή third-party social login SDKs.",
       ],
     },
@@ -257,6 +279,7 @@ const greekPrivacyCopy: PrivacyCopy = {
       title: "Οι επιλογές σας",
       body: [
         "Μπορείτε να χρησιμοποιήσετε το NutsNews χωρίς λογαριασμό. Μπορείτε να αφαιρέσετε likes πατώντας ξανά το κουμπί, να αλλάξετε τοπικές προτιμήσεις στις Ρυθμίσεις και να διαγράψετε την εφαρμογή για να αφαιρέσετε τοπικά δεδομένα από τη συσκευή.",
+        "Μπορείτε να αφήσετε τα website analytics απενεργοποιημένα ή να επιτρέψετε ελάχιστα analytics από το control αυτής της σελίδας. Το Do Not Track και το Global Privacy Control γίνονται σεβαστά και συνεχίζουν να μπλοκάρουν analytics, ακόμη και αν η τοπική ρύθμιση τα επιτρέπει.",
         "Μπορείτε να επιλέξετε αν θα ανοίγετε links αρχικών εκδοτών. Οι ιστότοποι εκδοτών είναι ξεχωριστοί από το NutsNews και μπορεί να έχουν δικούς τους ελέγχους απορρήτου.",
       ],
     },
@@ -282,6 +305,16 @@ const greekPrivacyCopy: PrivacyCopy = {
   returnBody:
     "Συνεχίστε να διαβάζετε τις πιο πρόσφατες θετικές ιστορίες στη ροή της αρχικής σελίδας του NutsNews.",
   returnButton: "Πίσω στην αρχική",
+  analyticsConsent: {
+    title: "Ρύθμιση analytics",
+    body: "Το NutsNews φορτώνει το Google Analytics 4 μόνο αφού επιτρέψετε ελάχιστα analytics. Αυτή η επιλογή αποθηκεύεται μόνο σε αυτόν τον browser.",
+    statusLabel: "Τρέχουσα κατάσταση",
+    statusAllowed: "Τα ελάχιστα analytics επιτρέπονται",
+    statusDenied: "Τα analytics είναι απενεργοποιημένα",
+    statusBlocked: "Τα analytics μπλοκάρονται από σήματα απορρήτου του browser",
+    allowButton: "Επιτρέψτε ελάχιστα analytics",
+    denyButton: "Κρατήστε τα analytics off",
+  },
 };
 
 export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
@@ -292,7 +325,7 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
     eyebrow: "Privacy Policy",
     title: "NutsNews Privacy Policy",
     lastUpdatedLabel: "Last updated",
-    lastUpdated: "June 19, 2026",
+    lastUpdated: "July 16, 2026",
     intro:
       "NutsNews is built to be simple and privacy-conscious: no account is required, app preferences are stored locally, and the app focuses on showing positive story summaries with links back to original publishers.",
     highlightsEyebrow: "Privacy highlights",
@@ -355,7 +388,10 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
         id: "analytics-diagnostics",
         title: "Website analytics and diagnostics",
         body: [
-          "The NutsNews website may use analytics and diagnostics tools to understand site traffic, reliability, and errors. These tools help improve the website and keep the service working properly.",
+          "The NutsNews website uses Google Analytics 4 only when production telemetry is live, a measurement ID is configured, the browser is not sending Do Not Track or Global Privacy Control, and the reader has allowed minimal analytics on this page. The default is off.",
+          "The allowed taxonomy is intentionally small: standard page views, basic engagement signals, coarse device/browser class, referrer, approximate region, and performance timing. NutsNews does not currently define custom analytics events for article clicks, likes, searches, categories, or personal profiles.",
+          "NutsNews does not send names, email addresses, account IDs, payment details, precise location, liked stories, or AI prompts to analytics tools. Advertising personalization and Google Signals are disabled.",
+          "Sentry may collect production errors and diagnostics when production telemetry is live. Events are scrubbed before sending so cookies, authorization headers, and other sensitive headers are not forwarded.",
           "The iOS app is a separate native app experience. The current iOS app does not include advertising SDKs, account login SDKs, or third-party social login SDKs.",
         ],
       },
@@ -388,6 +424,7 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
         title: "Your choices",
         body: [
           "You can use NutsNews without creating an account. You can unlike stories by tapping the like button again, change local preferences in Settings, and delete the app to remove local app data from your device.",
+          "You can keep website analytics off or allow minimal analytics using the control on this page. Do Not Track and Global Privacy Control are respected and continue to block analytics even if the local setting allows analytics.",
           "You can choose whether to open original publisher links. Publisher websites are separate from NutsNews and may have their own privacy controls.",
         ],
       },
@@ -413,12 +450,22 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
     returnBody:
       "Continue browsing the latest uplifting stories on the NutsNews home feed.",
     returnButton: "Back to home",
+    analyticsConsent: {
+      title: "Analytics setting",
+      body: "NutsNews loads Google Analytics 4 only after you allow minimal analytics. This choice is stored only in this browser.",
+      statusLabel: "Current status",
+      statusAllowed: "Minimal analytics is allowed",
+      statusDenied: "Analytics is off",
+      statusBlocked: "Analytics is blocked by browser privacy signals",
+      allowButton: "Allow minimal analytics",
+      denyButton: "Keep analytics off",
+    },
   },
   fr: {
     eyebrow: "Politique de confidentialité",
     title: "Politique de confidentialité de NutsNews",
     lastUpdatedLabel: "Dernière mise à jour",
-    lastUpdated: "19 juin 2026",
+    lastUpdated: "16 juillet 2026",
     intro:
       "NutsNews est conçu pour être simple et respectueux de la vie privée : aucun compte n’est requis, les préférences de l’app sont stockées localement, et l’app se concentre sur des résumés d’histoires positives avec des liens vers les éditeurs d’origine.",
     highlightsEyebrow: "Points clés de confidentialité",
@@ -481,7 +528,10 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
         id: "analytics-diagnostics",
         title: "Analyses et diagnostics du site",
         body: [
-          "Le site NutsNews peut utiliser des outils d’analyse et de diagnostic pour comprendre le trafic, la fiabilité et les erreurs. Ces outils aident à améliorer le site et à garder le service opérationnel.",
+          "Le site NutsNews utilise Google Analytics 4 uniquement lorsque la télémétrie de production est active, qu’un identifiant de mesure est configuré, que le navigateur n’envoie pas Do Not Track ou Global Privacy Control et que le lecteur a autorisé une analyse minimale sur cette page. Par défaut, cette analyse est désactivée.",
+          "La taxonomie autorisée est volontairement limitée : vues de page standard, signaux d’engagement de base, catégorie générale d’appareil ou de navigateur, référent, région approximative et mesures de performance. NutsNews ne définit actuellement aucun événement d’analyse personnalisé pour les clics d’articles, les likes, les recherches, les catégories ou les profils personnels.",
+          "NutsNews n’envoie pas aux outils d’analyse les noms, adresses e-mail, identifiants de compte, données de paiement, localisation précise, histoires aimées ou prompts d’IA. La personnalisation publicitaire et Google Signals sont désactivés.",
+          "Sentry peut collecter des erreurs et diagnostics de production lorsque la télémétrie de production est active. Les événements sont nettoyés avant l’envoi afin que les cookies, en-têtes d’autorisation et autres en-têtes sensibles ne soient pas transmis.",
           "L’app iOS est une expérience native séparée. L’app iOS actuelle n’inclut pas de SDK publicitaire, de SDK de connexion de compte ni de SDK de connexion sociale tiers.",
         ],
       },
@@ -514,6 +564,7 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
         title: "Vos choix",
         body: [
           "Vous pouvez utiliser NutsNews sans créer de compte. Vous pouvez retirer un like en appuyant à nouveau sur le bouton, changer les préférences locales dans les paramètres et supprimer l’app pour retirer les données locales de votre appareil.",
+          "Vous pouvez garder l’analyse du site désactivée ou autoriser une analyse minimale avec le contrôle de cette page. Do Not Track et Global Privacy Control sont respectés et continuent de bloquer l’analyse même si le réglage local l’autorise.",
           "Vous pouvez choisir d’ouvrir ou non les liens des éditeurs d’origine. Les sites des éditeurs sont séparés de NutsNews et peuvent avoir leurs propres contrôles de confidentialité.",
         ],
       },
@@ -539,12 +590,22 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
     returnBody:
       "Continuez à parcourir les dernières histoires positives sur le fil d’accueil NutsNews.",
     returnButton: "Retour à l’accueil",
+    analyticsConsent: {
+      title: "Réglage d’analyse",
+      body: "NutsNews charge Google Analytics 4 uniquement après votre autorisation d’une analyse minimale. Ce choix est enregistré seulement dans ce navigateur.",
+      statusLabel: "État actuel",
+      statusAllowed: "L’analyse minimale est autorisée",
+      statusDenied: "L’analyse est désactivée",
+      statusBlocked: "L’analyse est bloquée par les signaux de confidentialité du navigateur",
+      allowButton: "Autoriser l’analyse minimale",
+      denyButton: "Garder l’analyse désactivée",
+    },
   },
   ja: {
     eyebrow: "プライバシーポリシー",
     title: "NutsNews プライバシーポリシー",
     lastUpdatedLabel: "最終更新日",
-    lastUpdated: "2026年6月19日",
+    lastUpdated: "2026年7月16日",
     intro:
       "NutsNewsは、シンプルでプライバシーに配慮した作りを目指しています。アカウントは不要で、アプリの設定はローカルに保存され、前向きなストーリーの要約と元の出版社へのリンクを表示することに集中しています。",
     highlightsEyebrow: "プライバシーのポイント",
@@ -607,7 +668,10 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
         id: "analytics-diagnostics",
         title: "ウェブサイトの分析と診断",
         body: [
-          "NutsNewsサイトは、サイトのトラフィック、信頼性、エラーを理解するために分析や診断ツールを使うことがあります。これらのツールはサイト改善とサービス維持に役立ちます。",
+          "NutsNewsサイトは、本番テレメトリーが有効で、測定IDが設定され、ブラウザがDo Not TrackまたはGlobal Privacy Controlを送信しておらず、このページで読者が最小限の分析を許可した場合にのみGoogle Analytics 4を使用します。初期状態ではオフです。",
+          "許可される分類は意図的に小さくしています。標準のページビュー、基本的なエンゲージメント信号、大まかな端末またはブラウザ種別、参照元、おおよその地域、パフォーマンスタイミングに限ります。NutsNewsは現在、記事クリック、いいね、検索、カテゴリー、個人プロフィールのためのカスタム分析イベントを定義していません。",
+          "NutsNewsは、名前、メールアドレス、アカウントID、支払い情報、正確な位置情報、いいねしたストーリー、AIプロンプトを分析ツールに送信しません。広告パーソナライズとGoogle Signalsは無効です。",
+          "本番テレメトリーが有効な場合、Sentryが本番エラーと診断情報を収集することがあります。送信前にイベントを整理し、Cookie、認可ヘッダー、その他の機密ヘッダーを転送しないようにします。",
           "iOSアプリは別のネイティブアプリ体験です。現在のiOSアプリには、広告SDK、アカウントログインSDK、第三者ソーシャルログインSDKは含まれていません。",
         ],
       },
@@ -640,6 +704,7 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
         title: "選択肢",
         body: [
           "NutsNewsはアカウントを作らずに使えます。いいねボタンをもう一度押していいねを外したり、設定でローカル設定を変更したり、アプリを削除して端末内のローカルデータを削除したりできます。",
+          "このページのコントロールで、ウェブサイト分析をオフのままにするか、最小限の分析を許可できます。Do Not TrackとGlobal Privacy Controlは尊重され、ローカル設定で分析を許可していても分析をブロックします。",
           "元の出版社リンクを開くかどうかは選択できます。出版社のサイトはNutsNewsとは別であり、独自のプライバシー設定を持つ場合があります。",
         ],
       },
@@ -665,6 +730,16 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
     returnBody:
       "NutsNewsのホームフィードで最新の前向きなストーリーを続けて読めます。",
     returnButton: "ホームに戻る",
+    analyticsConsent: {
+      title: "分析設定",
+      body: "NutsNewsは、あなたが最小限の分析を許可した後にのみGoogle Analytics 4を読み込みます。この選択はこのブラウザだけに保存されます。",
+      statusLabel: "現在の状態",
+      statusAllowed: "最小限の分析が許可されています",
+      statusDenied: "分析はオフです",
+      statusBlocked: "ブラウザのプライバシー信号により分析がブロックされています",
+      allowButton: "最小限の分析を許可",
+      denyButton: "分析をオフのままにする",
+    },
   },
 };
 
@@ -755,6 +830,8 @@ export function LocalizedPrivacyPolicyPage() {
             ))}
           </div>
         </section>
+
+        <AnalyticsConsentControls copy={copy.analyticsConsent} />
 
         <div className="mt-6 grid gap-4">
           {copy.sections.map((section) => (
