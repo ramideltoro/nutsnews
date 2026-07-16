@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:components": "vitest run --config vitest.config.ts",
+    "test:i18n": "vitest run --config vitest.i18n.config.ts",
     "test:accessibility": "playwright test --config=playwright.accessibility.config.ts",
     "audit:pagespeed": "node scripts/pagespeed-insights.mjs --strategy=both",
     "audit:pagespeed:mobile": "node scripts/pagespeed-insights.mjs --strategy=mobile",

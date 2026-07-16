@@ -385,7 +385,7 @@ const greekAboutCopy: AboutCopy = {
     "Η καλύτερη εκδοχή του NutsNews είναι ζεστή, χρήσιμη, αξιόπιστη και εύκολη να επιστρέψεις σε αυτήν. Πρέπει να μοιάζει με άνοιγμα παραθύρου, όχι με είσοδο σε καταιγίδα. Αυτή είναι η ιστορία που προσπαθεί να πει το project: η τεχνολογία μπορεί να κάνει τα media πιο ήπια, πιο εστιασμένα και πιο ανθρώπινα.",
 };
 
-const aboutCopyByLanguage: Record<LanguageCode, AboutCopy> = {
+export const aboutCopyByLanguage: Record<LanguageCode, AboutCopy> = {
   "de-CH": germanAboutCopy,
   de: germanAboutCopy,
   el: greekAboutCopy,

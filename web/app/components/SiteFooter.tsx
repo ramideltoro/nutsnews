@@ -35,7 +35,7 @@ type SearchResponse = {
   error?: string;
 };
 
-const footerCopyByLanguage: Record<
+export const footerCopyByLanguage: Record<
   LanguageCode,
   {
     shortcuts: string;

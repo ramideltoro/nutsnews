@@ -55,7 +55,7 @@ const themes = [
 type ThemeId = (typeof themes)[number]["id"];
 type SettingsPanel = "menu" | "theme" | "language";
 
-const settingsCopyByLanguage: Record<
+export const settingsCopyByLanguage: Record<
   LanguageCode,
   {
     openSettings: string;

@@ -29,7 +29,7 @@ const primarySections: PrimarySection[] = [
   { id: "achievements", href: "#achievements" },
 ];
 
-const navCopyByLanguage: Record<LanguageCode, { ariaLabel: string; labels: Record<PrimarySectionId, string> }> = {
+export const navCopyByLanguage: Record<LanguageCode, { ariaLabel: string; labels: Record<PrimarySectionId, string> }> = {
   en: {
     ariaLabel: "Primary sections",
     labels: {

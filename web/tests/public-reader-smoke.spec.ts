@@ -132,6 +132,19 @@ test.describe('Public reader smoke flows', () => {
     await expect(page.getByText(FIRST_ARTICLE_FRENCH_TITLE).first()).toBeVisible({ timeout: 15_000 });
   });
 
+  test('unsupported stored language falls back to visible English copy', async ({ page }) => {
+    await page.addInitScript((languageStorageKey) => {
+      window.localStorage.setItem(languageStorageKey, 'zz');
+    }, LANGUAGE_STORAGE_KEY);
+
+    const response = await page.goto('/contact', { waitUntil: 'domcontentloaded' });
+    expect(response?.ok(), `Expected /contact to load, got ${response?.status() ?? 'no response'}`).toBeTruthy();
+
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.getByRole('heading', { name: 'Send a message' })).toBeVisible();
+    await expect(page.getByText('zz')).toHaveCount(0);
+  });
+
   test('contact page renders and blocks invalid submissions', async ({ page }) => {
     const contactRequests: string[] = [];
     page.on('request', (request) => {

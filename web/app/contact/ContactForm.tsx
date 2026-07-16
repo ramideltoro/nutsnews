@@ -34,7 +34,7 @@ declare global {
   }
 }
 
-const formCopyByLanguage: Record<
+export const formCopyByLanguage: Record<
   LanguageCode,
   {
     hiddenWebsite: string;

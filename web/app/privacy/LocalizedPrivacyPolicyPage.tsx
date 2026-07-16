@@ -284,7 +284,7 @@ const greekPrivacyCopy: PrivacyCopy = {
   returnButton: "Πίσω στην αρχική",
 };
 
-const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
+export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
   "de-CH": germanPrivacyCopy,
   de: germanPrivacyCopy,
   el: greekPrivacyCopy,

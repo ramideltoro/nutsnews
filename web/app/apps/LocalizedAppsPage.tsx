@@ -31,7 +31,7 @@ type AppsCopy = {
   roadmapItems: RoadmapItem[];
 };
 
-const appsCopyByLanguage: Record<LanguageCode, AppsCopy> = {
+export const appsCopyByLanguage: Record<LanguageCode, AppsCopy> = {
   en: {
     heroEyebrow: "NutsNews apps",
     heroTitle: "NutsNews for iPhone is here.",
