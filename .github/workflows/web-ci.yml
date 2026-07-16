@@ -5,11 +5,15 @@ on:
     branches: [main]
     paths:
       - "web/**"
+      - "scripts/feed_ingestion_regression.mjs"
+      - "tests/fixtures/ingestion/**"
       - ".github/workflows/web-ci.yml"
   pull_request:
     branches: [main]
     paths:
       - "web/**"
+      - "scripts/feed_ingestion_regression.mjs"
+      - "tests/fixtures/ingestion/**"
       - ".github/workflows/web-ci.yml"
   workflow_dispatch:
 
@@ -67,6 +71,9 @@ jobs:
 
       - name: API route handler regression tests
         run: npm run test:routes
+
+      - name: Feed ingestion regression tests
+        run: npm run test:feed-ingestion
 
       - name: Lint
         run: npm run lint
