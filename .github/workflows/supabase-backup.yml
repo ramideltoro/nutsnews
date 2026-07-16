@@ -10,9 +10,9 @@ permissions:
 
 jobs:
   backup:
-    name: Export Supabase REST backup artifact
+    name: Export backup and run restore fire drill
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     env:
       NUTSNEWS_RUNTIME_ENV: production
       NUTSNEWS_SIDE_EFFECTS_MODE: live
@@ -22,7 +22,7 @@ jobs:
       NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF }}
       SUPABASE_URL: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NUTSNEWS_PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}
-      BACKUP_TABLES: articles,article_summaries,rss_feeds,worker_runs,article_ai_reviews,ai_usage_runs
+      BACKUP_TABLES: articles,article_summaries,rss_feeds,feed_health,worker_runs,article_ai_reviews,ai_usage_runs,quota_usage_events,runtime_feature_flags,release_readiness
       BACKUP_LIMIT_PER_TABLE: "5000"
     steps:
       - name: Checkout repository
@@ -31,8 +31,33 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 22
+      - name: Use Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.105.0
+      - name: Install PostgreSQL client
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
       - name: Create Supabase backup artifact
         run: node scripts/supabase_backup.mjs
+      - name: Start disposable local Supabase
+        run: |
+          set -euo pipefail
+          supabase start -x studio,imgproxy,logflare,vector
+          supabase db reset --local
+      - name: Run backup restore fire drill
+        run: node scripts/supabase_restore_fire_drill.mjs --backup-dir backups/supabase --local-supabase
+      - name: Summarize restore fire drill
+        if: always()
+        run: |
+          set -euo pipefail
+          if [[ -f reports/supabase-restore/latest.md ]]; then
+            cat reports/supabase-restore/latest.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Restore fire drill report was not created." >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Upload backup artifact
         if: always()
         uses: actions/upload-artifact@v6
@@ -41,3 +66,14 @@ jobs:
           path: backups/supabase
           retention-days: 14
           if-no-files-found: ignore
+      - name: Upload restore fire drill report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: supabase-restore-fire-drill-report
+          path: reports/supabase-restore
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Stop disposable local Supabase
+        if: always()
+        run: supabase stop --no-backup || true

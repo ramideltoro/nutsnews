@@ -1,0 +1,50 @@
+name: Supabase Restore Fire Drill Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/supabase-backup.yml"
+      - ".github/workflows/supabase-restore-fire-drill-regression.yml"
+      - "scripts/supabase_backup.mjs"
+      - "scripts/supabase_restore_fire_drill.mjs"
+      - "scripts/supabase_restore_fire_drill_regression.mjs"
+      - "tests/supabase-restore-fire-drill.test.mjs"
+      - "web/lib/adminProductionReadiness.ts"
+      - "web/package.json"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/supabase-backup.yml"
+      - ".github/workflows/supabase-restore-fire-drill-regression.yml"
+      - "scripts/supabase_backup.mjs"
+      - "scripts/supabase_restore_fire_drill.mjs"
+      - "scripts/supabase_restore_fire_drill_regression.mjs"
+      - "tests/supabase-restore-fire-drill.test.mjs"
+      - "web/lib/adminProductionReadiness.ts"
+      - "web/package.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: Verify Supabase restore fire drill automation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Run restore fire drill contract checks
+        run: |
+          set -euo pipefail
+          node --test tests/supabase-restore-fire-drill.test.mjs
+          node scripts/supabase_restore_fire_drill_regression.mjs
