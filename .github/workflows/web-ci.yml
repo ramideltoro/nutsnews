@@ -71,6 +71,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Security regression tests
+        run: npm run test:security-regression
+
       - name: Security header checks
         run: npm run test:security-headers
 

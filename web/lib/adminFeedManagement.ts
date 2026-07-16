@@ -1,4 +1,5 @@
 import { formatAdminDateTime } from "@/lib/adminTime";
+import { ExternalUrlSafetyError, assertPublicHttpUrl } from "@/lib/externalUrlSafety";
 import { getServerSupabaseConfig } from "@/lib/supabase";
 import { RuntimeSafetyError, assertDataMutation } from "@/lib/runtimeSafety";
 
@@ -636,6 +637,20 @@ export async function setAdminRssFeedActiveStatus({
     throw error;
   }
 
+  let safeFeedUrl: string;
+  try {
+    safeFeedUrl = assertPublicHttpUrl(feedUrl, "Feed URL");
+  } catch (error) {
+    if (error instanceof ExternalUrlSafetyError) {
+      return {
+        ok: false,
+        message: "Feed URL is not allowed.",
+      };
+    }
+
+    throw error;
+  }
+
   const config = getSupabaseConfig();
 
   if (!config) {
@@ -646,7 +661,7 @@ export async function setAdminRssFeedActiveStatus({
   }
 
   const response = await fetch(
-    `${config.url}/rest/v1/rss_feeds?url=eq.${encodeURIComponent(feedUrl)}`,
+    `${config.url}/rest/v1/rss_feeds?url=eq.${encodeURIComponent(safeFeedUrl)}`,
     {
       method: "PATCH",
       cache: "no-store",
