@@ -62,6 +62,9 @@ jobs:
       - name: Component regression tests
         run: npm run test:components
 
+      - name: I18n regression tests
+        run: npm run test:i18n
+
       - name: Lint
         run: npm run lint
 

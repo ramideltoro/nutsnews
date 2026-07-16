@@ -82,7 +82,7 @@ const CATEGORY_NAV_ITEMS: CategoryNavItem[] = [
   { id: "achievements", href: "#achievements", query: "achievement" },
 ];
 
-const copyByLanguage: Record<LanguageCode, FeedCopy> = {
+export const copyByLanguage: Record<LanguageCode, FeedCopy> = {
   en: {
     recently: "Recently",
     loadingMore: "Loading more stories",
@@ -241,7 +241,7 @@ const copyByLanguage: Record<LanguageCode, FeedCopy> = {
   },
 };
 
-const dateLocaleByLanguage: Record<LanguageCode, string> = {
+export const dateLocaleByLanguage: Record<LanguageCode, string> = {
   en: "en-US",
   fr: "fr-FR",
   ja: "ja-JP",

@@ -7,7 +7,7 @@ import { SiteFooter } from "../components/SiteFooter";
 import { useSelectedLanguage } from "../components/useSelectedLanguage";
 import { ContactForm } from "./ContactForm";
 
-const contactCopyByLanguage: Record<
+export const contactCopyByLanguage: Record<
   LanguageCode,
   {
     eyebrow: string;
