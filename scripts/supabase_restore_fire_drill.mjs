@@ -398,11 +398,40 @@ export function buildRestoreSql(tables) {
   for (const entry of ordered) {
     if (entry.rows.length === 0) continue;
     const json = JSON.stringify(entry.rows);
+    const tableRef = `public.${quoteIdent(entry.table)}`;
+    const relationLiteral = dollarQuote(`public.${entry.table}`, `nutsnews_restore_${entry.table}_relation`);
+    const rowsLiteral = dollarQuote(json, `nutsnews_restore_${entry.table}_rows`);
     statements.push(
-      [
-        `insert into public.${quoteIdent(entry.table)}`,
-        `select * from jsonb_populate_recordset(null::public.${quoteIdent(entry.table)}, ${dollarQuote(json, `nutsnews_restore_${entry.table}`)}::jsonb);`,
-      ].join("\n"),
+      `do ${dollarQuote(
+        `
+declare
+  insert_columns text;
+  select_columns text;
+begin
+  select
+    string_agg(quote_ident(attname), ', ' order by attnum),
+    string_agg('restore_rows.' || quote_ident(attname), ', ' order by attnum)
+  into insert_columns, select_columns
+  from pg_attribute
+  where attrelid = ${relationLiteral}::regclass
+    and attnum > 0
+    and not attisdropped
+    and attgenerated = '';
+
+  if insert_columns is null then
+    raise exception 'No insertable columns found for %', ${relationLiteral};
+  end if;
+
+  execute format(
+    'insert into ${tableRef} (%s) select %s from jsonb_populate_recordset(null::${tableRef}, %L::jsonb) as restore_rows',
+    insert_columns,
+    select_columns,
+    ${rowsLiteral}
+  );
+end;
+`,
+        `nutsnews_restore_${entry.table}_block`,
+      )};`,
     );
   }
 
