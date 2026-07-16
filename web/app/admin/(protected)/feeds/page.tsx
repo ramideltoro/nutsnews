@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { auth } from "@/auth";
+import { isAllowedAdminEmail } from "@/lib/adminAuth";
 import {
   type FeedManagementStatus,
   type FeedQualityGrade,
@@ -34,18 +36,30 @@ async function toggleFeedAction(formData: FormData) {
 
   const feedUrl = String(formData.get("feedUrl") ?? "");
   const nextActive = String(formData.get("nextActive") ?? "false") === "true";
+  const session = await auth();
+  const actorEmail = session?.user?.email;
+
+  if (!actorEmail) {
+    redirect("/admin/login");
+  }
+
+  if (!isAllowedAdminEmail(actorEmail)) {
+    redirect("/admin/access-denied");
+  }
 
   if (!feedUrl) {
     redirect("/admin/feeds?error=Missing%20feed%20URL");
   }
 
   const result = await setAdminRssFeedActiveStatus({
+    actorEmail,
     feedUrl,
     isActive: nextActive,
   });
 
   revalidatePath("/admin/feeds");
   revalidatePath("/admin/feed-health");
+  revalidatePath("/admin/audit");
 
   if (!result.ok) {
     redirect(`/admin/feeds?error=${encodeURIComponent(result.message)}`);
