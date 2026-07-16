@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   immutable-all-tests:
-    name: Protect every established test
+    name: Report established test changes
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -32,6 +32,4 @@ jobs:
       - name: Check immutable tests
         env:
           BASE_REF: ${{ github.base_ref || 'main' }}
-          PR_TITLE: ${{ github.event.pull_request.title || '' }}
-          PR_BODY: ${{ github.event.pull_request.body || '' }}
         run: node scripts/immutable_all_tests_guard.mjs
