@@ -1,19 +1,19 @@
-name: Production Release Workflow Regression
+name: Staging Release Workflow Regression
 
 on:
   pull_request:
     branches: [main]
     paths:
       - ".github/workflows/container-image.yml"
-      - ".github/workflows/production-release.yml"
-      - ".github/workflows/production-release-regression.yml"
+      - ".github/workflows/staging-release.yml"
+      - ".github/workflows/staging-release-regression.yml"
       - "scripts/production_release_workflow_regression.mjs"
   push:
     branches: [main]
     paths:
       - ".github/workflows/container-image.yml"
-      - ".github/workflows/production-release.yml"
-      - ".github/workflows/production-release-regression.yml"
+      - ".github/workflows/staging-release.yml"
+      - ".github/workflows/staging-release-regression.yml"
       - "scripts/production_release_workflow_regression.mjs"
 
 permissions:
@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   regression:
-    name: Verify production release automation
+    name: Verify staging release automation
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -34,5 +34,5 @@ jobs:
         with:
           node-version: 22
 
-      - name: Run production release workflow regression
+      - name: Run staging release workflow regression
         run: node scripts/production_release_workflow_regression.mjs

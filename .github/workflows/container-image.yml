@@ -571,10 +571,10 @@ jobs:
             echo "Immutable image: \`ghcr.io/ramideltoro/nutsnews@${IMAGE_DIGEST}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Write production release metadata
+      - name: Write staging release metadata
         env:
           IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
-          RELEASE_METADATA_PATH: ${{ runner.temp }}/nutsnews-production-release/metadata.json
+          RELEASE_METADATA_PATH: ${{ runner.temp }}/nutsnews-staging-release/metadata.json
         run: |
           set -euo pipefail
 
@@ -585,6 +585,7 @@ jobs:
 
           const digest = process.env.IMAGE_DIGEST ?? "";
           const sourceCommit = process.env.GITHUB_SHA ?? "";
+          const sourceWorkflowRunId = process.env.GITHUB_RUN_ID ?? "";
           const buildId = `${process.env.GITHUB_RUN_ID ?? ""}-${process.env.GITHUB_RUN_ATTEMPT ?? ""}`;
           const metadataPath = process.env.RELEASE_METADATA_PATH ?? "";
 
@@ -594,8 +595,11 @@ jobs:
           if (!/^sha256:[0-9a-f]{64}$/.test(digest)) {
             throw new Error("Published image digest must be an immutable sha256 digest.");
           }
-          if (!/^\d+-\d+$/.test(buildId) || !metadataPath) {
+          if (!/^[1-9][0-9]{0,19}$/.test(sourceWorkflowRunId) || !/^\d+-\d+$/.test(buildId) || !metadataPath) {
             throw new Error("Release metadata requires a valid build ID and output path.");
+          }
+          if (buildId.split("-", 1)[0] !== sourceWorkflowRunId) {
+            throw new Error("Release metadata build ID must belong to the source workflow run.");
           }
 
           const [migrationContract, applicationContract] = await Promise.all([
@@ -608,7 +612,9 @@ jobs:
 
           const imageRepository = "ghcr.io/ramideltoro/nutsnews";
           const release = {
+            source_repository: "ramideltoro/nutsnews",
             source_commit: sourceCommit,
+            source_workflow_run_id: sourceWorkflowRunId,
             build_id: buildId,
             deployment_target: "vps",
             image_repository: imageRepository,
@@ -623,10 +629,10 @@ jobs:
           writeFileSync(metadataPath, `${JSON.stringify(release, null, 2)}\n`, "utf8");
           NODE
 
-      - name: Upload production release metadata
+      - name: Upload staging release metadata
         uses: actions/upload-artifact@v6
         with:
-          name: nutsnews-production-release
-          path: ${{ runner.temp }}/nutsnews-production-release/metadata.json
+          name: nutsnews-staging-release
+          path: ${{ runner.temp }}/nutsnews-staging-release/metadata.json
           if-no-files-found: error
           retention-days: 7
