@@ -1,0 +1,194 @@
+name: Request Verified Staging Release
+
+on:
+  workflow_run:
+    workflows: ["Container Image"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: nutsnews-staging-release
+  cancel-in-progress: false
+
+jobs:
+  request-staging:
+    name: Request VPS staging candidate
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Download immutable staging metadata
+        uses: actions/download-artifact@v5
+        with:
+          name: nutsnews-staging-release
+          path: ${{ runner.temp }}/nutsnews-staging-release
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate staging metadata belongs to the completed main build
+        id: candidate
+        env:
+          METADATA_PATH: ${{ runner.temp }}/nutsnews-staging-release/metadata.json
+          SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha }}
+          SOURCE_WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE'
+          import { readFileSync, appendFileSync } from "node:fs";
+          import crypto from "node:crypto";
+
+          const sourceCommit = process.env.SOURCE_COMMIT ?? "";
+          const sourceWorkflowRunId = process.env.SOURCE_WORKFLOW_RUN_ID ?? "";
+          const metadataPath = process.env.METADATA_PATH ?? "";
+          const release = JSON.parse(readFileSync(metadataPath, "utf8"));
+          const imageRepository = "ghcr.io/ramideltoro/nutsnews";
+
+          if (!/^[0-9a-f]{40}$/.test(sourceCommit)) {
+            throw new Error("The completed workflow run did not provide a full main commit SHA.");
+          }
+          if (!/^[1-9][0-9]{0,19}$/.test(sourceWorkflowRunId)) {
+            throw new Error("The completed workflow run did not provide a trusted run ID.");
+          }
+          if (release.source_commit !== sourceCommit || release.source_workflow_run_id !== sourceWorkflowRunId) {
+            throw new Error("Staging metadata does not match the completed Container Image run.");
+          }
+          if (release.source_repository !== "ramideltoro/nutsnews") {
+            throw new Error("Staging metadata must be emitted by ramideltoro/nutsnews.");
+          }
+          if (release.image_repository !== imageRepository || release.image_tag !== sourceCommit) {
+            throw new Error("Staging metadata must use the expected repository and full-commit image tag.");
+          }
+          if (!/^sha256:[0-9a-f]{64}$/.test(release.image_digest ?? "")) {
+            throw new Error("Staging metadata must contain an immutable sha256 image digest.");
+          }
+          if (release.image !== `${imageRepository}@${release.image_digest}`) {
+            throw new Error("Staging metadata image reference must match its immutable digest.");
+          }
+          if (!/^\d+-\d+$/.test(release.build_id ?? "") || release.deployment_target !== "vps") {
+            throw new Error("Staging metadata has an invalid build identity or deployment target.");
+          }
+          if (release.build_id.split("-", 1)[0] !== sourceWorkflowRunId) {
+            throw new Error("Staging metadata build ID must belong to the source workflow run.");
+          }
+          if (!/^[0-9]{14}$/.test(release.schema_version ?? "")) {
+            throw new Error("Staging metadata must contain the rollback-compatible schema marker.");
+          }
+
+          const candidate = {
+            schema_version: release.schema_version,
+            source_repository: release.source_repository,
+            source_commit: release.source_commit,
+            image_repository: release.image_repository,
+            image_digest: release.image_digest,
+            build_id: release.build_id,
+            source_workflow_run_id: release.source_workflow_run_id,
+          };
+          const deploymentId = `stg-${crypto
+            .createHash("sha256")
+            .update(JSON.stringify(candidate, Object.keys(candidate).sort()))
+            .digest("hex")
+            .slice(0, 24)}`;
+          const lines = [
+            `candidate_json=${JSON.stringify(candidate)}`,
+            `deployment_id=${deploymentId}`,
+            `source_commit=${candidate.source_commit}`,
+            `image_repository=${candidate.image_repository}`,
+            `image_digest=${candidate.image_digest}`,
+            `build_id=${candidate.build_id}`,
+            `schema_version=${candidate.schema_version}`,
+          ];
+          appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join("\n")}\n`, "utf8");
+          NODE
+
+      - name: Request GitOps VPS staging candidate
+        env:
+          NUTSNEWS_INFRA_STAGING_TOKEN: ${{ secrets.NUTSNEWS_INFRA_STAGING_TOKEN }}
+          CANDIDATE_JSON: ${{ steps.candidate.outputs.candidate_json }}
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE'
+          const token = process.env.NUTSNEWS_INFRA_STAGING_TOKEN ?? "";
+          const candidate = JSON.parse(process.env.CANDIDATE_JSON ?? "{}");
+          const expectedKeys = [
+            "schema_version",
+            "source_repository",
+            "source_commit",
+            "image_repository",
+            "image_digest",
+            "build_id",
+            "source_workflow_run_id",
+          ];
+
+          if (!token) {
+            throw new Error("NUTSNEWS_INFRA_STAGING_TOKEN is required to request a GitOps VPS staging candidate.");
+          }
+          if (Object.keys(candidate).sort().join("\n") !== expectedKeys.sort().join("\n")) {
+            throw new Error("Refusing to dispatch a staging candidate with unexpected fields.");
+          }
+          if (
+            candidate.source_repository !== "ramideltoro/nutsnews" ||
+            candidate.image_repository !== "ghcr.io/ramideltoro/nutsnews" ||
+            !/^[0-9a-f]{40}$/.test(candidate.source_commit ?? "") ||
+            !/^sha256:[0-9a-f]{64}$/.test(candidate.image_digest ?? "") ||
+            !/^\d+-\d+$/.test(candidate.build_id ?? "") ||
+            !/^[1-9][0-9]{0,19}$/.test(candidate.source_workflow_run_id ?? "") ||
+            candidate.build_id.split("-", 1)[0] !== candidate.source_workflow_run_id ||
+            !/^[0-9]{14}$/.test(candidate.schema_version ?? "")
+          ) {
+            throw new Error("Refusing to dispatch an incomplete or incompatible VPS staging candidate.");
+          }
+
+          const response = await fetch("https://api.github.com/repos/ramideltoro/nutsnews-infra/dispatches", {
+            method: "POST",
+            headers: {
+              Accept: "application/vnd.github+json",
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+              "X-GitHub-Api-Version": "2026-03-10",
+            },
+            body: JSON.stringify({
+              event_type: "nutsnews-staging-release",
+              client_payload: candidate,
+            }),
+          });
+
+          if (response.status !== 204) {
+            throw new Error(`VPS staging dispatch returned ${response.status}.`);
+          }
+          console.log(`Requested GitOps VPS staging candidate for ${candidate.source_commit}.`);
+          NODE
+
+      - name: Summarize verified staging handoff
+        env:
+          SOURCE_COMMIT: ${{ steps.candidate.outputs.source_commit }}
+          IMAGE_DIGEST: ${{ steps.candidate.outputs.image_digest }}
+          BUILD_ID: ${{ steps.candidate.outputs.build_id }}
+          SCHEMA_VERSION: ${{ steps.candidate.outputs.schema_version }}
+          DEPLOYMENT_ID: ${{ steps.candidate.outputs.deployment_id }}
+        run: |
+          {
+            echo "## Verified NutsNews staging handoff"
+            echo
+            echo "- Source commit: \`${SOURCE_COMMIT}\`"
+            echo "- Staging deployment ID: \`${DEPLOYMENT_ID}\`"
+            echo "- VPS image: \`ghcr.io/ramideltoro/nutsnews@${IMAGE_DIGEST}\`"
+            echo "- Build ID: \`${BUILD_ID}\`"
+            echo "- Rollback-compatible schema: \`${SCHEMA_VERSION}\`"
+            echo "- GitOps VPS staging request: accepted"
+            echo "- Staging deploy workflow: https://github.com/ramideltoro/nutsnews-infra/actions/workflows/nutsnews-staging-deploy.yml"
+            echo "- Staging qualifier workflow: https://github.com/ramideltoro/nutsnews-infra/actions/workflows/nutsnews-staging-qualification.yml"
+            echo "- Production gate workflow: https://github.com/ramideltoro/nutsnews-infra/actions/workflows/protected-ansible-apply.yml"
+            echo "- Rollback workflow: https://github.com/ramideltoro/nutsnews-infra/actions/workflows/protected-nutsnews-rollback.yml"
+            echo
+            echo "Vercel Production deploys independently and is not VPS production authorization."
+          } >> "$GITHUB_STEP_SUMMARY"
