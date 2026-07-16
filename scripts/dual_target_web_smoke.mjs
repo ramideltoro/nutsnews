@@ -56,6 +56,10 @@ function options(name) {
   return values;
 }
 
+function flag(name) {
+  return process.argv.includes(name);
+}
+
 function required(value, label) {
   if (!value) {
     throw new Error(`${label} is required`);
@@ -81,6 +85,22 @@ async function fetchOk(url, label) {
   if (!response.ok) {
     throw new Error(`${label} returned HTTP ${response.status}`);
   }
+
+  return response;
+}
+
+async function fetchAny(url, label, init = {}) {
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/json, text/html;q=0.9, */*;q=0.8",
+      ...protectedHeaders,
+      ...(init.headers ?? {}),
+    },
+    redirect: init.redirect ?? "manual",
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+    method: init.method,
+    body: init.body,
+  });
 
   return response;
 }
@@ -113,6 +133,19 @@ function assertRuntimeConfigIsPublic(config) {
   if (unexpectedKeys.length > 0) {
     throw new Error("Runtime public configuration returned keys outside its allowlist");
   }
+}
+
+function assertHeaderPresent(response, name, label) {
+  const value = response.headers.get(name);
+  if (!value) {
+    throw new Error(`${label} missing required ${name} header`);
+  }
+  return value;
+}
+
+function firstStaticAssetPath(html) {
+  const match = html.match(/["'](\/_next\/static\/[^"']+\.(?:js|css))["']/);
+  return match?.[1];
 }
 
 const baseUrlValue = required(
@@ -150,6 +183,7 @@ const expectedTurnstileSiteKey =
 const expectedSentryDsn = option("--expected-sentry-dsn") || process.env.NUTSNEWS_EXPECTED_SENTRY_DSN;
 const expectedGaId = option("--expected-ga-id") || process.env.NUTSNEWS_EXPECTED_GA_ID;
 const forbiddenRuntimeConfigTokens = options("--forbidden-runtime-config-token");
+const productionSafeSurfaces = flag("--production-safe-surfaces") || process.env.NUTSNEWS_PRODUCTION_SAFE_SURFACES === "true";
 
 const baseUrl = new URL(baseUrlValue.endsWith("/") ? baseUrlValue : `${baseUrlValue}/`);
 
@@ -182,6 +216,9 @@ assertEqual(
   expectedHealthDeploymentTarget,
   "Health deployment target header",
 );
+if (productionSafeSurfaces && !/s-maxage=60/.test(healthResponse.headers.get("cdn-cache-control") ?? "")) {
+  throw new Error("Production health endpoint must retain the bounded CDN cache policy");
+}
 
 const readinessResponse = await fetchOk(
   endpoint(baseUrl, `/readyz?cache-bust=${encodeURIComponent(expectedConfigGeneration)}`),
@@ -267,6 +304,19 @@ if (!home.includes("NutsNews")) {
   throw new Error("Homepage did not contain the expected NutsNews identity");
 }
 
+if (productionSafeSurfaces) {
+  assertHeaderPresent(homeResponse, "x-content-type-options", "Homepage");
+  assertHeaderPresent(homeResponse, "referrer-policy", "Homepage");
+  const assetPath = firstStaticAssetPath(home);
+  if (!assetPath) {
+    throw new Error("Homepage did not reference a Next.js static asset");
+  }
+  const assetResponse = await fetchOk(endpoint(baseUrl, assetPath), "Next.js static asset");
+  if (!/immutable/.test(assetResponse.headers.get("cache-control") ?? "")) {
+    throw new Error("Next.js static asset must use immutable cache headers");
+  }
+}
+
 const articlesResponse = await fetchOk(
   endpoint(baseUrl, "/api/articles?page=0"),
   "Public articles API",
@@ -277,7 +327,41 @@ if (!Array.isArray(articles?.articles)) {
   throw new Error("Public articles API did not return an articles array");
 }
 
+if (productionSafeSurfaces) {
+  const corsProbe = await fetchAny(endpoint(baseUrl, "/api/articles?page=0"), "Public articles CORS probe", {
+    headers: { Origin: "https://www.nutsnews.com" },
+  });
+  if (!corsProbe.ok) {
+    throw new Error(`Public articles CORS probe returned HTTP ${corsProbe.status}`);
+  }
+  if (
+    corsProbe.headers.get("access-control-allow-origin") === "*" &&
+    corsProbe.headers.get("access-control-allow-credentials") === "true"
+  ) {
+    throw new Error("Public articles CORS must not combine wildcard origin with credentials");
+  }
+
+  const contactResponse = await fetchAny(endpoint(baseUrl, "/api/contact"), "Contact validation probe", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "invalid", message: "" }),
+  });
+  if (![400, 422].includes(contactResponse.status)) {
+    throw new Error(`Contact validation probe returned HTTP ${contactResponse.status}`);
+  }
+
+  const authResponse = await fetchAny(endpoint(baseUrl, "/api/auth/session"), "Auth session probe", {
+    headers: { Accept: "application/json" },
+  });
+  if (![200, 204, 302, 307].includes(authResponse.status)) {
+    throw new Error(`Auth session probe returned HTTP ${authResponse.status}`);
+  }
+}
+
 console.log(`Web deployment smoke passed for ${baseUrl.origin}`);
 console.log(`Source commit: ${expectedSourceCommit}`);
 console.log(`Build ID: ${expectedBuildId}`);
 console.log(`Deployment target: ${expectedDeploymentTarget}`);
+if (productionSafeSurfaces) {
+  console.log("Production safe surface probes passed");
+}
