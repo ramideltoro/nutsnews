@@ -139,6 +139,27 @@ function quoteIdent(identifier) {
   return `"${identifier.replaceAll('"', '""')}"`;
 }
 
+function sourceColumnNames(table, rows) {
+  const names = new Set();
+
+  for (const row of rows) {
+    if (!row || typeof row !== "object" || Array.isArray(row)) {
+      throw new RestoreFireDrillError(`Backup artifact row for ${table} must be a JSON object.`);
+    }
+
+    for (const name of Object.keys(row)) {
+      try {
+        assertSafeTableName(name);
+      } catch {
+        throw new RestoreFireDrillError(`Unsafe backup column name in ${table}: ${name}`);
+      }
+      names.add(name);
+    }
+  }
+
+  return [...names].sort();
+}
+
 function parseDate(value, label) {
   const parsed = Date.parse(String(value ?? ""));
   if (!Number.isFinite(parsed)) {
@@ -324,6 +345,33 @@ function redact(value, databaseUrl) {
   return redacted;
 }
 
+export function summarizePsqlStderrForReport(stderr) {
+  const summarized = [];
+
+  for (const rawLine of String(stderr ?? "").split(/\r?\n/)) {
+    const trimmed = rawLine.trim();
+    if (!trimmed) continue;
+
+    if (/^DETAIL:\s+Failing row contains/i.test(trimmed)) {
+      summarized.push("DETAIL: Failing row redacted.");
+      continue;
+    }
+
+    if (/^CONTEXT:/i.test(trimmed)) {
+      summarized.push("CONTEXT: Restore SQL context redacted.");
+      continue;
+    }
+
+    if (/^SQL statement /i.test(trimmed) || /^PL\/pgSQL/i.test(trimmed)) {
+      continue;
+    }
+
+    summarized.push(trimmed.length > 500 ? `${trimmed.slice(0, 500)} [truncated]` : trimmed);
+  }
+
+  return summarized.slice(-6).join(" ");
+}
+
 function runPsql({ databaseUrl, input, args = [] }) {
   const result = spawnSync(
     "psql",
@@ -343,7 +391,7 @@ function runPsql({ databaseUrl, input, args = [] }) {
   }
 
   if (result.status !== 0) {
-    const stderr = redact(result.stderr, databaseUrl).trim();
+    const stderr = summarizePsqlStderrForReport(redact(result.stderr, databaseUrl));
     throw new RestoreFireDrillError(
       `psql restore fire drill command failed.${stderr ? ` ${stderr.split(/\r?\n/).slice(-6).join(" ")}` : ""}`,
     );
@@ -398,8 +446,13 @@ export function buildRestoreSql(tables) {
   for (const entry of ordered) {
     if (entry.rows.length === 0) continue;
     const json = JSON.stringify(entry.rows);
+    const sourceColumns = sourceColumnNames(entry.table, entry.rows);
+    if (sourceColumns.length === 0) {
+      throw new RestoreFireDrillError(`Backup artifact for ${entry.table} does not contain any restorable columns.`);
+    }
     const tableRef = `public.${quoteIdent(entry.table)}`;
     const relationLiteral = dollarQuote(`public.${entry.table}`, `nutsnews_restore_${entry.table}_relation`);
+    const sourceColumnsLiteral = dollarQuote(JSON.stringify(sourceColumns), `nutsnews_restore_${entry.table}_columns`);
     const rowsLiteral = dollarQuote(json, `nutsnews_restore_${entry.table}_rows`);
     statements.push(
       `do ${dollarQuote(
@@ -407,7 +460,12 @@ export function buildRestoreSql(tables) {
 declare
   insert_columns text;
   select_columns text;
+  source_columns text[];
 begin
+  select array_agg(column_name)
+  into source_columns
+  from jsonb_array_elements_text(${sourceColumnsLiteral}::jsonb) as payload(column_name);
+
   select
     string_agg(quote_ident(attname), ', ' order by attnum),
     string_agg('restore_rows.' || quote_ident(attname), ', ' order by attnum)
@@ -416,7 +474,8 @@ begin
   where attrelid = ${relationLiteral}::regclass
     and attnum > 0
     and not attisdropped
-    and attgenerated = '';
+    and attgenerated = ''
+    and attname = any(source_columns);
 
   if insert_columns is null then
     raise exception 'No insertable columns found for %', ${relationLiteral};
