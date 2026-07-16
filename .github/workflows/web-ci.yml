@@ -65,6 +65,9 @@ jobs:
       - name: I18n regression tests
         run: npm run test:i18n
 
+      - name: API route handler regression tests
+        run: npm run test:routes
+
       - name: Lint
         run: npm run lint
 
