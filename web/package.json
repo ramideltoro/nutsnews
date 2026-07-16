@@ -33,6 +33,7 @@
     "test:staging-qualification": "node ../scripts/staging_qualification.mjs",
     "test:staging-qualification-regression": "node --test ../tests/staging-qualification.test.mjs",
     "test:migrations": "node --test ../tests/migration-contract.test.mjs ../tests/migration-workflow.test.mjs ../tests/old-digest-compatibility.test.mjs ../tests/staging-fixtures.test.mjs ../tests/staging-migration-request.test.mjs ../tests/production-migration-request.test.mjs",
+    "test:supabase-restore-fire-drill": "node --test ../tests/supabase-restore-fire-drill.test.mjs",
     "fixtures:staging": "node ../scripts/staging_fixtures.mjs exercise",
     "migrate:locked": "node ../scripts/locked_migration_workflow.mjs",
     "test:fluid-cpu": "node ../scripts/fluid_active_cpu_regression.mjs",

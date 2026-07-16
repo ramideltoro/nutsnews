@@ -19,8 +19,15 @@ const GITHUB_REPO_NAME = "nutsnews";
 const GITHUB_ACTIONS_BRANCH = "main";
 const GITHUB_ACTIONS_REVALIDATE_SECONDS = 300;
 const GITHUB_ACTIONS_STALE_HOURS = 72;
+const BACKUP_RESTORE_STALE_HOURS = 30;
 const GITHUB_ACTIONS_URL = `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/actions`;
 const GITHUB_ACTIONS_RUNS_API_URL = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/actions/runs?branch=${GITHUB_ACTIONS_BRANCH}&per_page=50`;
+
+type GitHubWorkflowRequirement = {
+  label: string;
+  names: readonly string[];
+  paths: readonly string[];
+};
 
 const REQUIRED_GITHUB_WORKFLOWS = [
   {
@@ -78,7 +85,13 @@ const REQUIRED_GITHUB_WORKFLOWS = [
     names: ["Snyk Security Scan"],
     paths: [".github/workflows/snyk.yml"],
   },
-] as const;
+] as const satisfies readonly GitHubWorkflowRequirement[];
+
+const BACKUP_RESTORE_WORKFLOW = {
+  label: "Backup restore fire drill",
+  names: ["Supabase Backup"],
+  paths: [".github/workflows/supabase-backup.yml"],
+} as const satisfies GitHubWorkflowRequirement;
 
 export type ProductionReadinessStatus = "green" | "yellow" | "red";
 
@@ -657,18 +670,164 @@ function buildImageSignal(recentArticles: RecentArticleRow[]) {
   });
 }
 
-function buildBackupSignal() {
+function buildBackupFallbackSignal(detail: string) {
   return signal({
     id: "backup-freshness",
     title: "Backup freshness",
     status: "yellow",
     statusLabel: "Verify",
     value: "External",
-    detail: "The app repo has a Supabase Backup workflow and backup runbook, but no in-app live backup metric source is configured.",
-    nextStep: "Open the Supabase Backup workflow or backup runbook and verify the latest successful backup before promotion.",
+    detail,
+    nextStep: "Open the Supabase Backup workflow, confirm the latest run completed the restore fire drill, and review the uploaded restore report artifact.",
     href: "https://github.com/ramideltoro/nutsnews/actions/workflows/supabase-backup.yml",
     linkLabel: "Open backup workflow",
   });
+}
+
+function mapBackupWorkflowRunStatus(run: GitHubWorkflowRun | undefined) {
+  if (!run) {
+    return {
+      name: BACKUP_RESTORE_WORKFLOW.label,
+      status: "yellow" as const,
+      statusLabel: "Missing",
+      githubStatus: "missing",
+      conclusion: "missing",
+      branch: GITHUB_ACTIONS_BRANCH,
+      commitSha: "unknown",
+      updatedAt: null,
+      href: getRequiredWorkflowHref(BACKUP_RESTORE_WORKFLOW),
+      linkLabel: "Open workflow",
+      detail: "No Supabase Backup workflow run was returned for the main branch.",
+    };
+  }
+
+  const status = normalizeWorkflowValue(run.status);
+  const conclusion = normalizeWorkflowValue(run.conclusion);
+  const href = run.html_url ?? getRequiredWorkflowHref(BACKUP_RESTORE_WORKFLOW);
+  const stale = status === "completed" && isWorkflowRunOlderThan(run.updated_at, BACKUP_RESTORE_STALE_HOURS);
+  const name = run.name ?? BACKUP_RESTORE_WORKFLOW.label;
+
+  if (status !== "completed") {
+    return {
+      name,
+      status: "yellow" as const,
+      statusLabel: status || "Pending",
+      githubStatus: status || "unknown",
+      conclusion: conclusion || "pending",
+      branch: run.head_branch ?? GITHUB_ACTIONS_BRANCH,
+      commitSha: run.head_sha ?? "unknown",
+      updatedAt: run.updated_at,
+      href,
+      linkLabel: "Open run",
+      detail: "The backup and restore fire drill is queued, in progress, or otherwise not complete.",
+    };
+  }
+
+  if (conclusion === "success" && !stale) {
+    return {
+      name,
+      status: "green" as const,
+      statusLabel: "Verified",
+      githubStatus: status,
+      conclusion,
+      branch: run.head_branch ?? GITHUB_ACTIONS_BRANCH,
+      commitSha: run.head_sha ?? "unknown",
+      updatedAt: run.updated_at,
+      href,
+      linkLabel: "Open run",
+      detail: "The latest backup workflow exported artifacts, restored them to disposable Supabase, and ran restore validation SQL.",
+    };
+  }
+
+  if (["failure", "cancelled", "timed_out", "action_required"].includes(conclusion)) {
+    return {
+      name,
+      status: "red" as const,
+      statusLabel: "Failed",
+      githubStatus: status,
+      conclusion,
+      branch: run.head_branch ?? GITHUB_ACTIONS_BRANCH,
+      commitSha: run.head_sha ?? "unknown",
+      updatedAt: run.updated_at,
+      href,
+      linkLabel: "Open run",
+      detail: "The latest backup or disposable restore fire drill failed and must be investigated before trusting the backup.",
+    };
+  }
+
+  return {
+    name,
+    status: stale ? ("red" as const) : ("yellow" as const),
+    statusLabel: stale ? "Stale" : conclusion || "Verify",
+    githubStatus: status,
+    conclusion: stale ? `${conclusion || "success"}; stale` : conclusion || "unknown",
+    branch: run.head_branch ?? GITHUB_ACTIONS_BRANCH,
+    commitSha: run.head_sha ?? "unknown",
+    updatedAt: run.updated_at,
+    href,
+    linkLabel: "Open run",
+    detail: stale
+      ? `The latest completed backup restore fire drill is older than ${BACKUP_RESTORE_STALE_HOURS} hours.`
+      : "The latest backup run was skipped, neutral, startup-failed, or otherwise not a clear success.",
+  };
+}
+
+async function buildBackupSignal() {
+  const token = getGitHubActionsToken();
+
+  if (!token) {
+    return buildBackupFallbackSignal(
+      "Backup restore status is visible in GitHub Actions, but the admin app cannot query it because ACTIONS_READ_TOKEN is not configured.",
+    );
+  }
+
+  try {
+    const response = await fetch(GITHUB_ACTIONS_RUNS_API_URL, {
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${token}`,
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+      next: { revalidate: GITHUB_ACTIONS_REVALIDATE_SECONDS },
+    });
+
+    if (!response.ok) {
+      const rateLimited =
+        response.status === 403 &&
+        response.headers.get("x-ratelimit-remaining") === "0";
+      return buildBackupFallbackSignal(
+        rateLimited
+          ? "Live backup restore status is rate-limited. The admin app preserved the external GitHub Actions fallback."
+          : `Live backup restore status is unavailable because GitHub returned HTTP ${response.status}.`,
+      );
+    }
+
+    const data = (await response.json()) as GitHubWorkflowRunsResponse;
+    const runs = Array.isArray(data.workflow_runs) ? data.workflow_runs : [];
+    const workflow = mapBackupWorkflowRunStatus(
+      findLatestWorkflowRun(runs, BACKUP_RESTORE_WORKFLOW),
+    );
+
+    return signal({
+      id: "backup-freshness",
+      title: "Backup freshness",
+      status: workflow.status,
+      statusLabel: workflow.statusLabel,
+      value: workflow.updatedAt ? formatAge(minutesSince(workflow.updatedAt, new Date())) : "Missing",
+      detail: workflow.detail,
+      nextStep:
+        workflow.status === "green"
+          ? "Use the linked workflow run and restore report artifact as the latest successful restore-check record."
+          : "Open the linked workflow run, inspect the restore fire drill report artifact, and rerun Supabase Backup after fixing the failure.",
+      href: workflow.href,
+      linkLabel: workflow.linkLabel,
+      workflows: [workflow],
+    });
+  } catch {
+    return buildBackupFallbackSignal(
+      "Live backup restore status is unavailable because the GitHub API request failed before a response was returned.",
+    );
+  }
 }
 
 function getGitHubActionsToken() {
@@ -681,7 +840,7 @@ function normalizeWorkflowValue(value: string | null) {
 
 function matchesRequiredWorkflow(
   run: GitHubWorkflowRun,
-  required: (typeof REQUIRED_GITHUB_WORKFLOWS)[number],
+  required: GitHubWorkflowRequirement,
 ) {
   const runName = normalizeWorkflowValue(run.name);
   const runPath = normalizeWorkflowValue(run.path);
@@ -692,7 +851,7 @@ function matchesRequiredWorkflow(
   );
 }
 
-function getRequiredWorkflowHref(required: (typeof REQUIRED_GITHUB_WORKFLOWS)[number]) {
+function getRequiredWorkflowHref(required: GitHubWorkflowRequirement) {
   const workflowParts = required.paths[0]?.split("/") ?? [];
   const workflowFile = workflowParts[workflowParts.length - 1];
 
@@ -709,14 +868,14 @@ function workflowRunTimestamp(run: GitHubWorkflowRun) {
 
 function findLatestWorkflowRun(
   runs: GitHubWorkflowRun[],
-  required: (typeof REQUIRED_GITHUB_WORKFLOWS)[number],
+  required: GitHubWorkflowRequirement,
 ) {
   return runs
     .filter((run) => matchesRequiredWorkflow(run, required))
     .sort((a, b) => workflowRunTimestamp(b) - workflowRunTimestamp(a))[0];
 }
 
-function isWorkflowRunStale(updatedAt: string | null) {
+function isWorkflowRunOlderThan(updatedAt: string | null, hours: number) {
   if (!updatedAt) {
     return true;
   }
@@ -727,11 +886,15 @@ function isWorkflowRunStale(updatedAt: string | null) {
     return true;
   }
 
-  return Date.now() - updatedTime > GITHUB_ACTIONS_STALE_HOURS * 60 * 60 * 1000;
+  return Date.now() - updatedTime > hours * 60 * 60 * 1000;
+}
+
+function isWorkflowRunStale(updatedAt: string | null) {
+  return isWorkflowRunOlderThan(updatedAt, GITHUB_ACTIONS_STALE_HOURS);
 }
 
 function mapWorkflowRunStatus(
-  required: (typeof REQUIRED_GITHUB_WORKFLOWS)[number],
+  required: GitHubWorkflowRequirement,
   run: GitHubWorkflowRun | undefined,
 ): ProductionReadinessWorkflow {
   if (!run) {
@@ -951,7 +1114,7 @@ async function emptyDashboard(
       href: "/admin/guardrails",
       linkLabel: "Open guardrails",
     }),
-    buildBackupSignal(),
+    await buildBackupSignal(),
     await buildCiSignal(),
   ];
   const summary = summarize(signals);
@@ -996,6 +1159,7 @@ export async function getAdminProductionReadinessDashboardData(): Promise<Produc
       countArticlesSince(client, 24 * 7),
     ]);
     const { summaries, expectedCount } = await loadRecentSummaries(client, recentArticles);
+    const backupSignal = await buildBackupSignal();
     const ciSignal = await buildCiSignal();
     const signals = [
       buildPublicApiSignal({ publicFeedSnapshotCount, recentArticles }),
@@ -1010,7 +1174,7 @@ export async function getAdminProductionReadinessDashboardData(): Promise<Produc
         availableCount: summaries.length,
       }),
       buildImageSignal(recentArticles),
-      buildBackupSignal(),
+      backupSignal,
       ciSignal,
     ].sort((a, b) => statusRank(b.status) - statusRank(a.status));
     const summary = summarize(signals);
