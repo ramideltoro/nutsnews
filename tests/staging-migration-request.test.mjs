@@ -10,7 +10,7 @@ import {
 
 const validRequest = {
   sourceCommit: "4a9b727b260f1380f1529524b8a01ba0b0caaac2",
-  migrationHead: "20260713000000",
+  migrationHead: "20260716090000",
   confirmation: STAGING_MIGRATION_CONFIRMATION,
 };
 
