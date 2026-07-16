@@ -18,6 +18,7 @@ import {
 } from "@/lib/articleIdentity";
 import type { Article } from "@/lib/articles";
 import { DEFAULT_LANGUAGE_CODE, type LanguageCode } from "@/lib/languages";
+import { formatPublisherName, getPublisherAttribution } from "@/lib/publisherAttribution";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { OptimizedArticleImage } from "./OptimizedArticleImage";
 import { useSelectedLanguage } from "./useSelectedLanguage";
@@ -325,19 +326,6 @@ function formatSiteDate(dateValue: string | null, languageCode: LanguageCode) {
   }).format(parsedDate);
 }
 
-function formatSourceLabel(source: string | null) {
-  if (!source) {
-    return "NutsNews";
-  }
-
-  const cleanedSource = source
-    .replace(/^Google\s+News\s*-\s*/i, "")
-    .replace(/^Google\s*-\s*/i, "")
-    .trim();
-
-  return cleanedSource || "NutsNews";
-}
-
 function SearchMenu({
   languageCode,
   isOpen,
@@ -599,52 +587,13 @@ function SearchMenu({
 
           <div className="mt-5 space-y-3">
             {articles.map((article, index) => (
-              <article
+              <SearchResultArticle
                 key={getArticleIdentityKey(article) ?? `unkeyed:${index}`}
-                data-testid="nutsnews-search-result-card"
-                className="overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-surface-soft)]"
-              >
-                <div className="grid gap-0 sm:grid-cols-[150px_1fr]">
-                  <a
-                    href={article.original_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="relative block h-36 overflow-hidden bg-[var(--theme-surface-strong)] sm:h-full"
-                    aria-label={`${copy.readFullStory}: ${article.title}`}
-                  >
-                    <OptimizedArticleImage
-                      src={article.image_url}
-                      category={article.category}
-                      sizes="(min-width: 640px) 150px, 100vw"
-                    />
-                  </a>
-
-                  <div className="p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-black uppercase tracking-[0.12em] text-[var(--theme-muted)]">
-                      <span>
-                        {formatSiteDate(article.published_on_site_at, languageCode)}
-                      </span>
-                      <span>{formatSourceLabel(article.source)}</span>
-                    </div>
-                    <h3 className="mt-3 text-lg font-black leading-tight tracking-[-0.03em] text-[var(--theme-heading)]">
-                      {article.title}
-                    </h3>
-                    {article.ai_summary ? (
-                      <p className="mt-2 line-clamp-3 text-sm font-semibold leading-6 text-[var(--theme-muted)]">
-                        {article.ai_summary}
-                      </p>
-                    ) : null}
-                    <a
-                      href={article.original_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="read-story-button mt-4 px-4 py-2 text-[11px]"
-                    >
-                      {copy.readFullStory}
-                    </a>
-                  </div>
-                </div>
-              </article>
+                article={article}
+                index={index}
+                copy={copy}
+                languageCode={languageCode}
+              />
             ))}
           </div>
 
@@ -678,6 +627,73 @@ function SearchMenu({
       </section>
     </div>,
     document.body,
+  );
+}
+
+function SearchResultArticle({
+  article,
+  index,
+  copy,
+  languageCode,
+}: {
+  article: Article;
+  index: number;
+  copy: (typeof footerCopyByLanguage)[LanguageCode];
+  languageCode: LanguageCode;
+}) {
+  const publisherAttribution = getPublisherAttribution(
+    article.source,
+    article.original_url,
+  );
+
+  return (
+              <article
+                key={getArticleIdentityKey(article) ?? `unkeyed:${index}`}
+                data-testid="nutsnews-search-result-card"
+                className="overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-surface-soft)]"
+              >
+                <div className="grid gap-0 sm:grid-cols-[150px_1fr]">
+                  <a
+                    href={article.original_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="relative block h-36 overflow-hidden bg-[var(--theme-surface-strong)] sm:h-full"
+                    aria-label={`${publisherAttribution.readFullStoryLabel}: ${article.title}`}
+                  >
+                    <OptimizedArticleImage
+                      src={article.image_url}
+                      category={article.category}
+                      sizes="(min-width: 640px) 150px, 100vw"
+                    />
+                  </a>
+
+                  <div className="p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-black uppercase tracking-[0.12em] text-[var(--theme-muted)]">
+                      <span>
+                        {formatSiteDate(article.published_on_site_at, languageCode)}
+                      </span>
+                      <span>{formatPublisherName(article.source)}</span>
+                    </div>
+                    <h3 className="mt-3 text-lg font-black leading-tight tracking-[-0.03em] text-[var(--theme-heading)]">
+                      {article.title}
+                    </h3>
+                    {article.ai_summary ? (
+                      <p className="mt-2 line-clamp-3 text-sm font-semibold leading-6 text-[var(--theme-muted)]">
+                        {article.ai_summary}
+                      </p>
+                    ) : null}
+                    <a
+                      href={article.original_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="read-story-button mt-4 px-4 py-2 text-[11px]"
+                      aria-label={`${publisherAttribution.readFullStoryLabel}: ${article.title}`}
+                    >
+                      {copy.readFullStory}
+                    </a>
+                  </div>
+                </div>
+              </article>
   );
 }
 

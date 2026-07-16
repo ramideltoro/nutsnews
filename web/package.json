@@ -40,6 +40,7 @@
     "test:public-route-cpu-cache": "node ../scripts/public_route_cpu_cache_regression.mjs",
     "test:public-cache": "node ../scripts/public_cache_policy_regression.mjs",
     "test:feed-ingestion": "node ../scripts/feed_ingestion_regression.mjs",
+    "test:publisher-attribution": "node ../scripts/publisher_attribution_regression.mjs",
     "test:performance-budget": "npm run analyze:homepage && node scripts/public-performance-budget.mjs",
     "pretest:api-contracts": "node ../scripts/api_contract_compatibility_regression.mjs",
     "test:api-contracts": "node ../scripts/api_contract_regression.mjs",
