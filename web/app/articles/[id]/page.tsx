@@ -6,6 +6,7 @@ import { SiteFooter } from "@/app/components/SiteFooter";
 import { getArticleById, getRecentArticleSitemapItems, SITE_URL } from "@/lib/articles";
 import { OptimizedArticleImage } from "@/app/components/OptimizedArticleImage";
 import { ARTICLE_DETAIL_IMAGE_SIZES } from "@/lib/imageDelivery";
+import { getPublisherAttribution } from "@/lib/publisherAttribution";
 
 export const revalidate = 3600;
 
@@ -52,10 +53,20 @@ export async function generateMetadata({
       article.ai_summary ??
       "Read this uplifting story summary on NutsNews and visit the original publisher for the full article.";
   const socialImageUrl = "/opengraph-image";
+  const publisherAttribution = getPublisherAttribution(
+    article.source,
+    article.original_url,
+  );
 
   return {
     title: article.title,
-    description,
+    description: `${description} Original publisher: ${publisherAttribution.publisherName}.`,
+    authors: [
+      {
+        name: publisherAttribution.publisherName,
+        url: publisherAttribution.originalUrl,
+      },
+    ],
     alternates: {
       canonical: `/articles/${article.id}`,
     },
@@ -67,20 +78,26 @@ export async function generateMetadata({
       siteName: "NutsNews",
       publishedTime: article.published_at ?? undefined,
       modifiedTime: article.published_on_site_at ?? undefined,
+      authors: [publisherAttribution.publisherName],
       images: [
         {
           url: socialImageUrl,
           width: 1200,
           height: 630,
-          alt: `${article.title} | NutsNews`,
+          alt: `${article.title} | NutsNews summary with attribution to ${publisherAttribution.publisherName}`,
         },
       ],
     },
     twitter: {
       card: "summary_large_image",
       title: article.title,
-      description,
+      description: `${description} Source: ${publisherAttribution.publisherName}.`,
       images: [socialImageUrl],
+    },
+    other: {
+      "nutsnews:publisher": publisherAttribution.publisherName,
+      "nutsnews:publisher-url": publisherAttribution.originalUrl,
+      "nutsnews:attribution-policy-version": publisherAttribution.policyVersion,
     },
   };
 }
@@ -94,6 +111,10 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   }
 
   const articleUrl = `${SITE_URL}/articles/${article.id}`;
+  const publisherAttribution = getPublisherAttribution(
+    article.source,
+    article.original_url,
+  );
 
   const articleJsonLd = {
     "@context": "https://schema.org",
@@ -106,7 +127,8 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
     dateModified: article.published_on_site_at ?? article.published_at,
     author: {
       "@type": "Organization",
-      name: article.source,
+      name: publisherAttribution.publisherName,
+      url: publisherAttribution.originalUrl,
     },
     publisher: {
       "@type": "Organization",
@@ -114,6 +136,8 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
       url: SITE_URL,
     },
     isBasedOn: article.original_url,
+    citation: article.original_url,
+    creditText: publisherAttribution.policySummary,
     mainEntityOfPage: {
       "@type": "WebPage",
       "@id": articleUrl,
@@ -178,6 +202,8 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="rounded-full bg-amber-400 px-5 py-3 text-sm font-bold text-neutral-950 transition hover:bg-amber-300"
+                    aria-label={`${publisherAttribution.readFullStoryLabel}: ${article.title}`}
+                    title={publisherAttribution.policySummary}
                 >
                   Read full story
                 </a>

@@ -14,6 +14,7 @@ import {
   isSupportedLanguageCode,
 } from "@/lib/languages";
 import { OptimizedArticleImage } from "./OptimizedArticleImage";
+import { formatPublisherName, getPublisherAttribution } from "@/lib/publisherAttribution";
 
 export type ArticleCategorySection = {
   id: Exclude<CategoryId, "all">;
@@ -284,19 +285,6 @@ function formatSiteDate(dateValue: string | null, languageCode: LanguageCode) {
   }).format(parsedDate);
 }
 
-function formatSourceLabel(source: string | null) {
-  if (!source) {
-    return "NutsNews";
-  }
-
-  const cleanedSource = source
-    .replace(/^Google\s+News\s*-\s*/i, "")
-    .replace(/^Google\s*-\s*/i, "")
-    .trim();
-
-  return cleanedSource || "NutsNews";
-}
-
 function LoadingIndicator({ label }: { label: string }) {
   return (
     <div className="flex items-center justify-center py-7" aria-live="polite">
@@ -400,7 +388,11 @@ function ArticleCard({
   }, []);
 
   const revealDelay = `${Math.min(index % 5, 4) * 50}ms`;
-  const sourceLabel = formatSourceLabel(article.source);
+  const sourceLabel = formatPublisherName(article.source);
+  const publisherAttribution = getPublisherAttribution(
+    article.source,
+    article.original_url,
+  );
   const siteDate = formatSiteDate(article.published_on_site_at, languageCode);
   const showSummary = variant !== "rail";
   const showCta = variant === "lead" || variant === "standard";
@@ -420,8 +412,9 @@ function ArticleCard({
       <a
         href={article.original_url}
         target="_blank"
-        rel="noreferrer"
+        rel="noopener noreferrer"
         className="wp-article-card__link"
+        aria-label={`${publisherAttribution.readFullStoryLabel}: ${article.title}`}
       >
         <div className="wp-article-card__image relative overflow-hidden">
           <OptimizedArticleImage
