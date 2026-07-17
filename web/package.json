@@ -44,6 +44,7 @@
     "test:rss-source-policy": "node ../scripts/rss_source_policy_regression.mjs",
     "test:source-trust-tiers": "node ../scripts/source_trust_tiers_regression.mjs",
     "test:ai-decision-versions": "node ../scripts/ai_decision_versions_regression.mjs",
+    "test:saved-stories": "node ../scripts/saved_stories_regression.mjs",
     "test:publisher-attribution": "node ../scripts/publisher_attribution_regression.mjs",
     "test:performance-budget": "npm run analyze:homepage && node scripts/public-performance-budget.mjs",
     "pretest:api-contracts": "node ../scripts/api_contract_compatibility_regression.mjs",

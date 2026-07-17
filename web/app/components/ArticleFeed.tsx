@@ -14,6 +14,7 @@ import {
   isSupportedLanguageCode,
 } from "@/lib/languages";
 import { OptimizedArticleImage } from "./OptimizedArticleImage";
+import { SavedStoryButton } from "./SavedStoryButton";
 import { formatPublisherName, getPublisherAttribution } from "@/lib/publisherAttribution";
 
 export type ArticleCategorySection = {
@@ -72,6 +73,11 @@ type FeedCopy = {
   moreGoodNews: string;
   moreGoodNewsDeck: string;
   sourceLabel: string;
+  saveStory: string;
+  savedStory: string;
+  saveStoryUnavailable: string;
+  saveStoryAria: (title: string) => string;
+  unsaveStoryAria: (title: string) => string;
   categoryLabels: Record<CategoryId, string>;
 };
 
@@ -104,6 +110,11 @@ export const copyByLanguage: Record<LanguageCode, FeedCopy> = {
     moreGoodNews: "More Good News",
     moreGoodNewsDeck: "Keep reading from the full NutsNews feed.",
     sourceLabel: "Source",
+    saveStory: "Save",
+    savedStory: "Saved",
+    saveStoryUnavailable: "Saved stories are unavailable in this browser.",
+    saveStoryAria: (title) => `Save story: ${title}`,
+    unsaveStoryAria: (title) => `Remove saved story: ${title}`,
     categoryLabels: {
       all: "All",
       community: "Community",
@@ -132,6 +143,12 @@ export const copyByLanguage: Record<LanguageCode, FeedCopy> = {
     moreGoodNews: "Plus de bonnes nouvelles",
     moreGoodNewsDeck: "Continuez à lire le fil complet de NutsNews.",
     sourceLabel: "Source",
+    saveStory: "Enregistrer",
+    savedStory: "Enregistré",
+    saveStoryUnavailable:
+      "Les histoires enregistrées ne sont pas disponibles dans ce navigateur.",
+    saveStoryAria: (title) => `Enregistrer l’histoire : ${title}`,
+    unsaveStoryAria: (title) => `Retirer l’histoire enregistrée : ${title}`,
     categoryLabels: {
       all: "Tout",
       community: "Communauté",
@@ -160,6 +177,12 @@ export const copyByLanguage: Record<LanguageCode, FeedCopy> = {
     moreGoodNews: "さらに良いニュース",
     moreGoodNewsDeck: "NutsNewsのフィードを続けて読む。",
     sourceLabel: "出典",
+    saveStory: "保存",
+    savedStory: "保存済み",
+    saveStoryUnavailable:
+      "このブラウザでは保存済みストーリーを利用できません。",
+    saveStoryAria: (title) => `ストーリーを保存: ${title}`,
+    unsaveStoryAria: (title) => `保存済みストーリーを削除: ${title}`,
     categoryLabels: {
       all: "すべて",
       community: "コミュニティ",
@@ -188,6 +211,12 @@ export const copyByLanguage: Record<LanguageCode, FeedCopy> = {
     moreGoodNews: "Mehr gute Nachrichten",
     moreGoodNewsDeck: "Lies weiter im ganzen NutsNews-Feed.",
     sourceLabel: "Quelle",
+    saveStory: "Speichern",
+    savedStory: "Gespeichert",
+    saveStoryUnavailable:
+      "Gespeicherte Geschichten sind in diesem Browser nicht verfügbar.",
+    saveStoryAria: (title) => `Geschichte speichern: ${title}`,
+    unsaveStoryAria: (title) => `Gespeicherte Geschichte entfernen: ${title}`,
     categoryLabels: {
       all: "Alle",
       community: "Gemeinschaft",
@@ -216,6 +245,12 @@ export const copyByLanguage: Record<LanguageCode, FeedCopy> = {
     moreGoodNews: "Mehr gute Nachrichten",
     moreGoodNewsDeck: "Lies weiter im gesamten NutsNews-Feed.",
     sourceLabel: "Quelle",
+    saveStory: "Speichern",
+    savedStory: "Gespeichert",
+    saveStoryUnavailable:
+      "Gespeicherte Geschichten sind in diesem Browser nicht verfügbar.",
+    saveStoryAria: (title) => `Geschichte speichern: ${title}`,
+    unsaveStoryAria: (title) => `Gespeicherte Geschichte entfernen: ${title}`,
     categoryLabels: {
       all: "Alle",
       community: "Gemeinschaft",
@@ -244,6 +279,13 @@ export const copyByLanguage: Record<LanguageCode, FeedCopy> = {
     moreGoodNews: "Περισσότερα καλά νέα",
     moreGoodNewsDeck: "Συνεχίστε να διαβάζετε από όλη τη ροή του NutsNews.",
     sourceLabel: "Πηγή",
+    saveStory: "Αποθήκευση",
+    savedStory: "Αποθηκεύτηκε",
+    saveStoryUnavailable:
+      "Οι αποθηκευμένες ιστορίες δεν είναι διαθέσιμες σε αυτόν τον browser.",
+    saveStoryAria: (title) => `Αποθήκευση ιστορίας: ${title}`,
+    unsaveStoryAria: (title) =>
+      `Αφαίρεση αποθηκευμένης ιστορίας: ${title}`,
     categoryLabels: {
       all: "Όλα",
       community: "Κοινότητα",
@@ -464,6 +506,11 @@ function ArticleCard({
           ) : null}
         </div>
       </a>
+      <SavedStoryButton
+        article={article}
+        copy={copyByLanguage[languageCode]}
+        className="wp-article-card__save"
+      />
     </article>
   );
 }

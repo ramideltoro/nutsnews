@@ -9,6 +9,7 @@ import { settingsCopyByLanguage } from "@/app/components/ThemeSwitcher";
 import { formCopyByLanguage } from "@/app/contact/ContactForm";
 import { contactCopyByLanguage } from "@/app/contact/LocalizedContactPage";
 import { privacyCopyByLanguage } from "@/app/privacy/LocalizedPrivacyPolicyPage";
+import { savedStoriesCopyByLanguage } from "@/app/saved/SavedStoriesPage";
 import {
   DEFAULT_LANGUAGE_CODE,
   SUPPORTED_LANGUAGES,
@@ -31,6 +32,7 @@ const copyMaps: { name: string; value: CopyMap }[] = [
   { name: "footer", value: footerCopyByLanguage },
   { name: "nav", value: navCopyByLanguage },
   { name: "privacy", value: privacyCopyByLanguage },
+  { name: "savedStories", value: savedStoriesCopyByLanguage },
   { name: "settings", value: settingsCopyByLanguage },
 ];
 
@@ -50,6 +52,8 @@ const criticalTranslatedPaths = [
   { map: "nav", path: ["labels", "community"] },
   { map: "privacy", path: ["title"] },
   { map: "privacy", path: ["returnButton"] },
+  { map: "savedStories", path: ["title"] },
+  { map: "savedStories", path: ["emptyTitle"] },
   { map: "settings", path: ["openSettings"] },
   { map: "settings", path: ["language"] },
 ] as const;
