@@ -163,7 +163,7 @@ async function testAdminFeedMutationUrlBoundary() {
       return new Response(null, { status: 204 });
     };
 
-    const { setAdminRssFeedActiveStatus } = loadTsModule("web/lib/adminFeedManagement.ts", {
+    const { setAdminRssFeedActiveStatus, setAdminRssFeedTrustTier } = loadTsModule("web/lib/adminFeedManagement.ts", {
       "@/lib/adminTime": {
         formatAdminDateTime(value, fallback = "Never") {
           return value ?? fallback;
@@ -197,6 +197,42 @@ async function testAdminFeedMutationUrlBoundary() {
     });
     assert.deepEqual(allowed, { ok: true, message: "Feed disabled." }, "public feed URL can reach the mutation path");
     assert.equal(fetchCalls, 1, "public feed URL reaches exactly one mutation request");
+
+    const deniedTrustUrl = await setAdminRssFeedTrustTier({
+      feedUrl: "http://169.254.169.254/latest/meta-data",
+      sourceTrustTier: "trusted",
+      publisherAllowlistStatus: "allowlisted",
+    });
+    assert.deepEqual(
+      deniedTrustUrl,
+      { ok: false, message: "Feed URL is not allowed." },
+      "private feed URL is denied generically for trust tier updates",
+    );
+    assert.equal(fetchCalls, 1, "private trust tier URL denial does not reach fetch");
+
+    const deniedTrustTier = await setAdminRssFeedTrustTier({
+      feedUrl: "https://publisher.example/feed.xml",
+      sourceTrustTier: "administrator",
+      publisherAllowlistStatus: "allowlisted",
+    });
+    assert.deepEqual(
+      deniedTrustTier,
+      { ok: false, message: "Source trust tier is not allowed." },
+      "unexpected trust tier values are denied before fetch",
+    );
+    assert.equal(fetchCalls, 1, "invalid trust tier denial does not reach fetch");
+
+    const allowedTrustTier = await setAdminRssFeedTrustTier({
+      feedUrl: "https://publisher.example/feed.xml",
+      sourceTrustTier: "watchlist",
+      publisherAllowlistStatus: "candidate",
+    });
+    assert.deepEqual(
+      allowedTrustTier,
+      { ok: true, message: "Source trust tier updated to Watchlist." },
+      "public feed URL and valid trust tier can reach the mutation path",
+    );
+    assert.equal(fetchCalls, 2, "trust tier mutation reaches exactly one additional request");
   } finally {
     globalThis.fetch = originalFetch;
   }

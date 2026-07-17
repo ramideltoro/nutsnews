@@ -53,12 +53,12 @@ for (const required of [
 
 assertIncludes(
   migrationContract,
-  'MIGRATION_HEAD = "20260717032000"',
+  'MIGRATION_HEAD = "20260717093000"',
   "web/migrationContract.mjs",
 );
 assertIncludes(
   containerWorkflow,
-  '"migration_head":"20260717032000"',
+  '"migration_head":"20260717093000"',
   ".github/workflows/container-image.yml",
 );
 assertIncludes(feedHealthReport, "activeGoogleFeedCount", "feed_health_report.mjs");
