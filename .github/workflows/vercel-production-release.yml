@@ -113,6 +113,28 @@ jobs:
         run: |
           set -euo pipefail
           npx --yes vercel@latest pull --yes --environment=production --token "$VERCEL_TOKEN"
+          node --input-type=module <<'NODE'
+          import { readFile, writeFile } from "node:fs/promises";
+
+          const envPath = ".vercel/.env.production.local";
+          const shellSensitiveEnvNames = new Set(["HOME", "PATH", "Path", "SHELL"]);
+          try {
+            const input = await readFile(envPath, "utf8");
+            const lines = input.split(/\r?\n/);
+            const safeLines = lines.filter((line) => {
+              const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)=/);
+              return !match || !shellSensitiveEnvNames.has(match[1]);
+            });
+            if (safeLines.length !== lines.length) {
+              await writeFile(envPath, `${safeLines.join("\n").replace(/\n*$/, "")}\n`);
+              console.log("Removed shell-sensitive Vercel env names before local build.");
+            }
+          } catch (error) {
+            if (error?.code !== "ENOENT") {
+              throw error;
+            }
+          }
+          NODE
           npx --yes vercel@latest build --prod --token "$VERCEL_TOKEN"
           deploy_output="$RUNNER_TEMP/vercel-production-deploy.txt"
           npx --yes vercel@latest deploy --prebuilt --prod --token "$VERCEL_TOKEN" > "$deploy_output"
