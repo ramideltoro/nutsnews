@@ -52,6 +52,20 @@ export type Article = {
 };
 
 export type PublishedArticleDataSource = "public_feed_snapshot" | "articles_fallback" | "edge_feed_snapshot";
+export type FeedDependencyState = "available" | "degraded" | "unavailable" | "unknown";
+export type FeedDegradationStatus = {
+  mode: "degraded" | "maintenance";
+  reason: string;
+  message: string;
+  services: {
+    supabase: FeedDependencyState;
+    edgeSnapshot: FeedDependencyState;
+    worker: FeedDependencyState;
+    localAi: FeedDependencyState;
+    translations: FeedDependencyState;
+  };
+  loggedAt: string;
+};
 
 export type SearchArticlesResult = {
   articles: Article[];
@@ -130,6 +144,7 @@ export type HomeFeedSection = {
 
 export type HomeFeedPayload = PublishedArticlesResult & {
   sections: HomeFeedSection[];
+  degradation?: FeedDegradationStatus | null;
 };
 
 function encodeArticleCursor(article: Article) {
