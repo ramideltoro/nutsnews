@@ -9,6 +9,10 @@ const FEED_QUALITY_SELECT_COLUMNS = [
   "feed_url",
   "is_active",
   "is_positive_source",
+  "source_trust_tier",
+  "publisher_allowlist_status",
+  "recommended_trust_tier",
+  "tier_recommendation_reason",
   "feed_health_id",
   "last_checked_at",
   "last_success_at",
@@ -53,6 +57,10 @@ type FeedQualityDbRow = {
   feed_url: string;
   is_active: boolean | string | null;
   is_positive_source: boolean | string | null;
+  source_trust_tier: string | null;
+  publisher_allowlist_status: string | null;
+  recommended_trust_tier: string | null;
+  tier_recommendation_reason: string | null;
   feed_health_id: number | null;
   last_checked_at: string | null;
   last_success_at: string | null;
@@ -99,12 +107,31 @@ export type FeedQualityGrade =
   | "untracked"
   | "inactive";
 
+export type SourceTrustTier =
+  | "trusted"
+  | "watchlist"
+  | "experimental"
+  | "disabled";
+
+export type PublisherAllowlistStatus =
+  | "allowlisted"
+  | "candidate"
+  | "blocked";
+
 export type ManagedFeed = {
   id: number;
   source: string;
   url: string;
   isActive: boolean;
   isPositiveSource: boolean;
+  sourceTrustTier: SourceTrustTier;
+  sourceTrustTierLabel: string;
+  publisherAllowlistStatus: PublisherAllowlistStatus;
+  publisherAllowlistLabel: string;
+  recommendedTrustTier: SourceTrustTier;
+  recommendedTrustTierLabel: string;
+  tierRecommendationReason: string;
+  tierRecommendationMatches: boolean;
   status: FeedManagementStatus;
   statusLabel: string;
   reason: string;
@@ -147,6 +174,14 @@ export type FeedManagementSummary = {
   inactiveFeeds: number;
   positiveFeeds: number;
   ordinaryFeeds: number;
+  trustedFeeds: number;
+  watchlistFeeds: number;
+  experimentalFeeds: number;
+  disabledTierFeeds: number;
+  allowlistedPublishers: number;
+  candidatePublishers: number;
+  blockedPublishers: number;
+  tierRecommendationMismatches: number;
   trackedFeeds: number;
   untrackedFeeds: number;
   failingFeeds: number;
@@ -194,6 +229,19 @@ type FeedToggleRpcRow = {
   audit_event_id: string;
 };
 
+type FeedTrustTierRpcRow = {
+  feed_id: number;
+  feed_source: string;
+  feed_url: string;
+  previous_source_trust_tier: string;
+  next_source_trust_tier: string;
+  previous_publisher_allowlist_status: string;
+  next_publisher_allowlist_status: string;
+  previous_is_active: boolean | string | null;
+  next_is_active: boolean | string | null;
+  audit_event_id: string;
+};
+
 function getSupabaseConfig(): SupabaseConfig | null {
   try {
     return getServerSupabaseConfig();
@@ -209,6 +257,14 @@ function emptySummary(): FeedManagementSummary {
     inactiveFeeds: 0,
     positiveFeeds: 0,
     ordinaryFeeds: 0,
+    trustedFeeds: 0,
+    watchlistFeeds: 0,
+    experimentalFeeds: 0,
+    disabledTierFeeds: 0,
+    allowlistedPublishers: 0,
+    candidatePublishers: 0,
+    blockedPublishers: 0,
+    tierRecommendationMismatches: 0,
     trackedFeeds: 0,
     untrackedFeeds: 0,
     failingFeeds: 0,
@@ -331,6 +387,82 @@ function getQualityLabel(grade: FeedQualityGrade) {
   return "Untracked";
 }
 
+function normalizeSourceTrustTier(value: string | null | undefined): SourceTrustTier {
+  if (
+    value === "trusted" ||
+    value === "watchlist" ||
+    value === "experimental" ||
+    value === "disabled"
+  ) {
+    return value;
+  }
+
+  return "experimental";
+}
+
+function normalizePublisherAllowlistStatus(
+  value: string | null | undefined,
+): PublisherAllowlistStatus {
+  if (value === "allowlisted" || value === "candidate" || value === "blocked") {
+    return value;
+  }
+
+  return "candidate";
+}
+
+function getSourceTrustTierLabel(tier: SourceTrustTier) {
+  if (tier === "trusted") {
+    return "Trusted";
+  }
+
+  if (tier === "watchlist") {
+    return "Watchlist";
+  }
+
+  if (tier === "disabled") {
+    return "Disabled";
+  }
+
+  return "Experimental";
+}
+
+function getPublisherAllowlistLabel(status: PublisherAllowlistStatus) {
+  if (status === "allowlisted") {
+    return "Allowlisted";
+  }
+
+  if (status === "blocked") {
+    return "Blocked";
+  }
+
+  return "Candidate";
+}
+
+function parseSourceTrustTierInput(value: string): SourceTrustTier | null {
+  const normalized = value.trim().toLowerCase();
+
+  if (
+    normalized === "trusted" ||
+    normalized === "watchlist" ||
+    normalized === "experimental" ||
+    normalized === "disabled"
+  ) {
+    return normalized;
+  }
+
+  return null;
+}
+
+function parsePublisherAllowlistStatusInput(value: string): PublisherAllowlistStatus | null {
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized === "allowlisted" || normalized === "candidate" || normalized === "blocked") {
+    return normalized;
+  }
+
+  return null;
+}
+
 function resolveStatus(feed: ManagedFeed): Pick<ManagedFeed, "status" | "statusLabel" | "reason"> {
   if (!feed.isActive) {
     return {
@@ -396,12 +528,24 @@ function buildManagedFeed(row: FeedQualityDbRow): ManagedFeed {
   const totalAcceptedCount = safeNumber(row.total_accepted_count);
   const totalRejectedCount = safeNumber(row.total_rejected_count);
   const qualityGrade = normalizeQualityGrade(row.quality_grade);
+  const sourceTrustTier = normalizeSourceTrustTier(row.source_trust_tier);
+  const publisherAllowlistStatus = normalizePublisherAllowlistStatus(row.publisher_allowlist_status);
+  const recommendedTrustTier = normalizeSourceTrustTier(row.recommended_trust_tier);
   const baseFeed: ManagedFeed = {
     id: row.feed_id,
     source: row.source,
     url: row.feed_url,
     isActive: safeBoolean(row.is_active, true),
     isPositiveSource: safeBoolean(row.is_positive_source, false),
+    sourceTrustTier,
+    sourceTrustTierLabel: getSourceTrustTierLabel(sourceTrustTier),
+    publisherAllowlistStatus,
+    publisherAllowlistLabel: getPublisherAllowlistLabel(publisherAllowlistStatus),
+    recommendedTrustTier,
+    recommendedTrustTierLabel: getSourceTrustTierLabel(recommendedTrustTier),
+    tierRecommendationReason:
+      row.tier_recommendation_reason || "No trust tier recommendation is available yet.",
+    tierRecommendationMatches: sourceTrustTier === recommendedTrustTier,
     status: "untracked",
     statusLabel: "Untracked",
     reason: "Feed is active but has not been checked since feed health tracking was enabled.",
@@ -454,6 +598,14 @@ function buildSummary(feeds: ManagedFeed[]): FeedManagementSummary {
     acc.inactiveFeeds += feed.isActive ? 0 : 1;
     acc.positiveFeeds += feed.isPositiveSource ? 1 : 0;
     acc.ordinaryFeeds += feed.isPositiveSource ? 0 : 1;
+    acc.trustedFeeds += feed.sourceTrustTier === "trusted" ? 1 : 0;
+    acc.watchlistFeeds += feed.sourceTrustTier === "watchlist" ? 1 : 0;
+    acc.experimentalFeeds += feed.sourceTrustTier === "experimental" ? 1 : 0;
+    acc.disabledTierFeeds += feed.sourceTrustTier === "disabled" ? 1 : 0;
+    acc.allowlistedPublishers += feed.publisherAllowlistStatus === "allowlisted" ? 1 : 0;
+    acc.candidatePublishers += feed.publisherAllowlistStatus === "candidate" ? 1 : 0;
+    acc.blockedPublishers += feed.publisherAllowlistStatus === "blocked" ? 1 : 0;
+    acc.tierRecommendationMismatches += feed.tierRecommendationMatches ? 0 : 1;
     acc.trackedFeeds += feed.lastCheckedAt ? 1 : 0;
     acc.untrackedFeeds += feed.lastCheckedAt ? 0 : 1;
     acc.failingFeeds += feed.status === "failing" ? 1 : 0;
@@ -531,6 +683,9 @@ function buildRankingSql() {
   source,
   feed_url,
   is_active,
+  source_trust_tier,
+  publisher_allowlist_status,
+  recommended_trust_tier,
   quality_score,
   quality_grade,
   success_rate_pct,
@@ -540,9 +695,10 @@ function buildRankingSql() {
   duplicate_rate_pct,
   total_fetch_count,
   total_accepted_count,
-  quality_reason
+  quality_reason,
+  tier_recommendation_reason
 from public.feed_quality_scores
-order by quality_score desc, total_accepted_count desc, source asc;`;
+order by source_trust_tier asc, quality_score desc, total_accepted_count desc, source asc;`;
 }
 
 export async function getAdminFeedManagementDashboardData(): Promise<FeedManagementDashboardData> {
@@ -710,6 +866,122 @@ export async function setAdminRssFeedActiveStatus({
   return {
     ok: true,
     message: isActive ? "Feed enabled." : "Feed disabled.",
+  };
+}
+
+export async function setAdminRssFeedTrustTier({
+  actorEmail,
+  feedUrl,
+  sourceTrustTier,
+  publisherAllowlistStatus,
+}: {
+  actorEmail?: string | null;
+  feedUrl: string;
+  sourceTrustTier: string;
+  publisherAllowlistStatus: string;
+}) {
+  try {
+    assertDataMutation("admin-feed-management");
+  } catch (error) {
+    if (error instanceof RuntimeSafetyError) {
+      return {
+        ok: false,
+        message: "Feed management mutations are disabled in this environment.",
+      };
+    }
+    throw error;
+  }
+
+  let safeFeedUrl: string;
+  try {
+    safeFeedUrl = assertPublicHttpUrl(feedUrl, "Feed URL");
+  } catch (error) {
+    if (error instanceof ExternalUrlSafetyError) {
+      return {
+        ok: false,
+        message: "Feed URL is not allowed.",
+      };
+    }
+
+    throw error;
+  }
+
+  const safeSourceTrustTier = parseSourceTrustTierInput(sourceTrustTier);
+  const safePublisherAllowlistStatus = parsePublisherAllowlistStatusInput(
+    publisherAllowlistStatus,
+  );
+
+  if (!safeSourceTrustTier) {
+    return {
+      ok: false,
+      message: "Source trust tier is not allowed.",
+    };
+  }
+
+  if (!safePublisherAllowlistStatus) {
+    return {
+      ok: false,
+      message: "Publisher allowlist status is not allowed.",
+    };
+  }
+
+  const config = getSupabaseConfig();
+
+  if (!config) {
+    return {
+      ok: false,
+      message: "Missing Supabase admin configuration.",
+    };
+  }
+
+  const normalizedActorEmail = actorEmail?.trim().toLowerCase() || "unknown-admin@example.invalid";
+
+  const response = await fetch(`${config.url}/rest/v1/rpc/set_rss_feed_trust_tier_with_audit`, {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      apikey: config.serviceRoleKey,
+      Authorization: `Bearer ${config.serviceRoleKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      p_actor_email: normalizedActorEmail,
+      p_feed_url: safeFeedUrl,
+      p_source_trust_tier: safeSourceTrustTier,
+      p_publisher_allowlist_status: safePublisherAllowlistStatus,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+
+    return {
+      ok: false,
+      message: errorText || `Supabase returned ${response.status}`,
+    };
+  }
+
+  const rows = response.status === 204 ? [] : ((await response.json()) as FeedTrustTierRpcRow[]);
+  const updatedFeed = rows[0];
+
+  if (response.status !== 204 && !updatedFeed?.audit_event_id) {
+    return {
+      ok: false,
+      message: "Source tier changed, but the audit event was not returned.",
+    };
+  }
+
+  const nextTier = parseSourceTrustTierInput(
+    updatedFeed?.next_source_trust_tier ?? safeSourceTrustTier,
+  ) ?? safeSourceTrustTier;
+  const nextTierLabel = getSourceTrustTierLabel(nextTier);
+
+  return {
+    ok: true,
+    message:
+      nextTier === "disabled"
+        ? "Source trust tier set to Disabled and feed disabled."
+        : `Source trust tier updated to ${nextTierLabel}.`,
   };
 }
 

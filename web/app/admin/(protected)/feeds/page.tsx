@@ -8,9 +8,12 @@ import {
   type FeedManagementStatus,
   type FeedQualityGrade,
   type ManagedFeed,
+  type PublisherAllowlistStatus,
+  type SourceTrustTier,
   formatFeedManagementDateTime,
   getAdminFeedManagementDashboardData,
   setAdminRssFeedActiveStatus,
+  setAdminRssFeedTrustTier,
 } from "@/lib/adminFeedManagement";
 
 export const metadata = {
@@ -55,6 +58,45 @@ async function toggleFeedAction(formData: FormData) {
     actorEmail,
     feedUrl,
     isActive: nextActive,
+  });
+
+  revalidatePath("/admin/feeds");
+  revalidatePath("/admin/feed-health");
+  revalidatePath("/admin/audit");
+
+  if (!result.ok) {
+    redirect(`/admin/feeds?error=${encodeURIComponent(result.message)}`);
+  }
+
+  redirect(`/admin/feeds?updated=${encodeURIComponent(result.message)}`);
+}
+
+async function updateTrustTierAction(formData: FormData) {
+  "use server";
+
+  const feedUrl = String(formData.get("feedUrl") ?? "");
+  const sourceTrustTier = String(formData.get("sourceTrustTier") ?? "");
+  const publisherAllowlistStatus = String(formData.get("publisherAllowlistStatus") ?? "");
+  const session = await auth();
+  const actorEmail = session?.user?.email;
+
+  if (!actorEmail) {
+    redirect("/admin/login");
+  }
+
+  if (!isAllowedAdminEmail(actorEmail)) {
+    redirect("/admin/access-denied");
+  }
+
+  if (!feedUrl) {
+    redirect("/admin/feeds?error=Missing%20feed%20URL");
+  }
+
+  const result = await setAdminRssFeedTrustTier({
+    actorEmail,
+    feedUrl,
+    sourceTrustTier,
+    publisherAllowlistStatus,
   });
 
   revalidatePath("/admin/feeds");
@@ -128,6 +170,34 @@ function qualityClasses(grade: FeedQualityGrade) {
   return "border-violet-300/25 bg-violet-400/10 text-violet-100";
 }
 
+function tierClasses(tier: SourceTrustTier) {
+  if (tier === "trusted") {
+    return "border-emerald-300/30 bg-emerald-400/15 text-emerald-100";
+  }
+
+  if (tier === "watchlist") {
+    return "border-orange-300/30 bg-orange-400/15 text-orange-100";
+  }
+
+  if (tier === "disabled") {
+    return "border-red-300/35 bg-red-500/15 text-red-100";
+  }
+
+  return "border-sky-300/25 bg-sky-400/10 text-sky-100";
+}
+
+function allowlistClasses(status: PublisherAllowlistStatus) {
+  if (status === "allowlisted") {
+    return "border-emerald-300/30 bg-emerald-400/15 text-emerald-100";
+  }
+
+  if (status === "blocked") {
+    return "border-red-300/35 bg-red-500/15 text-red-100";
+  }
+
+  return "border-amber-300/25 bg-amber-400/10 text-amber-100";
+}
+
 function StatusPill({ status, label }: { status: FeedManagementStatus; label: string }) {
   return (
     <span
@@ -136,6 +206,36 @@ function StatusPill({ status, label }: { status: FeedManagementStatus; label: st
       )}`}
     >
       {label}
+    </span>
+  );
+}
+
+function SourceTrustPill({ feed }: { feed: ManagedFeed }) {
+  const recommendation = feed.tierRecommendationMatches
+    ? "Matches quality recommendation."
+    : `Recommended: ${feed.recommendedTrustTierLabel}. ${feed.tierRecommendationReason}`;
+
+  return (
+    <span
+      className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${tierClasses(
+        feed.sourceTrustTier,
+      )}`}
+      title={recommendation}
+    >
+      {feed.sourceTrustTierLabel} tier · Quality {formatNumber(feed.qualityScore)}/100
+    </span>
+  );
+}
+
+function PublisherAllowlistPill({ feed }: { feed: ManagedFeed }) {
+  return (
+    <span
+      className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${allowlistClasses(
+        feed.publisherAllowlistStatus,
+      )}`}
+      title="Publisher allowlist state for source expansion and disabling decisions."
+    >
+      Publisher {feed.publisherAllowlistLabel}
     </span>
   );
 }
@@ -209,6 +309,7 @@ function Section({
 function QuickNav() {
   const links = [
     ["Summary", "#summary"],
+    ["Trust", "#trust-review"],
     ["Quality", "#quality-review"],
     ["Best", "#best-quality"],
     ["Manage", "#manage-feeds"],
@@ -266,6 +367,45 @@ function ToggleFeedButton({ feed }: { feed: ManagedFeed }) {
   );
 }
 
+function SourceTrustTierForm({ feed }: { feed: ManagedFeed }) {
+  return (
+    <form action={updateTrustTierAction} className="grid gap-2 rounded-[1.25rem] border border-amber-300/15 bg-black/25 p-3">
+      <input type="hidden" name="feedUrl" value={feed.url} />
+      <label className="grid gap-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-100/65">
+        Tier
+        <select
+          name="sourceTrustTier"
+          defaultValue={feed.sourceTrustTier}
+          className="rounded-xl border border-amber-300/20 bg-neutral-950 px-3 py-2 text-xs font-semibold normal-case tracking-normal text-amber-50"
+        >
+          <option value="trusted">Trusted</option>
+          <option value="watchlist">Watchlist</option>
+          <option value="experimental">Experimental</option>
+          <option value="disabled">Disabled</option>
+        </select>
+      </label>
+      <label className="grid gap-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-100/65">
+        Allowlist
+        <select
+          name="publisherAllowlistStatus"
+          defaultValue={feed.publisherAllowlistStatus}
+          className="rounded-xl border border-amber-300/20 bg-neutral-950 px-3 py-2 text-xs font-semibold normal-case tracking-normal text-amber-50"
+        >
+          <option value="allowlisted">Allowlisted</option>
+          <option value="candidate">Candidate</option>
+          <option value="blocked">Blocked</option>
+        </select>
+      </label>
+      <button
+        type="submit"
+        className="rounded-full border border-amber-300/25 bg-amber-400/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-amber-100 transition hover:border-amber-300/50 hover:bg-amber-400/15"
+      >
+        Update Tier
+      </button>
+    </form>
+  );
+}
+
 function FeedManagementCard({ feed }: { feed: ManagedFeed }) {
   return (
     <article className="rounded-[1.6rem] border border-amber-300/15 bg-black/30 p-4 shadow-lg shadow-amber-950/10">
@@ -273,7 +413,9 @@ function FeedManagementCard({ feed }: { feed: ManagedFeed }) {
         <div className="min-w-0">
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <StatusPill status={feed.status} label={feed.statusLabel} />
+            <SourceTrustPill feed={feed} />
             <QualityScorePill feed={feed} />
+            <PublisherAllowlistPill feed={feed} />
             <span className="rounded-full border border-amber-300/15 bg-amber-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-100/75">
               DB is_active: {feed.rawIsActiveValue}
             </span>
@@ -288,6 +430,10 @@ function FeedManagementCard({ feed }: { feed: ManagedFeed }) {
           <p className="mt-2 text-xs leading-5 text-amber-100/50">
             Quality reason: <span className="text-amber-50">{feed.qualityReason}</span>
           </p>
+          <p className="mt-2 text-xs leading-5 text-amber-100/50">
+            Tier recommendation: <span className="text-amber-50">{feed.recommendedTrustTierLabel}</span>{" "}
+            · {feed.tierRecommendationReason}
+          </p>
 
           {feed.lastErrorMessage ? (
             <p className="mt-2 rounded-2xl border border-red-300/15 bg-red-500/10 px-3 py-2 text-xs leading-5 text-red-100/80">
@@ -297,6 +443,7 @@ function FeedManagementCard({ feed }: { feed: ManagedFeed }) {
         </div>
 
         <div className="flex shrink-0 flex-col gap-3 lg:items-end">
+          <SourceTrustTierForm feed={feed} />
           <ToggleFeedButton feed={feed} />
           <Link
             href="/admin/feed-health"
@@ -310,6 +457,9 @@ function FeedManagementCard({ feed }: { feed: ManagedFeed }) {
       <div className="mt-4 grid gap-2 border-t border-amber-300/10 pt-4 text-xs text-amber-100/55 sm:grid-cols-2 lg:grid-cols-4">
         <p>Quality: <span className="text-amber-50">{formatNumber(feed.qualityScore)}/100</span></p>
         <p>Grade: <span className="text-amber-50">{feed.qualityLabel}</span></p>
+        <p>Trust tier: <span className="text-amber-50">{feed.sourceTrustTierLabel}</span></p>
+        <p>Allowlist: <span className="text-amber-50">{feed.publisherAllowlistLabel}</span></p>
+        <p>Recommended tier: <span className="text-amber-50">{feed.recommendedTrustTierLabel}</span></p>
         <p>Success: <span className="text-amber-50">{formatPercent(feed.successRate)}</span></p>
         <p>Images: <span className="text-amber-50">{formatPercent(feed.imageRate)}</span></p>
         <p>Accepted rate: <span className="text-amber-50">{formatPercent(feed.acceptanceRate)}</span></p>
@@ -386,7 +536,7 @@ export default async function FeedManagementPage({ searchParams }: FeedManagemen
                 Feed Management
               </h1>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-amber-100/70">
-                Manage RSS sources without a code deploy. Review active status, positive-source flags, health metrics, quality scores, and safely enable or disable feeds from the private admin portal.
+                Manage RSS sources without a code deploy. Review trust tiers, publisher allowlist state, quality scores, health metrics, and safely promote, watchlist, or disable feeds from the private admin portal.
               </p>
             </div>
 
@@ -398,7 +548,7 @@ export default async function FeedManagementPage({ searchParams }: FeedManagemen
                 {formatFeedManagementDateTime(data.generatedAt)}
               </p>
               <p className="mt-2 text-xs leading-5 text-amber-100/55">
-                Quality scores come from Supabase `feed_quality_scores` and rank feeds from 0 to 100.
+                Quality scores and tier recommendations come from Supabase `feed_quality_scores`; admin tier changes are written to the audit log.
               </p>
             </div>
           </div>
@@ -412,11 +562,15 @@ export default async function FeedManagementPage({ searchParams }: FeedManagemen
         <section id="summary" className="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard label="Total Feeds" value={formatNumber(data.summary.totalFeeds)} helper={`${formatNumber(data.summary.activeFeeds)} active · ${formatNumber(data.summary.inactiveFeeds)} inactive`} />
           <MetricCard label="Avg Quality" value={`${formatNumber(data.summary.averageQualityScore)}/100`} helper={`${formatNumber(data.summary.excellentFeeds + data.summary.goodFeeds)} excellent/good feeds · ${formatNumber(data.summary.poorFeeds)} poor feeds.`} />
-          <MetricCard label="Weak or Failing" value={formatNumber(data.summary.failingFeeds + data.summary.weakFeeds)} helper="Feeds that may need disabling or replacement." />
-          <MetricCard label="Accepted Articles" value={formatNumber(data.summary.totalAcceptedCount)} helper={`${formatPercent(data.summary.acceptanceRate)} acceptance rate · ${formatPercent(data.summary.duplicateRate)} duplicate/already-seen rate.`} />
+          <MetricCard label="Trusted Sources" value={formatNumber(data.summary.trustedFeeds)} helper={`${formatNumber(data.summary.allowlistedPublishers)} publishers allowlisted · ${formatNumber(data.summary.tierRecommendationMismatches)} tier recommendations to review.`} />
+          <MetricCard label="Weak or Failing" value={formatNumber(data.summary.failingFeeds + data.summary.weakFeeds)} helper={`${formatNumber(data.summary.watchlistFeeds)} watchlist · ${formatNumber(data.summary.disabledTierFeeds)} disabled tier feeds.`} />
         </section>
 
         <div className="grid gap-5">
+          <Section id="trust-review" eyebrow="Source Trust" title="Trust Tier Review" description="Review current trust tier and allowlist state beside quality recommendations. Disabled or blocked sources are kept inactive before Worker shards can select them.">
+            <FeedList feeds={data.feeds.filter((feed) => !feed.tierRecommendationMatches)} emptyMessage="All sources match their current quality-based tier recommendation." />
+          </Section>
+
           <Section id="quality-review" eyebrow="Source Quality" title="Lowest Quality Scores" description="Feeds listed here have poor or review-level quality scores based on success, thumbnails, accepted output, failures, and duplicate or already-seen signals.">
             <FeedList feeds={data.lowQualityFeeds} emptyMessage="No low-quality active feeds detected right now." />
           </Section>

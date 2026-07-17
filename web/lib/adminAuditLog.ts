@@ -88,6 +88,10 @@ function getActionLabel(action: string) {
     return "RSS feed disabled";
   }
 
+  if (action === "rss_feed.trust_tier_update") {
+    return "RSS source trust tier updated";
+  }
+
   return action
     .split(/[._:-]+/)
     .filter(Boolean)

@@ -258,7 +258,7 @@ export default async function AdminPage() {
             <DashboardCard
               eyebrow="Source Controls"
               title="Feed Management"
-              description="List RSS feeds, see active and inactive status, view positive-source flags, inspect 0-100 quality scores, and safely enable or disable feeds."
+              description="List RSS feeds, see active and inactive status, manage source trust tiers and publisher allowlist state, inspect 0-100 quality scores, and safely enable or disable feeds."
               href="/admin/feeds"
               status="Live"
             />
