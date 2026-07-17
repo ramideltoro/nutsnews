@@ -89,7 +89,7 @@ for (const fragment of [
   "outbound article clicks and category interest",
   "event type, article ID, source, and category",
   "raw URLs, article titles, referrers, IP addresses, user agents, cookies, or visitor identifiers",
-  "NutsNews does not define custom analytics events for likes, searches, personal profiles, or cross-device tracking.",
+  "NutsNews does not define custom analytics events for likes, saved stories, searches, personal profiles, or cross-device tracking.",
   "Advertising personalization and Google Signals are disabled.",
   "Sentry may collect production errors and diagnostics",
   "analyticsConsent",

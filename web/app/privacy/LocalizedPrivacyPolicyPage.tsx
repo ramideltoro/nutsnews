@@ -41,7 +41,7 @@ const germanPrivacyCopy: PrivacyCopy = {
   lastUpdatedLabel: "Zuletzt aktualisiert",
   lastUpdated: "17. Juli 2026",
   intro:
-    "NutsNews ist bewusst einfach und datenschutzfreundlich gebaut: Es ist kein Konto erforderlich, App-Einstellungen werden lokal gespeichert, und die App zeigt positive Zusammenfassungen mit Links zurück zu den Originalverlagen.",
+    "NutsNews ist bewusst einfach und datenschutzfreundlich gebaut: Es ist kein Konto erforderlich, App-Einstellungen und Website-Auswahlen werden lokal gespeichert, und die App zeigt positive Zusammenfassungen mit Links zurück zu den Originalverlagen.",
   highlightsEyebrow: "Datenschutz auf einen Blick",
   highlightsTitle: "Klar gestaltet",
   highlights: [
@@ -49,7 +49,7 @@ const germanPrivacyCopy: PrivacyCopy = {
     "Die iOS-App fragt nicht nach Name, E-Mail-Adresse, Telefonnummer, Passwort oder Zahlungsinformationen.",
     "Die iOS-App nutzt keine Berechtigungen für Standort, Kamera, Mikrofon, Fotos, Kontakte oder Gesundheitsdaten.",
     "Die iOS-App enthält keine Werbe-SDKs und keine Funktionen für appübergreifendes Tracking.",
-    "Geliktete Geschichten, Designauswahl und Haptik-Einstellungen werden lokal auf dem Gerät gespeichert.",
+    "Geliktete Geschichten, gespeicherte Website-Geschichten, Designauswahl und Haptik-Einstellungen werden lokal auf dem Gerät oder im Browser gespeichert.",
     "Zwischengespeicherte Artikelantworten verbessern die Geschwindigkeit und reduzieren unnötige Netzwerkanfragen.",
     "Jede Geschichte verweist auf den Originalverlag, statt den vollständigen Artikel erneut zu veröffentlichen.",
   ],
@@ -76,8 +76,9 @@ const germanPrivacyCopy: PrivacyCopy = {
       title: "Lokale Speicherung auf dem Gerät",
       body: [
         "Die iOS-App speichert bestimmte Einstellungen lokal auf dem Gerät des Lesers. Dazu gehören ausgewähltes Design, Haptik-Einstellung und Kennungen gelikteter Geschichten.",
-        "Geliktete Geschichten werden lokal gespeichert, damit dieselbe Geschichte im Home-Feed und auf der Story-Seite als gelikt erscheint. Diese Information wird nicht an ein NutsNews-Konto gesendet, weil die App keine Konten verlangt.",
-        "Leser können ein Like entfernen, indem sie den Like-Button erneut antippen. Lokale App-Daten können auch entfernt werden, indem die App vom Gerät gelöscht wird.",
+        "Die Website speichert Design, Sprache, Analyseauswahl und gespeicherte Story-Kartendaten im lokalen Browser-Speicher, wenn Leser diese Steuerelemente verwenden.",
+        "Geliktete oder gespeicherte Geschichten bleiben lokal, damit dieselbe Geschichte in der passenden App- oder Website-Ansicht wieder erscheint. Diese Information wird nicht an ein NutsNews-Konto gesendet, weil NutsNews keine Konten verlangt.",
+        "Leser können ein Like oder eine gespeicherte Geschichte entfernen, indem sie dieselbe Aktion erneut antippen oder anklicken. Lokale App- oder Browserdaten können auch durch Löschen der App oder Browserdaten entfernt werden.",
       ],
     },
     {
@@ -105,8 +106,8 @@ const germanPrivacyCopy: PrivacyCopy = {
         "Die NutsNews-Website nutzt Google Analytics 4 nur, wenn Production-Telemetrie live ist, eine Mess-ID konfiguriert ist, der Browser kein Do Not Track oder Global Privacy Control sendet und der Leser minimale Analyse auf dieser Seite erlaubt hat. Standardmäßig ist diese Analyse aus.",
         "Die erlaubte Taxonomie ist absichtlich klein: Standard-Seitenaufrufe, grundlegende Engagement-Signale, grobe Geräte-/Browserklasse, Referrer, ungefährer Standort und Performance-Timing. Wenn minimale Analyse erlaubt ist, kann NutsNews außerdem eigene aggregierte Zähler für ausgehende Artikelklicks und Kategorieinteresse speichern.",
         "Diese Artikel-Engagement-Zähler enthalten nur Event-Typ, Artikel-ID, Quelle und Kategorie. NutsNews sendet dabei keine rohen URLs, Artikeltitel, Referrer, IP-Adressen, User-Agents, Cookies oder Besucherkennungen.",
-        "NutsNews definiert keine benutzerdefinierten Analyse-Events für Likes, Suchanfragen, persönliche Profile oder geräteübergreifendes Tracking.",
-        "NutsNews sendet keine Namen, E-Mail-Adressen, Konto-IDs, Zahlungsdaten, präzisen Standortdaten, gelikten Geschichten oder KI-Prompts an Analysewerkzeuge. Anzeigenpersonalisierung und Google Signals sind deaktiviert.",
+        "NutsNews definiert keine benutzerdefinierten Analyse-Events für Likes, gespeicherte Geschichten, Suchanfragen, persönliche Profile oder geräteübergreifendes Tracking.",
+        "NutsNews sendet keine Namen, E-Mail-Adressen, Konto-IDs, Zahlungsdaten, präzisen Standortdaten, gelikten oder gespeicherten Geschichten oder KI-Prompts an Analysewerkzeuge. Anzeigenpersonalisierung und Google Signals sind deaktiviert.",
         "Sentry kann Produktionsfehler und Diagnostik erfassen, wenn Production-Telemetrie live ist. Ereignisse werden vor dem Senden bereinigt, damit Cookies, Autorisierungs-Header und andere sensible Header nicht weitergegeben werden.",
         "Die iOS-App ist eine separate native App-Erfahrung. Die aktuelle iOS-App enthält keine Werbe-SDKs, Konto-Login-SDKs oder Social-Login-SDKs Dritter.",
       ],
@@ -139,7 +140,7 @@ const germanPrivacyCopy: PrivacyCopy = {
       id: "choices",
       title: "Deine Wahlmöglichkeiten",
       body: [
-        "Du kannst NutsNews ohne Konto verwenden. Du kannst Likes durch erneutes Tippen entfernen, lokale Einstellungen in den Einstellungen ändern und die App löschen, um lokale App-Daten vom Gerät zu entfernen.",
+        "Du kannst NutsNews ohne Konto verwenden. Du kannst Likes oder gespeicherte Geschichten durch erneutes Tippen oder Klicken entfernen, lokale Einstellungen in den Einstellungen ändern und die App- oder Browserdaten löschen, um lokale Daten vom Gerät zu entfernen.",
         "Du kannst die Analyse auf der Website über die Kontrolle auf dieser Seite ausgeschaltet lassen oder minimale Analyse erlauben. Do Not Track und Global Privacy Control werden respektiert und blockieren Analyse weiterhin, selbst wenn die lokale Einstellung Analyse erlaubt.",
         "Du kannst selbst entscheiden, ob du Originalverlagslinks öffnest. Publisher-Websites sind von NutsNews getrennt und können eigene Datenschutzkontrollen haben.",
       ],
@@ -184,7 +185,7 @@ const greekPrivacyCopy: PrivacyCopy = {
   lastUpdatedLabel: "Τελευταία ενημέρωση",
   lastUpdated: "17 Ιουλίου 2026",
   intro:
-    "Το NutsNews είναι φτιαγμένο ώστε να είναι απλό και προσεκτικό με το απόρρητο: δεν απαιτείται λογαριασμός, οι προτιμήσεις της εφαρμογής αποθηκεύονται τοπικά και η εφαρμογή εστιάζει σε θετικές περιλήψεις ιστοριών με συνδέσμους προς τους αρχικούς εκδότες.",
+    "Το NutsNews είναι φτιαγμένο ώστε να είναι απλό και προσεκτικό με το απόρρητο: δεν απαιτείται λογαριασμός, οι προτιμήσεις της εφαρμογής και οι επιλογές του ιστότοπου αποθηκεύονται τοπικά και η εφαρμογή εστιάζει σε θετικές περιλήψεις ιστοριών με συνδέσμους προς τους αρχικούς εκδότες.",
   highlightsEyebrow: "Σημεία απορρήτου",
   highlightsTitle: "Καθαρό από τον σχεδιασμό",
   highlights: [
@@ -192,7 +193,7 @@ const greekPrivacyCopy: PrivacyCopy = {
     "Η iOS εφαρμογή δεν ζητά όνομα, email, αριθμό τηλεφώνου, κωδικό ή στοιχεία πληρωμής.",
     "Η iOS εφαρμογή δεν χρησιμοποιεί άδειες για τοποθεσία, κάμερα, μικρόφωνο, φωτογραφίες, επαφές ή δεδομένα υγείας.",
     "Η iOS εφαρμογή δεν περιλαμβάνει διαφημιστικά SDK ή λειτουργίες cross-app tracking.",
-    "Οι αγαπημένες ιστορίες, οι επιλογές θέματος και οι προτιμήσεις haptics αποθηκεύονται τοπικά στη συσκευή.",
+    "Οι αγαπημένες ιστορίες, οι αποθηκευμένες ιστορίες ιστότοπου, οι επιλογές θέματος και οι προτιμήσεις haptics αποθηκεύονται τοπικά στη συσκευή ή στον browser.",
     "Οι cached απαντήσεις άρθρων βελτιώνουν την ταχύτητα και μειώνουν τις περιττές δικτυακές αιτήσεις.",
     "Κάθε ιστορία συνδέει πίσω στον αρχικό εκδότη αντί να αναδημοσιεύει ολόκληρο το άρθρο.",
   ],
@@ -219,8 +220,9 @@ const greekPrivacyCopy: PrivacyCopy = {
       title: "Τοπική αποθήκευση στη συσκευή",
       body: [
         "Η iOS εφαρμογή αποθηκεύει ορισμένες προτιμήσεις τοπικά στη συσκευή του αναγνώστη, όπως το επιλεγμένο θέμα, την προτίμηση haptics και τα αναγνωριστικά των αγαπημένων ιστοριών.",
-        "Οι αγαπημένες ιστορίες αποθηκεύονται τοπικά ώστε η ίδια ιστορία να εμφανίζεται ως αγαπημένη στη ροή και στη σελίδα ιστορίας. Αυτή η πληροφορία δεν αποστέλλεται σε λογαριασμό NutsNews, επειδή η εφαρμογή δεν απαιτεί λογαριασμούς.",
-        "Οι αναγνώστες μπορούν να αφαιρέσουν ένα like πατώντας ξανά το κουμπί. Μπορούν επίσης να αφαιρέσουν τα τοπικά δεδομένα διαγράφοντας την εφαρμογή από τη συσκευή.",
+        "Ο ιστότοπος αποθηκεύει θέμα, γλώσσα, επιλογή analytics και αποθηκευμένα δεδομένα κάρτας ιστορίας στο τοπικό storage του browser όταν οι αναγνώστες χρησιμοποιούν αυτά τα controls.",
+        "Οι αγαπημένες ή αποθηκευμένες ιστορίες μένουν τοπικές ώστε η ίδια ιστορία να εμφανίζεται ξανά στην αντίστοιχη προβολή app ή website. Αυτή η πληροφορία δεν αποστέλλεται σε λογαριασμό NutsNews, επειδή το NutsNews δεν απαιτεί λογαριασμούς.",
+        "Οι αναγνώστες μπορούν να αφαιρέσουν ένα like ή μια αποθηκευμένη ιστορία πατώντας ή κάνοντας κλικ ξανά στην ίδια ενέργεια. Μπορούν επίσης να αφαιρέσουν τοπικά app ή browser δεδομένα διαγράφοντας την εφαρμογή ή τα δεδομένα του browser.",
       ],
     },
     {
@@ -248,8 +250,8 @@ const greekPrivacyCopy: PrivacyCopy = {
         "Ο ιστότοπος NutsNews χρησιμοποιεί Google Analytics 4 μόνο όταν η παραγωγική τηλεμετρία είναι live, υπάρχει ρυθμισμένο measurement ID, ο browser δεν στέλνει Do Not Track ή Global Privacy Control και ο αναγνώστης έχει επιτρέψει ελάχιστα analytics σε αυτή τη σελίδα. Η προεπιλογή είναι off.",
         "Η επιτρεπόμενη ταξινόμηση είναι σκόπιμα μικρή: τυπικά page views, βασικά engagement signals, χονδρική κατηγορία συσκευής/browser, referrer, κατά προσέγγιση περιοχή και performance timing. Όταν επιτρέπονται ελάχιστα analytics, το NutsNews μπορεί επίσης να αποθηκεύει δικούς του συγκεντρωτικούς μετρητές για outbound κλικ άρθρων και ενδιαφέρον κατηγορίας.",
         "Αυτοί οι μετρητές article engagement περιέχουν μόνο τύπο event, article ID, πηγή και κατηγορία. Το NutsNews δεν στέλνει raw URLs, τίτλους άρθρων, referrers, IP addresses, user agents, cookies ή visitor identifiers.",
-        "Το NutsNews δεν ορίζει custom analytics events για likes, αναζητήσεις, προσωπικά profiles ή cross-device tracking.",
-        "Το NutsNews δεν στέλνει ονόματα, email, account IDs, στοιχεία πληρωμής, ακριβή τοποθεσία, αγαπημένες ιστορίες ή AI prompts σε analytics tools. Το ad personalization και τα Google Signals είναι απενεργοποιημένα.",
+        "Το NutsNews δεν ορίζει custom analytics events για likes, αποθηκευμένες ιστορίες, αναζητήσεις, προσωπικά profiles ή cross-device tracking.",
+        "Το NutsNews δεν στέλνει ονόματα, email, account IDs, στοιχεία πληρωμής, ακριβή τοποθεσία, αγαπημένες ή αποθηκευμένες ιστορίες ή AI prompts σε analytics tools. Το ad personalization και τα Google Signals είναι απενεργοποιημένα.",
         "Το Sentry μπορεί να συλλέγει production errors και diagnostics όταν η παραγωγική τηλεμετρία είναι live. Τα events καθαρίζονται πριν την αποστολή ώστε cookies, authorization headers και άλλα ευαίσθητα headers να μην αποστέλλονται.",
         "Η iOS εφαρμογή είναι ξεχωριστή native εμπειρία. Η τρέχουσα iOS εφαρμογή δεν περιλαμβάνει διαφημιστικά SDK, account login SDKs ή third-party social login SDKs.",
       ],
@@ -282,7 +284,7 @@ const greekPrivacyCopy: PrivacyCopy = {
       id: "choices",
       title: "Οι επιλογές σας",
       body: [
-        "Μπορείτε να χρησιμοποιήσετε το NutsNews χωρίς λογαριασμό. Μπορείτε να αφαιρέσετε likes πατώντας ξανά το κουμπί, να αλλάξετε τοπικές προτιμήσεις στις Ρυθμίσεις και να διαγράψετε την εφαρμογή για να αφαιρέσετε τοπικά δεδομένα από τη συσκευή.",
+        "Μπορείτε να χρησιμοποιήσετε το NutsNews χωρίς λογαριασμό. Μπορείτε να αφαιρέσετε likes ή αποθηκευμένες ιστορίες πατώντας ή κάνοντας κλικ ξανά, να αλλάξετε τοπικές προτιμήσεις στις Ρυθμίσεις και να διαγράψετε app ή browser δεδομένα για να αφαιρέσετε τοπικά δεδομένα από τη συσκευή.",
         "Μπορείτε να αφήσετε τα website analytics απενεργοποιημένα ή να επιτρέψετε ελάχιστα analytics από το control αυτής της σελίδας. Το Do Not Track και το Global Privacy Control γίνονται σεβαστά και συνεχίζουν να μπλοκάρουν analytics, ακόμη και αν η τοπική ρύθμιση τα επιτρέπει.",
         "Μπορείτε να επιλέξετε αν θα ανοίγετε links αρχικών εκδοτών. Οι ιστότοποι εκδοτών είναι ξεχωριστοί από το NutsNews και μπορεί να έχουν δικούς τους ελέγχους απορρήτου.",
       ],
@@ -331,7 +333,7 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
     lastUpdatedLabel: "Last updated",
     lastUpdated: "July 17, 2026",
     intro:
-      "NutsNews is built to be simple and privacy-conscious: no account is required, app preferences are stored locally, and the app focuses on showing positive story summaries with links back to original publishers.",
+      "NutsNews is built to be simple and privacy-conscious: no account is required, app preferences and website choices are stored locally, and the app focuses on showing positive story summaries with links back to original publishers.",
     highlightsEyebrow: "Privacy highlights",
     highlightsTitle: "Clear by design",
     highlights: [
@@ -339,7 +341,7 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
       "The iOS app does not ask for a name, email address, phone number, password, or payment information.",
       "The iOS app does not use location, camera, microphone, photos, contacts, or health data permissions.",
       "The iOS app does not include advertising SDKs or cross-app tracking features.",
-      "Liked stories, theme choices, and haptics preferences are stored locally on the device.",
+      "Liked stories, saved website stories, theme choices, and haptics preferences are stored locally on the device or in the browser.",
       "Cached article responses are used to improve speed and reduce unnecessary network requests.",
       "Every story links back to the original publisher instead of republishing the full article.",
     ],
@@ -366,8 +368,9 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
         title: "Local device storage",
         body: [
           "The iOS app stores certain preferences locally on the reader's device. This includes selected app theme, haptics preference, and liked-story identifiers.",
-          "Liked stories are saved locally so the same story can appear as liked on both the home feed and story page. This liked-story information is not sent to a NutsNews account because the app does not require accounts.",
-          "Readers can remove a liked story by tapping the like button again. Readers can also remove local app data by deleting the app from their device.",
+          "The website stores theme, language, analytics choice, and saved-story card data in browser local storage when readers use those controls.",
+          "Liked or saved stories stay local so the same story can reappear in the matching app or website view. This information is not sent to a NutsNews account because NutsNews does not require accounts.",
+          "Readers can remove a liked or saved story by tapping or clicking the same action again. Readers can also remove local app or browser data by deleting the app or clearing browser data on their device.",
         ],
       },
       {
@@ -395,8 +398,8 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
           "The NutsNews website uses Google Analytics 4 only when production telemetry is live, a measurement ID is configured, the browser is not sending Do Not Track or Global Privacy Control, and the reader has allowed minimal analytics on this page. The default is off.",
           "The allowed taxonomy is intentionally small: standard page views, basic engagement signals, coarse device/browser class, referrer, approximate region, and performance timing. When minimal analytics is allowed, NutsNews may also record first-party aggregate counters for outbound article clicks and category interest.",
           "These article engagement counters include only event type, article ID, source, and category. NutsNews does not send raw URLs, article titles, referrers, IP addresses, user agents, cookies, or visitor identifiers with those events.",
-          "NutsNews does not define custom analytics events for likes, searches, personal profiles, or cross-device tracking.",
-          "NutsNews does not send names, email addresses, account IDs, payment details, precise location, liked stories, or AI prompts to analytics tools. Advertising personalization and Google Signals are disabled.",
+          "NutsNews does not define custom analytics events for likes, saved stories, searches, personal profiles, or cross-device tracking.",
+          "NutsNews does not send names, email addresses, account IDs, payment details, precise location, liked or saved stories, or AI prompts to analytics tools. Advertising personalization and Google Signals are disabled.",
           "Sentry may collect production errors and diagnostics when production telemetry is live. Events are scrubbed before sending so cookies, authorization headers, and other sensitive headers are not forwarded.",
           "The iOS app is a separate native app experience. The current iOS app does not include advertising SDKs, account login SDKs, or third-party social login SDKs.",
         ],
@@ -429,7 +432,7 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
         id: "choices",
         title: "Your choices",
         body: [
-          "You can use NutsNews without creating an account. You can unlike stories by tapping the like button again, change local preferences in Settings, and delete the app to remove local app data from your device.",
+          "You can use NutsNews without creating an account. You can unlike or unsave stories by tapping or clicking the same action again, change local preferences in Settings, and delete app or browser data to remove local data from your device.",
           "You can keep website analytics off or allow minimal analytics using the control on this page. Do Not Track and Global Privacy Control are respected and continue to block analytics even if the local setting allows analytics.",
           "You can choose whether to open original publisher links. Publisher websites are separate from NutsNews and may have their own privacy controls.",
         ],
@@ -473,7 +476,7 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
     lastUpdatedLabel: "Dernière mise à jour",
     lastUpdated: "17 juillet 2026",
     intro:
-      "NutsNews est conçu pour être simple et respectueux de la vie privée : aucun compte n’est requis, les préférences de l’app sont stockées localement, et l’app se concentre sur des résumés d’histoires positives avec des liens vers les éditeurs d’origine.",
+      "NutsNews est conçu pour être simple et respectueux de la vie privée : aucun compte n’est requis, les préférences de l’app et les choix du site sont stockés localement, et l’app se concentre sur des résumés d’histoires positives avec des liens vers les éditeurs d’origine.",
     highlightsEyebrow: "Points clés de confidentialité",
     highlightsTitle: "Clair par conception",
     highlights: [
@@ -481,7 +484,7 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
       "L’app iOS ne demande pas de nom, d’adresse email, de numéro de téléphone, de mot de passe ni d’informations de paiement.",
       "L’app iOS n’utilise pas les permissions de localisation, caméra, microphone, photos, contacts ou données de santé.",
       "L’app iOS n’inclut pas de SDK publicitaire ni de fonctions de suivi entre apps.",
-      "Les histoires aimées, les choix de thème et les préférences haptiques sont stockés localement sur l’appareil.",
+      "Les histoires aimées, les histoires enregistrées sur le site, les choix de thème et les préférences haptiques sont stockés localement sur l’appareil ou dans le navigateur.",
       "Les réponses d’articles mises en cache améliorent la vitesse et réduisent les requêtes réseau inutiles.",
       "Chaque histoire renvoie vers l’éditeur d’origine au lieu de republier l’article complet.",
     ],
@@ -508,8 +511,9 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
         title: "Stockage local sur l’appareil",
         body: [
           "L’app iOS stocke certaines préférences localement sur l’appareil du lecteur, notamment le thème choisi, la préférence haptique et les identifiants des histoires aimées.",
-          "Les histoires aimées sont enregistrées localement pour apparaître comme aimées dans le fil d’accueil et sur la page de l’histoire. Cette information n’est pas envoyée à un compte NutsNews, car l’app ne nécessite pas de compte.",
-          "Les lecteurs peuvent retirer un like en appuyant à nouveau sur le bouton. Ils peuvent aussi supprimer les données locales en supprimant l’app de leur appareil.",
+          "Le site stocke le thème, la langue, le choix d’analyse et les données de carte des histoires enregistrées dans le stockage local du navigateur lorsque les lecteurs utilisent ces contrôles.",
+          "Les histoires aimées ou enregistrées restent locales afin que la même histoire réapparaisse dans la vue correspondante de l’app ou du site. Cette information n’est pas envoyée à un compte NutsNews, car NutsNews ne nécessite pas de compte.",
+          "Les lecteurs peuvent retirer un like ou une histoire enregistrée en appuyant ou en cliquant à nouveau sur la même action. Ils peuvent aussi supprimer les données locales de l’app ou du navigateur en supprimant l’app ou les données du navigateur sur leur appareil.",
         ],
       },
       {
@@ -537,8 +541,8 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
           "Le site NutsNews utilise Google Analytics 4 uniquement lorsque la télémétrie de production est active, qu’un identifiant de mesure est configuré, que le navigateur n’envoie pas Do Not Track ou Global Privacy Control et que le lecteur a autorisé une analyse minimale sur cette page. Par défaut, cette analyse est désactivée.",
           "La taxonomie autorisée est volontairement limitée : vues de page standard, signaux d’engagement de base, catégorie générale d’appareil ou de navigateur, référent, région approximative et mesures de performance. Lorsque l’analyse minimale est autorisée, NutsNews peut aussi enregistrer des compteurs agrégés internes pour les clics sortants d’articles et l’intérêt par catégorie.",
           "Ces compteurs d’engagement d’article contiennent seulement le type d’événement, l’ID d’article, la source et la catégorie. NutsNews n’envoie pas d’URLs brutes, de titres d’articles, de référents, d’adresses IP, d’agents utilisateur, de cookies ni d’identifiants de visiteur avec ces événements.",
-          "NutsNews ne définit pas d’événements d’analyse personnalisés pour les likes, les recherches, les profils personnels ou le suivi entre appareils.",
-          "NutsNews n’envoie pas aux outils d’analyse les noms, adresses e-mail, identifiants de compte, données de paiement, localisation précise, histoires aimées ou prompts d’IA. La personnalisation publicitaire et Google Signals sont désactivés.",
+          "NutsNews ne définit pas d’événements d’analyse personnalisés pour les likes, les histoires enregistrées, les recherches, les profils personnels ou le suivi entre appareils.",
+          "NutsNews n’envoie pas aux outils d’analyse les noms, adresses e-mail, identifiants de compte, données de paiement, localisation précise, histoires aimées ou enregistrées, ou prompts d’IA. La personnalisation publicitaire et Google Signals sont désactivés.",
           "Sentry peut collecter des erreurs et diagnostics de production lorsque la télémétrie de production est active. Les événements sont nettoyés avant l’envoi afin que les cookies, en-têtes d’autorisation et autres en-têtes sensibles ne soient pas transmis.",
           "L’app iOS est une expérience native séparée. L’app iOS actuelle n’inclut pas de SDK publicitaire, de SDK de connexion de compte ni de SDK de connexion sociale tiers.",
         ],
@@ -571,7 +575,7 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
         id: "choices",
         title: "Vos choix",
         body: [
-          "Vous pouvez utiliser NutsNews sans créer de compte. Vous pouvez retirer un like en appuyant à nouveau sur le bouton, changer les préférences locales dans les paramètres et supprimer l’app pour retirer les données locales de votre appareil.",
+          "Vous pouvez utiliser NutsNews sans créer de compte. Vous pouvez retirer un like ou une histoire enregistrée en appuyant ou en cliquant à nouveau, changer les préférences locales dans les paramètres et supprimer les données de l’app ou du navigateur pour retirer les données locales de votre appareil.",
           "Vous pouvez garder l’analyse du site désactivée ou autoriser une analyse minimale avec le contrôle de cette page. Do Not Track et Global Privacy Control sont respectés et continuent de bloquer l’analyse même si le réglage local l’autorise.",
           "Vous pouvez choisir d’ouvrir ou non les liens des éditeurs d’origine. Les sites des éditeurs sont séparés de NutsNews et peuvent avoir leurs propres contrôles de confidentialité.",
         ],
@@ -615,7 +619,7 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
     lastUpdatedLabel: "最終更新日",
     lastUpdated: "2026年7月17日",
     intro:
-      "NutsNewsは、シンプルでプライバシーに配慮した作りを目指しています。アカウントは不要で、アプリの設定はローカルに保存され、前向きなストーリーの要約と元の出版社へのリンクを表示することに集中しています。",
+      "NutsNewsは、シンプルでプライバシーに配慮した作りを目指しています。アカウントは不要で、アプリの設定とサイト上の選択はローカルに保存され、前向きなストーリーの要約と元の出版社へのリンクを表示することに集中しています。",
     highlightsEyebrow: "プライバシーのポイント",
     highlightsTitle: "わかりやすさを前提に設計",
     highlights: [
@@ -623,7 +627,7 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
       "iOSアプリは、名前、メールアドレス、電話番号、パスワード、支払い情報を求めません。",
       "iOSアプリは、位置情報、カメラ、マイク、写真、連絡先、健康データの権限を使用しません。",
       "iOSアプリには広告SDKやアプリ横断トラッキング機能は含まれていません。",
-      "いいねしたストーリー、テーマ選択、ハプティクス設定は端末内に保存されます。",
+      "いいねしたストーリー、サイトで保存したストーリー、テーマ選択、ハプティクス設定は端末またはブラウザ内に保存されます。",
       "キャッシュされた記事レスポンスは、速度を上げ、不要なネットワーク要求を減らすために使われます。",
       "すべてのストーリーは、全文を再掲載するのではなく、元の出版社へリンクします。",
     ],
@@ -650,8 +654,9 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
         title: "端末内のローカル保存",
         body: [
           "iOSアプリは、選択したアプリテーマ、ハプティクス設定、いいねしたストーリーの識別子など、一部の設定を読者の端末にローカル保存します。",
-          "いいねしたストーリーは、ホームフィードとストーリーページの両方で同じストーリーがいいね済みに見えるよう、ローカルに保存されます。アプリはアカウントを必要としないため、この情報はNutsNewsアカウントへ送信されません。",
-          "読者はいいねボタンをもう一度押して、いいねを外せます。アプリを削除することで端末内のローカルデータも削除できます。",
+          "サイトでは、読者がこれらの操作を使った場合、テーマ、言語、分析の選択、保存したストーリーカードのデータをブラウザのローカルストレージに保存します。",
+          "いいねまたは保存したストーリーはローカルに残り、同じストーリーが該当するアプリまたはサイトの表示に再び現れます。NutsNewsはアカウントを必要としないため、この情報はNutsNewsアカウントへ送信されません。",
+          "読者は同じ操作をもう一度押すかクリックして、いいねまたは保存したストーリーを削除できます。アプリを削除するかブラウザデータを消去することで、端末内のローカルデータも削除できます。",
         ],
       },
       {
@@ -679,8 +684,8 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
           "NutsNewsサイトは、本番テレメトリーが有効で、測定IDが設定され、ブラウザがDo Not TrackまたはGlobal Privacy Controlを送信しておらず、このページで読者が最小限の分析を許可した場合にのみGoogle Analytics 4を使用します。初期状態ではオフです。",
           "許可される分類は意図的に小さくしています。標準のページビュー、基本的なエンゲージメント信号、大まかな端末またはブラウザ種別、参照元、おおよその地域、パフォーマンスタイミングに限ります。読者が最小限の分析を許可した場合、NutsNewsは記事の外部リンククリックとカテゴリー関心について、自社の集計カウンターを記録することがあります。",
           "これらの記事エンゲージメントカウンターに含まれるのは、イベント種別、記事ID、ソース、カテゴリーだけです。NutsNewsは、これらのイベントで生のURL、記事タイトル、参照元、IPアドレス、ユーザーエージェント、Cookie、訪問者識別子を送信しません。",
-          "NutsNewsは、いいね、検索、個人プロフィール、デバイス横断トラッキングのためのカスタム分析イベントを定義しません。",
-          "NutsNewsは、名前、メールアドレス、アカウントID、支払い情報、正確な位置情報、いいねしたストーリー、AIプロンプトを分析ツールに送信しません。広告パーソナライズとGoogle Signalsは無効です。",
+          "NutsNewsは、いいね、保存済みストーリー、検索、個人プロフィール、デバイス横断トラッキングのためのカスタム分析イベントを定義しません。",
+          "NutsNewsは、名前、メールアドレス、アカウントID、支払い情報、正確な位置情報、いいねまたは保存したストーリー、AIプロンプトを分析ツールに送信しません。広告パーソナライズとGoogle Signalsは無効です。",
           "本番テレメトリーが有効な場合、Sentryが本番エラーと診断情報を収集することがあります。送信前にイベントを整理し、Cookie、認可ヘッダー、その他の機密ヘッダーを転送しないようにします。",
           "iOSアプリは別のネイティブアプリ体験です。現在のiOSアプリには、広告SDK、アカウントログインSDK、第三者ソーシャルログインSDKは含まれていません。",
         ],
@@ -713,7 +718,7 @@ export const privacyCopyByLanguage: Record<LanguageCode, PrivacyCopy> = {
         id: "choices",
         title: "選択肢",
         body: [
-          "NutsNewsはアカウントを作らずに使えます。いいねボタンをもう一度押していいねを外したり、設定でローカル設定を変更したり、アプリを削除して端末内のローカルデータを削除したりできます。",
+          "NutsNewsはアカウントを作らずに使えます。同じ操作をもう一度押すかクリックして、いいねや保存を外したり、設定でローカル設定を変更したり、アプリまたはブラウザデータを削除して端末内のローカルデータを削除したりできます。",
           "このページのコントロールで、ウェブサイト分析をオフのままにするか、最小限の分析を許可できます。Do Not TrackとGlobal Privacy Controlは尊重され、ローカル設定で分析を許可していても分析をブロックします。",
           "元の出版社リンクを開くかどうかは選択できます。出版社のサイトはNutsNewsとは別であり、独自のプライバシー設定を持つ場合があります。",
         ],
