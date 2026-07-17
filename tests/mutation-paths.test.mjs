@@ -8,6 +8,7 @@ const root = resolve(import.meta.dirname, "..");
 const guardedPaths = {
   "web/app/api/contact/route.ts": "assertExternalSideEffect",
   "web/lib/quotaUsage.ts": "assertIsolatedDataMutation",
+  "web/lib/articleEngagement.ts": "assertIsolatedDataMutation",
   "web/lib/adminFeedManagement.ts": "assertDataMutation",
   "web/lib/logger.ts": "isTelemetryDeliveryAllowed",
   "web/app/api/log-test/route.ts": "assertProductionOperation",
@@ -46,6 +47,7 @@ test("service-role clients are centralized behind the runtime-validated Supabase
     [
       "web/lib/adminAiUsage.ts",
       "web/lib/adminArticleReviews.ts",
+      "web/lib/adminArticleEngagement.ts",
       "web/lib/adminCostGuardrails.ts",
       "web/lib/adminFeedHealth.ts",
       "web/lib/adminFeedManagement.ts",
@@ -54,6 +56,7 @@ test("service-role clients are centralized behind the runtime-validated Supabase
       "web/lib/adminShardHealth.ts",
       "web/lib/adminTranslationQuality.ts",
       "web/lib/runtimeFeatureFlags.ts",
+      "web/lib/articleEngagement.ts",
     ].map((relativePath) => readFile(resolve(root, relativePath), "utf8")),
   );
 

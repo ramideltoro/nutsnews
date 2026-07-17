@@ -176,6 +176,14 @@ export default async function AdminPage() {
             />
 
             <DashboardCard
+              eyebrow="Reader Signals"
+              title="Article Engagement"
+              description="See privacy-friendly aggregate outbound clicks, category interest, top sources, top categories, and article-level publisher-link performance."
+              href="/admin/engagement"
+              status="Live"
+            />
+
+            <DashboardCard
               eyebrow="AI Cost"
               title="AI Usage"
               description="Track OpenAI calls, prompt tokens, completion tokens, estimated cost, accepted decisions, rejected decisions, cost protection hits, and spike warnings."
