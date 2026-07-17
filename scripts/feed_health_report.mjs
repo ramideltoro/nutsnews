@@ -37,6 +37,9 @@ try {
 
 const activeFeeds = feeds.filter((feed) => feed.is_active !== false);
 const inactiveFeeds = feeds.length - activeFeeds.length;
+const activeGoogleFeedCount = activeFeeds.filter((feed) =>
+  /news\.google\.com/i.test(String(feed.url || '')),
+).length;
 const failedFeedCounts = new Map();
 for (const run of runs) {
   for (const failed of run.failed_feeds || []) {
@@ -47,7 +50,7 @@ for (const run of runs) {
 const repeatedFailures = [...failedFeedCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 25);
 const latestRun = runs[0];
 
-const report = { createdAt: new Date().toISOString(), feedCount: feeds.length, activeFeedCount: activeFeeds.length, inactiveFeedCount: inactiveFeeds, latestRun, repeatedFailures };
+const report = { createdAt: new Date().toISOString(), feedCount: feeds.length, activeFeedCount: activeFeeds.length, inactiveFeedCount: inactiveFeeds, activeGoogleFeedCount, latestRun, repeatedFailures };
 const markdown = [
   '# NutsNews Feed Health Report',
   '',
@@ -56,6 +59,7 @@ const markdown = [
   `- Feeds checked: ${feeds.length}`,
   `- Active feeds: ${activeFeeds.length}`,
   `- Inactive feeds: ${inactiveFeeds}`,
+  `- Active Google News RSS feeds: ${activeGoogleFeedCount}`,
   latestRun ? `- Latest run: shard ${latestRun.shard_index}, success=${latestRun.success}, feed success=${latestRun.feed_fetch_success_count}, feed failures=${latestRun.feed_fetch_failure_count}, accepted=${latestRun.accepted_count}` : '- Latest run: none found',
   '',
   '## Repeated failed feeds from recent worker runs',
