@@ -7,7 +7,9 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const containerWorkflow = await readFile(resolve(root, ".github/workflows/container-image.yml"), "utf8");
 const releaseWorkflow = await readFile(resolve(root, ".github/workflows/staging-release.yml"), "utf8");
 const regressionWorkflow = await readFile(resolve(root, ".github/workflows/staging-release-regression.yml"), "utf8");
+const vercelProductionWorkflow = await readFile(resolve(root, ".github/workflows/vercel-production-release.yml"), "utf8");
 const dualTargetSmoke = await readFile(resolve(root, "scripts/dual_target_web_smoke.mjs"), "utf8");
+const vercelConfig = JSON.parse(await readFile(resolve(root, "web/vercel.json"), "utf8"));
 const workflowNames = await readdir(resolve(root, ".github/workflows"));
 
 function requireText(text, fragment, message) {
@@ -21,6 +23,7 @@ requireText(containerWorkflow, "image_digest", "Release metadata must include th
 requireText(containerWorkflow, "image_tag: sourceCommit", "Release metadata must use the full commit tag.");
 requireText(containerWorkflow, "migration_head: migrationContract.head", "Release metadata must include the repository migration head.");
 requireText(containerWorkflow, "schema_version: applicationContract.legacyVersion", "Release metadata must include the rollback-compatible schema marker.");
+requireText(containerWorkflow, "supabase_project_ref: productionSupabaseProjectRef", "Release metadata must include the production Supabase project reference.");
 requireText(containerWorkflow, "source_repository: \"ramideltoro/nutsnews\"", "Release metadata must bind the source repository.");
 requireText(containerWorkflow, "source_workflow_run_id: sourceWorkflowRunId", "Release metadata must bind the source workflow run.");
 requireText(containerWorkflow, "uses: actions/upload-artifact@v6", "Release metadata must be retained as an artifact.");
@@ -47,15 +50,40 @@ requireText(releaseWorkflow, "schema_version", "Staging candidate must include s
 requireText(releaseWorkflow, "source_repository", "Staging candidate must include source repository.");
 requireText(releaseWorkflow, "source_workflow_run_id", "Staging candidate must include source workflow run.");
 requireText(releaseWorkflow, "image_digest", "Staging candidate must include the immutable image digest.");
+requireText(releaseWorkflow, "migration_head", "Staging candidate must include migration head.");
+requireText(releaseWorkflow, "supabase_project_ref", "Staging candidate must include production Supabase project ref.");
 requireText(
   releaseWorkflow,
-  "Vercel Production deploys independently and is not VPS production authorization.",
-  "Staging handoff summary must document that Vercel Production is not VPS authorization.",
+  "Vercel Production is disabled for app main and deploys only after the protected VPS release workflow dispatches the exact same source commit.",
+  "Staging handoff summary must document that Vercel Production is part of the protected release chain.",
 );
 requireText(regressionWorkflow, ".github/workflows/staging-release.yml", "Regression workflow must watch the staging handoff workflow.");
 
+assert.equal(
+  vercelConfig.git?.deploymentEnabled?.main,
+  false,
+  "Vercel Git auto-deploys for main must be disabled so VPS and Vercel cannot deploy independently.",
+);
+requireText(vercelProductionWorkflow, "repository_dispatch:", "Vercel production must be dispatched by infra after VPS apply.");
+requireText(vercelProductionWorkflow, "nutsnews-vercel-production-release", "Vercel production workflow must use the infra release event.");
+requireText(vercelProductionWorkflow, "deploy-vercel-production", "Manual Vercel production dispatch must require an explicit confirmation.");
+requireText(vercelProductionWorkflow, "actions/checkout@v5", "Vercel production must checkout the exact source commit.");
+requireText(vercelProductionWorkflow, "ref: ${{ env.SOURCE_COMMIT }}", "Vercel production must deploy the dispatch source commit.");
+requireText(vercelProductionWorkflow, "vercel@latest build --prod", "Vercel production must use a production build.");
+requireText(vercelProductionWorkflow, "vercel@latest deploy --prebuilt --prod", "Vercel production must deploy the prebuilt production artifact.");
+requireText(vercelProductionWorkflow, "VERCEL_TOKEN", "Vercel production must use the scoped Vercel token secret.");
+requireText(vercelProductionWorkflow, "VERCEL_ORG_ID", "Vercel production must set the Vercel org identity.");
+requireText(vercelProductionWorkflow, "VERCEL_PROJECT_ID", "Vercel production must set the Vercel project identity.");
+requireText(vercelProductionWorkflow, "NUTSNEWS_SOURCE_COMMIT: ${{ env.SOURCE_COMMIT }}", "Vercel production must build with explicit source identity.");
+requireText(vercelProductionWorkflow, "NUTSNEWS_BUILD_ID: ${{ env.BUILD_ID }}", "Vercel production must build with explicit build identity.");
+requireText(vercelProductionWorkflow, "NUTSNEWS_DEPLOYMENT_TARGET: vercel-production", "Vercel production must build with explicit target identity.");
+requireText(vercelProductionWorkflow, "https://www.nutsnews.com/healthz", "Vercel production must verify the public www alias.");
+requireText(vercelProductionWorkflow, "https://nutsnews.com/healthz", "Vercel production must verify the apex alias.");
+requireText(vercelProductionWorkflow, "deploymentTarget !== \"vercel-production\"", "Vercel production health must verify the production target.");
+
 assert.ok(!workflowNames.includes("production-release.yml"), "Direct production release workflow file must not exist.");
 assert.ok(!workflowNames.includes("production-release-regression.yml"), "Old production release regression workflow file must not exist.");
+assert.ok(workflowNames.includes("vercel-production-release.yml"), "Vercel production must be an explicit post-VPS workflow.");
 for (const [label, text] of [
   ["Container Image", containerWorkflow],
   ["Staging handoff", releaseWorkflow],

@@ -579,6 +579,7 @@ jobs:
       - name: Write staging release metadata
         env:
           IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
+          PRODUCTION_SUPABASE_PROJECT_REF: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF }}
           RELEASE_METADATA_PATH: ${{ runner.temp }}/nutsnews-staging-release/metadata.json
         run: |
           set -euo pipefail
@@ -592,6 +593,7 @@ jobs:
           const sourceCommit = process.env.GITHUB_SHA ?? "";
           const sourceWorkflowRunId = process.env.GITHUB_RUN_ID ?? "";
           const buildId = `${process.env.GITHUB_RUN_ID ?? ""}-${process.env.GITHUB_RUN_ATTEMPT ?? ""}`;
+          const productionSupabaseProjectRef = process.env.PRODUCTION_SUPABASE_PROJECT_REF ?? "";
           const metadataPath = process.env.RELEASE_METADATA_PATH ?? "";
 
           if (!/^[0-9a-f]{40}$/.test(sourceCommit)) {
@@ -605,6 +607,9 @@ jobs:
           }
           if (buildId.split("-", 1)[0] !== sourceWorkflowRunId) {
             throw new Error("Release metadata build ID must belong to the source workflow run.");
+          }
+          if (!/^[a-z0-9]{20}$/.test(productionSupabaseProjectRef)) {
+            throw new Error("Release metadata requires the production Supabase project reference.");
           }
 
           const [migrationContract, applicationContract] = await Promise.all([
@@ -628,6 +633,7 @@ jobs:
             image: `${imageRepository}@${digest}`,
             migration_head: migrationContract.head,
             schema_version: applicationContract.legacyVersion,
+            supabase_project_ref: productionSupabaseProjectRef,
           };
 
           mkdirSync(dirname(metadataPath), { recursive: true });
