@@ -5,7 +5,7 @@ import {
   dedupeArticlesByIdentity,
   getArticleIdentityKey,
 } from "@/lib/articleIdentity";
-import type { Article } from "@/lib/articles";
+import type { Article, FeedDegradationStatus } from "@/lib/articles";
 import {
   DEFAULT_LANGUAGE_CODE,
   LANGUAGE_CHANGE_EVENT,
@@ -26,6 +26,7 @@ type ArticleFeedProps = {
   initialNextPage: number | null;
   initialNextCursor: string | null;
   initialCategorySections: ArticleCategorySection[];
+  initialDegradation?: FeedDegradationStatus | null;
 };
 
 type ArticlesResponse = {
@@ -33,6 +34,7 @@ type ArticlesResponse = {
   nextPage: number | null;
   nextCursor: string | null;
   error?: string;
+  degradation?: FeedDegradationStatus | null;
 };
 
 type HomeFeedResponse = ArticlesResponse & {
@@ -60,6 +62,7 @@ type FeedCopy = {
   loadingMore: string;
   readFullStory: string;
   emptyFeed: string;
+  maintenanceFeed: string;
   loadError: string;
   tryAgain: string;
   topStories: string;
@@ -90,6 +93,8 @@ export const copyByLanguage: Record<LanguageCode, FeedCopy> = {
     readFullStory: "Read full story",
     emptyFeed:
       "No uplifting stories are available yet. Please check back soon.",
+    maintenanceFeed:
+      "NutsNews is refreshing the feed right now. Please check back soon.",
     loadError: "Could not load more stories.",
     tryAgain: "Try again",
     topStories: "Top Stories",
@@ -116,6 +121,8 @@ export const copyByLanguage: Record<LanguageCode, FeedCopy> = {
     readFullStory: "Lire l’article complet",
     emptyFeed:
       "Aucune histoire positive n’est disponible pour le moment. Revenez bientôt.",
+    maintenanceFeed:
+      "NutsNews actualise le fil en ce moment. Revenez bientôt.",
     loadError: "Impossible de charger plus d’histoires.",
     tryAgain: "Réessayer",
     topStories: "À la une",
@@ -142,6 +149,8 @@ export const copyByLanguage: Record<LanguageCode, FeedCopy> = {
     readFullStory: "元の記事を読む",
     emptyFeed:
       "前向きなストーリーはまだありません。しばらくしてからご確認ください。",
+    maintenanceFeed:
+      "NutsNewsは現在フィードを更新しています。しばらくしてからご確認ください。",
     loadError: "ストーリーを読み込めませんでした。",
     tryAgain: "もう一度試す",
     topStories: "トップストーリー",
@@ -168,6 +177,8 @@ export const copyByLanguage: Record<LanguageCode, FeedCopy> = {
     readFullStory: "Ganze Geschichte lesen",
     emptyFeed:
       "Im Moment sind keine positiven Geschichten verfügbar. Schau bald wieder vorbei.",
+    maintenanceFeed:
+      "NutsNews aktualisiert gerade den Feed. Schau bald wieder vorbei.",
     loadError: "Weitere Geschichten konnten nicht geladen werden.",
     tryAgain: "Erneut versuchen",
     topStories: "Top-Geschichten",
@@ -194,6 +205,8 @@ export const copyByLanguage: Record<LanguageCode, FeedCopy> = {
     readFullStory: "Ganze Geschichte lesen",
     emptyFeed:
       "Im Moment sind keine positiven Geschichten verfügbar. Schau bald wieder vorbei.",
+    maintenanceFeed:
+      "NutsNews aktualisiert gerade den Feed. Schau bald wieder vorbei.",
     loadError: "Weitere Geschichten konnten nicht geladen werden.",
     tryAgain: "Erneut versuchen",
     topStories: "Top-Geschichten",
@@ -220,6 +233,8 @@ export const copyByLanguage: Record<LanguageCode, FeedCopy> = {
     readFullStory: "Διαβάστε ολόκληρη την ιστορία",
     emptyFeed:
       "Δεν υπάρχουν ακόμα θετικές ιστορίες. Ελέγξτε ξανά σύντομα.",
+    maintenanceFeed:
+      "Το NutsNews ανανεώνει τη ροή αυτή τη στιγμή. Ελέγξτε ξανά σύντομα.",
     loadError: "Δεν ήταν δυνατή η φόρτωση περισσότερων ιστοριών.",
     tryAgain: "Δοκιμάστε ξανά",
     topStories: "Κύριες ιστορίες",
@@ -458,6 +473,7 @@ export function ArticleFeed({
   initialNextPage,
   initialNextCursor,
   initialCategorySections,
+  initialDegradation = null,
 }: ArticleFeedProps) {
   const initialUniqueArticles = useMemo(
     () => dedupeArticlesByIdentity(initialArticles),
@@ -478,6 +494,8 @@ export function ArticleFeed({
     DEFAULT_LANGUAGE_CODE,
   );
   const [categorySections, setCategorySections] = useState(initialUniqueCategorySections);
+  const [feedDegradation, setFeedDegradation] =
+    useState<FeedDegradationStatus | null>(initialDegradation);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -486,8 +504,11 @@ export function ArticleFeed({
   const initialEnglishNextPageRef = useRef(initialNextPage);
   const initialEnglishNextCursorRef = useRef(initialNextCursor);
   const initialEnglishCategorySectionsRef = useRef(initialUniqueCategorySections);
+  const initialEnglishDegradationRef = useRef(initialDegradation);
 
   const copy = copyByLanguage[selectedLanguage];
+  const emptyFeedMessage =
+    feedDegradation?.mode === "maintenance" ? copy.maintenanceFeed : copy.emptyFeed;
 
   const frontPage = useMemo(
     () => ({
@@ -617,6 +638,7 @@ export function ArticleFeed({
         setCategorySections(
           dedupeCategorySectionsForPage(data.sections, uniqueArticles),
         );
+        setFeedDegradation(data.degradation ?? null);
         document.documentElement.lang = languageCode;
       } catch (error) {
         setLoadError(
@@ -662,6 +684,7 @@ export function ArticleFeed({
         setNextPage(initialEnglishNextPageRef.current);
         setNextCursor(initialEnglishNextCursorRef.current);
         setCategorySections(initialEnglishCategorySectionsRef.current);
+        setFeedDegradation(initialEnglishDegradationRef.current);
         setLoadError(null);
         document.documentElement.lang = DEFAULT_LANGUAGE_CODE;
         return;
@@ -749,7 +772,7 @@ export function ArticleFeed({
 
       {articles.length === 0 && !isLoading ? (
         <div className="empty-feed-card px-5 py-8 text-center">
-          <p className="text-sm font-semibold">{copy.emptyFeed}</p>
+          <p className="text-sm font-semibold">{emptyFeedMessage}</p>
         </div>
       ) : null}
 
@@ -820,7 +843,7 @@ export function ArticleFeed({
             </div>
           ) : (
             <div className="empty-feed-card mt-5 px-5 py-8 text-center">
-              <p className="text-sm font-semibold">{copy.emptyFeed}</p>
+              <p className="text-sm font-semibold">{emptyFeedMessage}</p>
             </div>
           )}
         </section>

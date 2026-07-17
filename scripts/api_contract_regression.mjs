@@ -191,6 +191,7 @@ const languagesMock = {
 const loggerMock = {
   async logError() {},
   async logInfoSampled() {},
+  async logWarn() {},
 };
 
 async function testArticlesApiContract() {
@@ -219,6 +220,29 @@ async function testArticlesApiContract() {
       },
     },
     "@/lib/edgeFeedSnapshot": {
+      createMaintenanceHomeFeedPayload(languageCode) {
+        return {
+          articles: [],
+          nextPage: null,
+          nextCursor: null,
+          dataSource: "articles_fallback",
+          languageCode,
+          sections: [],
+          degradation: {
+            mode: "maintenance",
+            reason: "home_feed_exception",
+            message: "NutsNews is showing a maintenance state while the public feed dependencies recover.",
+            services: {
+              supabase: "unavailable",
+              edgeSnapshot: "unavailable",
+              worker: "unknown",
+              localAi: "unknown",
+              translations: "unknown",
+            },
+            loggedAt: "2026-07-16T00:00:00.000Z",
+          },
+        };
+      },
       async getEdgeFeedSnapshotPage() {
         throw new Error("edge fallback should not be used in happy path");
       },

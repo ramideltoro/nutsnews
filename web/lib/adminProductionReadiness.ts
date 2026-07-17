@@ -424,6 +424,89 @@ function buildPublicApiSignal({
   });
 }
 
+function buildGracefulDegradationSignal({
+  publicFeedSnapshotCount,
+  recentArticles,
+  workerRun,
+  now,
+}: {
+  publicFeedSnapshotCount: number;
+  recentArticles: RecentArticleRow[];
+  workerRun: WorkerRunRow | null;
+  now: Date;
+}) {
+  const lastRunAt = workerRun?.run_started_at || workerRun?.run_completed_at || null;
+  const workerAgeMinutes = minutesSince(lastRunAt, now);
+  const snapshotReady = publicFeedSnapshotCount >= PAGE_SIZE;
+  const sourceFallbackReady = recentArticles.length >= PAGE_SIZE;
+  const workerFresh =
+    Boolean(workerRun?.success) &&
+    workerAgeMinutes !== null &&
+    workerAgeMinutes <= WORKER_STALE_WARNING_MINUTES;
+
+  if (snapshotReady && workerFresh) {
+    return signal({
+      id: "graceful-degradation",
+      title: "Graceful degradation mode",
+      status: "green",
+      statusLabel: "Protected",
+      value: "Snapshot ready",
+      detail:
+        "The reader has a full public_feed_snapshot and the latest Worker run is fresh, so a short Supabase, Worker, or local-AI outage can fall back without showing a broken home feed.",
+      nextStep:
+        "Keep watching edge snapshot age, Worker shard health, and local AI fallback counts during incidents.",
+      href: "/admin/edge-snapshot",
+      linkLabel: "Open edge snapshot",
+    });
+  }
+
+  if (snapshotReady) {
+    return signal({
+      id: "graceful-degradation",
+      title: "Graceful degradation mode",
+      status: "yellow",
+      statusLabel: "Reader protected",
+      value: "Feed frozen",
+      detail:
+        "The reader can still serve the last-known-good public feed, but Worker or local-AI health needs review before relying on fresh ingestion.",
+      nextStep:
+        "Open Worker shard health and local AI dashboards, then confirm failed AI reviews are falling back or being skipped without blocking all article saves.",
+      href: "/admin/shards",
+      linkLabel: "Open Worker health",
+    });
+  }
+
+  if (sourceFallbackReady) {
+    return signal({
+      id: "graceful-degradation",
+      title: "Graceful degradation mode",
+      status: "yellow",
+      statusLabel: "DB fallback",
+      value: "No snapshot",
+      detail:
+        "public_feed_snapshot is not ready, but the canonical articles table can still provide a first page. A Supabase read outage would leave only the edge snapshot or maintenance state.",
+      nextStep:
+        "Refresh public_feed_snapshot and verify Cloudflare edge snapshot status before the next incident.",
+      href: "/admin/edge-snapshot",
+      linkLabel: "Open edge snapshot",
+    });
+  }
+
+  return signal({
+    id: "graceful-degradation",
+    title: "Graceful degradation mode",
+    status: "red",
+    statusLabel: "Blocked",
+    value: "No fallback",
+    detail:
+      "No full public snapshot or source-table first page is available. A Supabase, Worker, or local-AI outage would put the reader into maintenance mode.",
+    nextStep:
+      "Restore Worker ingestion, refresh public_feed_snapshot, and confirm local AI failures do not prevent article saves.",
+    href: "/admin/shards",
+    linkLabel: "Open Worker health",
+  });
+}
+
 function buildWorkerSignal(workerRun: WorkerRunRow | null, now: Date) {
   if (!workerRun) {
     return signal({
@@ -1163,6 +1246,12 @@ export async function getAdminProductionReadinessDashboardData(): Promise<Produc
     const ciSignal = await buildCiSignal();
     const signals = [
       buildPublicApiSignal({ publicFeedSnapshotCount, recentArticles }),
+      buildGracefulDegradationSignal({
+        publicFeedSnapshotCount,
+        recentArticles,
+        workerRun,
+        now,
+      }),
       buildWorkerSignal(workerRun, now),
       buildDbGrowthSignal({
         articleCount,

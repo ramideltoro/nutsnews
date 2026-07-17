@@ -21,6 +21,7 @@ const packageJson = JSON.parse(read("web/package.json"));
 
 for (const required of [
   "Public API health",
+  "Graceful degradation mode",
   "Latest Worker/controller success",
   "DB growth signal",
   "Translation coverage",

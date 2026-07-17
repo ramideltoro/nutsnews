@@ -6,6 +6,8 @@ import {
   HOME_FEED_SECTIONS,
   PAGE_SIZE,
   type Article,
+  type FeedDependencyState,
+  type FeedDegradationStatus,
   type HomeFeedPayload,
   type PublicFeedEdgeSnapshotMetadata,
   type PublishedArticlesResult,
@@ -19,6 +21,7 @@ import {
   normalizeLanguageCode,
   type LanguageCode,
 } from "@/lib/languages";
+import { logWarn } from "@/lib/logger";
 
 const EDGE_SNAPSHOT_URL_ENV_KEYS = [
   "NUTSNEWS_EDGE_FEED_SNAPSHOT_URL",
@@ -50,6 +53,17 @@ export type EdgeFeedSnapshotStatus = PublicFeedEdgeSnapshotMetadata & {
   articleCount: number | null;
   maxArticles?: number | null;
   refreshedAt?: string | null;
+};
+
+type HomeFeedDegradationOptions = {
+  mode: FeedDegradationStatus["mode"];
+  reason: string;
+  message: string;
+  supabase?: FeedDependencyState;
+  edgeSnapshot?: FeedDependencyState;
+  worker?: FeedDependencyState;
+  localAi?: FeedDependencyState;
+  translations?: FeedDependencyState;
 };
 
 function getConfiguredEdgeSnapshotBaseUrl() {
@@ -101,6 +115,81 @@ function normalizeEdgeArticles(articles: Article[], requestedLanguageCode: Langu
     requested_language_code: requestedLanguageCode,
     translation_available: requestedLanguageCode === DEFAULT_LANGUAGE_CODE,
   }));
+}
+
+function buildHomeFeedDegradationStatus({
+  mode,
+  reason,
+  message,
+  supabase = "unknown",
+  edgeSnapshot = "unknown",
+  worker = "unknown",
+  localAi = "unknown",
+  translations = "unknown",
+}: HomeFeedDegradationOptions): FeedDegradationStatus {
+  return {
+    mode,
+    reason,
+    message,
+    services: {
+      supabase,
+      edgeSnapshot,
+      worker,
+      localAi,
+      translations,
+    },
+    loggedAt: new Date().toISOString(),
+  };
+}
+
+function emptyHomeFeedSections(): HomeFeedPayload["sections"] {
+  return HOME_FEED_SECTIONS.map((section) => ({
+    id: section.id,
+    articles: [],
+  }));
+}
+
+async function logHomeFeedDegradation(
+  event: string,
+  message: string,
+  fields: Record<string, unknown> = {},
+) {
+  try {
+    await logWarn(event, message, {
+      route: "home-feed",
+      ...fields,
+    });
+  } catch (error) {
+    console.warn("Failed to log home feed degradation event:", error);
+  }
+}
+
+export function createMaintenanceHomeFeedPayload(
+  requestedLanguageCode?: string | null,
+  options: Partial<HomeFeedDegradationOptions> = {},
+): HomeFeedPayload {
+  const languageCode = normalizeLanguageCode(requestedLanguageCode);
+
+  return {
+    articles: [],
+    nextPage: null,
+    nextCursor: null,
+    dataSource: "articles_fallback",
+    languageCode,
+    sections: emptyHomeFeedSections(),
+    degradation: buildHomeFeedDegradationStatus({
+      mode: "maintenance",
+      reason: "no_public_feed_data",
+      message:
+        "NutsNews is showing a maintenance state while the public feed dependencies recover.",
+      supabase: "unavailable",
+      edgeSnapshot: "unavailable",
+      worker: "unknown",
+      localAi: "unknown",
+      translations: "unknown",
+      ...options,
+    }),
+  };
 }
 
 function buildEdgeMetadata(response: Response, endpoint: string): PublicFeedEdgeSnapshotMetadata {
@@ -231,24 +320,55 @@ export async function getPublishedArticlesWithEdgeFallback(
 export async function getHomeFeedDataWithEdgeFallback(
   requestedLanguageCode?: string | null,
 ): Promise<HomeFeedPayload> {
-  const snapshotResult = await getHomeFeedFromSnapshot(requestedLanguageCode);
+  let snapshotResult: HomeFeedPayload | null = null;
+
+  try {
+    snapshotResult = await getHomeFeedFromSnapshot(requestedLanguageCode);
+  } catch (error) {
+    await logHomeFeedDegradation(
+      "web.home_feed.snapshot_read_failed",
+      "Homepage public feed snapshot read failed before fallback.",
+      {
+        languageCode: normalizeLanguageCode(requestedLanguageCode),
+        errorMessage: error instanceof Error ? error.message : String(error),
+      },
+    );
+  }
 
   if (snapshotResult) {
     return snapshotResult;
   }
 
-  const [mainResult, sections] = await Promise.all([
-    getPublishedArticlesWithEdgeFallback(0, null, requestedLanguageCode),
-    Promise.all(
-      HOME_FEED_SECTIONS.map(async (section) => ({
-        id: section.id,
-        articles: await getPublishedArticlesForSectionWithEdgeFallback(
-          section.query,
-          requestedLanguageCode,
-        ),
-      })),
-    ),
-  ]);
+  let mainResult: PublishedArticlesResult;
+  let sections: HomeFeedPayload["sections"];
+
+  try {
+    [mainResult, sections] = await Promise.all([
+      getPublishedArticlesWithEdgeFallback(0, null, requestedLanguageCode),
+      Promise.all(
+        HOME_FEED_SECTIONS.map(async (section) => ({
+          id: section.id,
+          articles: await getPublishedArticlesForSectionWithEdgeFallback(
+            section.query,
+            requestedLanguageCode,
+          ),
+        })),
+      ),
+    ]);
+  } catch (error) {
+    await logHomeFeedDegradation(
+      "web.home_feed.fallback_read_failed",
+      "Homepage fallback reads failed; returning maintenance payload.",
+      {
+        languageCode: normalizeLanguageCode(requestedLanguageCode),
+        errorMessage: error instanceof Error ? error.message : String(error),
+      },
+    );
+
+    return createMaintenanceHomeFeedPayload(requestedLanguageCode, {
+      reason: "home_feed_exception",
+    });
+  }
   const seenArticleKeys = new Set(
     mainResult.articles
       .map((article) => getArticleIdentityKey(article))
@@ -277,11 +397,69 @@ export async function getHomeFeedDataWithEdgeFallback(
     };
   });
 
-  return {
+  const payload: HomeFeedPayload = {
     ...mainResult,
     nextPage: mainResult.nextCursor ? null : mainResult.nextPage,
     sections: uniqueSections,
   };
+  const hasAnyArticles =
+    payload.articles.length > 0 ||
+    payload.sections.some((section) => section.articles.length > 0);
+
+  if (!hasAnyArticles) {
+    await logHomeFeedDegradation(
+      "web.home_feed.maintenance_returned",
+      "Homepage feed returned maintenance state after all public feed sources were empty.",
+      {
+        languageCode: payload.languageCode,
+        dataSource: payload.dataSource,
+      },
+    );
+
+    return {
+      ...payload,
+      degradation: buildHomeFeedDegradationStatus({
+        mode: "maintenance",
+        reason: "no_public_feed_data",
+        message:
+          "NutsNews is showing a maintenance state while the public feed dependencies recover.",
+        supabase: "unavailable",
+        edgeSnapshot: "unavailable",
+        worker: "unknown",
+        localAi: "unknown",
+        translations: "unknown",
+      }),
+    };
+  }
+
+  if (payload.dataSource === "edge_feed_snapshot") {
+    await logHomeFeedDegradation(
+      "web.home_feed.edge_snapshot_degraded",
+      "Homepage feed recovered from the Cloudflare edge feed snapshot.",
+      {
+        languageCode: payload.languageCode,
+        articleCount: payload.articles.length,
+        edgeSnapshotAgeSeconds: payload.edgeSnapshot?.ageSeconds ?? null,
+      },
+    );
+
+    return {
+      ...payload,
+      degradation: buildHomeFeedDegradationStatus({
+        mode: "degraded",
+        reason: "edge_snapshot_fallback",
+        message:
+          "NutsNews is serving the last-known-good public feed while Supabase recovers.",
+        supabase: "unavailable",
+        edgeSnapshot: "available",
+        worker: "unknown",
+        localAi: "unknown",
+        translations: "degraded",
+      }),
+    };
+  }
+
+  return payload;
 }
 
 export async function getPublishedArticlesForSectionWithEdgeFallback(

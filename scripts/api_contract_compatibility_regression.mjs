@@ -381,6 +381,32 @@ function homeSections(languageCode = "en") {
   }));
 }
 
+function maintenanceHomeFeed(languageCode = "en") {
+  return {
+    ...articleResult({
+      articles: [],
+      nextPage: null,
+      nextCursor: null,
+      dataSource: "articles_fallback",
+      languageCode,
+    }),
+    sections: HOME_SECTION_IDS.map((id) => ({ id, articles: [] })),
+    degradation: {
+      mode: "maintenance",
+      reason: "home_feed_exception",
+      message: "NutsNews is showing a maintenance state while the public feed dependencies recover.",
+      services: {
+        supabase: "unavailable",
+        edgeSnapshot: "unavailable",
+        worker: "unknown",
+        localAi: "unknown",
+        translations: "unknown",
+      },
+      loggedAt: "2026-07-16T00:00:00.000Z",
+    },
+  };
+}
+
 function loadArticlesRoute(overrides = {}) {
   return loadModule("web/app/api/articles/route.ts", {
     "next/server": nextServerMock(),
@@ -391,6 +417,8 @@ function loadArticlesRoute(overrides = {}) {
       ...overrides.articles,
     },
     "@/lib/edgeFeedSnapshot": {
+      createMaintenanceHomeFeedPayload: (languageCode) =>
+        maintenanceHomeFeed(languageCode),
       getEdgeFeedSnapshotPage: async () => null,
       getHomeFeedDataWithEdgeFallback: async (languageCode) => ({
         ...articleResult({ languageCode, nextPage: null, nextCursor: "home-next-cursor" }),
@@ -722,6 +750,8 @@ async function testHomeFeedContract() {
     "next/server": nextServerMock(),
     "@/lib/cacheHeaders": cacheHeadersMock,
     "@/lib/edgeFeedSnapshot": {
+      createMaintenanceHomeFeedPayload: (languageCode) =>
+        maintenanceHomeFeed(languageCode),
       async getHomeFeedDataWithEdgeFallback(languageCode) {
         calls.push(languageCode);
         return {
@@ -753,6 +783,8 @@ async function testHomeFeedContract() {
     "next/server": nextServerMock(),
     "@/lib/cacheHeaders": cacheHeadersMock,
     "@/lib/edgeFeedSnapshot": {
+      createMaintenanceHomeFeedPayload: (languageCode) =>
+        maintenanceHomeFeed(languageCode),
       async getHomeFeedDataWithEdgeFallback(languageCode) {
         return {
           ...articleResult({ languageCode, articles: [], nextPage: null, nextCursor: null }),
@@ -776,6 +808,8 @@ async function testHomeFeedContract() {
     "next/server": nextServerMock(),
     "@/lib/cacheHeaders": cacheHeadersMock,
     "@/lib/edgeFeedSnapshot": {
+      createMaintenanceHomeFeedPayload: (languageCode) =>
+        maintenanceHomeFeed(languageCode),
       async getHomeFeedDataWithEdgeFallback() {
         throw new Error("feed unavailable");
       },
@@ -784,9 +818,15 @@ async function testHomeFeedContract() {
     "@/lib/logger": loggerMock,
   });
   const failedResponse = await failedRoute.GET(new Request("https://www.nutsnews.com/api/home-feed"));
-  assertStatus(failedResponse, 500, "/api/home-feed error");
-  assert.match(failedResponse.headers.get("cache-control") ?? "", /no-store/);
-  assertArticleErrorPayload(await responseJson(failedResponse), "/api/home-feed error payload", { home: true });
+  assertStatus(failedResponse, 200, "/api/home-feed maintenance");
+  assert.match(failedResponse.headers.get("cache-control") ?? "", /s-maxage=300/);
+  assert.equal(failedResponse.headers.get("x-nutsnews-degradation-mode"), "maintenance");
+  assert.equal(failedResponse.headers.get("x-nutsnews-degradation-reason"), "home_feed_exception");
+  const failedPayload = await responseJson(failedResponse);
+  assertArticlePayloadContract(failedPayload, "/api/home-feed maintenance payload");
+  assertHomeSectionsContract(failedPayload.sections, "/api/home-feed maintenance sections");
+  assert.equal(failedPayload.degradation?.mode, "maintenance");
+  assert.equal(failedPayload.degradation?.reason, "home_feed_exception");
 }
 
 async function testSearchContract() {

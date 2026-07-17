@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => {
     authPost: vi.fn(),
     assertExternalSideEffect: vi.fn(),
     assertOAuthCallback: vi.fn(),
+    createMaintenanceHomeFeedPayload: vi.fn(),
     getEdgeFeedSnapshotPage: vi.fn(),
     getHomeFeedDataWithEdgeFallback: vi.fn(),
     getPublishedArticlesByCursor: vi.fn(),
@@ -24,6 +25,7 @@ const mocks = vi.hoisted(() => {
     isRuntimeFeatureFlagEnabled: vi.fn(),
     logError: vi.fn(),
     logInfoSampled: vi.fn(),
+    logWarn: vi.fn(),
     recordQuotaUsageEvent: vi.fn(),
     runtimeSafetyError: MockRuntimeSafetyError,
     searchPublishedArticles: vi.fn(),
@@ -55,6 +57,7 @@ vi.mock("@/lib/articles", () => ({
 }));
 
 vi.mock("@/lib/edgeFeedSnapshot", () => ({
+  createMaintenanceHomeFeedPayload: mocks.createMaintenanceHomeFeedPayload,
   getEdgeFeedSnapshotPage: mocks.getEdgeFeedSnapshotPage,
   getHomeFeedDataWithEdgeFallback: mocks.getHomeFeedDataWithEdgeFallback,
   getPublishedArticlesWithEdgeFallback: mocks.getPublishedArticlesWithEdgeFallback,
@@ -63,6 +66,7 @@ vi.mock("@/lib/edgeFeedSnapshot", () => ({
 vi.mock("@/lib/logger", () => ({
   logError: mocks.logError,
   logInfoSampled: mocks.logInfoSampled,
+  logWarn: mocks.logWarn,
 }));
 
 vi.mock("@/lib/quotaUsage", () => ({
@@ -121,6 +125,30 @@ function homeFeedResult(overrides: JsonValue = {}) {
   };
 }
 
+function maintenanceHomeFeedResult(overrides: JsonValue = {}) {
+  return homeFeedResult({
+    articles: [],
+    nextPage: null,
+    nextCursor: null,
+    dataSource: "articles_fallback",
+    sections: [{ id: "community", articles: [] }],
+    degradation: {
+      mode: "maintenance",
+      reason: "home_feed_exception",
+      message: "NutsNews is showing a maintenance state while the public feed dependencies recover.",
+      services: {
+        supabase: "unavailable",
+        edgeSnapshot: "unavailable",
+        worker: "unknown",
+        localAi: "unknown",
+        translations: "unknown",
+      },
+      loggedAt: "2026-07-16T00:00:00.000Z",
+    },
+    ...overrides,
+  });
+}
+
 function request(url: string, init?: RequestInit) {
   return new Request(url, init);
 }
@@ -135,6 +163,7 @@ beforeEach(() => {
   mocks.authPost.mockResolvedValue(Response.json({ ok: true, method: "POST" }));
   mocks.assertExternalSideEffect.mockReturnValue(undefined);
   mocks.assertOAuthCallback.mockReturnValue(undefined);
+  mocks.createMaintenanceHomeFeedPayload.mockImplementation(() => maintenanceHomeFeedResult());
   mocks.getEdgeFeedSnapshotPage.mockResolvedValue(null);
   mocks.getHomeFeedDataWithEdgeFallback.mockResolvedValue(homeFeedResult());
   mocks.getPublishedArticlesByCursor.mockResolvedValue(publicArticlesResult({ nextCursor: null }));
@@ -213,6 +242,28 @@ describe("public article route handlers", () => {
     expect(response.headers.get("cache-control")).toContain("s-maxage=300");
     expect(response.headers.get("x-nutsnews-cache-policy")).toBe("public-home-feed-cache-3600s");
     expect(mocks.getHomeFeedDataWithEdgeFallback).toHaveBeenCalledWith("fr");
+  });
+
+  it("returns a maintenance home feed when all home-feed sources fail", async () => {
+    mocks.getHomeFeedDataWithEdgeFallback.mockRejectedValueOnce(new Error("feed unavailable"));
+
+    const { GET } = await import("@/app/api/home-feed/route");
+
+    const response = await GET(request("https://www.nutsnews.com/api/home-feed"));
+    const body = await json(response);
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      articles: [],
+      sections: [{ id: "community", articles: [] }],
+      degradation: {
+        mode: "maintenance",
+        reason: "home_feed_exception",
+      },
+    });
+    expect(response.headers.get("x-nutsnews-cache-policy")).toBe("public-home-feed-cache-3600s");
+    expect(response.headers.get("x-nutsnews-degradation-mode")).toBe("maintenance");
+    expect(response.headers.get("x-nutsnews-degradation-reason")).toBe("home_feed_exception");
   });
 });
 

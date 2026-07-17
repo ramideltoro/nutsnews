@@ -5,8 +5,10 @@ import {
   getPublishedArticlesByCursor,
   PAGE_SIZE,
   type PublishedArticlesResult,
+  type FeedDegradationStatus,
 } from "@/lib/articles";
 import {
+  createMaintenanceHomeFeedPayload,
   getEdgeFeedSnapshotPage,
   getHomeFeedDataWithEdgeFallback,
   getPublishedArticlesWithEdgeFallback,
@@ -17,7 +19,7 @@ import {
   BYPASS_CACHE_HEADERS,
   PUBLIC_CDN_S_MAXAGE_SECONDS,
 } from "@/lib/cacheHeaders";
-import { logError, logInfoSampled } from "@/lib/logger";
+import { logError, logInfoSampled, logWarn } from "@/lib/logger";
 
 export const revalidate = 900;
 
@@ -49,6 +51,16 @@ function buildArticleApiHeaders({
     "X-NutsNews-Feed-Snapshot": feedSnapshotStatus,
     "X-NutsNews-Edge-Snapshot": result.edgeSnapshot?.status ?? "not-used",
   };
+
+  const degradation =
+    (result as PublishedArticlesResult & {
+      degradation?: FeedDegradationStatus | null;
+    }).degradation ?? null;
+
+  if (degradation) {
+    headers["X-NutsNews-Degradation-Mode"] = degradation.mode;
+    headers["X-NutsNews-Degradation-Reason"] = degradation.reason;
+  }
 
   if (result.edgeSnapshot?.updatedAt) {
     headers["X-NutsNews-Edge-Snapshot-Updated-At"] = result.edgeSnapshot.updatedAt;
@@ -196,13 +208,46 @@ export async function GET(request: Request) {
       }
     }
 
+    if (homeMode) {
+      const result = createMaintenanceHomeFeedPayload(languageCode, {
+        reason: "home_feed_exception",
+      });
+
+      await logWarn(
+        "api.articles.home_maintenance_returned",
+        "Articles API home mode returned a maintenance payload after all feed sources failed.",
+        {
+          route: "/api/articles",
+          method: "GET",
+          status: 200,
+          homeMode,
+          paginationMode,
+          languageCode,
+          degradationMode: result.degradation?.mode ?? null,
+          degradationReason: result.degradation?.reason ?? null,
+          durationMs: Date.now() - startedAt,
+        },
+      );
+
+      return NextResponse.json(result, {
+        status: 200,
+        headers: {
+          ...buildArticleApiHeaders({
+            result,
+            paginationMode,
+            languageCode,
+          }),
+          "X-NutsNews-Cache-Policy": `public-home-feed-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`,
+        },
+      });
+    }
+
     return NextResponse.json(
       {
         articles: [],
         nextPage: null,
         nextCursor: null,
-        ...(homeMode ? { sections: [] } : {}),
-        error: homeMode ? "Failed to load home feed" : "Failed to load articles",
+        error: "Failed to load articles",
       },
       {
         status: 500,

@@ -9,7 +9,11 @@ import { HomeArrivalAnimation } from "./components/HomeArrivalAnimation";
 import { NewspaperPrimaryNav } from "./components/NewspaperPrimaryNav";
 import { SiteFooter } from "./components/SiteFooter";
 import { SITE_URL } from "@/lib/articles";
-import { getHomeFeedDataWithEdgeFallback } from "@/lib/edgeFeedSnapshot";
+import {
+  createMaintenanceHomeFeedPayload,
+  getHomeFeedDataWithEdgeFallback,
+} from "@/lib/edgeFeedSnapshot";
+import { logError } from "@/lib/logger";
 
 const getCachedHomeFeed = unstable_cache(
   async () => getHomeFeedDataWithEdgeFallback(),
@@ -37,6 +41,27 @@ function shouldBypassHomeFeedCacheForQualification(
   );
 }
 
+async function getSafeHomeFeedData(useUncachedFeed: boolean) {
+  try {
+    return useUncachedFeed
+      ? await getHomeFeedDataWithEdgeFallback()
+      : await getCachedHomeFeed();
+  } catch (error) {
+    await logError(
+      "web.home_page.home_feed_failed",
+      "Home page returned maintenance feed after home feed data failed.",
+      error,
+      {
+        route: "/",
+      },
+    );
+
+    return createMaintenanceHomeFeedPayload(null, {
+      reason: "home_page_feed_exception",
+    });
+  }
+}
+
 export default async function Home({ searchParams }: HomePageProps) {
   // The immutable container image is built with neutral fixtures. Defer this
   // route only outside Vercel so the running image reads its target's feed,
@@ -46,10 +71,10 @@ export default async function Home({ searchParams }: HomePageProps) {
   }
 
   const resolvedSearchParams = await searchParams;
-  const { articles, nextPage, nextCursor, sections } =
-    shouldBypassHomeFeedCacheForQualification(resolvedSearchParams)
-      ? await getHomeFeedDataWithEdgeFallback()
-      : await getCachedHomeFeed();
+  const shouldBypassCache =
+    shouldBypassHomeFeedCacheForQualification(resolvedSearchParams);
+  const { articles, nextPage, nextCursor, sections, degradation } =
+    await getSafeHomeFeedData(shouldBypassCache);
 
   const homeJsonLd = {
     "@context": "https://schema.org",
@@ -113,6 +138,7 @@ export default async function Home({ searchParams }: HomePageProps) {
           initialNextPage={nextPage}
           initialNextCursor={nextCursor}
           initialCategorySections={sections}
+          initialDegradation={degradation ?? null}
         />
       </div>
 
