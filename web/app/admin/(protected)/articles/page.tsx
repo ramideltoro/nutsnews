@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import {
+  type AiDecisionVersionReportRow,
   type AdminRecentPublishedArticle,
   type ArticleReviewDashboardData,
   type ArticleReviewDecision,
@@ -33,6 +34,27 @@ function formatDecimal(value: number) {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   }).format(value);
+}
+
+function formatPercent(value: number) {
+  return `${formatDecimal(value)}%`;
+}
+
+function formatSignedDecimal(value: number | null) {
+  if (value === null) {
+    return "n/a";
+  }
+
+  const roundedValue = Math.abs(value) < 0.05 ? 0 : value;
+  const prefix = roundedValue > 0 ? "+" : "";
+
+  return `${prefix}${formatDecimal(roundedValue)}`;
+}
+
+function formatSignedPercent(value: number | null) {
+  const formattedValue = formatSignedDecimal(value);
+
+  return formattedValue === "n/a" ? formattedValue : `${formattedValue}%`;
 }
 
 function formatDateTime(value: string | null) {
@@ -110,7 +132,9 @@ function MetricCard({
         {label}
       </p>
       <h3 className="mt-3 text-3xl font-black text-amber-50">{value}</h3>
-      <p className="mt-2 text-sm leading-6 text-amber-100/60">{helper}</p>
+      <p className="mt-2 break-words text-sm leading-6 text-amber-100/60">
+        {helper}
+      </p>
     </div>
   );
 }
@@ -119,6 +143,7 @@ function QuickNav() {
   const links = [
     ["Summary", "#summary"],
     ["Published", "#published"],
+    ["Versions", "#versions"],
     ["Filters", "#filters"],
     ["Reviews", "#reviews"],
     ["SQL", "#review-sql"],
@@ -149,7 +174,7 @@ function DecisionPill({ decision }: { decision: ArticleReviewDecision }) {
 
   return (
     <span
-      className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${classes}`}
+      className={`inline-flex max-w-full break-all rounded-full border px-3 py-1 text-left text-[10px] font-black uppercase leading-4 tracking-[0.12em] ${classes}`}
     >
       {decision === "accept" ? "Accepted" : "Rejected"}
     </span>
@@ -166,7 +191,7 @@ function ScorePill({ score }: { score: number }) {
 
   return (
     <span
-      className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${classes}`}
+      className={`inline-flex max-w-full break-all rounded-full border px-3 py-1 text-left text-[10px] font-black uppercase leading-4 tracking-[0.12em] ${classes}`}
     >
       Score {formatDecimal(score)}
     </span>
@@ -188,7 +213,7 @@ function StatusPill({
 
   return (
     <span
-      className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${classes[tone]}`}
+      className={`inline-flex max-w-full break-all rounded-full border px-3 py-1 text-left text-[10px] font-black uppercase leading-4 tracking-[0.12em] ${classes[tone]}`}
     >
       {label}
     </span>
@@ -249,6 +274,23 @@ function FilterInput({
       />
     </label>
   );
+}
+
+function VersionWindowPill({ report }: { report: AiDecisionVersionReportRow }) {
+  const label =
+    report.versionWindow === "current"
+      ? "Current"
+      : report.versionWindow === "previous"
+        ? "Previous"
+        : "Historical";
+  const tone =
+    report.versionWindow === "current"
+      ? "ok"
+      : report.versionWindow === "previous"
+        ? "watch"
+        : "neutral";
+
+  return <StatusPill label={label} tone={tone} />;
 }
 
 function ReviewFilters({ data }: { data: ArticleReviewDashboardData }) {
@@ -337,6 +379,182 @@ function ReviewFilters({ data }: { data: ArticleReviewDashboardData }) {
           </Link>
         </div>
       </form>
+    </DashboardSection>
+  );
+}
+
+function getDeltaTone(value: number | null) {
+  if (value === null || Math.abs(value) < 0.05) {
+    return "default";
+  }
+
+  return value > 0 ? "good" : "danger";
+}
+
+function VersionReportCard({
+  report,
+}: {
+  report: AiDecisionVersionReportRow;
+}) {
+  return (
+    <article className="rounded-[1.75rem] border border-amber-300/15 bg-black/30 p-4 shadow-lg shadow-amber-950/10 sm:p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <VersionWindowPill report={report} />
+            <StatusPill
+              label={`Rank ${formatNumber(report.versionRank)}`}
+              tone="neutral"
+            />
+            <StatusPill label={report.aiProviderLabel} tone="neutral" />
+          </div>
+
+          <h3 className="break-all text-xl font-black leading-snug text-amber-50">
+            {report.promptVersion}
+          </h3>
+
+          <p className="mt-2 break-all text-xs font-black uppercase tracking-[0.14em] text-amber-300/70">
+            {report.modelVersion} • {report.aiModel} • Latest{" "}
+            {report.latestReviewedAtLabel}
+          </p>
+        </div>
+
+        <div className="grid min-w-48 gap-2 text-right text-xs text-amber-100/60">
+          <p>
+            <span className="font-black text-amber-50">
+              {formatPercent(report.acceptanceRatePct)}
+            </span>{" "}
+            acceptance
+          </p>
+          <p>
+            <span className="font-black text-amber-50">
+              {formatSignedPercent(report.acceptanceRateDeltaPct)}
+            </span>{" "}
+            vs previous
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 text-xs text-amber-100/55 md:grid-cols-2 xl:grid-cols-4">
+        <p>
+          <span className="font-black uppercase tracking-[0.12em] text-amber-300/70">
+            Reviews:
+          </span>{" "}
+          {formatNumber(report.totalReviews)}
+        </p>
+        <p>
+          <span className="font-black uppercase tracking-[0.12em] text-amber-300/70">
+            Accepted:
+          </span>{" "}
+          {formatNumber(report.acceptedReviews)}
+        </p>
+        <p>
+          <span className="font-black uppercase tracking-[0.12em] text-amber-300/70">
+            Rejected:
+          </span>{" "}
+          {formatNumber(report.rejectedReviews)}
+        </p>
+        <p>
+          <span className="font-black uppercase tracking-[0.12em] text-amber-300/70">
+            Avg Score:
+          </span>{" "}
+          {formatDecimal(report.averagePositivityScore)} (
+          {formatSignedDecimal(report.averageScoreDelta)})
+        </p>
+        <p>
+          <span className="font-black uppercase tracking-[0.12em] text-amber-300/70">
+            Rejection Rate:
+          </span>{" "}
+          {formatPercent(report.rejectionRatePct)} (
+          {formatSignedPercent(report.rejectionRateDeltaPct)})
+        </p>
+        <p>
+          <span className="font-black uppercase tracking-[0.12em] text-amber-300/70">
+            First Review:
+          </span>{" "}
+          {formatAdminDateTime(report.firstReviewedAt, "Unknown")}
+        </p>
+        <p className="break-all">
+          <span className="font-black uppercase tracking-[0.12em] text-amber-300/70">
+            Prompt:
+          </span>{" "}
+          {report.promptVersion}
+        </p>
+        <p className="break-all">
+          <span className="font-black uppercase tracking-[0.12em] text-amber-300/70">
+            Model:
+          </span>{" "}
+          {report.modelVersion}
+        </p>
+      </div>
+    </article>
+  );
+}
+
+function VersionReportsSection({ data }: { data: ArticleReviewDashboardData }) {
+  const current = data.versionReports[0] ?? null;
+  const previous = data.versionReports[1] ?? null;
+
+  return (
+    <DashboardSection
+      id="versions"
+      eyebrow="AI Version Audit"
+      title="Prompt and Model Version Quality"
+      description="Current and previous AI decision versions are grouped by prompt version, model version, provider, and model so acceptance and rejection changes are visible before a rollout becomes hard to trace."
+    >
+      {data.versionReportError ? (
+        <div className="mb-5 rounded-[1.5rem] border border-orange-300/25 bg-orange-400/10 p-4 text-sm font-semibold leading-6 text-orange-100">
+          Version report unavailable: {data.versionReportError}
+        </div>
+      ) : null}
+
+      {current ? (
+        <div className="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard
+            label="Current Acceptance"
+            value={formatPercent(current.acceptanceRatePct)}
+            helper={`${formatNumber(current.totalReviews)} reviews on ${current.promptVersion}.`}
+            tone={current.acceptanceRatePct >= 70 ? "good" : "warning"}
+          />
+          <MetricCard
+            label="Previous Acceptance"
+            value={previous ? formatPercent(previous.acceptanceRatePct) : "n/a"}
+            helper={
+              previous
+                ? `${formatNumber(previous.totalReviews)} reviews on ${previous.promptVersion}.`
+                : "No previous version has been recorded."
+            }
+            tone="default"
+          />
+          <MetricCard
+            label="Acceptance Delta"
+            value={formatSignedPercent(current.acceptanceRateDeltaPct)}
+            helper="Current acceptance rate minus the immediately previous version."
+            tone={getDeltaTone(current.acceptanceRateDeltaPct)}
+          />
+          <MetricCard
+            label="Current Rejects"
+            value={formatNumber(current.rejectedReviews)}
+            helper={`${formatPercent(current.rejectionRatePct)} rejection rate for the current version.`}
+            tone={current.rejectionRatePct > 40 ? "danger" : "default"}
+          />
+        </div>
+      ) : null}
+
+      <div className="grid gap-4">
+        {data.versionReports.length === 0 ? (
+          <div className="rounded-[1.5rem] border border-amber-300/15 bg-black/25 p-5 text-center text-sm text-amber-100/65">
+            No AI decision versions have been recorded yet.
+          </div>
+        ) : (
+          data.versionReports.map((report) => (
+            <VersionReportCard
+              key={`${report.versionRank}-${report.promptVersion}-${report.modelVersion}-${report.aiModel}`}
+              report={report}
+            />
+          ))
+        )}
+      </div>
     </DashboardSection>
   );
 }
@@ -534,6 +752,11 @@ function ArticleReviewCard({ review }: { review: ArticleReviewRow }) {
             />
             <StatusPill label={review.aiModel} tone="neutral" />
             <StatusPill
+              label={`Prompt ${review.promptVersion}`}
+              tone="neutral"
+            />
+            <StatusPill label={`Model ${review.modelVersion}`} tone="neutral" />
+            <StatusPill
               label={review.isPublished ? "Published" : "Not Published"}
               tone={review.isPublished ? "ok" : "neutral"}
             />
@@ -545,7 +768,8 @@ function ArticleReviewCard({ review }: { review: ArticleReviewRow }) {
 
           <p className="mt-2 text-xs font-black uppercase tracking-[0.14em] text-amber-300/70">
             {review.source} • {review.category} • {review.aiProviderLabel} /{" "}
-            {review.aiModel} • Reviewed {review.reviewedAtLabel}
+            {review.aiModel} • Prompt {review.promptVersion} • Reviewed{" "}
+            {review.reviewedAtLabel}
           </p>
 
           {review.publishedArticle && !review.publishedArticle.imageUrl ? (
@@ -598,7 +822,7 @@ function ArticleReviewCard({ review }: { review: ArticleReviewRow }) {
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3 text-xs text-amber-100/55 md:grid-cols-4">
+      <div className="mt-4 grid gap-3 text-xs text-amber-100/55 md:grid-cols-2 xl:grid-cols-3">
         <p>
           <span className="font-black uppercase tracking-[0.12em] text-amber-300/70">
             Reviewed:
@@ -610,6 +834,18 @@ function ArticleReviewCard({ review }: { review: ArticleReviewRow }) {
             Published:
           </span>{" "}
           {formatDateTime(review.publishedArticle?.publishedOnSiteAt ?? null)}
+        </p>
+        <p className="break-all">
+          <span className="font-black uppercase tracking-[0.12em] text-amber-300/70">
+            Prompt:
+          </span>{" "}
+          {review.promptVersion}
+        </p>
+        <p className="break-all">
+          <span className="font-black uppercase tracking-[0.12em] text-amber-300/70">
+            Model:
+          </span>{" "}
+          {review.modelVersion}
         </p>
         <p>
           <span className="font-black uppercase tracking-[0.12em] text-amber-300/70">
@@ -688,7 +924,7 @@ function ReviewSqlSection({ data }: { data: ArticleReviewDashboardData }) {
       id="review-sql"
       eyebrow="Supabase Query"
       title="Review SQL"
-      description="Use these queries in Supabase SQL Editor to reproduce the current published-article freshness view and article-review view."
+      description="Use these queries in Supabase SQL Editor to reproduce the current published-article freshness view, AI version report, and article-review view."
     >
       <div className="grid gap-4">
         <div>
@@ -697,6 +933,15 @@ function ReviewSqlSection({ data }: { data: ArticleReviewDashboardData }) {
           </p>
           <pre className="overflow-x-auto rounded-[1.5rem] border border-amber-300/15 bg-black/45 p-4 text-xs leading-6 text-amber-100/75">
             <code>{data.recentPublishedArticlesSql}</code>
+          </pre>
+        </div>
+
+        <div>
+          <p className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-amber-300/70">
+            AI Version Report
+          </p>
+          <pre className="overflow-x-auto rounded-[1.5rem] border border-amber-300/15 bg-black/45 p-4 text-xs leading-6 text-amber-100/75">
+            <code>{data.versionReportSql}</code>
           </pre>
         </div>
 
@@ -802,6 +1047,7 @@ export default async function AdminArticlesPage({
         <div className="grid gap-5">
           <SummarySection data={data} />
           <PublishedArticlesSection data={data} />
+          <VersionReportsSection data={data} />
           <ReviewFilters data={data} />
           <ReviewsSection data={data} />
           <ReviewSqlSection data={data} />

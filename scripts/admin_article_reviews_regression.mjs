@@ -56,13 +56,13 @@ assert.match(
 
 assert.match(
   articleFeed,
-  /const initialEnglishArticlesRef = useRef\(initialArticles\)/,
+  /const initialEnglishArticlesRef = useRef\(initialUniqueArticles\)/,
   "Article feed must retain the initial English article order for language reset stability.",
 );
 
 assert.match(
   articleFeed,
-  /if \(storedLanguage !== DEFAULT_LANGUAGE_CODE\) \{[\s\S]*forceFresh: true/,
+  /storedLanguage !== DEFAULT_LANGUAGE_CODE \|\|[\s\S]*initialEnglishArticlesRef\.current\.length === 0[\s\S]*void loadLocalizedHomeFeed\(storedLanguage\)/,
   "Article feed must not force-refresh the initial English feed immediately after hydration.",
 );
 

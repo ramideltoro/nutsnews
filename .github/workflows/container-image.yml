@@ -54,7 +54,7 @@ jobs:
                 "Access-Control-Allow-Origin": "*",
                 "Content-Type": "application/json",
               });
-              response.end('[{"legacy_schema_version":"20260712170000","migration_head":"20260717093000","expected_schema_fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","actual_schema_fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]');
+              response.end('[{"legacy_schema_version":"20260712170000","migration_head":"20260717103000","expected_schema_fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","actual_schema_fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]');
               return;
             }
 
