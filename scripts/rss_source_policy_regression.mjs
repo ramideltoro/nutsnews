@@ -23,6 +23,7 @@ const migration = read(
 );
 const migrationContract = read("web/migrationContract.mjs");
 const feedHealthReport = read("scripts/feed_health_report.mjs");
+const containerWorkflow = read(".github/workflows/container-image.yml");
 const packageJson = JSON.parse(read("web/package.json"));
 
 for (const required of [
@@ -54,6 +55,11 @@ assertIncludes(
   migrationContract,
   'MIGRATION_HEAD = "20260717032000"',
   "web/migrationContract.mjs",
+);
+assertIncludes(
+  containerWorkflow,
+  '"migration_head":"20260717032000"',
+  ".github/workflows/container-image.yml",
 );
 assertIncludes(feedHealthReport, "activeGoogleFeedCount", "feed_health_report.mjs");
 assertIncludes(feedHealthReport, "Active Google News RSS feeds", "feed_health_report.mjs");
