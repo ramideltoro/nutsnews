@@ -71,6 +71,8 @@ requireText(vercelProductionWorkflow, "actions/checkout@v5", "Vercel production 
 requireText(vercelProductionWorkflow, "ref: ${{ env.SOURCE_COMMIT }}", "Vercel production must deploy the dispatch source commit.");
 requireText(vercelProductionWorkflow, "vercel@latest build --prod", "Vercel production must use a production build.");
 requireText(vercelProductionWorkflow, "vercel@latest deploy --prebuilt --prod", "Vercel production must deploy the prebuilt production artifact.");
+requireText(vercelProductionWorkflow, "shellSensitiveEnvNames", "Vercel production must sanitize pulled env names that can break the CI shell.");
+requireText(vercelProductionWorkflow, "Removed shell-sensitive Vercel env names before local build.", "Vercel production must report when shell-sensitive env names were sanitized.");
 requireText(vercelProductionWorkflow, "VERCEL_TOKEN", "Vercel production must use the scoped Vercel token secret.");
 requireText(vercelProductionWorkflow, "VERCEL_ORG_ID", "Vercel production must set the Vercel org identity.");
 requireText(vercelProductionWorkflow, "VERCEL_PROJECT_ID", "Vercel production must set the Vercel project identity.");
