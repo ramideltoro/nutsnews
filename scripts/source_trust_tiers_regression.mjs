@@ -73,8 +73,8 @@ for (const required of [
 
 assertIncludes(auditLog, "RSS source trust tier updated", "adminAuditLog.ts");
 assertIncludes(adminHome, "source trust tiers", "admin home");
-assertIncludes(migrationContract, 'MIGRATION_HEAD = "20260717093000"', "web/migrationContract.mjs");
-assertIncludes(containerWorkflow, '"migration_head":"20260717093000"', ".github/workflows/container-image.yml");
+assertIncludes(migrationContract, 'MIGRATION_HEAD = "20260717103000"', "web/migrationContract.mjs");
+assertIncludes(containerWorkflow, '"migration_head":"20260717103000"', ".github/workflows/container-image.yml");
 
 assert.equal(
   packageJson.scripts?.["test:source-trust-tiers"],

@@ -15,7 +15,32 @@ const REVIEW_SELECT_COLUMNS = [
   "reason",
   "ai_provider",
   "ai_model",
+  "prompt_version",
+  "model_version",
   "review_duration_ms",
+].join(",");
+
+const AI_DECISION_VERSION_REPORT_SELECT_COLUMNS = [
+  "version_window",
+  "version_rank",
+  "prompt_version",
+  "model_version",
+  "ai_provider",
+  "ai_model",
+  "total_reviews",
+  "accepted_reviews",
+  "rejected_reviews",
+  "acceptance_rate_pct",
+  "rejection_rate_pct",
+  "average_positivity_score",
+  "previous_acceptance_rate_pct",
+  "previous_rejection_rate_pct",
+  "previous_average_positivity_score",
+  "acceptance_rate_delta_pct",
+  "rejection_rate_delta_pct",
+  "average_score_delta",
+  "first_reviewed_at",
+  "latest_reviewed_at",
 ].join(",");
 
 const PUBLISHED_ARTICLE_SELECT_COLUMNS = [
@@ -35,6 +60,7 @@ const PUBLISHED_ARTICLE_SELECT_COLUMNS = [
 
 export const ARTICLE_REVIEW_PAGE_SIZE = 50;
 export const RECENT_PUBLISHED_ARTICLE_LIMIT = 10;
+export const AI_DECISION_VERSION_REPORT_LIMIT = 20;
 const MAX_OPTION_ROWS = 5000;
 
 type SupabaseConfig = {
@@ -72,7 +98,32 @@ type ArticleReviewDbRow = {
   reason: string | null;
   ai_provider: string | null;
   ai_model: string | null;
+  prompt_version: string | null;
+  model_version: string | null;
   review_duration_ms: number | string | null;
+};
+
+type AiDecisionVersionReportDbRow = {
+  version_window: string | null;
+  version_rank: number | string | null;
+  prompt_version: string | null;
+  model_version: string | null;
+  ai_provider: string | null;
+  ai_model: string | null;
+  total_reviews: number | string | null;
+  accepted_reviews: number | string | null;
+  rejected_reviews: number | string | null;
+  acceptance_rate_pct: number | string | null;
+  rejection_rate_pct: number | string | null;
+  average_positivity_score: number | string | null;
+  previous_acceptance_rate_pct: number | string | null;
+  previous_rejection_rate_pct: number | string | null;
+  previous_average_positivity_score: number | string | null;
+  acceptance_rate_delta_pct: number | string | null;
+  rejection_rate_delta_pct: number | string | null;
+  average_score_delta: number | string | null;
+  first_reviewed_at: string | null;
+  latest_reviewed_at: string | null;
 };
 
 type PublishedArticleDbRow = {
@@ -138,9 +189,36 @@ export type ArticleReviewRow = {
   aiProvider: string;
   aiProviderLabel: string;
   aiModel: string;
+  promptVersion: string;
+  modelVersion: string;
   reviewDurationMs: number;
   isPublished: boolean;
   publishedArticle: ArticleReviewPublishedArticle | null;
+};
+
+export type AiDecisionVersionReportRow = {
+  versionWindow: string;
+  versionRank: number;
+  promptVersion: string;
+  modelVersion: string;
+  aiProvider: string;
+  aiProviderLabel: string;
+  aiModel: string;
+  totalReviews: number;
+  acceptedReviews: number;
+  rejectedReviews: number;
+  acceptanceRatePct: number;
+  rejectionRatePct: number;
+  averagePositivityScore: number;
+  previousAcceptanceRatePct: number | null;
+  previousRejectionRatePct: number | null;
+  previousAveragePositivityScore: number | null;
+  acceptanceRateDeltaPct: number | null;
+  rejectionRateDeltaPct: number | null;
+  averageScoreDelta: number | null;
+  firstReviewedAt: string | null;
+  latestReviewedAt: string | null;
+  latestReviewedAtLabel: string;
 };
 
 export type ArticleReviewSummary = {
@@ -162,6 +240,8 @@ export type ArticleReviewDashboardData = {
   filters: ArticleReviewFilters;
   summary: ArticleReviewSummary;
   reviews: ArticleReviewRow[];
+  versionReports: AiDecisionVersionReportRow[];
+  versionReportError: string | null;
   recentPublishedArticles: AdminRecentPublishedArticle[];
   sourceOptions: string[];
   categoryOptions: string[];
@@ -170,6 +250,7 @@ export type ArticleReviewDashboardData = {
   previousPageHref: string;
   nextPageHref: string;
   reviewSql: string;
+  versionReportSql: string;
   recentPublishedArticlesSql: string;
 };
 
@@ -312,6 +393,8 @@ function emptyDashboardData(
     filters,
     summary: emptySummary(filters),
     reviews: [],
+    versionReports: [],
+    versionReportError: null,
     recentPublishedArticles: [],
     sourceOptions: [],
     categoryOptions: [],
@@ -320,6 +403,7 @@ function emptyDashboardData(
     previousPageHref: buildHref(filters, Math.max(0, filters.page - 1)),
     nextPageHref: buildHref(filters, filters.page + 1),
     reviewSql: buildReviewSql(filters),
+    versionReportSql: buildVersionReportSql(),
     recentPublishedArticlesSql: buildRecentPublishedArticlesSql(),
   };
 }
@@ -366,7 +450,11 @@ function buildReviewSql(filters: ArticleReviewFilters) {
     conditions.push(`positivity_score <= ${filters.maxScore}`);
   }
 
-  return `select\n  reviewed_at,\n  decision,\n  source,\n  category,\n  positivity_score,\n  ai_provider,\n  ai_model,\n  review_duration_ms,\n  title,\n  reason,\n  original_url\nfrom public.article_ai_reviews\nwhere ${conditions.join("\n  and ")}\norder by reviewed_at ${filters.sort === "oldest" ? "asc" : "desc"}\nlimit ${ARTICLE_REVIEW_PAGE_SIZE};`;
+  return `select\n  reviewed_at,\n  decision,\n  source,\n  category,\n  positivity_score,\n  ai_provider,\n  ai_model,\n  prompt_version,\n  model_version,\n  review_duration_ms,\n  title,\n  reason,\n  original_url\nfrom public.article_ai_reviews\nwhere ${conditions.join("\n  and ")}\norder by reviewed_at ${filters.sort === "oldest" ? "asc" : "desc"}\nlimit ${ARTICLE_REVIEW_PAGE_SIZE};`;
+}
+
+function buildVersionReportSql() {
+  return `select\n  version_window,\n  version_rank,\n  prompt_version,\n  model_version,\n  ai_provider,\n  ai_model,\n  total_reviews,\n  accepted_reviews,\n  rejected_reviews,\n  acceptance_rate_pct,\n  rejection_rate_pct,\n  average_positivity_score,\n  acceptance_rate_delta_pct,\n  rejection_rate_delta_pct,\n  average_score_delta,\n  first_reviewed_at,\n  latest_reviewed_at\nfrom public.ai_decision_version_report\norder by version_rank asc\nlimit ${AI_DECISION_VERSION_REPORT_LIMIT};`;
 }
 
 function buildRecentPublishedArticlesSql() {
@@ -430,6 +518,52 @@ function formatProviderLabel(provider: string) {
   return "OpenAI";
 }
 
+function toNullableNumber(value: number | string | null | undefined) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const numericValue = Number(value);
+
+  return Number.isFinite(numericValue) ? numericValue : null;
+}
+
+function mapVersionReportRow(
+  row: AiDecisionVersionReportDbRow,
+): AiDecisionVersionReportRow {
+  const aiProvider = row.ai_provider || "openai";
+  const latestReviewedAt = row.latest_reviewed_at ?? null;
+
+  return {
+    versionWindow: row.version_window || "historical",
+    versionRank: toNumber(row.version_rank),
+    promptVersion: row.prompt_version || "legacy-unversioned",
+    modelVersion: row.model_version || row.ai_model || "unknown-model",
+    aiProvider,
+    aiProviderLabel: formatProviderLabel(aiProvider),
+    aiModel: row.ai_model || "unknown-model",
+    totalReviews: toNumber(row.total_reviews),
+    acceptedReviews: toNumber(row.accepted_reviews),
+    rejectedReviews: toNumber(row.rejected_reviews),
+    acceptanceRatePct: toNumber(row.acceptance_rate_pct),
+    rejectionRatePct: toNumber(row.rejection_rate_pct),
+    averagePositivityScore: toNumber(row.average_positivity_score),
+    previousAcceptanceRatePct: toNullableNumber(
+      row.previous_acceptance_rate_pct,
+    ),
+    previousRejectionRatePct: toNullableNumber(row.previous_rejection_rate_pct),
+    previousAveragePositivityScore: toNullableNumber(
+      row.previous_average_positivity_score,
+    ),
+    acceptanceRateDeltaPct: toNullableNumber(row.acceptance_rate_delta_pct),
+    rejectionRateDeltaPct: toNullableNumber(row.rejection_rate_delta_pct),
+    averageScoreDelta: toNullableNumber(row.average_score_delta),
+    firstReviewedAt: row.first_reviewed_at ?? null,
+    latestReviewedAt,
+    latestReviewedAtLabel: formatAdminDateTime(latestReviewedAt, "Unknown"),
+  };
+}
+
 function mapReviewRow(
   row: ArticleReviewDbRow,
   publishedByOriginalUrl: Map<string, PublishedArticleDbRow>,
@@ -454,6 +588,8 @@ function mapReviewRow(
     aiProvider,
     aiProviderLabel: formatProviderLabel(aiProvider),
     aiModel: row.ai_model || "gpt-4o-mini",
+    promptVersion: row.prompt_version || "legacy-unversioned",
+    modelVersion: row.model_version || row.ai_model || "gpt-4o-mini",
     reviewDurationMs: toNumber(row.review_duration_ms),
     isPublished: Boolean(publishedArticle?.id),
     publishedArticle: publishedArticle
@@ -493,6 +629,27 @@ function mapRecentPublishedArticle(
       review?.reviewed_at ?? null,
       "No review row",
     ),
+  };
+}
+
+async function loadVersionReports(client: SupabaseClient) {
+  const { data, error } = await client
+    .from("ai_decision_version_report")
+    .select(AI_DECISION_VERSION_REPORT_SELECT_COLUMNS)
+    .order("version_rank", { ascending: true })
+    .limit(AI_DECISION_VERSION_REPORT_LIMIT);
+
+  if (error) {
+    return {
+      versionReports: [],
+      versionReportError: error.message,
+    };
+  }
+
+  return {
+    versionReports: ((data ?? []) as unknown as AiDecisionVersionReportDbRow[])
+      .map(mapVersionReportRow),
+    versionReportError: null,
   };
 }
 
@@ -582,10 +739,15 @@ export async function getAdminArticleReviewDashboardData(
 
   const client = getServerSupabase();
 
-  const [{ sourceOptions, categoryOptions }, recentPublishedArticles] =
+  const [
+    { sourceOptions, categoryOptions },
+    recentPublishedArticles,
+    { versionReports, versionReportError },
+  ] =
     await Promise.all([
       loadOptions(client),
       loadRecentPublishedArticles(client),
+      loadVersionReports(client),
     ]);
 
   const from = filters.page * ARTICLE_REVIEW_PAGE_SIZE;
@@ -625,6 +787,8 @@ export async function getAdminArticleReviewDashboardData(
       ...emptyDashboardData(filters, error.message),
       sourceOptions,
       categoryOptions,
+      versionReports,
+      versionReportError,
       recentPublishedArticles,
     };
   }
@@ -659,6 +823,8 @@ export async function getAdminArticleReviewDashboardData(
     filters,
     summary: summarizeVisibleReviews(filters, reviews, totalMatchingReviews),
     reviews,
+    versionReports,
+    versionReportError,
     recentPublishedArticles,
     sourceOptions,
     categoryOptions,
@@ -667,6 +833,7 @@ export async function getAdminArticleReviewDashboardData(
     previousPageHref: buildHref(filters, Math.max(0, filters.page - 1)),
     nextPageHref: buildHref(filters, filters.page + 1),
     reviewSql: buildReviewSql(filters),
+    versionReportSql: buildVersionReportSql(),
     recentPublishedArticlesSql: buildRecentPublishedArticlesSql(),
   };
 }
