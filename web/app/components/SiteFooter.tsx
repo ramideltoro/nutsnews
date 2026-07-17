@@ -57,6 +57,7 @@ export const footerCopyByLanguage: Record<
     emptyBody: (query: string) => string;
     footerNav: string;
     apps: string;
+    saved: string;
     about: string;
     contact: string;
     privacy: string;
@@ -84,6 +85,7 @@ export const footerCopyByLanguage: Record<
       `No published NutsNews stories matched “${query}”. Try a broader word like animals, science, community, travel, or wellness.`,
     footerNav: "Footer navigation",
     apps: "Apps",
+    saved: "Saved",
     about: "About",
     contact: "Contact",
     privacy: "Privacy",
@@ -110,6 +112,7 @@ export const footerCopyByLanguage: Record<
       `Aucune histoire publiée ne correspond à « ${query} ». Essayez un mot plus large comme animaux, science, communauté, voyage ou bien-être.`,
     footerNav: "Navigation du pied de page",
     apps: "Apps",
+    saved: "Enregistrées",
     about: "À propos",
     contact: "Contact",
     privacy: "Confidentialité",
@@ -135,6 +138,7 @@ export const footerCopyByLanguage: Record<
       `「${query}」に一致する公開済みストーリーはありません。動物、科学、コミュニティ、旅行、健康など広い言葉を試してください。`,
     footerNav: "フッターナビゲーション",
     apps: "アプリ",
+    saved: "保存済み",
     about: "概要",
     contact: "お問い合わせ",
     privacy: "プライバシー",
@@ -162,6 +166,7 @@ export const footerCopyByLanguage: Record<
       `Keine veröffentlichte NutsNews-Geschichte passt zu „${query}“. Versuch ein breiteres Wort wie Tiere, Wissenschaft, Gemeinschaft, Reisen oder Wohlbefinden.`,
     footerNav: "Footer-Navigation",
     apps: "Apps",
+    saved: "Gespeichert",
     about: "Über uns",
     contact: "Kontakt",
     privacy: "Datenschutz",
@@ -188,6 +193,7 @@ export const footerCopyByLanguage: Record<
       `Keine veröffentlichte NutsNews-Geschichte passt zu „${query}“. Versuch ein breiteres Wort wie Tiere, Wissenschaft, Gemeinschaft, Reisen oder Wohlbefinden.`,
     footerNav: "Footer-Navigation",
     apps: "Apps",
+    saved: "Gespeichert",
     about: "Über uns",
     contact: "Kontakt",
     privacy: "Datenschutz",
@@ -214,6 +220,7 @@ export const footerCopyByLanguage: Record<
       `Καμία δημοσιευμένη ιστορία του NutsNews δεν ταίριαξε με «${query}». Δοκιμάστε μια πιο γενική λέξη όπως ζώα, επιστήμη, κοινότητα, ταξίδια ή ευεξία.`,
     footerNav: "Πλοήγηση υποσέλιδου",
     apps: "Εφαρμογές",
+    saved: "Αποθηκευμένα",
     about: "Σχετικά",
     contact: "Επικοινωνία",
     privacy: "Απόρρητο",
@@ -778,6 +785,9 @@ export function SiteFooter() {
           <nav aria-label={copy.footerNav} className="site-footer-modern__nav">
             <Link href="/apps" className="site-footer-modern__link">
               {copy.apps}
+            </Link>
+            <Link href="/saved" className="site-footer-modern__link">
+              {copy.saved}
             </Link>
             <Link href="/about" className="site-footer-modern__link">
               {copy.about}

@@ -5,7 +5,7 @@ import { LocalizedPrivacyPolicyPage } from "./LocalizedPrivacyPolicyPage";
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description:
-    "Read the NutsNews privacy policy, including how the iOS app and website handle article browsing, local likes, caching, diagnostics, and third-party publisher links.",
+    "Read the NutsNews privacy policy, including how the iOS app and website handle article browsing, local likes, saved stories, caching, diagnostics, and third-party publisher links.",
   alternates: {
     canonical: "/privacy",
   },

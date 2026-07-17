@@ -1714,6 +1714,59 @@ body {
   padding-bottom: 1rem;
 }
 
+.saved-story-button {
+  display: inline-flex;
+  min-height: 2rem;
+  max-width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.38rem;
+  border: 1px solid var(--theme-border);
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--theme-surface) 84%, transparent);
+  padding: 0.42rem 0.68rem;
+  color: var(--theme-accent-soft);
+  font-size: 0.68rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: uppercase;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.28);
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.saved-story-button:hover:not(:disabled) {
+  border-color: var(--theme-border-strong);
+  background: var(--theme-surface-soft);
+  color: var(--theme-heading);
+  transform: translateY(-1px);
+}
+
+.saved-story-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.saved-story-button--active {
+  border-color: var(--theme-border-strong);
+  background: var(--theme-glow-soft);
+  color: var(--theme-heading);
+}
+
+.saved-story-button__icon {
+  height: 0.95rem;
+  width: 0.95rem;
+  flex: 0 0 auto;
+}
+
+.wp-article-card__save {
+  position: absolute;
+  top: 0.58rem;
+  right: 0.58rem;
+  z-index: 3;
+}
+
 .wp-article-card__link {
   display: grid;
   gap: 0.82rem;
@@ -1863,6 +1916,18 @@ body {
   -webkit-line-clamp: 4;
 }
 
+.wp-article-card--rail .wp-article-card__save {
+  top: 0.44rem;
+  right: auto;
+  left: 0.44rem;
+  min-width: 2rem;
+  padding-inline: 0.48rem;
+}
+
+.wp-article-card--rail .wp-article-card__save span {
+  display: none;
+}
+
 .newspaper-more-section {
   scroll-margin-top: 5.25rem;
   margin-top: clamp(2rem, 5vw, 4.5rem);
@@ -1886,6 +1951,167 @@ body {
   -webkit-line-clamp: 4;
 }
 
+.saved-stories-page .newspaper-page-wrap {
+  padding-top: clamp(1.5rem, 4vw, 3rem);
+}
+
+.saved-stories-header {
+  display: grid;
+  gap: 0.82rem;
+  border-bottom: 3px double var(--theme-border-strong);
+  padding-bottom: clamp(1.2rem, 3vw, 2rem);
+}
+
+.saved-stories-header__eyebrow {
+  color: var(--theme-muted-strong);
+  font-size: 0.68rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.saved-stories-header h1 {
+  color: var(--theme-heading);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2.7rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 0.96;
+}
+
+.saved-stories-header p {
+  max-width: 42rem;
+  color: var(--theme-muted);
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.saved-stories-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  padding-top: 0.35rem;
+}
+
+.saved-stories-header__actions span {
+  color: var(--theme-muted-strong);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.saved-stories-list {
+  display: grid;
+  gap: 1.2rem;
+  margin-top: clamp(1.25rem, 3vw, 2rem);
+}
+
+.saved-stories-empty {
+  display: grid;
+  justify-items: start;
+  gap: 0.8rem;
+  border-bottom: 1px solid var(--theme-border);
+  padding-block: 2rem;
+}
+
+.saved-stories-empty h2 {
+  color: var(--theme-heading);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.8rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1.05;
+}
+
+.saved-stories-empty p {
+  max-width: 36rem;
+  color: var(--theme-muted);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.saved-story-card {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  border-bottom: 1px solid var(--theme-border);
+  padding-bottom: 1.2rem;
+}
+
+.saved-story-card__image {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border: 1px solid var(--theme-border);
+  border-radius: 0.22rem;
+  background: var(--theme-surface-strong);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.26);
+}
+
+.saved-story-card__body {
+  display: grid;
+  align-content: start;
+  gap: 0.7rem;
+}
+
+.saved-story-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.42rem 0.62rem;
+  color: var(--theme-muted-strong);
+  font-size: 0.63rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.saved-story-card__meta span:not(:last-child)::after {
+  content: "·";
+  margin-left: 0.62rem;
+  color: var(--theme-border-strong);
+}
+
+.saved-story-card__title {
+  color: var(--theme-heading);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.65rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1.04;
+}
+
+.saved-story-card__title a {
+  color: inherit;
+  text-decoration: none;
+  transition: color 180ms ease;
+}
+
+.saved-story-card__title a:hover {
+  color: var(--theme-accent-soft);
+}
+
+.saved-story-card__summary {
+  color: var(--theme-muted);
+  font-size: 0.95rem;
+  line-height: 1.62;
+}
+
+.saved-story-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.7rem;
+  padding-top: 0.2rem;
+}
+
+.saved-story-card__read {
+  min-height: 2rem;
+}
+
 @media (min-width: 720px) {
   .newspaper-page-wrap {
     padding-inline: 1.5rem;
@@ -1897,6 +2123,11 @@ body {
 
   .newspaper-more-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .saved-story-card {
+    grid-template-columns: minmax(13rem, 16rem) minmax(0, 1fr);
+    align-items: start;
   }
 }
 
@@ -1955,11 +2186,23 @@ body {
   .wp-article-card--rail .wp-article-card__link {
     grid-template-columns: minmax(5rem, 6.3rem) minmax(0, 1fr);
   }
+
+  .saved-stories-header h1 {
+    font-size: 2.25rem;
+  }
+
+  .saved-story-button {
+    min-height: 1.95rem;
+    padding-inline: 0.6rem;
+    font-size: 0.64rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .newspaper-primary-nav a,
   .newspaper-category-chip,
+  .saved-story-button,
+  .saved-story-card__title a,
   .wp-article-card__image img,
   .wp-article-card__title {
     transition: none;
@@ -1998,4 +2241,3 @@ html.nutsnews-home-arrival .newspaper-home-shell .site-footer-modern {
     animation: none;
   }
 }
-
