@@ -22,6 +22,22 @@ const GITHUB_ACTIONS_STALE_HOURS = 72;
 const BACKUP_RESTORE_STALE_HOURS = 30;
 const GITHUB_ACTIONS_URL = `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/actions`;
 const GITHUB_ACTIONS_RUNS_API_URL = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/actions/runs?branch=${GITHUB_ACTIONS_BRANCH}&per_page=50`;
+const SLO_DOC_URL =
+  "https://github.com/ramideltoro/nutsnews-docs/blob/main/SERVICE_LEVEL_OBJECTIVES.md";
+const SLO_MONTHLY_AVAILABILITY_TARGET = "99.5%";
+const SLO_MONTHLY_ERROR_BUDGET_MINUTES = 216;
+const SLO_TARGET_SUMMARY =
+  "homepage and /api/articles 99.5% monthly availability, Worker success >=95%, feed freshness <=3h, translation coverage >=90%, and backup verification <=30h";
+const SLO_COMPONENT_SIGNAL_IDS = new Set([
+  "configuration",
+  "public-api-health",
+  "graceful-degradation",
+  "worker-controller",
+  "db-growth",
+  "translation-coverage",
+  "backup-freshness",
+  "ci-status",
+]);
 
 type GitHubWorkflowRequirement = {
   label: string;
@@ -753,6 +769,68 @@ function buildImageSignal(recentArticles: RecentArticleRow[]) {
   });
 }
 
+function summarizeSignalTitles(signals: ProductionReadinessSignal[]) {
+  const names = signals.slice(0, 3).map((signal) => signal.title);
+  const remaining = signals.length - names.length;
+
+  if (remaining > 0) {
+    names.push(`${remaining} more`);
+  }
+
+  return names.join(", ");
+}
+
+function buildSloErrorBudgetSignal(componentSignals: ProductionReadinessSignal[]) {
+  const sloSignals = componentSignals.filter((signal) =>
+    SLO_COMPONENT_SIGNAL_IDS.has(signal.id),
+  );
+  const redSignals = sloSignals.filter((signal) => signal.status === "red");
+  const yellowSignals = sloSignals.filter((signal) => signal.status === "yellow");
+
+  if (redSignals.length > 0) {
+    return signal({
+      id: "slo-error-budgets",
+      title: "SLO and error budgets",
+      status: "red",
+      statusLabel: "Critical",
+      value: `${redSignals.length} critical`,
+      detail: `Critical SLO signals are burning error budget: ${summarizeSignalTitles(redSignals)}. Targets cover ${SLO_TARGET_SUMMARY}.`,
+      nextStep:
+        "Declare a critical or high incident based on reader, data, and recovery impact, then follow the SLO runbook before promotion.",
+      href: SLO_DOC_URL,
+      linkLabel: "Open SLO runbook",
+    });
+  }
+
+  if (yellowSignals.length > 0) {
+    return signal({
+      id: "slo-error-budgets",
+      title: "SLO and error budgets",
+      status: "yellow",
+      statusLabel: "High/medium watch",
+      value: `${yellowSignals.length} watch`,
+      detail: `Watch SLO signals before they burn the monthly ${SLO_MONTHLY_ERROR_BUDGET_MINUTES} minute error budget: ${summarizeSignalTitles(yellowSignals)}.`,
+      nextStep:
+        "Verify the linked dashboards, classify the condition as high or medium, and open follow-up work if the warning repeats.",
+      href: SLO_DOC_URL,
+      linkLabel: "Open SLO runbook",
+    });
+  }
+
+  return signal({
+    id: "slo-error-budgets",
+    title: "SLO and error budgets",
+    status: "green",
+    statusLabel: "Within budget",
+    value: `${SLO_MONTHLY_AVAILABILITY_TARGET} target`,
+    detail: `Core reader, API, Worker, translation, and backup indicators are inside the defined SLO budget. Monthly availability budget is ${SLO_MONTHLY_ERROR_BUDGET_MINUTES} minutes.`,
+    nextStep:
+      "Keep reviewing external uptime, Lighthouse, worker, translation, and backup reports against the SLO runbook.",
+    href: SLO_DOC_URL,
+    linkLabel: "Open SLO runbook",
+  });
+}
+
 function buildBackupFallbackSignal(detail: string) {
   return signal({
     id: "backup-freshness",
@@ -1185,7 +1263,7 @@ async function buildCiSignal() {
 async function emptyDashboard(
   errorMessage: string | null,
 ): Promise<ProductionReadinessDashboardData> {
-  const signals = [
+  const componentSignals = [
     signal({
       id: "configuration",
       title: "Readiness data source",
@@ -1199,6 +1277,10 @@ async function emptyDashboard(
     }),
     await buildBackupSignal(),
     await buildCiSignal(),
+  ];
+  const signals = [
+    buildSloErrorBudgetSignal(componentSignals),
+    ...componentSignals,
   ];
   const summary = summarize(signals);
 
@@ -1244,7 +1326,7 @@ export async function getAdminProductionReadinessDashboardData(): Promise<Produc
     const { summaries, expectedCount } = await loadRecentSummaries(client, recentArticles);
     const backupSignal = await buildBackupSignal();
     const ciSignal = await buildCiSignal();
-    const signals = [
+    const componentSignals = [
       buildPublicApiSignal({ publicFeedSnapshotCount, recentArticles }),
       buildGracefulDegradationSignal({
         publicFeedSnapshotCount,
@@ -1265,6 +1347,10 @@ export async function getAdminProductionReadinessDashboardData(): Promise<Produc
       buildImageSignal(recentArticles),
       backupSignal,
       ciSignal,
+    ];
+    const signals = [
+      buildSloErrorBudgetSignal(componentSignals),
+      ...componentSignals,
     ].sort((a, b) => statusRank(b.status) - statusRank(a.status));
     const summary = summarize(signals);
     const overallStatus: ProductionReadinessStatus =
