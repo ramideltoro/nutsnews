@@ -483,7 +483,7 @@ function testInventoryCompleteness() {
   const inventory = readJson("api-contracts/inventory.json");
   assert.equal(inventory.schemaVersion, 1, "API inventory schema version must be explicit");
   assert(Array.isArray(inventory.endpoints), "API inventory endpoints must be an array");
-  assert.equal(inventory.endpoints.length, 16, "API inventory must include every supported custom response endpoint");
+  assert.equal(inventory.endpoints.length, 17, "API inventory must include every supported custom response endpoint");
 
   const inventoryFiles = inventory.endpoints.map((endpoint) => endpoint.routeFile).sort();
   assert.equal(new Set(inventoryFiles).size, inventoryFiles.length, "API inventory route files must be unique");
@@ -976,6 +976,138 @@ function loadContactRoute(recordQuotaUsageEvent = async () => {}) {
     "@/lib/quotaUsage": { recordQuotaUsageEvent },
     "@/lib/runtimeSafety": { assertExternalSideEffect() {} },
   });
+}
+
+function engagementRequest(body, { headers = {}, contentType = true } = {}) {
+  return new Request("https://www.nutsnews.com/api/engagement", {
+    method: "POST",
+    headers: {
+      ...(contentType ? { "content-type": "application/json" } : {}),
+      ...headers,
+    },
+    body: typeof body === "string" ? body : JSON.stringify(body),
+  });
+}
+
+function validEngagementBody(overrides = {}) {
+  return {
+    eventType: "outbound_click",
+    articleId: "11111111-1111-4111-8111-111111111111",
+    source: "Good News Network",
+    category: "community",
+    ...overrides,
+  };
+}
+
+function loadEngagementRoute(recordArticleEngagementEvent = async () => ({
+  recorded: true,
+  reason: "recorded",
+})) {
+  return loadModule("web/app/api/engagement/route.ts", {
+    "next/server": nextServerMock(),
+    "@/lib/cacheHeaders": cacheHeadersMock,
+    "@/lib/articleEngagement": { recordArticleEngagementEvent },
+  });
+}
+
+function assertEngagementPayload(payload, label) {
+  assertRequiredKeys(payload, ["ok", "recorded", "reason"], label);
+  assert.equal(payload.ok, true, `${label}.ok must be true`);
+  assert.equal(typeof payload.recorded, "boolean", `${label}.recorded must be boolean`);
+  assert(
+    ["recorded", "runtime_disabled", "database_error"].includes(payload.reason),
+    `${label}.reason has an unsupported enum value`,
+  );
+}
+
+async function testEngagementContract() {
+  const recordedEvents = [];
+  const route = loadEngagementRoute(async (event) => {
+    recordedEvents.push(event);
+    return {
+      recorded: true,
+      reason: "recorded",
+    };
+  });
+  assertMethodExports(route, ["POST"], "/api/engagement");
+
+  const successResponse = await route.POST(
+    engagementRequest(validEngagementBody()),
+  );
+  assertStatus(successResponse, 202, "/api/engagement success");
+  assertEngagementPayload(await responseJson(successResponse), "/api/engagement success body");
+  assert.equal(recordedEvents.length, 1, "Valid engagement event must call the recorder once");
+  assert.deepEqual(recordedEvents[0], {
+    eventType: "outbound_click",
+    articleId: "11111111-1111-4111-8111-111111111111",
+    source: "Good News Network",
+    category: "community",
+  });
+
+  const categoryResponse = await route.POST(
+    engagementRequest(validEngagementBody({
+      eventType: "category_interest",
+      articleId: undefined,
+    })),
+  );
+  assertStatus(categoryResponse, 202, "/api/engagement category interest");
+  assertEngagementPayload(await responseJson(categoryResponse), "/api/engagement category interest body");
+
+  const blockedRoute = loadEngagementRoute(async () => ({
+    recorded: false,
+    reason: "runtime_disabled",
+  }));
+  const blockedResponse = await blockedRoute.POST(
+    engagementRequest(validEngagementBody()),
+  );
+  assertStatus(blockedResponse, 202, "/api/engagement runtime blocked");
+  assert.deepEqual(await responseJson(blockedResponse), {
+    ok: true,
+    recorded: false,
+    reason: "runtime_disabled",
+  });
+
+  const disallowedOriginResponse = await route.POST(
+    engagementRequest(validEngagementBody(), {
+      headers: { origin: "https://untrusted.example" },
+    }),
+  );
+  assertStatus(disallowedOriginResponse, 403, "/api/engagement disallowed origin");
+  assertErrorPayload(await responseJson(disallowedOriginResponse), "/api/engagement disallowed origin body");
+
+  const nonJsonResponse = await route.POST(
+    engagementRequest("plain text", {
+      contentType: false,
+      headers: { "content-type": "text/plain" },
+    }),
+  );
+  assertStatus(nonJsonResponse, 415, "/api/engagement content type");
+  assertErrorPayload(await responseJson(nonJsonResponse), "/api/engagement content type body");
+
+  const malformedResponse = await route.POST(engagementRequest("{not valid json"));
+  assertStatus(malformedResponse, 400, "/api/engagement malformed JSON");
+  assertErrorPayload(await responseJson(malformedResponse), "/api/engagement malformed JSON body");
+
+  const tooLargeResponse = await route.POST(
+    engagementRequest({
+      ...validEngagementBody(),
+      source: "x".repeat(3_000),
+    }),
+  );
+  assertStatus(tooLargeResponse, 413, "/api/engagement request size");
+  assertErrorPayload(await responseJson(tooLargeResponse), "/api/engagement request size body");
+
+  const unsupportedEventResponse = await route.POST(
+    engagementRequest(validEngagementBody({ eventType: "profile_view" })),
+  );
+  assertStatus(unsupportedEventResponse, 400, "/api/engagement unsupported event");
+  assertErrorPayload(await responseJson(unsupportedEventResponse), "/api/engagement unsupported event body");
+
+  const invalidArticleResponse = await route.POST(
+    engagementRequest(validEngagementBody({ articleId: "not-a-uuid" })),
+  );
+  assertStatus(invalidArticleResponse, 400, "/api/engagement invalid article");
+  assertErrorPayload(await responseJson(invalidArticleResponse), "/api/engagement invalid article body");
 }
 
 async function testContactContract() {
@@ -1640,6 +1772,7 @@ async function testConfiguredCachePolicies() {
   assert.match(headerValue("/api/articles", "Cache-Control"), /s-maxage=300/);
   assert.match(headerValue("/api/home-feed", "X-NutsNews-Cache-Policy"), /public-home-feed-cache/);
   assert.equal(headerValue("/api/contact", "Cache-Control"), "no-store, max-age=0");
+  assert.equal(headerValue("/api/engagement", "Cache-Control"), "no-store, max-age=0");
   assert.equal(headerValue("/api/auth/:path*", "Cache-Control"), "no-store, max-age=0");
   assert.equal(headerValue("/api/log-test", "Cache-Control"), "no-store, max-age=0");
   assert.equal(headerValue("/readyz", "Cache-Control"), "no-store, max-age=0");
@@ -1665,6 +1798,7 @@ try {
   await testHomeFeedContract();
   await testSearchContract();
   await testContactContract();
+  await testEngagementContract();
   await testHealthContract();
   await testRuntimePublicConfigContract();
   await testReadinessContract();

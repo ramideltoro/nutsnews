@@ -174,6 +174,10 @@ const nextConfig: NextConfig = {
         headers: noStoreHeaders("bypass-contact-api-cache"),
       },
       {
+        source: "/api/engagement",
+        headers: noStoreHeaders("bypass-engagement-api-cache"),
+      },
+      {
         source: "/opengraph-image",
         headers: publicCacheHeaders("public-og-image-cache-3600s", PUBLIC_LONG_CACHE_CONTROL, PUBLIC_LONG_CDN_CACHE_CONTROL),
       },
