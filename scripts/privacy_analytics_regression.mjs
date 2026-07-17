@@ -19,6 +19,7 @@ function assertIncludes(source, fragment, label) {
 
 const runtimeAnalytics = read("web/app/components/RuntimeAnalytics.tsx");
 const analyticsConsent = read("web/lib/analyticsConsent.ts");
+const engagementAnalytics = read("web/lib/engagementAnalytics.ts");
 const consentControls = read("web/app/privacy/AnalyticsConsentControls.tsx");
 const privacyPolicy = read("web/app/privacy/LocalizedPrivacyPolicyPage.tsx");
 const packageJson = JSON.parse(read("web/package.json"));
@@ -57,6 +58,17 @@ for (const fragment of [
 }
 
 for (const fragment of [
+  "browserRequestsAnalyticsOptOut",
+  "getAnalyticsConsentState() === \"granted\"",
+  "navigator.sendBeacon",
+  "keepalive: true",
+  "eventType: \"outbound_click\"",
+  "eventType: \"category_interest\"",
+]) {
+  assertIncludes(engagementAnalytics, fragment, "engagement analytics helper");
+}
+
+for (const fragment of [
   "AnalyticsConsentControls",
   "setAnalyticsConsentState(nextConsent)",
   "updateConsent(\"denied\")",
@@ -73,7 +85,11 @@ for (const fragment of [
   "Do Not Track",
   "Global Privacy Control",
   "The allowed taxonomy is intentionally small",
-  "NutsNews does not currently define custom analytics events",
+  "first-party aggregate counters",
+  "outbound article clicks and category interest",
+  "event type, article ID, source, and category",
+  "raw URLs, article titles, referrers, IP addresses, user agents, cookies, or visitor identifiers",
+  "NutsNews does not define custom analytics events for likes, saved stories, searches, personal profiles, or cross-device tracking.",
   "Advertising personalization and Google Signals are disabled.",
   "Sentry may collect production errors and diagnostics",
   "analyticsConsent",
@@ -85,6 +101,12 @@ assert.equal(
   packageJson.scripts?.["test:privacy-analytics"],
   "node ../scripts/privacy_analytics_regression.mjs",
   "web/package.json is missing test:privacy-analytics",
+);
+
+assert.equal(
+  packageJson.scripts?.["test:article-engagement-analytics"],
+  "node ../scripts/article_engagement_analytics_regression.mjs",
+  "web/package.json is missing test:article-engagement-analytics",
 );
 
 console.log("Privacy analytics regression checks passed.");

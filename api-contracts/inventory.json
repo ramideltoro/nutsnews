@@ -226,6 +226,42 @@
       "testFile": "scripts/api_contract_compatibility_regression.mjs"
     },
     {
+      "id": "engagement",
+      "method": ["POST"],
+      "path": "/api/engagement",
+      "routeFile": "web/app/api/engagement/route.ts",
+      "request": {
+        "headers": {
+          "Content-Type": "must include application/json",
+          "Origin": "when supplied, must match the request origin or an allowed NutsNews origin"
+        },
+        "body": {
+          "eventType": "required enum outbound_click|category_interest",
+          "articleId": "required UUID for outbound_click; ignored for category_interest",
+          "source": "optional string, normalized and capped at 160 characters",
+          "category": "optional string, normalized and capped at 96 characters"
+        }
+      },
+      "auth": "public; same-origin validation, strict payload limits, runtime safety, and aggregate-only storage replace user authentication",
+      "successStatus": [202],
+      "successResponseShape": {
+        "contentType": "application/json",
+        "requiredKeys": ["ok", "recorded", "reason"],
+        "ok": true,
+        "recorded": "boolean",
+        "reason": "recorded|runtime_disabled|database_error"
+      },
+      "errorStatuses": [400, 403, 413, 415],
+      "errorShape": {
+        "requiredKeys": ["error"],
+        "error": "string"
+      },
+      "pagination": "none",
+      "cache": "bypass/no-store on every response",
+      "iosCallSites": [],
+      "testFile": "scripts/api_contract_compatibility_regression.mjs"
+    },
+    {
       "id": "auth",
       "method": ["GET", "POST"],
       "path": "/api/auth/[...nextauth]",

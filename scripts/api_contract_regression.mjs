@@ -584,11 +584,62 @@ function testScriptIsRegistered() {
   );
 }
 
+async function testEngagementApiContract() {
+  const calls = [];
+  const engagementRoute = loadRouteModule("web/app/api/engagement/route.ts", {
+    "next/server": nextServerMock(),
+    "@/lib/cacheHeaders": cacheHeadersMock,
+    "@/lib/articleEngagement": {
+      async recordArticleEngagementEvent(event) {
+        calls.push(event);
+        return {
+          recorded: true,
+          reason: "recorded",
+        };
+      },
+    },
+  });
+
+  const response = await engagementRoute.POST(
+    new Request("https://www.nutsnews.com/api/engagement", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        eventType: "outbound_click",
+        articleId: "11111111-1111-4111-8111-111111111111",
+        source: "Good News Network",
+        category: "community",
+      }),
+    }),
+  );
+  assert.equal(response.status, 202);
+  assert.deepEqual(await json(response), {
+    ok: true,
+    recorded: true,
+    reason: "recorded",
+  });
+  assert.equal(calls.length, 1);
+
+  const invalidResponse = await engagementRoute.POST(
+    new Request("https://www.nutsnews.com/api/engagement", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        eventType: "outbound_click",
+        articleId: "not-a-uuid",
+      }),
+    }),
+  );
+  assert.equal(invalidResponse.status, 400);
+  assert.equal(typeof (await json(invalidResponse)).error, "string");
+}
+
 try {
   await testArticlesApiContract();
   await testSearchApiContract();
   await testSitemapAndRobotsContracts();
   await testContactApiValidationWithoutEmail();
+  await testEngagementApiContract();
   testScriptIsRegistered();
   console.log("API contract regression checks passed.");
 } catch (error) {

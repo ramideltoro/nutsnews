@@ -6,6 +6,7 @@ import {
   getArticleIdentityKey,
 } from "@/lib/articleIdentity";
 import type { Article, FeedDegradationStatus } from "@/lib/articles";
+import { recordArticleOutboundClick } from "@/lib/engagementAnalytics";
 import {
   DEFAULT_LANGUAGE_CODE,
   LANGUAGE_CHANGE_EVENT,
@@ -453,6 +454,9 @@ function ArticleCard({
   const siteDate = formatSiteDate(article.published_on_site_at, languageCode);
   const showSummary = variant !== "rail";
   const showCta = variant === "lead" || variant === "standard";
+  const handleArticleClick = useCallback(() => {
+    recordArticleOutboundClick(article);
+  }, [article]);
 
   return (
     <article
@@ -471,6 +475,7 @@ function ArticleCard({
         target="_blank"
         rel="noopener noreferrer"
         className="wp-article-card__link"
+        onClick={handleArticleClick}
         aria-label={`${publisherAttribution.readFullStoryLabel}: ${article.title}`}
       >
         <div className="wp-article-card__image relative overflow-hidden">
