@@ -82,9 +82,17 @@ jobs:
           if (!/^[0-9]{14}$/.test(release.schema_version ?? "")) {
             throw new Error("Staging metadata must contain the rollback-compatible schema marker.");
           }
+          if (!/^[0-9]{14}$/.test(release.migration_head ?? "")) {
+            throw new Error("Staging metadata must contain the repository migration head.");
+          }
+          if (!/^[a-z0-9]{20}$/.test(release.supabase_project_ref ?? "")) {
+            throw new Error("Staging metadata must contain the production Supabase project reference.");
+          }
 
           const candidate = {
             schema_version: release.schema_version,
+            migration_head: release.migration_head,
+            supabase_project_ref: release.supabase_project_ref,
             source_repository: release.source_repository,
             source_commit: release.source_commit,
             image_repository: release.image_repository,
@@ -105,6 +113,8 @@ jobs:
             `image_digest=${candidate.image_digest}`,
             `build_id=${candidate.build_id}`,
             `schema_version=${candidate.schema_version}`,
+            `migration_head=${candidate.migration_head}`,
+            `supabase_project_ref=${candidate.supabase_project_ref}`,
           ];
           appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join("\n")}\n`, "utf8");
           NODE
@@ -121,6 +131,8 @@ jobs:
           const candidate = JSON.parse(process.env.CANDIDATE_JSON ?? "{}");
           const expectedKeys = [
             "schema_version",
+            "migration_head",
+            "supabase_project_ref",
             "source_repository",
             "source_commit",
             "image_repository",
@@ -143,7 +155,9 @@ jobs:
             !/^\d+-\d+$/.test(candidate.build_id ?? "") ||
             !/^[1-9][0-9]{0,19}$/.test(candidate.source_workflow_run_id ?? "") ||
             candidate.build_id.split("-", 1)[0] !== candidate.source_workflow_run_id ||
-            !/^[0-9]{14}$/.test(candidate.schema_version ?? "")
+            !/^[0-9]{14}$/.test(candidate.schema_version ?? "") ||
+            !/^[0-9]{14}$/.test(candidate.migration_head ?? "") ||
+            !/^[a-z0-9]{20}$/.test(candidate.supabase_project_ref ?? "")
           ) {
             throw new Error("Refusing to dispatch an incomplete or incompatible VPS staging candidate.");
           }
@@ -174,6 +188,8 @@ jobs:
           IMAGE_DIGEST: ${{ steps.candidate.outputs.image_digest }}
           BUILD_ID: ${{ steps.candidate.outputs.build_id }}
           SCHEMA_VERSION: ${{ steps.candidate.outputs.schema_version }}
+          MIGRATION_HEAD: ${{ steps.candidate.outputs.migration_head }}
+          SUPABASE_PROJECT_REF: ${{ steps.candidate.outputs.supabase_project_ref }}
           DEPLOYMENT_ID: ${{ steps.candidate.outputs.deployment_id }}
         run: |
           {
@@ -183,12 +199,14 @@ jobs:
             echo "- Staging deployment ID: \`${DEPLOYMENT_ID}\`"
             echo "- VPS image: \`ghcr.io/ramideltoro/nutsnews@${IMAGE_DIGEST}\`"
             echo "- Build ID: \`${BUILD_ID}\`"
+            echo "- Migration head: \`${MIGRATION_HEAD}\`"
             echo "- Rollback-compatible schema: \`${SCHEMA_VERSION}\`"
+            echo "- Production Supabase project ref: \`${SUPABASE_PROJECT_REF}\`"
             echo "- GitOps VPS staging request: accepted"
             echo "- Staging deploy workflow: https://github.com/ramideltoro/nutsnews-infra/actions/workflows/nutsnews-staging-deploy.yml"
             echo "- Staging qualifier workflow: https://github.com/ramideltoro/nutsnews-infra/actions/workflows/nutsnews-staging-qualification.yml"
             echo "- Production gate workflow: https://github.com/ramideltoro/nutsnews-infra/actions/workflows/protected-ansible-apply.yml"
             echo "- Rollback workflow: https://github.com/ramideltoro/nutsnews-infra/actions/workflows/protected-nutsnews-rollback.yml"
             echo
-            echo "Vercel Production deploys independently and is not VPS production authorization."
+            echo "Vercel Production is disabled for app main and deploys only after the protected VPS release workflow dispatches the exact same source commit."
           } >> "$GITHUB_STEP_SUMMARY"
