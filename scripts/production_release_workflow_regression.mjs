@@ -16,6 +16,18 @@ function requireText(text, fragment, message) {
   assert.ok(text.includes(fragment), message);
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function requirePinnedWorkflowUse(text, action, version, message) {
+  assert.match(
+    text,
+    new RegExp(`uses:\\s+${escapeRegExp(action)}@[0-9a-f]{40}\\s+#\\s+${escapeRegExp(version)}`),
+    message,
+  );
+}
+
 assert.doesNotMatch(containerWorkflow, /^\s+paths:\s*$/m, "Container Image must run for every main merge, not a path subset.");
 requireText(containerWorkflow, "cancel-in-progress: false", "Container Image must not skip a merged release.");
 requireText(containerWorkflow, "name: nutsnews-staging-release", "Container Image must publish staging metadata.");
@@ -26,7 +38,7 @@ requireText(containerWorkflow, "schema_version: applicationContract.legacyVersio
 requireText(containerWorkflow, "supabase_project_ref: productionSupabaseProjectRef", "Release metadata must include the production Supabase project reference.");
 requireText(containerWorkflow, "source_repository: \"ramideltoro/nutsnews\"", "Release metadata must bind the source repository.");
 requireText(containerWorkflow, "source_workflow_run_id: sourceWorkflowRunId", "Release metadata must bind the source workflow run.");
-requireText(containerWorkflow, "uses: actions/upload-artifact@v6", "Release metadata must be retained as an artifact.");
+requirePinnedWorkflowUse(containerWorkflow, "actions/upload-artifact", "v6", "Release metadata must be retained as an artifact.");
 requireText(containerWorkflow, "NUTSNEWS_DEPLOYMENT_TARGET=vps", "OCI provenance must keep the infra-approved VPS build target.");
 
 requireText(releaseWorkflow, "workflow_run:", "Staging handoff must wait for Container Image completion.");
@@ -39,7 +51,7 @@ requireText(
   "github.event.workflow_run.head_repository.full_name == github.repository",
   "Staging handoff must reject untrusted fork workflow runs.",
 );
-requireText(releaseWorkflow, "uses: actions/download-artifact@v5", "Staging handoff must consume the image workflow artifact.");
+requirePinnedWorkflowUse(releaseWorkflow, "actions/download-artifact", "v5", "Staging handoff must consume the image workflow artifact.");
 requireText(releaseWorkflow, "path: ${{ runner.temp }}/nutsnews-staging-release", "Release metadata must be downloaded outside the workspace.");
 requireText(releaseWorkflow, "run-id: ${{ github.event.workflow_run.id }}", "Release metadata must come from the triggering run.");
 requireText(releaseWorkflow, "NUTSNEWS_INFRA_STAGING_TOKEN", "Cross-repository staging handoff must use the staging-only token.");
@@ -68,18 +80,37 @@ requireText(vercelProductionWorkflow, "repository_dispatch:", "Vercel production
 requireText(vercelProductionWorkflow, "nutsnews-vercel-production-release", "Vercel production workflow must use the infra release event.");
 requireText(vercelProductionWorkflow, "on:\n  repository_dispatch:", "Vercel production must be driven by repository dispatch, not manual workflow dispatch.");
 assert.ok(!vercelProductionWorkflow.includes("workflow_dispatch:"), "Vercel production must not allow manual workflow_dispatch.");
-requireText(vercelProductionWorkflow, "actions/checkout@v5", "Vercel production must checkout the exact source commit.");
+requirePinnedWorkflowUse(vercelProductionWorkflow, "actions/checkout", "v5", "Vercel production must checkout the exact source commit.");
 requireText(vercelProductionWorkflow, "ref: ${{ env.SOURCE_COMMIT }}", "Vercel production must deploy the dispatch source commit.");
 requireText(vercelProductionWorkflow, "vercel@latest build --prod", "Vercel production must use a production build.");
-requireText(vercelProductionWorkflow, "vercel@latest deploy --prebuilt --prod", "Vercel production must deploy the prebuilt production artifact.");
+requireText(vercelProductionWorkflow, "vercel@latest deploy --prebuilt --prod --skip-domain", "Vercel production must stage the prebuilt artifact without assigning production domains.");
+requireText(vercelProductionWorkflow, "vercel@latest promote \"$VERCEL_DEPLOYMENT_ID\"", "Vercel production must promote the qualified deployment through Vercel.");
+requireText(vercelProductionWorkflow, "Run staged Vercel qualification smoke", "Vercel production must qualify the staged deployment before promotion.");
+requireText(vercelProductionWorkflow, "Promote staged Vercel deployment after qualification", "Vercel production must promote only after the staged smoke.");
+assert.ok(
+  vercelProductionWorkflow.indexOf("Run staged Vercel qualification smoke") <
+    vercelProductionWorkflow.indexOf("Promote staged Vercel deployment after qualification"),
+  "Vercel staged smoke must run before production promotion.",
+);
+assert.ok(
+  vercelProductionWorkflow.indexOf("Promote staged Vercel deployment after qualification") <
+    vercelProductionWorkflow.indexOf("Verify Vercel production identity"),
+  "Vercel production aliases must be verified only after promotion.",
+);
 requireText(vercelProductionWorkflow, "localBuildControlEnv", "Vercel production must set local build control env names for the CI shell.");
 requireText(vercelProductionWorkflow, "Prepared Vercel local build control env names: HOME, PATH, SHELL.", "Vercel production must report when local build control env names were prepared.");
 requireText(vercelProductionWorkflow, "VERCEL_TOKEN", "Vercel production must use the scoped Vercel token secret.");
 requireText(vercelProductionWorkflow, "VERCEL_ORG_ID", "Vercel production must set the Vercel org identity.");
 requireText(vercelProductionWorkflow, "VERCEL_PROJECT_ID", "Vercel production must set the Vercel project identity.");
+requireText(vercelProductionWorkflow, "https://api.vercel.com/v13/deployments", "Vercel production must resolve and record the Vercel deployment ID.");
+requireText(vercelProductionWorkflow, "VPS_STAGING_DEPLOYMENT_ID", "Vercel production releases must receive VPS staging deployment evidence.");
+requireText(vercelProductionWorkflow, "VPS_QUALIFICATION_RUN_ID", "Vercel production releases must receive staging qualification evidence.");
+requireText(vercelProductionWorkflow, "STAGED_SMOKE_RESULT", "Vercel production promotion must depend on the staged smoke result.");
 requireText(vercelProductionWorkflow, "NUTSNEWS_SOURCE_COMMIT: ${{ env.SOURCE_COMMIT }}", "Vercel production must build with explicit source identity.");
 requireText(vercelProductionWorkflow, "NUTSNEWS_BUILD_ID: ${{ env.BUILD_ID }}", "Vercel production must build with explicit build identity.");
+requireText(vercelProductionWorkflow, "NUTSNEWS_CONFIG_GENERATION: ${{ env.VERCEL_CONFIG_GENERATION }}", "Vercel production must expose a qualified config generation.");
 requireText(vercelProductionWorkflow, "NUTSNEWS_DEPLOYMENT_TARGET: vercel-production", "Vercel production must build with explicit target identity.");
+requireText(vercelProductionWorkflow, "Retain sanitized Vercel release evidence", "Vercel production must retain staged URL, deployment ID, and test evidence.");
 requireText(vercelProductionWorkflow, "https://www.nutsnews.com/healthz", "Vercel production must verify the public www alias.");
 requireText(vercelProductionWorkflow, "https://nutsnews.com/healthz", "Vercel production must verify the apex alias.");
 requireText(vercelProductionWorkflow, "deploymentTarget !== \"vercel-production\"", "Vercel production health must verify the production target.");

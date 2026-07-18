@@ -20,6 +20,23 @@ function requireText(text, fragment, message) {
   assert.ok(text.includes(fragment), message);
 }
 
+function requirePinnedWorkflowUse(text, action, version, message) {
+  const escapedAction = action.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escapedVersion = version.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  assert.match(
+    text,
+    new RegExp(`uses:\\s+${escapedAction}@[0-9a-f]{40}\\s+#\\s+${escapedVersion}`),
+    message,
+  );
+}
+
+requirePinnedWorkflowUse(
+  backupWorkflow,
+  "supabase/setup-cli",
+  "v1",
+  "Supabase backup workflow must pin supabase/setup-cli with the v1 comment.",
+);
+
 for (const fragment of [
   "SUPABASE_URL: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_URL }}",
   "SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NUTSNEWS_PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}",
@@ -27,7 +44,6 @@ for (const fragment of [
   "quota_usage_events",
   "runtime_feature_flags",
   "release_readiness",
-  "supabase/setup-cli@v1",
   "sudo apt-get install --yes postgresql-client",
   "supabase start -x studio,imgproxy,logflare,vector",
   "supabase db reset --local",
