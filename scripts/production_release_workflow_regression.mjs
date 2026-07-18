@@ -66,7 +66,8 @@ assert.equal(
 );
 requireText(vercelProductionWorkflow, "repository_dispatch:", "Vercel production must be dispatched by infra after VPS apply.");
 requireText(vercelProductionWorkflow, "nutsnews-vercel-production-release", "Vercel production workflow must use the infra release event.");
-requireText(vercelProductionWorkflow, "deploy-vercel-production", "Manual Vercel production dispatch must require an explicit confirmation.");
+requireText(vercelProductionWorkflow, "on:\n  repository_dispatch:", "Vercel production must be driven by repository dispatch, not manual workflow dispatch.");
+assert.ok(!vercelProductionWorkflow.includes("workflow_dispatch:"), "Vercel production must not allow manual workflow_dispatch.");
 requireText(vercelProductionWorkflow, "actions/checkout@v5", "Vercel production must checkout the exact source commit.");
 requireText(vercelProductionWorkflow, "ref: ${{ env.SOURCE_COMMIT }}", "Vercel production must deploy the dispatch source commit.");
 requireText(vercelProductionWorkflow, "vercel@latest build --prod", "Vercel production must use a production build.");
