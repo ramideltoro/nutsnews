@@ -43,4 +43,6 @@ jobs:
         run: ./actionlint -color
 
       - name: Verify external action refs are SHA-pinned
-        run: node scripts/verify_github_actions_pinned.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/verify_github_actions_pinned.mjs --verify-commits
