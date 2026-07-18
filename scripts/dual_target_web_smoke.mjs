@@ -18,7 +18,21 @@ function accessHeaders(env = process.env) {
     : {};
 }
 
-const protectedHeaders = accessHeaders();
+function vercelProtectionHeaders(env = process.env) {
+  const bypassSecret = String(env.VERCEL_AUTOMATION_BYPASS_SECRET ?? "").trim();
+
+  return bypassSecret
+    ? {
+        "x-vercel-protection-bypass": bypassSecret,
+        "x-vercel-set-bypass-cookie": "true",
+      }
+    : {};
+}
+
+const protectedHeaders = {
+  ...accessHeaders(),
+  ...vercelProtectionHeaders(),
+};
 
 function option(name) {
   const index = process.argv.indexOf(name);

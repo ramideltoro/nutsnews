@@ -7,6 +7,8 @@ on:
       - ".github/workflows/container-image.yml"
       - ".github/workflows/staging-release.yml"
       - ".github/workflows/staging-release-regression.yml"
+      - ".github/workflows/vercel-production-release.yml"
+      - "scripts/dual_target_web_smoke.mjs"
       - "scripts/production_release_workflow_regression.mjs"
   push:
     branches: [main]
@@ -14,6 +16,8 @@ on:
       - ".github/workflows/container-image.yml"
       - ".github/workflows/staging-release.yml"
       - ".github/workflows/staging-release-regression.yml"
+      - ".github/workflows/vercel-production-release.yml"
+      - "scripts/dual_target_web_smoke.mjs"
       - "scripts/production_release_workflow_regression.mjs"
 
 permissions:
@@ -27,10 +31,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
 
       - name: Use Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5
         with:
           node-version: 22
 

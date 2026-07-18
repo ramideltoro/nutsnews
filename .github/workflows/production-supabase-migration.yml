@@ -43,7 +43,7 @@ jobs:
 
     steps:
       - name: Checkout the reviewed automation revision with history
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
@@ -64,7 +64,7 @@ jobs:
           node scripts/production_migration_request.mjs
 
       - name: Checkout the approved migration source
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
         with:
           ref: ${{ steps.request.outputs.source_commit }}
           persist-credentials: false
@@ -118,26 +118,26 @@ jobs:
 
     steps:
       - name: Checkout the reviewed automation revision
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
           path: automation
 
       - name: Checkout the approved migration source files
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
         with:
           ref: ${{ needs.preflight.outputs.source_commit }}
           persist-credentials: false
           path: approved-source
 
       - name: Use Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5
         with:
           node-version: 22
 
       - name: Use the reviewed Supabase CLI version
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1  # v1
         with:
           version: 2.105.0
 
@@ -173,7 +173,7 @@ jobs:
             --workdir "$GITHUB_WORKSPACE/approved-source"
 
       - name: Upload pre-migration schema snapshot
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6
         with:
           name: production-supabase-schema-before-${{ github.run_id }}
           path: ${{ runner.temp }}/nutsnews-production-schema-backup/public-schema.sql

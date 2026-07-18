@@ -24,6 +24,10 @@ jobs:
       IMAGE_DIGEST: ${{ github.event.client_payload.image_digest }}
       BUILD_ID: ${{ github.event.client_payload.build_id }}
       VPS_APPLY_RUN_ID: ${{ github.event.client_payload.vps_apply_run_id }}
+      VPS_STAGING_DEPLOYMENT_ID: ${{ github.event.client_payload.staging_deployment_id }}
+      VPS_QUALIFICATION_RUN_ID: ${{ github.event.client_payload.qualification_run_id }}
+      RELEASE_KIND: ${{ github.event.client_payload.release_kind }}
+      VERCEL_CONFIG_GENERATION: vercel-${{ github.event.client_payload.source_commit }}-${{ github.run_id }}-${{ github.run_attempt }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
@@ -54,30 +58,51 @@ jobs:
             echo "VPS apply run ID must be numeric." >&2
             exit 1
           fi
+          release_kind="${RELEASE_KIND:-release}"
+          if [[ "$release_kind" != "release" && "$release_kind" != "rollback" ]]; then
+            echo "Release kind must be release or rollback." >&2
+            exit 1
+          fi
+          if [[ "$release_kind" == "release" ]]; then
+            if [[ ! "$VPS_STAGING_DEPLOYMENT_ID" =~ ^stg-[0-9a-f]{24}$ ]]; then
+              echo "Staging deployment ID is required for a Vercel production release." >&2
+              exit 1
+            fi
+            if [[ ! "$VPS_QUALIFICATION_RUN_ID" =~ ^[1-9][0-9]{0,19}$ ]]; then
+              echo "Staging qualification run ID is required for a Vercel production release." >&2
+              exit 1
+            fi
+          fi
+          if [[ ! "$VERCEL_CONFIG_GENERATION" =~ ^vercel-[0-9a-f]{40}-[1-9][0-9]{0,19}-[1-9][0-9]{0,5}$ ]]; then
+            echo "Vercel config generation must bind the source commit and workflow run." >&2
+            exit 1
+          fi
           if [[ -z "$VERCEL_TOKEN" || -z "$VERCEL_ORG_ID" || -z "$VERCEL_PROJECT_ID" ]]; then
             echo "VERCEL_TOKEN, VERCEL_ORG_ID, and VERCEL_PROJECT_ID secrets are required." >&2
             exit 1
           fi
+          echo "RELEASE_KIND=$release_kind" >> "$GITHUB_ENV"
 
       - name: Checkout exact app source commit
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
         with:
           ref: ${{ env.SOURCE_COMMIT }}
           persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5
         with:
           node-version: 26
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: Build and deploy Vercel production
-        id: deploy
+      - name: Build and stage Vercel production candidate
+        id: stage
         shell: bash
         working-directory: web
         env:
           NUTSNEWS_BUILD_ID: ${{ env.BUILD_ID }}
+          NUTSNEWS_CONFIG_GENERATION: ${{ env.VERCEL_CONFIG_GENERATION }}
           NUTSNEWS_DEPLOYMENT_TARGET: vercel-production
           NUTSNEWS_SOURCE_COMMIT: ${{ env.SOURCE_COMMIT }}
           NEXT_PUBLIC_NUTSNEWS_BUILD_ID: ${{ env.BUILD_ID }}
@@ -116,18 +141,100 @@ jobs:
           NODE
           npx --yes vercel@latest build --prod --token "$VERCEL_TOKEN"
           deploy_output="$RUNNER_TEMP/vercel-production-deploy.txt"
-          npx --yes vercel@latest deploy --prebuilt --prod --token "$VERCEL_TOKEN" > "$deploy_output"
+          npx --yes vercel@latest deploy --prebuilt --prod --skip-domain --token "$VERCEL_TOKEN" > "$deploy_output"
           deployment_url="$(grep -Eo 'https://[^[:space:]]+' "$deploy_output" | tail -n 1)"
           if [[ -z "$deployment_url" ]]; then
             echo "Vercel CLI did not return a deployment URL." >&2
             exit 1
           fi
-          printf 'deployment_url=%s\n' "$deployment_url" >> "$GITHUB_OUTPUT"
+          DEPLOYMENT_URL="$deployment_url" node --input-type=module <<'NODE'
+          import { appendFileSync } from "node:fs";
+
+          const deploymentUrl = process.env.DEPLOYMENT_URL ?? "";
+          const token = process.env.VERCEL_TOKEN ?? "";
+          const teamId = process.env.VERCEL_ORG_ID ?? "";
+          const expectedCommit = process.env.SOURCE_COMMIT ?? "";
+          const deploymentHost = new URL(deploymentUrl).hostname;
+          const query = new URLSearchParams({ teamId });
+          const response = await fetch(
+            `https://api.vercel.com/v13/deployments/${encodeURIComponent(deploymentHost)}?${query}`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+            },
+          );
+          if (!response.ok) {
+            throw new Error(`Vercel deployment lookup returned HTTP ${response.status}.`);
+          }
+          const deployment = await response.json();
+          const deploymentId = String(deployment.id ?? deployment.uid ?? "");
+          const deploymentSourceSha = String(
+            deployment.meta?.githubCommitSha ??
+              deployment.gitSource?.sha ??
+              expectedCommit,
+          );
+          if (!/^dpl_[A-Za-z0-9]+$/.test(deploymentId)) {
+            throw new Error("Vercel deployment lookup did not return a deployment ID.");
+          }
+          if (deploymentSourceSha && deploymentSourceSha !== expectedCommit) {
+            throw new Error("Vercel deployment source SHA did not match the requested source commit.");
+          }
+          appendFileSync(
+            process.env.GITHUB_OUTPUT,
+            [
+              `staged_deployment_url=${deploymentUrl}`,
+              `vercel_deployment_id=${deploymentId}`,
+              `vercel_source_sha=${deploymentSourceSha || expectedCommit}`,
+              "",
+            ].join("\n"),
+            "utf8",
+          );
+          NODE
+
+      - name: Run staged Vercel qualification smoke
+        id: staged_smoke
+        shell: bash
+        working-directory: web
+        env:
+          STAGED_DEPLOYMENT_URL: ${{ steps.stage.outputs.staged_deployment_url }}
+          VERCEL_DEPLOYMENT_ID: ${{ steps.stage.outputs.vercel_deployment_id }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          set -euo pipefail
+          node ../scripts/dual_target_web_smoke.mjs \
+            --base-url "$STAGED_DEPLOYMENT_URL" \
+            --expected-source-commit "$SOURCE_COMMIT" \
+            --expected-build-id "$BUILD_ID" \
+            --expected-deployment-target vercel-production \
+            --expected-runtime-env production \
+            --expected-side-effects-mode live \
+            --expected-config-generation "$VERCEL_CONFIG_GENERATION" \
+            --production-safe-surfaces
+          echo "result=pass" >> "$GITHUB_OUTPUT"
+
+      - name: Promote staged Vercel deployment after qualification
+        id: promote
+        shell: bash
+        working-directory: web
+        env:
+          STAGED_SMOKE_RESULT: ${{ steps.staged_smoke.outputs.result }}
+          VERCEL_DEPLOYMENT_ID: ${{ steps.stage.outputs.vercel_deployment_id }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ "$STAGED_SMOKE_RESULT" != "pass" ]]; then
+            echo "Staged Vercel smoke result must be pass before production promotion." >&2
+            exit 1
+          fi
+          npx --yes vercel@latest promote "$VERCEL_DEPLOYMENT_ID" --timeout=5m --token "$VERCEL_TOKEN"
+          echo "result=promoted" >> "$GITHUB_OUTPUT"
 
       - name: Verify Vercel production identity
         shell: bash
         env:
-          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
+          DEPLOYMENT_URL: ${{ steps.stage.outputs.staged_deployment_url }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           set -euo pipefail
@@ -187,13 +294,69 @@ jobs:
       - name: Summarize Vercel production deployment
         shell: bash
         env:
-          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
+          STAGED_DEPLOYMENT_URL: ${{ steps.stage.outputs.staged_deployment_url }}
+          VERCEL_DEPLOYMENT_ID: ${{ steps.stage.outputs.vercel_deployment_id }}
+          STAGED_SMOKE_RESULT: ${{ steps.staged_smoke.outputs.result }}
+          PROMOTION_RESULT: ${{ steps.promote.outputs.result }}
         run: |
           {
             echo "## Vercel production release"
             echo
             echo "- Source commit: \`${SOURCE_COMMIT}\`"
+            echo "- Release kind: \`${RELEASE_KIND}\`"
             echo "- VPS apply run: ${VPS_APPLY_RUN_ID}"
-            echo "- Vercel deployment: ${DEPLOYMENT_URL}"
+            if [[ "$RELEASE_KIND" == "release" ]]; then
+              echo "- VPS staging deployment: \`${VPS_STAGING_DEPLOYMENT_ID}\`"
+              echo "- VPS staging qualification run: ${VPS_QUALIFICATION_RUN_ID}"
+            fi
+            echo "- Vercel staged deployment URL: ${STAGED_DEPLOYMENT_URL}"
+            echo "- Vercel deployment ID: \`${VERCEL_DEPLOYMENT_ID}\`"
+            echo "- Vercel staged smoke result: \`${STAGED_SMOKE_RESULT}\`"
+            echo "- Vercel promotion result: \`${PROMOTION_RESULT}\`"
             echo "- Production aliases verified: \`www.nutsnews.com\`, \`nutsnews.com\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Write sanitized Vercel release evidence
+        if: ${{ always() }}
+        shell: bash
+        env:
+          EVIDENCE_PATH: ${{ runner.temp }}/vercel-release-evidence.json
+          STAGED_DEPLOYMENT_URL: ${{ steps.stage.outputs.staged_deployment_url }}
+          VERCEL_DEPLOYMENT_ID: ${{ steps.stage.outputs.vercel_deployment_id }}
+          VERCEL_SOURCE_SHA: ${{ steps.stage.outputs.vercel_source_sha }}
+          STAGED_SMOKE_RESULT: ${{ steps.staged_smoke.outputs.result }}
+          PROMOTION_RESULT: ${{ steps.promote.outputs.result }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from "node:fs";
+
+          const evidence = {
+            release_kind: process.env.RELEASE_KIND || "release",
+            source_repository: process.env.SOURCE_REPOSITORY || "",
+            source_commit: process.env.SOURCE_COMMIT || "",
+            build_id: process.env.BUILD_ID || "",
+            vps_image_digest: process.env.IMAGE_DIGEST || "",
+            vps_apply_run_id: process.env.VPS_APPLY_RUN_ID || "",
+            vps_staging_deployment_id: process.env.VPS_STAGING_DEPLOYMENT_ID || "",
+            vps_qualification_run_id: process.env.VPS_QUALIFICATION_RUN_ID || "",
+            vercel_deployment_id: process.env.VERCEL_DEPLOYMENT_ID || "",
+            vercel_deployment_url: process.env.STAGED_DEPLOYMENT_URL || "",
+            vercel_source_sha: process.env.VERCEL_SOURCE_SHA || "",
+            vercel_config_generation: process.env.VERCEL_CONFIG_GENERATION || "",
+            staged_smoke_result: process.env.STAGED_SMOKE_RESULT || "",
+            promotion_result: process.env.PROMOTION_RESULT || "",
+            workflow_run_id: process.env.GITHUB_RUN_ID || "",
+            workflow_run_attempt: process.env.GITHUB_RUN_ATTEMPT || "",
+          };
+          writeFileSync(process.env.EVIDENCE_PATH, `${JSON.stringify(evidence, null, 2)}\n`, "utf8");
+          NODE
+
+      - name: Retain sanitized Vercel release evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6
+        with:
+          name: nutsnews-vercel-production-release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/vercel-release-evidence.json
+          if-no-files-found: ignore
+          retention-days: 90
