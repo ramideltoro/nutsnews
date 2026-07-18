@@ -1,32 +1,10 @@
 name: Deploy Vercel Production Release
-run-name: Deploy Vercel production ${{ github.event.client_payload.source_commit || inputs.source_commit }}
+run-name: Deploy Vercel production ${{ github.event.client_payload.source_commit }}
 
 on:
   repository_dispatch:
     types:
       - nutsnews-vercel-production-release
-  workflow_dispatch:
-    inputs:
-      source_commit:
-        description: Full app source commit to deploy.
-        required: true
-        type: string
-      image_digest:
-        description: Immutable VPS image digest already applied to production.
-        required: true
-        type: string
-      build_id:
-        description: Source workflow build ID already applied to production.
-        required: true
-        type: string
-      vps_apply_run_id:
-        description: Protected VPS apply run that authorized this Vercel deploy.
-        required: true
-        type: string
-      release_confirmation:
-        description: Type deploy-vercel-production.
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -38,19 +16,14 @@ concurrency:
 jobs:
   deploy:
     name: Deploy exact release to Vercel production
-    if: >-
-      ${{
-        (github.event_name == 'repository_dispatch' && github.event.client_payload.source_repository == 'ramideltoro/nutsnews') ||
-        (github.event_name == 'workflow_dispatch' && inputs.release_confirmation == 'deploy-vercel-production')
-      }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
-      SOURCE_REPOSITORY: ${{ github.event.client_payload.source_repository || 'ramideltoro/nutsnews' }}
-      SOURCE_COMMIT: ${{ github.event.client_payload.source_commit || inputs.source_commit }}
-      IMAGE_DIGEST: ${{ github.event.client_payload.image_digest || inputs.image_digest }}
-      BUILD_ID: ${{ github.event.client_payload.build_id || inputs.build_id }}
-      VPS_APPLY_RUN_ID: ${{ github.event.client_payload.vps_apply_run_id || inputs.vps_apply_run_id }}
+      SOURCE_REPOSITORY: ${{ github.event.client_payload.source_repository }}
+      SOURCE_COMMIT: ${{ github.event.client_payload.source_commit }}
+      IMAGE_DIGEST: ${{ github.event.client_payload.image_digest }}
+      BUILD_ID: ${{ github.event.client_payload.build_id }}
+      VPS_APPLY_RUN_ID: ${{ github.event.client_payload.vps_apply_run_id }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
