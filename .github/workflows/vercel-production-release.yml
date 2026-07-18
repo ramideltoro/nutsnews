@@ -117,7 +117,13 @@ jobs:
           import { readFile, writeFile } from "node:fs/promises";
 
           const envPath = ".vercel/.env.production.local";
-          const shellSensitiveEnvNames = new Set(["HOME", "PATH", "Path", "SHELL"]);
+          const localBuildControlEnv = new Map([
+            ["HOME", process.env.HOME || "/home/runner"],
+            ["PATH", process.env.PATH || "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],
+            ["SHELL", "/bin/sh"],
+          ]);
+          const shellSensitiveEnvNames = new Set([...localBuildControlEnv.keys(), "Path"]);
+          const formatEnvLine = (name, value) => `${name}=${JSON.stringify(String(value))}`;
           try {
             const input = await readFile(envPath, "utf8");
             const lines = input.split(/\r?\n/);
@@ -125,10 +131,10 @@ jobs:
               const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)=/);
               return !match || !shellSensitiveEnvNames.has(match[1]);
             });
-            if (safeLines.length !== lines.length) {
-              await writeFile(envPath, `${safeLines.join("\n").replace(/\n*$/, "")}\n`);
-              console.log("Removed shell-sensitive Vercel env names before local build.");
-            }
+            const base = safeLines.join("\n").replace(/\n*$/, "");
+            const controlLines = [...localBuildControlEnv].map(([name, value]) => formatEnvLine(name, value));
+            await writeFile(envPath, `${base ? `${base}\n` : ""}${controlLines.join("\n")}\n`);
+            console.log("Prepared Vercel local build control env names: HOME, PATH, SHELL.");
           } catch (error) {
             if (error?.code !== "ENOENT") {
               throw error;
