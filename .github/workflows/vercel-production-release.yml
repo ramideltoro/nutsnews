@@ -28,9 +28,9 @@ jobs:
       VPS_STAGING_DEPLOYMENT_ID: ${{ github.event.client_payload.staging_deployment_id }}
       VPS_QUALIFICATION_RUN_ID: ${{ github.event.client_payload.qualification_run_id }}
       RELEASE_KIND: ${{ github.event.client_payload.release_kind }}
-      DATABASE_PROVIDER_MODE: ${{ github.event.client_payload.database_provider_mode || 'supabase_primary' }}
-      BACKEND_API_URL: ${{ github.event.client_payload.backend_api_url || '' }}
-      PROVIDER_SWITCH_CONFIRMATION: ${{ github.event.client_payload.provider_switch_confirmation || '' }}
+      DATABASE_PROVIDER_MODE: ${{ github.event.client_payload.provider_switch.database_provider_mode || 'supabase_primary' }}
+      BACKEND_API_URL: ${{ github.event.client_payload.provider_switch.backend_api_url || '' }}
+      PROVIDER_SWITCH_CONFIRMATION: ${{ github.event.client_payload.provider_switch.provider_switch_confirmation || '' }}
       BACKEND_POSTGRES_PRIMARY_CONFIRMATION: enable-backend-postgres-primary
       PRODUCTION_WRITES_PAUSED: ${{ github.event.client_payload.production_writes_paused || 'false' }}
       VERCEL_CONFIG_GENERATION: vercel-${{ github.event.client_payload.source_commit }}-${{ github.run_id }}-${{ github.run_attempt }}
