@@ -99,7 +99,6 @@ jobs:
       - name: Stage remote Vercel production candidate
         id: stage
         shell: bash
-        working-directory: web
         env:
           NUTSNEWS_BUILD_ID: ${{ env.BUILD_ID }}
           NUTSNEWS_CONFIG_GENERATION: ${{ env.VERCEL_CONFIG_GENERATION }}
