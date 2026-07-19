@@ -129,6 +129,7 @@ function assertRuntimeConfigIsPublic(config) {
   const expectedKeys = new Set([
     "runtimeEnv",
     "sideEffectsMode",
+    "databaseProviderMode",
     "supabaseUrl",
     "supabaseAnonKey",
     "turnstileSiteKey",
@@ -192,6 +193,8 @@ const expectedConfigGeneration = required(
 );
 const expectedSideEffectsMode =
   option("--expected-side-effects-mode") || process.env.NUTSNEWS_EXPECTED_SIDE_EFFECTS_MODE;
+const expectedDatabaseProviderMode =
+  option("--expected-database-provider-mode") || process.env.NUTSNEWS_EXPECTED_DATABASE_PROVIDER_MODE;
 const expectedTurnstileSiteKey =
   option("--expected-turnstile-site-key") || process.env.NUTSNEWS_EXPECTED_TURNSTILE_SITE_KEY;
 const expectedSentryDsn = option("--expected-sentry-dsn") || process.env.NUTSNEWS_EXPECTED_SENTRY_DSN;
@@ -263,6 +266,7 @@ if (
   expectedSupabaseUrl ||
   expectedImageDigest ||
   expectedSideEffectsMode ||
+  expectedDatabaseProviderMode ||
   expectedTurnstileSiteKey ||
   expectedSentryDsn ||
   expectedGaId ||
@@ -292,6 +296,9 @@ if (
   assertEqual(runtimeConfig.configGeneration, expectedConfigGeneration, "Runtime config generation");
   if (expectedSideEffectsMode) {
     assertEqual(runtimeConfig.sideEffectsMode, expectedSideEffectsMode, "Runtime side-effects mode");
+  }
+  if (expectedDatabaseProviderMode) {
+    assertEqual(runtimeConfig.databaseProviderMode, expectedDatabaseProviderMode, "Runtime database provider mode");
   }
   if (expectedTurnstileSiteKey) {
     assertEqual(runtimeConfig.turnstileSiteKey, expectedTurnstileSiteKey, "Runtime Turnstile site key");
