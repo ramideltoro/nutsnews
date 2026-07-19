@@ -96,7 +96,7 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: Build and stage Vercel production candidate
+      - name: Stage remote Vercel production candidate
         id: stage
         shell: bash
         working-directory: web
@@ -131,12 +131,28 @@ jobs:
             }
           }
           NODE
-          export HOME="${HOME:-/home/runner}"
-          export PATH="${PATH:-/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
-          export SHELL="/bin/sh"
-          npx --yes vercel@latest build --prod --token "$VERCEL_TOKEN"
+          vercel_identity_flags=(
+            --build-env "NUTSNEWS_BUILD_ID=$BUILD_ID"
+            --build-env "NUTSNEWS_CONFIG_GENERATION=$VERCEL_CONFIG_GENERATION"
+            --build-env "NUTSNEWS_DEPLOYMENT_TARGET=vercel-production"
+            --build-env "NUTSNEWS_SOURCE_COMMIT=$SOURCE_COMMIT"
+            --build-env "NEXT_PUBLIC_NUTSNEWS_BUILD_ID=$BUILD_ID"
+            --build-env "NEXT_PUBLIC_NUTSNEWS_SOURCE_COMMIT=$SOURCE_COMMIT"
+            --env "NUTSNEWS_BUILD_ID=$BUILD_ID"
+            --env "NUTSNEWS_CONFIG_GENERATION=$VERCEL_CONFIG_GENERATION"
+            --env "NUTSNEWS_DEPLOYMENT_TARGET=vercel-production"
+            --env "NUTSNEWS_SOURCE_COMMIT=$SOURCE_COMMIT"
+            --env "NEXT_PUBLIC_NUTSNEWS_BUILD_ID=$BUILD_ID"
+            --env "NEXT_PUBLIC_NUTSNEWS_SOURCE_COMMIT=$SOURCE_COMMIT"
+          )
           deploy_output="$RUNNER_TEMP/vercel-production-deploy.txt"
-          npx --yes vercel@latest deploy --prebuilt --prod --skip-domain --token "$VERCEL_TOKEN" > "$deploy_output"
+          npx --yes vercel@latest deploy \
+            --prod \
+            --skip-domain \
+            --force \
+            --archive=tgz \
+            --token "$VERCEL_TOKEN" \
+            "${vercel_identity_flags[@]}" > "$deploy_output"
           deployment_url="$(grep -Eo 'https://[^[:space:]]+' "$deploy_output" | tail -n 1)"
           if [[ -z "$deployment_url" ]]; then
             echo "Vercel CLI did not return a deployment URL." >&2
