@@ -101,6 +101,10 @@ jobs:
         shell: bash
         working-directory: web
         env:
+          SHELL: /bin/sh
+          HOME: /home/runner
+          PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+          NPM_CONFIG_SCRIPT_SHELL: /bin/sh
           NUTSNEWS_BUILD_ID: ${{ env.BUILD_ID }}
           NUTSNEWS_CONFIG_GENERATION: ${{ env.VERCEL_CONFIG_GENERATION }}
           NUTSNEWS_DEPLOYMENT_TARGET: vercel-production
@@ -119,9 +123,10 @@ jobs:
             ["HOME", process.env.HOME || "/home/runner"],
             ["PATH", process.env.PATH || "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],
             ["SHELL", "/bin/sh"],
+            ["NPM_CONFIG_SCRIPT_SHELL", process.env.NPM_CONFIG_SCRIPT_SHELL || "/bin/sh"],
           ]);
-          const shellSensitiveEnvNames = new Set([...localBuildControlEnv.keys(), "Path"]);
-          const formatEnvLine = (name, value) => `${name}=${JSON.stringify(String(value))}`;
+          const shellSensitiveEnvNames = new Set([...localBuildControlEnv.keys(), "Path", "NPM_CONFIG_SCRIPT_SHELL"]);
+          const formatEnvLine = (name, value) => `${name}=${String(value)}`;
           try {
             const input = await readFile(envPath, "utf8");
             const lines = input.split(/\r?\n/);
