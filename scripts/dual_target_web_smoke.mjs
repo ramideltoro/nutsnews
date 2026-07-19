@@ -137,6 +137,16 @@ function assertEqual(actual, expected, label) {
   }
 }
 
+function optionalBoolean(value, label) {
+  if (value === undefined || value === "") {
+    return undefined;
+  }
+  if (!["true", "false"].includes(value)) {
+    throw new Error(`${label} must be true or false`);
+  }
+  return value === "true";
+}
+
 function assertRuntimeConfigIsPublic(config) {
   const expectedKeys = new Set([
     "runtimeEnv",
@@ -208,6 +218,10 @@ const expectedSideEffectsMode =
   option("--expected-side-effects-mode") || process.env.NUTSNEWS_EXPECTED_SIDE_EFFECTS_MODE;
 const expectedDatabaseProviderMode =
   option("--expected-database-provider-mode") || process.env.NUTSNEWS_EXPECTED_DATABASE_PROVIDER_MODE;
+const expectedProductionWritesPaused = optionalBoolean(
+  option("--expected-production-writes-paused") || process.env.NUTSNEWS_EXPECTED_PRODUCTION_WRITES_PAUSED,
+  "--expected-production-writes-paused or NUTSNEWS_EXPECTED_PRODUCTION_WRITES_PAUSED",
+);
 const expectedTurnstileSiteKey =
   option("--expected-turnstile-site-key") || process.env.NUTSNEWS_EXPECTED_TURNSTILE_SITE_KEY;
 const expectedSentryDsn = option("--expected-sentry-dsn") || process.env.NUTSNEWS_EXPECTED_SENTRY_DSN;
@@ -270,6 +284,14 @@ assertEqual(readinessResponse.headers.get("x-nutsnews-build-id"), expectedBuildI
 assertEqual(readinessResponse.headers.get("x-nutsnews-deployment-target"), expectedDeploymentTarget, "Readiness deployment target header");
 assertEqual(readinessResponse.headers.get("x-nutsnews-runtime-environment"), expectedRuntimeEnv, "Readiness runtime environment header");
 assertEqual(readinessResponse.headers.get("x-nutsnews-config-generation"), expectedConfigGeneration, "Readiness config generation header");
+if (expectedProductionWritesPaused !== undefined) {
+  assertEqual(readiness.productionWritesPaused, expectedProductionWritesPaused, "Readiness production writes paused");
+  assertEqual(
+    readinessResponse.headers.get("x-nutsnews-production-writes-paused"),
+    String(expectedProductionWritesPaused),
+    "Readiness production writes paused header",
+  );
+}
 if (expectedImageDigest) {
   assertEqual(readinessResponse.headers.get("x-nutsnews-expected-image-digest"), expectedImageDigest, "Readiness image digest header");
 }
@@ -280,6 +302,7 @@ if (
   expectedImageDigest ||
   expectedSideEffectsMode ||
   expectedDatabaseProviderMode ||
+  expectedProductionWritesPaused !== undefined ||
   expectedTurnstileSiteKey ||
   expectedSentryDsn ||
   expectedGaId ||
@@ -312,6 +335,9 @@ if (
   }
   if (expectedDatabaseProviderMode) {
     assertEqual(runtimeConfig.databaseProviderMode, expectedDatabaseProviderMode, "Runtime database provider mode");
+  }
+  if (expectedProductionWritesPaused !== undefined) {
+    assertEqual(runtimeConfig.productionWritesPaused, expectedProductionWritesPaused, "Runtime production writes paused");
   }
   if (expectedTurnstileSiteKey) {
     assertEqual(runtimeConfig.turnstileSiteKey, expectedTurnstileSiteKey, "Runtime Turnstile site key");
