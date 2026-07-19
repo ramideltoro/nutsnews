@@ -107,8 +107,13 @@ requireText(vercelProductionWorkflow, "Promote staged Vercel deployment after qu
 requireText(vercelProductionWorkflow, "Export current Vercel smoke helper", "Vercel production must export current smoke automation before staging.");
 requireText(
   vercelProductionWorkflow,
-  'git show "$GITHUB_SHA:scripts/dual_target_web_smoke.mjs" > "$RUNNER_TEMP/dual_target_web_smoke.mjs"',
-  "Vercel production must run the current workflow commit smoke helper, not the qualified source commit copy.",
+  "https://api.github.com/repos/${repo}/contents/scripts/dual_target_web_smoke.mjs?ref=${sha}",
+  "Vercel production must export the current workflow commit smoke helper through the GitHub Contents API.",
+);
+requireText(
+  vercelProductionWorkflow,
+  "application/vnd.github.raw",
+  "Vercel production must export the smoke helper as raw source content.",
 );
 requireText(
   workflowStep(vercelProductionWorkflow, "Run staged Vercel qualification smoke"),
