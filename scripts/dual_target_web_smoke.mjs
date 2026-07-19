@@ -406,7 +406,8 @@ if (productionSafeSurfaces) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email: "invalid", message: "" }),
   });
-  if (![400, 422].includes(contactResponse.status)) {
+  const expectedContactStatuses = expectedProductionWritesPaused === true ? [503] : [400, 422];
+  if (!expectedContactStatuses.includes(contactResponse.status)) {
     throw new Error(`Contact validation probe returned HTTP ${contactResponse.status}`);
   }
 

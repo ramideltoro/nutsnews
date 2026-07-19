@@ -204,6 +204,11 @@ requireText(dualTargetSmoke, "VERCEL_SET_BYPASS_COOKIE", "Programmatic Vercel sm
 requireText(dualTargetSmoke, "--expected-production-writes-paused", "Post-production smoke must expose a production writer-pause assertion.");
 requireText(dualTargetSmoke, "Readiness production writes paused header", "Post-production smoke must assert the readiness pause header.");
 requireText(dualTargetSmoke, "Runtime production writes paused", "Post-production smoke must assert the runtime config pause value.");
+requireText(
+  dualTargetSmoke,
+  "expectedProductionWritesPaused === true ? [503] : [400, 422]",
+  "Post-production smoke must expect contact validation to be write-blocked during production writer pause.",
+);
 assert.doesNotMatch(
   dualTargetSmoke,
   /"x-vercel-protection-bypass": bypassSecret,\s*"x-vercel-set-bypass-cookie": "true"/,
