@@ -1,5 +1,10 @@
 export type RuntimeEnvironment = "staging" | "production" | "invalid";
 export type SideEffectsMode = "disabled" | "sandbox" | "live";
+export type DatabaseProviderMode =
+  | "supabase_primary"
+  | "backend_postgres_shadow"
+  | "backend_postgres_primary"
+  | "invalid";
 
 export interface RuntimeSafetyPolicy {
   ready: boolean;
@@ -7,6 +12,8 @@ export interface RuntimeSafetyPolicy {
   sideEffectsMode: SideEffectsMode;
   dataEnvironment: RuntimeEnvironment;
   credentialsEnvironment: RuntimeEnvironment;
+  databaseProviderMode: DatabaseProviderMode;
+  productionWritesPaused: boolean;
   code: string;
 }
 
@@ -26,6 +33,8 @@ export function getSafeReadiness(env?: NodeJS.ProcessEnv): Readonly<{
   ready: boolean;
   runtimeEnv: RuntimeEnvironment;
   sideEffectsMode: SideEffectsMode;
+  databaseProviderMode: DatabaseProviderMode;
+  productionWritesPaused: boolean;
   code: string;
 }>;
 export function assertDataRead(operation?: string, env?: NodeJS.ProcessEnv): RuntimeSafetyPolicy;

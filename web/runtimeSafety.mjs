@@ -9,6 +9,7 @@ const DATABASE_PROVIDER_MODES = new Set([
 const PROJECT_REF_PATTERN = /^[a-z0-9][a-z0-9-]{2,62}$/;
 const SYNTHETIC_NAMESPACE_PATTERN = /^nutsnews-test-[a-z0-9][a-z0-9-]{5,96}$/;
 const BACKEND_POSTGRES_PRIMARY_CONFIRMATION = "enable-backend-postgres-primary";
+const TRUTHY_CONFIG_VALUES = new Set(["1", "true", "yes", "on"]);
 
 const SUPABASE_URL_VARIABLES = [
   "NUTSNEWS_SUPABASE_URL",
@@ -100,6 +101,12 @@ function getDatabaseProviderModeValue(env) {
   return envValue(env, "NUTSNEWS_DATABASE_PROVIDER_MODE") || "supabase_primary";
 }
 
+function isProductionWritesPaused(env) {
+  return TRUTHY_CONFIG_VALUES.has(
+    envValue(env, "NUTSNEWS_PRODUCTION_WRITES_PAUSED").toLowerCase(),
+  );
+}
+
 function hasBackendApiConfig(env) {
   return envValue(env, "NUTSNEWS_BACKEND_API_URL") !== "" && envValue(env, "NUTSNEWS_BACKEND_API_TOKEN") !== "";
 }
@@ -138,6 +145,7 @@ function basePolicy(env) {
   const databaseProviderMode = getDatabaseProviderModeValue(env);
   const supabasePrimaryRequired = databaseProviderMode !== "backend_postgres_primary";
   const backendApiRequired = databaseProviderMode !== "supabase_primary";
+  const productionWritesPaused = isProductionWritesPaused(env);
 
   if (!RUNTIME_ENVS.has(runtimeEnv)) {
     reasons.push("runtime_environment_invalid");
@@ -251,6 +259,7 @@ function basePolicy(env) {
     databaseProviderMode: DATABASE_PROVIDER_MODES.has(databaseProviderMode)
       ? databaseProviderMode
       : "invalid",
+    productionWritesPaused,
     code: reasons[0] ?? "ready",
   };
 }
@@ -276,6 +285,15 @@ function refuse(code, message) {
   throw new RuntimeSafetyError(code, message);
 }
 
+function assertProductionWritesNotPaused(policy) {
+  if (policy.productionWritesPaused) {
+    refuse(
+      "production_writes_paused",
+      "Production writes and external side effects are paused for a database cutover window.",
+    );
+  }
+}
+
 export function assertRuntimeReady(env = process.env) {
   const policy = getRuntimeSafetyPolicy(env);
   if (!policy.ready) {
@@ -291,6 +309,7 @@ export function getSafeReadiness(env = process.env) {
     runtimeEnv: policy.runtimeEnv,
     sideEffectsMode: policy.sideEffectsMode,
     databaseProviderMode: policy.databaseProviderMode,
+    productionWritesPaused: policy.productionWritesPaused,
     code: policy.code,
   });
 }
@@ -330,6 +349,7 @@ export function assertProductionOperation(operation = "production-operation", en
       "This operation is disabled outside the live production runtime.",
     );
   }
+  assertProductionWritesNotPaused(policy);
   return policy;
 }
 
@@ -388,6 +408,9 @@ export function assertIsolatedDataMutation(operation = "isolated-data-mutation",
     (policy.runtimeEnv === "production" && policy.sideEffectsMode === "live") ||
     (policy.runtimeEnv === "staging" && policy.sideEffectsMode === "sandbox")
   ) {
+    if (policy.runtimeEnv === "production" && policy.productionWritesPaused) {
+      assertProductionWritesNotPaused(policy);
+    }
     return policy;
   }
   refuse(
@@ -427,6 +450,7 @@ export function isSandboxEndpoint(endpoint) {
 export function assertExternalSideEffect(operation, endpoint, env = process.env) {
   const policy = assertRuntimeReady(env);
   if (policy.runtimeEnv === "production" && policy.sideEffectsMode === "live") {
+    assertProductionWritesNotPaused(policy);
     return policy;
   }
   if (policy.runtimeEnv === "staging" && policy.sideEffectsMode === "sandbox" && isSandboxEndpoint(endpoint)) {

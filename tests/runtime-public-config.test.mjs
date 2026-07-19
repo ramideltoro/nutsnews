@@ -57,6 +57,8 @@ test("runtime public configuration differs by runtime environment without serial
   assert.equal(production.runtimeEnv, "production");
   assert.equal(staging.databaseProviderMode, "supabase_primary");
   assert.equal(production.databaseProviderMode, "supabase_primary");
+  assert.equal(staging.productionWritesPaused, false);
+  assert.equal(production.productionWritesPaused, false);
   assert.equal(staging.supabaseUrl, "https://staging-project.supabase.co");
   assert.equal(production.supabaseUrl, "https://production-project.supabase.co");
   assert.equal(staging.telemetryEnabled, false);
@@ -139,6 +141,26 @@ test("backend primary runtime config exposes provider mode without Supabase or b
   assert.equal(config.supabaseAnonKey, null);
   assert.doesNotMatch(serialized, /server-only-backend-token/);
   assert.doesNotMatch(serialized, /api\/app\/db/);
+});
+
+test("runtime public configuration exposes only the production writer pause boolean", () => {
+  const config = getRuntimePublicConfig({
+    NUTSNEWS_RUNTIME_ENV: "production",
+    NUTSNEWS_SIDE_EFFECTS_MODE: "live",
+    NUTSNEWS_DATA_ENVIRONMENT: "production",
+    NUTSNEWS_SUPABASE_CREDENTIALS_ENV: "production",
+    NUTSNEWS_SUPABASE_PROJECT_REF: "production-project",
+    NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: "production-project",
+    NUTSNEWS_PUBLIC_SUPABASE_URL: "https://production-project.supabase.co",
+    NUTSNEWS_PUBLIC_SUPABASE_ANON_KEY: "production-public-anon-key",
+    NUTSNEWS_PRODUCTION_WRITES_PAUSED: "on",
+    SUPABASE_SERVICE_ROLE_KEY: "server-only-production-secret",
+  });
+  const serialized = JSON.stringify(config);
+
+  assert.equal(config.runtimeEnv, "production");
+  assert.equal(config.productionWritesPaused, true);
+  assert.doesNotMatch(serialized, /server-only-production-secret/);
 });
 
 test("unknown environments and malformed image digests fail closed", () => {

@@ -9,6 +9,7 @@ export type RuntimeReadiness = {
     | "backend_postgres_shadow"
     | "backend_postgres_primary"
     | "invalid";
+  productionWritesPaused: boolean;
   code: string;
   sourceCommit: string;
   buildId: string;

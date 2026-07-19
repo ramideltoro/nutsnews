@@ -156,6 +156,7 @@ function result(policy, identity, ready, code) {
     runtimeEnv: policy.runtimeEnv,
     sideEffectsMode: policy.sideEffectsMode,
     databaseProviderMode: policy.databaseProviderMode,
+    productionWritesPaused: policy.productionWritesPaused,
     code,
     sourceCommit: identity.sourceCommit,
     buildId: identity.buildId,

@@ -171,6 +171,7 @@ beforeEach(() => {
   mocks.getRuntimePublicConfig.mockReturnValue({
     runtimeEnv: "staging",
     databaseProviderMode: "supabase_primary",
+    productionWritesPaused: false,
     deploymentTarget: "test",
     supabaseUrl: "https://staging-fixture.supabase.co",
     supabaseAnonKey: null,
@@ -329,6 +330,7 @@ describe("runtime config route handler", () => {
     expect(body).toMatchObject({
       runtimeEnv: "staging",
       databaseProviderMode: "supabase_primary",
+      productionWritesPaused: false,
       deploymentTarget: "test",
       supabaseUrl: "https://staging-fixture.supabase.co",
     });

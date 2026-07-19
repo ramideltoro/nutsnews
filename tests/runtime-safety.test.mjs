@@ -8,9 +8,11 @@ import {
   assertExternalSideEffect,
   assertIsolatedDataMutation,
   assertOAuthCallback,
+  assertProductionOperation,
   assertSyntheticFixtureMutation,
   getRuntimeSafetyPolicy,
   getSafeReadiness,
+  isTelemetryDeliveryAllowed,
 } from "../web/runtimeSafety.mjs";
 
 function stagingEnvironment(overrides = {}) {
@@ -135,11 +137,43 @@ test("staging recognizes Docker's isolated fixture hostname without allowing pro
 });
 
 test("only live production can perform production mutations", () => {
+  const policy = getRuntimeSafetyPolicy(productionEnvironment());
+
+  assert.equal(policy.productionWritesPaused, false);
   assert.doesNotThrow(() => assertDataMutation("admin-feed", productionEnvironment()));
   assert.throws(
     () => assertSyntheticFixtureMutation("nutsnews-test-production-fixture", productionEnvironment()),
     RuntimeSafetyError,
   );
+});
+
+test("production writer pause blocks app writes and external effects while preserving reads", () => {
+  const environment = productionEnvironment({ NUTSNEWS_PRODUCTION_WRITES_PAUSED: "true" });
+  const policy = getRuntimeSafetyPolicy(environment);
+  const readiness = getSafeReadiness(environment);
+
+  assert.equal(policy.ready, true);
+  assert.equal(policy.productionWritesPaused, true);
+  assert.equal(readiness.ready, true);
+  assert.equal(readiness.productionWritesPaused, true);
+  assert.doesNotThrow(() => assertDataRead("public-reader", environment));
+  assert.throws(
+    () => assertProductionOperation("admin-operation", environment),
+    (error) => error instanceof RuntimeSafetyError && error.code === "production_writes_paused",
+  );
+  assert.throws(
+    () => assertDataMutation("admin-feed", environment),
+    (error) => error instanceof RuntimeSafetyError && error.code === "production_writes_paused",
+  );
+  assert.throws(
+    () => assertIsolatedDataMutation("quota-usage-event", environment),
+    (error) => error instanceof RuntimeSafetyError && error.code === "production_writes_paused",
+  );
+  assert.throws(
+    () => assertExternalSideEffect("contact-form-delivery", "https://api.resend.com/emails", environment),
+    (error) => error instanceof RuntimeSafetyError && error.code === "production_writes_paused",
+  );
+  assert.equal(isTelemetryDeliveryAllowed(environment), false);
 });
 
 test("OAuth callbacks preserve production behavior and allow only the isolated staging identity", () => {
