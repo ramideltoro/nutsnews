@@ -97,13 +97,19 @@ assert.ok(
     vercelProductionWorkflow.indexOf("Verify Vercel production identity"),
   "Vercel production aliases must be verified only after promotion.",
 );
-requireText(vercelProductionWorkflow, "localBuildControlEnv", "Vercel production must set local build control env names for the CI shell.");
-requireText(vercelProductionWorkflow, "safeControlEnvValuePattern", "Vercel production must validate local build control env values before writing them.");
+requireText(vercelProductionWorkflow, 'new Set(["HOME", "PATH", "Path", "SHELL"])', "Vercel production must strip shell control env names from the pulled env file.");
+requireText(vercelProductionWorkflow, "Removed shell-sensitive env names from Vercel local build env file.", "Vercel production must report when shell control env names were stripped.");
+requireText(vercelProductionWorkflow, 'export SHELL="/bin/sh"', "Vercel production must set the runner shell without writing it to the dotenv file.");
 assert.ok(
   !vercelProductionWorkflow.includes("JSON.stringify(String(value))"),
   "Vercel production must not JSON-quote PATH/SHELL/HOME in .vercel env files.",
 );
-requireText(vercelProductionWorkflow, "Prepared Vercel local build control env names: HOME, PATH, SHELL.", "Vercel production must report when local build control env names were prepared.");
+assert.ok(
+  !vercelProductionWorkflow.includes("localBuildControlEnv") &&
+    !vercelProductionWorkflow.includes("safeControlEnvValuePattern") &&
+    !vercelProductionWorkflow.includes("formatEnvLine"),
+  "Vercel production must not write shell control env names back into .vercel env files.",
+);
 requireText(vercelProductionWorkflow, "VERCEL_TOKEN", "Vercel production must use the scoped Vercel token secret.");
 requireText(vercelProductionWorkflow, "VERCEL_ORG_ID", "Vercel production must set the Vercel org identity.");
 requireText(vercelProductionWorkflow, "VERCEL_PROJECT_ID", "Vercel production must set the Vercel project identity.");
