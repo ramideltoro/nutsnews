@@ -104,6 +104,21 @@ assert.ok(
 requireText(vercelProductionWorkflow, "vercel@latest promote \"$VERCEL_DEPLOYMENT_ID\"", "Vercel production must promote the qualified deployment through Vercel.");
 requireText(vercelProductionWorkflow, "Run staged Vercel qualification smoke", "Vercel production must qualify the staged deployment before promotion.");
 requireText(vercelProductionWorkflow, "Promote staged Vercel deployment after qualification", "Vercel production must promote only after the staged smoke.");
+requireText(vercelProductionWorkflow, "Export current Vercel smoke helper", "Vercel production must export current smoke automation before staging.");
+requireText(
+  vercelProductionWorkflow,
+  'git show "$GITHUB_SHA:scripts/dual_target_web_smoke.mjs" > "$RUNNER_TEMP/dual_target_web_smoke.mjs"',
+  "Vercel production must run the current workflow commit smoke helper, not the qualified source commit copy.",
+);
+requireText(
+  workflowStep(vercelProductionWorkflow, "Run staged Vercel qualification smoke"),
+  'node "$RUNNER_TEMP/dual_target_web_smoke.mjs"',
+  "Vercel staged smoke must use the exported current smoke helper.",
+);
+assert.ok(
+  !workflowStep(vercelProductionWorkflow, "Run staged Vercel qualification smoke").includes("node ../scripts/dual_target_web_smoke.mjs"),
+  "Vercel staged smoke must not run the qualified source commit smoke helper.",
+);
 assert.ok(
   vercelProductionWorkflow.indexOf("Run staged Vercel qualification smoke") <
     vercelProductionWorkflow.indexOf("Promote staged Vercel deployment after qualification"),
