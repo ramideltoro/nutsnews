@@ -255,7 +255,6 @@ jobs:
           const headers = bypass
             ? {
                 "x-vercel-protection-bypass": bypass,
-                "x-vercel-set-bypass-cookie": "true",
               }
             : {};
           const targets = [

@@ -175,5 +175,15 @@ requireText(dualTargetSmoke, "Contact validation probe", "Post-production smoke 
 requireText(dualTargetSmoke, "Auth session probe", "Post-production smoke must include an auth surface probe.");
 requireText(dualTargetSmoke, "Next.js static asset", "Post-production smoke must include a public asset probe.");
 requireText(dualTargetSmoke, "Public articles CORS probe", "Post-production smoke must include a CORS-shape probe.");
+requireText(dualTargetSmoke, "VERCEL_SET_BYPASS_COOKIE", "Programmatic Vercel smoke must make bypass-cookie setup explicit.");
+assert.doesNotMatch(
+  dualTargetSmoke,
+  /"x-vercel-protection-bypass": bypassSecret,\s*"x-vercel-set-bypass-cookie": "true"/,
+  "Programmatic Vercel smoke must not request bypass-cookie redirects by default.",
+);
+assert.ok(
+  !workflowStep(vercelProductionWorkflow, "Verify Vercel production identity").includes('"x-vercel-set-bypass-cookie": "true"'),
+  "Programmatic Vercel production identity verification must not request bypass-cookie redirects.",
+);
 
 console.log("Staging release workflow regression checks passed.");
