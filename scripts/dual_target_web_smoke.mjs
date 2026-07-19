@@ -21,12 +21,24 @@ function accessHeaders(env = process.env) {
 function vercelProtectionHeaders(env = process.env) {
   const bypassSecret = String(env.VERCEL_AUTOMATION_BYPASS_SECRET ?? "").trim();
 
-  return bypassSecret
-    ? {
-        "x-vercel-protection-bypass": bypassSecret,
-        "x-vercel-set-bypass-cookie": "true",
-      }
-    : {};
+  if (!bypassSecret) {
+    return {};
+  }
+
+  const headers = {
+    "x-vercel-protection-bypass": bypassSecret,
+  };
+  const bypassCookie = String(env.VERCEL_SET_BYPASS_COOKIE ?? "").trim().toLowerCase();
+
+  if (bypassCookie && !["true", "samesitenone"].includes(bypassCookie)) {
+    throw new Error('VERCEL_SET_BYPASS_COOKIE must be "true", "samesitenone", or unset');
+  }
+
+  if (bypassCookie) {
+    headers["x-vercel-set-bypass-cookie"] = bypassCookie;
+  }
+
+  return headers;
 }
 
 const protectedHeaders = {
