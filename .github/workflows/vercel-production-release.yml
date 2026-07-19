@@ -121,7 +121,14 @@ jobs:
             ["SHELL", "/bin/sh"],
           ]);
           const shellSensitiveEnvNames = new Set([...localBuildControlEnv.keys(), "Path"]);
-          const formatEnvLine = (name, value) => `${name}=${JSON.stringify(String(value))}`;
+          const safeControlEnvValuePattern = /^[A-Za-z0-9_./:@%+=,-]+$/;
+          const formatEnvLine = (name, value) => {
+            const normalized = String(value);
+            if (!safeControlEnvValuePattern.test(normalized)) {
+              throw new Error(`Refusing to write unsafe local build control env value for ${name}.`);
+            }
+            return `${name}=${normalized}`;
+          };
           try {
             const input = await readFile(envPath, "utf8");
             const lines = input.split(/\r?\n/);
