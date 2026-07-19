@@ -5,6 +5,11 @@ import { useEffect, useState } from "react";
 export type RuntimePublicConfig = {
   runtimeEnv: "staging" | "production" | "unknown";
   sideEffectsMode: "disabled" | "sandbox" | "live";
+  databaseProviderMode:
+    | "supabase_primary"
+    | "backend_postgres_shadow"
+    | "backend_postgres_primary"
+    | "invalid";
   supabaseUrl: string | null;
   supabaseAnonKey: string | null;
   turnstileSiteKey: string | null;

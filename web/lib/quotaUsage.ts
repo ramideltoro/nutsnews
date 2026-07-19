@@ -1,5 +1,40 @@
+import {
+  callBackendDatabaseOperation,
+  type DatabaseProviderMode,
+} from "@/lib/backendDatabase";
 import { getServerSupabase } from "@/lib/supabase";
-import { RuntimeSafetyError, assertIsolatedDataMutation } from "@/lib/runtimeSafety";
+import {
+  RuntimeSafetyError,
+  assertIsolatedDataMutation,
+  getDatabaseProviderMode,
+} from "@/lib/runtimeSafety";
+
+type QuotaUsageEvent = {
+  eventType: string;
+  eventSource: string;
+  provider?: string;
+  quantity?: number;
+  metadata?: Record<string, unknown>;
+};
+
+async function recordBackendQuotaUsageEvent({
+  eventType,
+  eventSource,
+  provider,
+  quantity = 1,
+  metadata = {},
+}: QuotaUsageEvent) {
+  await callBackendDatabaseOperation("record-quota-usage-event", {
+    eventType,
+    eventSource,
+    provider: provider ?? null,
+    quantity,
+    metadata,
+    // Before production cutover, verify this operation against the backend
+    // runbook evidence in nutsnews-backend#119.
+    cutoverRunbook: "runbooks/DB_MIGRATION_PRODUCTION_CUTOVER.md",
+  });
+}
 
 export async function recordQuotaUsageEvent({
   eventType,
@@ -16,6 +51,20 @@ export async function recordQuotaUsageEvent({
 }) {
   try {
     assertIsolatedDataMutation("quota-usage-event");
+    const providerMode = getDatabaseProviderMode() as DatabaseProviderMode;
+
+    if (providerMode === "backend_postgres_primary") {
+      await recordBackendQuotaUsageEvent({
+        eventType,
+        eventSource,
+        provider,
+        quantity,
+        metadata,
+      });
+
+      return true;
+    }
+
     const supabase = getServerSupabase();
 
     const { error } = await supabase.from("quota_usage_events").insert({

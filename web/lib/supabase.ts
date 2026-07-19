@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { assertDataRead } from "@/lib/runtimeSafety";
+import { assertDataRead, assertSupabasePrimaryAllowed } from "@/lib/runtimeSafety";
 
 type ServerSupabaseConfig = {
   url: string;
@@ -17,6 +17,7 @@ function getConfiguredServerSupabaseUrl() {
 
 export function getServerSupabaseConfig(): ServerSupabaseConfig {
   assertDataRead("server-supabase-config");
+  assertSupabasePrimaryAllowed("server-supabase-config");
 
   const url = getConfiguredServerSupabaseUrl();
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -41,6 +42,7 @@ export function getServerSupabase() {
 
 export function getSupabase() {
   assertDataRead("public-supabase-reader");
+  assertSupabasePrimaryAllowed("public-supabase-reader");
 
   const supabaseUrl =
     process.env.NUTSNEWS_PUBLIC_SUPABASE_URL ??

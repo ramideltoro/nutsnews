@@ -59,6 +59,7 @@ export function getRuntimePublicConfig(env = process.env) {
   return {
     runtimeEnv: resolvedRuntimeEnv,
     sideEffectsMode: resolvedSideEffectsMode,
+    databaseProviderMode: runtimeReady ? policy.databaseProviderMode : "invalid",
     supabaseUrl: runtimeReady
       ? publicUrl(env, "NUTSNEWS_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL")
       : null,

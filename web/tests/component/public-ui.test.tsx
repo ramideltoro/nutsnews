@@ -15,6 +15,7 @@ vi.mock("@/lib/runtimePublicConfigClient", () => ({
   useRuntimePublicConfig: () => ({
     runtimeEnv: "staging",
     sideEffectsMode: "disabled",
+    databaseProviderMode: "supabase_primary",
     supabaseUrl: null,
     supabaseAnonKey: null,
     turnstileSiteKey: null,

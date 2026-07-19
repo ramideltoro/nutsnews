@@ -1,5 +1,13 @@
+import {
+  callBackendDatabaseOperation,
+  type DatabaseProviderMode,
+} from "@/lib/backendDatabase";
 import { getServerSupabase } from "@/lib/supabase";
-import { RuntimeSafetyError, assertIsolatedDataMutation } from "@/lib/runtimeSafety";
+import {
+  RuntimeSafetyError,
+  assertIsolatedDataMutation,
+  getDatabaseProviderMode,
+} from "@/lib/runtimeSafety";
 
 export type ArticleEngagementEventType = "outbound_click" | "category_interest";
 
@@ -7,6 +15,29 @@ export type ArticleEngagementRecordResult = {
   recorded: boolean;
   reason: "recorded" | "runtime_disabled" | "database_error";
 };
+
+async function recordBackendArticleEngagementEvent({
+  eventType,
+  articleId,
+  source,
+  category,
+}: {
+  eventType: ArticleEngagementEventType;
+  articleId: string | null;
+  source: string;
+  category: string;
+}) {
+  await callBackendDatabaseOperation("record-article-engagement-event", {
+    eventType,
+    articleId: eventType === "category_interest" ? null : articleId,
+    source,
+    category,
+    quantity: 1,
+    // Before production cutover, verify this operation against the backend
+    // runbook evidence in nutsnews-backend#119.
+    cutoverRunbook: "runbooks/DB_MIGRATION_PRODUCTION_CUTOVER.md",
+  });
+}
 
 export async function recordArticleEngagementEvent({
   eventType,
@@ -21,6 +52,22 @@ export async function recordArticleEngagementEvent({
 }): Promise<ArticleEngagementRecordResult> {
   try {
     assertIsolatedDataMutation("article-engagement-event");
+    const providerMode = getDatabaseProviderMode() as DatabaseProviderMode;
+
+    if (providerMode === "backend_postgres_primary") {
+      await recordBackendArticleEngagementEvent({
+        eventType,
+        articleId,
+        source,
+        category,
+      });
+
+      return {
+        recorded: true,
+        reason: "recorded",
+      };
+    }
+
     const supabase = getServerSupabase();
 
     const { error } = await supabase.rpc("record_article_engagement_event", {
