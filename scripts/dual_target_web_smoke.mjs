@@ -130,6 +130,7 @@ function assertRuntimeConfigIsPublic(config) {
     "runtimeEnv",
     "sideEffectsMode",
     "databaseProviderMode",
+    "productionWritesPaused",
     "supabaseUrl",
     "supabaseAnonKey",
     "turnstileSiteKey",

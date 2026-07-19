@@ -68,14 +68,27 @@ test("readiness accepts staging and production configurations for the same immut
   assert.equal(staging.code, "ready");
   assert.equal(staging.runtimeEnv, "staging");
   assert.equal(staging.databaseProviderMode, "supabase_primary");
+  assert.equal(staging.productionWritesPaused, false);
   assert.equal(staging.deploymentTarget, "vps-staging");
   assert.equal(production.ready, true);
   assert.equal(production.code, "ready");
   assert.equal(production.runtimeEnv, "production");
   assert.equal(production.databaseProviderMode, "supabase_primary");
+  assert.equal(production.productionWritesPaused, false);
   assert.equal(production.deploymentTarget, "production-vps");
   assert.equal(staging.expectedImageDigest, production.expectedImageDigest);
   assert.notEqual(staging.configGeneration, production.configGeneration);
+});
+
+test("readiness stays healthy while exposing a production writer pause", async () => {
+  const readiness = await evaluate(
+    productionEnvironment({ NUTSNEWS_PRODUCTION_WRITES_PAUSED: "yes" }),
+  );
+
+  assert.equal(readiness.ready, true);
+  assert.equal(readiness.code, "ready");
+  assert.equal(readiness.runtimeEnv, "production");
+  assert.equal(readiness.productionWritesPaused, true);
 });
 
 test("Vercel retains the existing runtime-safety readiness contract without OCI-only inputs", async () => {

@@ -1393,6 +1393,8 @@ async function testReadinessContract() {
           ready: readinessCalls === 2,
           runtimeEnv: "staging",
           sideEffectsMode: "disabled",
+          databaseProviderMode: "supabase_primary",
+          productionWritesPaused: false,
           code: readinessCalls === 2 ? "ready" : "staging_production_project_rejected",
           sourceCommit: "source-commit",
           buildId: "build-id",
@@ -1427,6 +1429,8 @@ async function testReadinessContract() {
     service: "nutsnews-web",
     runtimeEnv: "staging",
     sideEffectsMode: "disabled",
+    databaseProviderMode: "supabase_primary",
+    productionWritesPaused: false,
     code: "staging_production_project_rejected",
   });
 

@@ -10,6 +10,7 @@ export type RuntimePublicConfig = {
     | "backend_postgres_shadow"
     | "backend_postgres_primary"
     | "invalid";
+  productionWritesPaused: boolean;
   supabaseUrl: string | null;
   supabaseAnonKey: string | null;
   turnstileSiteKey: string | null;
