@@ -27,7 +27,7 @@
     "test:supabase-rls": "node ../scripts/supabase_rls_regression.mjs",
     "test:security-headers": "node scripts/assert-security-headers.mjs",
     "test:runtime-config": "node --test ../tests/runtime-public-config.test.mjs",
-    "test:runtime-safety": "node --test ../tests/runtime-safety.test.mjs ../tests/mutation-paths.test.mjs ../tests/oauth-callback-route.test.mjs ../tests/runtime-public-config.test.mjs ../tests/runtime-readiness.test.mjs",
+    "test:runtime-safety": "node --test ../tests/runtime-safety.test.mjs ../tests/database-provider-mode.test.mjs ../tests/mutation-paths.test.mjs ../tests/oauth-callback-route.test.mjs ../tests/runtime-public-config.test.mjs ../tests/runtime-readiness.test.mjs",
     "test:readyz": "node --test ../tests/runtime-readiness.test.mjs",
     "test:staging-fixture": "node ../scripts/staging_fixture_integration.mjs",
     "test:staging-qualification": "node ../scripts/staging_qualification.mjs",

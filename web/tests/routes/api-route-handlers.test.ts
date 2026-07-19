@@ -170,6 +170,7 @@ beforeEach(() => {
   mocks.getPublishedArticlesWithEdgeFallback.mockResolvedValue(publicArticlesResult());
   mocks.getRuntimePublicConfig.mockReturnValue({
     runtimeEnv: "staging",
+    databaseProviderMode: "supabase_primary",
     deploymentTarget: "test",
     supabaseUrl: "https://staging-fixture.supabase.co",
     supabaseAnonKey: null,
@@ -327,6 +328,7 @@ describe("runtime config route handler", () => {
     expect(response.status).toBe(200);
     expect(body).toMatchObject({
       runtimeEnv: "staging",
+      databaseProviderMode: "supabase_primary",
       deploymentTarget: "test",
       supabaseUrl: "https://staging-fixture.supabase.co",
     });

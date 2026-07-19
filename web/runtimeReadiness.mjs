@@ -155,6 +155,7 @@ function result(policy, identity, ready, code) {
     ready,
     runtimeEnv: policy.runtimeEnv,
     sideEffectsMode: policy.sideEffectsMode,
+    databaseProviderMode: policy.databaseProviderMode,
     code,
     sourceCommit: identity.sourceCommit,
     buildId: identity.buildId,
@@ -191,6 +192,10 @@ export async function evaluateRuntimeReadiness({
   const identityCode = getIdentityReadiness(policy, identity);
   if (identityCode !== "ready") {
     return result(policy, identity, false, identityCode);
+  }
+
+  if (policy.databaseProviderMode === "backend_postgres_primary") {
+    return result(policy, identity, true, "ready");
   }
 
   if (typeof readSchemaContract !== "function") {

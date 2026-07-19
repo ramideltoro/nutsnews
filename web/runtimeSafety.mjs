@@ -1,8 +1,14 @@
 const RUNTIME_ENVS = new Set(["staging", "production"]);
 const SIDE_EFFECTS_MODES = new Set(["disabled", "sandbox", "live"]);
 const DATA_ENVS = new Set(["staging", "production"]);
+const DATABASE_PROVIDER_MODES = new Set([
+  "supabase_primary",
+  "backend_postgres_shadow",
+  "backend_postgres_primary",
+]);
 const PROJECT_REF_PATTERN = /^[a-z0-9][a-z0-9-]{2,62}$/;
 const SYNTHETIC_NAMESPACE_PATTERN = /^nutsnews-test-[a-z0-9][a-z0-9-]{5,96}$/;
+const BACKEND_POSTGRES_PRIMARY_CONFIRMATION = "enable-backend-postgres-primary";
 
 const SUPABASE_URL_VARIABLES = [
   "NUTSNEWS_SUPABASE_URL",
@@ -90,6 +96,34 @@ function requestUsesOrigin(value, expectedOrigin) {
   }
 }
 
+function getDatabaseProviderModeValue(env) {
+  return envValue(env, "NUTSNEWS_DATABASE_PROVIDER_MODE") || "supabase_primary";
+}
+
+function hasBackendApiConfig(env) {
+  return envValue(env, "NUTSNEWS_BACKEND_API_URL") !== "" && envValue(env, "NUTSNEWS_BACKEND_API_TOKEN") !== "";
+}
+
+function isBackendApiUrlValid(env) {
+  const value = envValue(env, "NUTSNEWS_BACKEND_API_URL");
+  if (!value) {
+    return false;
+  }
+
+  try {
+    const url = new URL(value);
+    return (
+      ["http:", "https:"].includes(url.protocol) &&
+      url.username === "" &&
+      url.password === "" &&
+      url.hash === "" &&
+      (url.protocol === "https:" || isLocalOrTestHost(url.hostname.toLowerCase()))
+    );
+  } catch {
+    return false;
+  }
+}
+
 function basePolicy(env) {
   const reasons = [];
   const runtimeEnv = envValue(env, "NUTSNEWS_RUNTIME_ENV");
@@ -101,6 +135,9 @@ function basePolicy(env) {
     env,
     "NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF",
   ).toLowerCase();
+  const databaseProviderMode = getDatabaseProviderModeValue(env);
+  const supabasePrimaryRequired = databaseProviderMode !== "backend_postgres_primary";
+  const backendApiRequired = databaseProviderMode !== "supabase_primary";
 
   if (!RUNTIME_ENVS.has(runtimeEnv)) {
     reasons.push("runtime_environment_invalid");
@@ -131,53 +168,74 @@ function basePolicy(env) {
   if (!DATA_ENVS.has(dataEnvironment)) {
     reasons.push("data_environment_invalid");
   }
-  if (!DATA_ENVS.has(credentialsEnvironment)) {
+  if (supabasePrimaryRequired && !DATA_ENVS.has(credentialsEnvironment)) {
     reasons.push("credentials_environment_invalid");
   }
-  if (!PROJECT_REF_PATTERN.test(projectRef)) {
+  if (!DATABASE_PROVIDER_MODES.has(databaseProviderMode)) {
+    reasons.push("database_provider_mode_invalid");
+  }
+  if (supabasePrimaryRequired && !PROJECT_REF_PATTERN.test(projectRef)) {
     reasons.push("supabase_project_identity_invalid");
   }
-  if (!PROJECT_REF_PATTERN.test(productionProjectRef)) {
+  if (supabasePrimaryRequired && !PROJECT_REF_PATTERN.test(productionProjectRef)) {
     reasons.push("production_project_identity_invalid");
   }
 
   if (RUNTIME_ENVS.has(runtimeEnv) && dataEnvironment !== runtimeEnv) {
     reasons.push("runtime_data_environment_mismatch");
   }
-  if (DATA_ENVS.has(dataEnvironment) && credentialsEnvironment !== dataEnvironment) {
+  if (
+    supabasePrimaryRequired &&
+    DATA_ENVS.has(dataEnvironment) &&
+    credentialsEnvironment !== dataEnvironment
+  ) {
     reasons.push("credentials_data_environment_mismatch");
   }
-  if (runtimeEnv === "staging" && projectRef === productionProjectRef) {
+  if (supabasePrimaryRequired && runtimeEnv === "staging" && projectRef === productionProjectRef) {
     reasons.push("staging_production_project_rejected");
   }
-  if (runtimeEnv === "production" && projectRef !== productionProjectRef) {
+  if (supabasePrimaryRequired && runtimeEnv === "production" && projectRef !== productionProjectRef) {
     reasons.push("production_project_identity_mismatch");
   }
 
   let hasSupabaseUrl = false;
-  for (const name of SUPABASE_URL_VARIABLES) {
-    const configuredUrl = envValue(env, name);
-    if (!configuredUrl) {
-      continue;
-    }
+  if (supabasePrimaryRequired) {
+    for (const name of SUPABASE_URL_VARIABLES) {
+      const configuredUrl = envValue(env, name);
+      if (!configuredUrl) {
+        continue;
+      }
 
-    hasSupabaseUrl = true;
-    const identity = projectRefFromUrl(configuredUrl);
-    if (identity.kind === "invalid") {
-      reasons.push("supabase_endpoint_invalid");
-      continue;
-    }
-    if (identity.kind === "fixture" && runtimeEnv !== "staging") {
-      reasons.push("production_fixture_endpoint_rejected");
-      continue;
-    }
-    if (identity.kind === "supabase" && identity.projectRef !== projectRef) {
-      reasons.push("supabase_endpoint_identity_mismatch");
+      hasSupabaseUrl = true;
+      const identity = projectRefFromUrl(configuredUrl);
+      if (identity.kind === "invalid") {
+        reasons.push("supabase_endpoint_invalid");
+        continue;
+      }
+      if (identity.kind === "fixture" && runtimeEnv !== "staging") {
+        reasons.push("production_fixture_endpoint_rejected");
+        continue;
+      }
+      if (identity.kind === "supabase" && identity.projectRef !== projectRef) {
+        reasons.push("supabase_endpoint_identity_mismatch");
+      }
     }
   }
 
-  if (!hasSupabaseUrl) {
+  if (supabasePrimaryRequired && !hasSupabaseUrl) {
     reasons.push("supabase_endpoint_missing");
+  }
+  if (backendApiRequired && !hasBackendApiConfig(env)) {
+    reasons.push("backend_api_config_missing");
+  }
+  if (backendApiRequired && hasBackendApiConfig(env) && !isBackendApiUrlValid(env)) {
+    reasons.push("backend_api_url_invalid");
+  }
+  if (
+    databaseProviderMode === "backend_postgres_primary" &&
+    envValue(env, "NUTSNEWS_BACKEND_POSTGRES_PRIMARY_CONFIRMATION") !== BACKEND_POSTGRES_PRIMARY_CONFIRMATION
+  ) {
+    reasons.push("backend_postgres_primary_confirmation_missing");
   }
 
   return {
@@ -189,6 +247,9 @@ function basePolicy(env) {
     dataEnvironment: DATA_ENVS.has(dataEnvironment) ? dataEnvironment : "invalid",
     credentialsEnvironment: DATA_ENVS.has(credentialsEnvironment)
       ? credentialsEnvironment
+      : "invalid",
+    databaseProviderMode: DATABASE_PROVIDER_MODES.has(databaseProviderMode)
+      ? databaseProviderMode
       : "invalid",
     code: reasons[0] ?? "ready",
   };
@@ -229,8 +290,30 @@ export function getSafeReadiness(env = process.env) {
     ready: policy.ready,
     runtimeEnv: policy.runtimeEnv,
     sideEffectsMode: policy.sideEffectsMode,
+    databaseProviderMode: policy.databaseProviderMode,
     code: policy.code,
   });
+}
+
+export function getDatabaseProviderMode(env = process.env) {
+  const policy = assertRuntimeReady(env);
+  return policy.databaseProviderMode;
+}
+
+export function isSupabasePrimaryRequired(env = process.env) {
+  return getDatabaseProviderModeValue(env) !== "backend_postgres_primary";
+}
+
+export function assertSupabasePrimaryAllowed(operation = "supabase-access", env = process.env) {
+  void operation;
+  const policy = assertRuntimeReady(env);
+  if (policy.databaseProviderMode === "backend_postgres_primary") {
+    refuse(
+      "supabase_access_disabled_for_backend_primary",
+      "Supabase access is disabled while backend PostgreSQL is the configured primary.",
+    );
+  }
+  return policy;
 }
 
 export function assertDataRead(operation = "data-read", env = process.env) {

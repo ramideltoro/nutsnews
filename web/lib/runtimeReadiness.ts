@@ -4,6 +4,11 @@ export type RuntimeReadiness = {
   ready: boolean;
   runtimeEnv: "staging" | "production" | "invalid";
   sideEffectsMode: "disabled" | "sandbox" | "live";
+  databaseProviderMode:
+    | "supabase_primary"
+    | "backend_postgres_shadow"
+    | "backend_postgres_primary"
+    | "invalid";
   code: string;
   sourceCommit: string;
   buildId: string;

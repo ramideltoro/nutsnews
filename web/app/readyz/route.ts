@@ -45,6 +45,7 @@ export async function GET() {
       service: "nutsnews-web",
       runtimeEnv: readiness.runtimeEnv,
       sideEffectsMode: readiness.sideEffectsMode,
+      databaseProviderMode: readiness.databaseProviderMode,
       code: readiness.code,
     },
     {
@@ -55,6 +56,7 @@ export async function GET() {
         "X-NutsNews-Build-Id": readiness.buildId,
         "X-NutsNews-Deployment-Target": readiness.deploymentTarget,
         "X-NutsNews-Runtime-Environment": readiness.runtimeEnv,
+        "X-NutsNews-Database-Provider-Mode": readiness.databaseProviderMode,
         "X-NutsNews-Config-Generation": readiness.configGeneration,
         "X-NutsNews-Expected-Image-Digest": readiness.expectedImageDigest,
       },

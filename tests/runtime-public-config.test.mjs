@@ -55,6 +55,8 @@ test("runtime public configuration differs by runtime environment without serial
 
   assert.equal(staging.runtimeEnv, "staging");
   assert.equal(production.runtimeEnv, "production");
+  assert.equal(staging.databaseProviderMode, "supabase_primary");
+  assert.equal(production.databaseProviderMode, "supabase_primary");
   assert.equal(staging.supabaseUrl, "https://staging-project.supabase.co");
   assert.equal(production.supabaseUrl, "https://production-project.supabase.co");
   assert.equal(staging.telemetryEnabled, false);
@@ -87,6 +89,7 @@ test("runtime public configuration rejects invalid URLs and unknown identities",
 
   assert.equal(config.runtimeEnv, "unknown");
   assert.equal(config.sideEffectsMode, "disabled");
+  assert.equal(config.databaseProviderMode, "invalid");
   assert.equal(config.supabaseUrl, null);
   assert.equal(config.sentryDsn, null);
   assert.equal(config.expectedImageDigest, "unknown");
@@ -107,7 +110,35 @@ test("staging configuration fails closed when live side effects are requested", 
 
   assert.equal(config.runtimeEnv, "unknown");
   assert.equal(config.sideEffectsMode, "disabled");
+  assert.equal(config.databaseProviderMode, "invalid");
   assert.equal(config.telemetryEnabled, false);
+});
+
+test("backend primary runtime config exposes provider mode without Supabase or backend secrets", () => {
+  const config = getRuntimePublicConfig({
+    NUTSNEWS_RUNTIME_ENV: "staging",
+    NUTSNEWS_SIDE_EFFECTS_MODE: "sandbox",
+    NUTSNEWS_DATA_ENVIRONMENT: "staging",
+    NUTSNEWS_DATABASE_PROVIDER_MODE: "backend_postgres_primary",
+    NUTSNEWS_BACKEND_POSTGRES_PRIMARY_CONFIRMATION: "enable-backend-postgres-primary",
+    NUTSNEWS_BACKEND_API_URL: "http://127.0.0.1:8787/api/app/db",
+    NUTSNEWS_BACKEND_API_TOKEN: "server-only-backend-token",
+    NUTSNEWS_SOURCE_COMMIT: "same-source-commit",
+    NUTSNEWS_BUILD_ID: "same-build-id",
+    NUTSNEWS_DEPLOYMENT_TARGET: "vps",
+    NUTSNEWS_EXPECTED_IMAGE_DIGEST:
+      "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    NUTSNEWS_CONFIG_GENERATION: "backend-primary-config-generation-1",
+  });
+  const serialized = JSON.stringify(config);
+
+  assert.equal(config.runtimeEnv, "staging");
+  assert.equal(config.sideEffectsMode, "sandbox");
+  assert.equal(config.databaseProviderMode, "backend_postgres_primary");
+  assert.equal(config.supabaseUrl, null);
+  assert.equal(config.supabaseAnonKey, null);
+  assert.doesNotMatch(serialized, /server-only-backend-token/);
+  assert.doesNotMatch(serialized, /api\/app\/db/);
 });
 
 test("unknown environments and malformed image digests fail closed", () => {
