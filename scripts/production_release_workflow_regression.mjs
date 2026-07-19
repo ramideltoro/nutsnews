@@ -82,8 +82,13 @@ requireText(vercelProductionWorkflow, "on:\n  repository_dispatch:", "Vercel pro
 assert.ok(!vercelProductionWorkflow.includes("workflow_dispatch:"), "Vercel production must not allow manual workflow_dispatch.");
 requirePinnedWorkflowUse(vercelProductionWorkflow, "actions/checkout", "v5", "Vercel production must checkout the exact source commit.");
 requireText(vercelProductionWorkflow, "ref: ${{ env.SOURCE_COMMIT }}", "Vercel production must deploy the dispatch source commit.");
-requireText(vercelProductionWorkflow, "vercel@latest build --prod", "Vercel production must use a production build.");
-requireText(vercelProductionWorkflow, "vercel@latest deploy --prebuilt --prod --skip-domain", "Vercel production must stage the prebuilt artifact without assigning production domains.");
+requireText(vercelProductionWorkflow, "vercel@latest deploy", "Vercel production must stage a Vercel deployment.");
+requireText(vercelProductionWorkflow, "--prod", "Vercel production must stage a production deployment.");
+requireText(vercelProductionWorkflow, "--skip-domain", "Vercel production must stage without assigning production domains.");
+requireText(vercelProductionWorkflow, "--force", "Vercel production must force a fresh remote build for the release identity.");
+requireText(vercelProductionWorkflow, "--archive=tgz", "Vercel production must archive uploaded source files for CI reliability.");
+assert.ok(!vercelProductionWorkflow.includes("vercel@latest build --prod"), "Vercel production must not use the local prebuild path.");
+assert.ok(!vercelProductionWorkflow.includes("--prebuilt"), "Vercel production must not deploy prebuilt output from the GitHub runner.");
 requireText(vercelProductionWorkflow, "vercel@latest promote \"$VERCEL_DEPLOYMENT_ID\"", "Vercel production must promote the qualified deployment through Vercel.");
 requireText(vercelProductionWorkflow, "Run staged Vercel qualification smoke", "Vercel production must qualify the staged deployment before promotion.");
 requireText(vercelProductionWorkflow, "Promote staged Vercel deployment after qualification", "Vercel production must promote only after the staged smoke.");
@@ -99,7 +104,15 @@ assert.ok(
 );
 requireText(vercelProductionWorkflow, 'new Set(["HOME", "PATH", "Path", "SHELL"])', "Vercel production must strip shell control env names from the pulled env file.");
 requireText(vercelProductionWorkflow, "Removed shell-sensitive env names from Vercel local build env file.", "Vercel production must report when shell control env names were stripped.");
-requireText(vercelProductionWorkflow, 'export SHELL="/bin/sh"', "Vercel production must set the runner shell without writing it to the dotenv file.");
+requireText(vercelProductionWorkflow, '--build-env "NUTSNEWS_SOURCE_COMMIT=$SOURCE_COMMIT"', "Vercel production remote build must receive explicit source identity.");
+requireText(vercelProductionWorkflow, '--build-env "NUTSNEWS_BUILD_ID=$BUILD_ID"', "Vercel production remote build must receive explicit build identity.");
+requireText(vercelProductionWorkflow, '--build-env "NUTSNEWS_CONFIG_GENERATION=$VERCEL_CONFIG_GENERATION"', "Vercel production remote build must receive explicit config generation.");
+requireText(vercelProductionWorkflow, '--build-env "NUTSNEWS_DEPLOYMENT_TARGET=vercel-production"', "Vercel production remote build must receive explicit target identity.");
+requireText(vercelProductionWorkflow, '--env "NUTSNEWS_SOURCE_COMMIT=$SOURCE_COMMIT"', "Vercel production runtime must receive explicit source identity.");
+requireText(vercelProductionWorkflow, '--env "NUTSNEWS_BUILD_ID=$BUILD_ID"', "Vercel production runtime must receive explicit build identity.");
+requireText(vercelProductionWorkflow, '--env "NUTSNEWS_CONFIG_GENERATION=$VERCEL_CONFIG_GENERATION"', "Vercel production runtime must receive explicit config generation.");
+requireText(vercelProductionWorkflow, '--env "NUTSNEWS_DEPLOYMENT_TARGET=vercel-production"', "Vercel production runtime must receive explicit target identity.");
+assert.ok(!vercelProductionWorkflow.includes('export SHELL="/bin/sh"'), "Vercel production must not rely on runner shell overrides for Vercel builds.");
 assert.ok(
   !vercelProductionWorkflow.includes("JSON.stringify(String(value))"),
   "Vercel production must not JSON-quote PATH/SHELL/HOME in .vercel env files.",
