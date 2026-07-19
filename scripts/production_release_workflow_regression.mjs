@@ -28,6 +28,14 @@ function requirePinnedWorkflowUse(text, action, version, message) {
   );
 }
 
+function workflowStep(text, name) {
+  const marker = `      - name: ${name}\n`;
+  const start = text.indexOf(marker);
+  assert.notEqual(start, -1, `Workflow step not found: ${name}`);
+  const next = text.indexOf("\n      - name:", start + marker.length);
+  return text.slice(start, next === -1 ? text.length : next);
+}
+
 assert.doesNotMatch(containerWorkflow, /^\s+paths:\s*$/m, "Container Image must run for every main merge, not a path subset.");
 requireText(containerWorkflow, "cancel-in-progress: false", "Container Image must not skip a merged release.");
 requireText(containerWorkflow, "name: nutsnews-staging-release", "Container Image must publish staging metadata.");
@@ -89,6 +97,10 @@ requireText(vercelProductionWorkflow, "--force", "Vercel production must force a
 requireText(vercelProductionWorkflow, "--archive=tgz", "Vercel production must archive uploaded source files for CI reliability.");
 assert.ok(!vercelProductionWorkflow.includes("vercel@latest build --prod"), "Vercel production must not use the local prebuild path.");
 assert.ok(!vercelProductionWorkflow.includes("--prebuilt"), "Vercel production must not deploy prebuilt output from the GitHub runner.");
+assert.ok(
+  !workflowStep(vercelProductionWorkflow, "Stage remote Vercel production candidate").includes("working-directory: web"),
+  "Vercel remote production staging must run from the repository root so the project root is not applied twice.",
+);
 requireText(vercelProductionWorkflow, "vercel@latest promote \"$VERCEL_DEPLOYMENT_ID\"", "Vercel production must promote the qualified deployment through Vercel.");
 requireText(vercelProductionWorkflow, "Run staged Vercel qualification smoke", "Vercel production must qualify the staged deployment before promotion.");
 requireText(vercelProductionWorkflow, "Promote staged Vercel deployment after qualification", "Vercel production must promote only after the staged smoke.");
