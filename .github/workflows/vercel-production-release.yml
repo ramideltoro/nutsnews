@@ -18,6 +18,7 @@ jobs:
     name: Deploy exact release to Vercel production
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    environment: Production
     env:
       SOURCE_REPOSITORY: ${{ github.event.client_payload.source_repository }}
       SOURCE_COMMIT: ${{ github.event.client_payload.source_commit }}
@@ -27,6 +28,10 @@ jobs:
       VPS_STAGING_DEPLOYMENT_ID: ${{ github.event.client_payload.staging_deployment_id }}
       VPS_QUALIFICATION_RUN_ID: ${{ github.event.client_payload.qualification_run_id }}
       RELEASE_KIND: ${{ github.event.client_payload.release_kind }}
+      DATABASE_PROVIDER_MODE: ${{ github.event.client_payload.database_provider_mode || 'supabase_primary' }}
+      BACKEND_API_URL: ${{ github.event.client_payload.backend_api_url || '' }}
+      PROVIDER_SWITCH_CONFIRMATION: ${{ github.event.client_payload.provider_switch_confirmation || '' }}
+      BACKEND_POSTGRES_PRIMARY_CONFIRMATION: enable-backend-postgres-primary
       PRODUCTION_WRITES_PAUSED: ${{ github.event.client_payload.production_writes_paused || 'false' }}
       VERCEL_CONFIG_GENERATION: vercel-${{ github.event.client_payload.source_commit }}-${{ github.run_id }}-${{ github.run_attempt }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -36,6 +41,7 @@ jobs:
       - name: Validate production release request
         shell: bash
         env:
+          NUTSNEWS_BACKEND_API_TOKEN: ${{ secrets.NUTSNEWS_BACKEND_API_TOKEN }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           set -euo pipefail
@@ -67,6 +73,24 @@ jobs:
           if [[ "$PRODUCTION_WRITES_PAUSED" != "true" && "$PRODUCTION_WRITES_PAUSED" != "false" ]]; then
             echo "Production writes paused must be true or false." >&2
             exit 1
+          fi
+          if [[ "$DATABASE_PROVIDER_MODE" != "supabase_primary" && "$DATABASE_PROVIDER_MODE" != "backend_postgres_primary" ]]; then
+            echo "Database provider mode must be supabase_primary or backend_postgres_primary." >&2
+            exit 1
+          fi
+          if [[ "$DATABASE_PROVIDER_MODE" == "backend_postgres_primary" ]]; then
+            if [[ "$PROVIDER_SWITCH_CONFIRMATION" != "$BACKEND_POSTGRES_PRIMARY_CONFIRMATION" ]]; then
+              echo "Backend PostgreSQL primary release requires provider switch confirmation." >&2
+              exit 1
+            fi
+            if [[ -z "$BACKEND_API_URL" || ! "$BACKEND_API_URL" =~ ^https://[^[:space:]]+$ ]]; then
+              echo "Backend API URL must be an https URL for backend PostgreSQL provider releases." >&2
+              exit 1
+            fi
+            if [[ -z "$NUTSNEWS_BACKEND_API_TOKEN" ]]; then
+              echo "NUTSNEWS_BACKEND_API_TOKEN Production environment secret is required for backend PostgreSQL provider releases." >&2
+              exit 1
+            fi
           fi
           if [[ "$release_kind" == "release" ]]; then
             if [[ ! "$VPS_STAGING_DEPLOYMENT_ID" =~ ^stg-[0-9a-f]{24}$ ]]; then
@@ -139,6 +163,7 @@ jobs:
           NUTSNEWS_CONFIG_GENERATION: ${{ env.VERCEL_CONFIG_GENERATION }}
           NUTSNEWS_DEPLOYMENT_TARGET: vercel-production
           NUTSNEWS_SOURCE_COMMIT: ${{ env.SOURCE_COMMIT }}
+          NUTSNEWS_BACKEND_API_TOKEN: ${{ secrets.NUTSNEWS_BACKEND_API_TOKEN }}
           NEXT_PUBLIC_NUTSNEWS_BUILD_ID: ${{ env.BUILD_ID }}
           NEXT_PUBLIC_NUTSNEWS_SOURCE_COMMIT: ${{ env.SOURCE_COMMIT }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -168,6 +193,7 @@ jobs:
           vercel_identity_flags=(
             --build-env "NUTSNEWS_BUILD_ID=$BUILD_ID"
             --build-env "NUTSNEWS_CONFIG_GENERATION=$VERCEL_CONFIG_GENERATION"
+            --build-env "NUTSNEWS_DATABASE_PROVIDER_MODE=$DATABASE_PROVIDER_MODE"
             --build-env "NUTSNEWS_DEPLOYMENT_TARGET=vercel-production"
             --build-env "NUTSNEWS_PRODUCTION_WRITES_PAUSED=$PRODUCTION_WRITES_PAUSED"
             --build-env "NUTSNEWS_SOURCE_COMMIT=$SOURCE_COMMIT"
@@ -175,12 +201,23 @@ jobs:
             --build-env "NEXT_PUBLIC_NUTSNEWS_SOURCE_COMMIT=$SOURCE_COMMIT"
             --env "NUTSNEWS_BUILD_ID=$BUILD_ID"
             --env "NUTSNEWS_CONFIG_GENERATION=$VERCEL_CONFIG_GENERATION"
+            --env "NUTSNEWS_DATABASE_PROVIDER_MODE=$DATABASE_PROVIDER_MODE"
             --env "NUTSNEWS_DEPLOYMENT_TARGET=vercel-production"
             --env "NUTSNEWS_PRODUCTION_WRITES_PAUSED=$PRODUCTION_WRITES_PAUSED"
             --env "NUTSNEWS_SOURCE_COMMIT=$SOURCE_COMMIT"
             --env "NEXT_PUBLIC_NUTSNEWS_BUILD_ID=$BUILD_ID"
             --env "NEXT_PUBLIC_NUTSNEWS_SOURCE_COMMIT=$SOURCE_COMMIT"
           )
+          if [[ "$DATABASE_PROVIDER_MODE" == "backend_postgres_primary" ]]; then
+            vercel_identity_flags+=(
+              --build-env "NUTSNEWS_BACKEND_API_URL=$BACKEND_API_URL"
+              --build-env "NUTSNEWS_BACKEND_API_TOKEN=$NUTSNEWS_BACKEND_API_TOKEN"
+              --build-env "NUTSNEWS_BACKEND_POSTGRES_PRIMARY_CONFIRMATION=$BACKEND_POSTGRES_PRIMARY_CONFIRMATION"
+              --env "NUTSNEWS_BACKEND_API_URL=$BACKEND_API_URL"
+              --env "NUTSNEWS_BACKEND_API_TOKEN=$NUTSNEWS_BACKEND_API_TOKEN"
+              --env "NUTSNEWS_BACKEND_POSTGRES_PRIMARY_CONFIRMATION=$BACKEND_POSTGRES_PRIMARY_CONFIRMATION"
+            )
+          fi
           deploy_output="$RUNNER_TEMP/vercel-production-deploy.txt"
           npx --yes vercel@latest deploy \
             --prod \
@@ -257,6 +294,7 @@ jobs:
             --expected-deployment-target vercel-production \
             --expected-runtime-env production \
             --expected-side-effects-mode live \
+            --expected-database-provider-mode "$DATABASE_PROVIDER_MODE" \
             --expected-config-generation "$VERCEL_CONFIG_GENERATION" \
             --expected-production-writes-paused "$PRODUCTION_WRITES_PAUSED" \
             --production-safe-surfaces

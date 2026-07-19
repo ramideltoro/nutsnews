@@ -90,6 +90,7 @@ requireText(vercelProductionWorkflow, "on:\n  repository_dispatch:", "Vercel pro
 assert.ok(!vercelProductionWorkflow.includes("workflow_dispatch:"), "Vercel production must not allow manual workflow_dispatch.");
 requirePinnedWorkflowUse(vercelProductionWorkflow, "actions/checkout", "v5", "Vercel production must checkout the exact source commit.");
 requireText(vercelProductionWorkflow, "ref: ${{ env.SOURCE_COMMIT }}", "Vercel production must deploy the dispatch source commit.");
+requireText(vercelProductionWorkflow, "environment: Production", "Vercel production must use the protected app Production environment.");
 requireText(vercelProductionWorkflow, "vercel@latest deploy", "Vercel production must stage a Vercel deployment.");
 requireText(vercelProductionWorkflow, "--prod", "Vercel production must stage a production deployment.");
 requireText(vercelProductionWorkflow, "--skip-domain", "Vercel production must stage without assigning production domains.");
@@ -139,11 +140,19 @@ requireText(vercelProductionWorkflow, "Removed shell-sensitive env names from Ve
 requireText(vercelProductionWorkflow, '--build-env "NUTSNEWS_SOURCE_COMMIT=$SOURCE_COMMIT"', "Vercel production remote build must receive explicit source identity.");
 requireText(vercelProductionWorkflow, '--build-env "NUTSNEWS_BUILD_ID=$BUILD_ID"', "Vercel production remote build must receive explicit build identity.");
 requireText(vercelProductionWorkflow, '--build-env "NUTSNEWS_CONFIG_GENERATION=$VERCEL_CONFIG_GENERATION"', "Vercel production remote build must receive explicit config generation.");
+requireText(vercelProductionWorkflow, '--build-env "NUTSNEWS_DATABASE_PROVIDER_MODE=$DATABASE_PROVIDER_MODE"', "Vercel production remote build must receive explicit database provider mode.");
 requireText(vercelProductionWorkflow, '--build-env "NUTSNEWS_DEPLOYMENT_TARGET=vercel-production"', "Vercel production remote build must receive explicit target identity.");
+requireText(vercelProductionWorkflow, '--build-env "NUTSNEWS_BACKEND_API_URL=$BACKEND_API_URL"', "Vercel production remote build must receive the backend API URL for backend provider releases.");
+requireText(vercelProductionWorkflow, '--build-env "NUTSNEWS_BACKEND_API_TOKEN=$NUTSNEWS_BACKEND_API_TOKEN"', "Vercel production remote build must receive the backend API token for backend provider releases.");
+requireText(vercelProductionWorkflow, '--build-env "NUTSNEWS_BACKEND_POSTGRES_PRIMARY_CONFIRMATION=$BACKEND_POSTGRES_PRIMARY_CONFIRMATION"', "Vercel production remote build must receive backend primary confirmation.");
 requireText(vercelProductionWorkflow, '--env "NUTSNEWS_SOURCE_COMMIT=$SOURCE_COMMIT"', "Vercel production runtime must receive explicit source identity.");
 requireText(vercelProductionWorkflow, '--env "NUTSNEWS_BUILD_ID=$BUILD_ID"', "Vercel production runtime must receive explicit build identity.");
 requireText(vercelProductionWorkflow, '--env "NUTSNEWS_CONFIG_GENERATION=$VERCEL_CONFIG_GENERATION"', "Vercel production runtime must receive explicit config generation.");
+requireText(vercelProductionWorkflow, '--env "NUTSNEWS_DATABASE_PROVIDER_MODE=$DATABASE_PROVIDER_MODE"', "Vercel production runtime must receive explicit database provider mode.");
 requireText(vercelProductionWorkflow, '--env "NUTSNEWS_DEPLOYMENT_TARGET=vercel-production"', "Vercel production runtime must receive explicit target identity.");
+requireText(vercelProductionWorkflow, '--env "NUTSNEWS_BACKEND_API_URL=$BACKEND_API_URL"', "Vercel production runtime must receive the backend API URL for backend provider releases.");
+requireText(vercelProductionWorkflow, '--env "NUTSNEWS_BACKEND_API_TOKEN=$NUTSNEWS_BACKEND_API_TOKEN"', "Vercel production runtime must receive the backend API token for backend provider releases.");
+requireText(vercelProductionWorkflow, '--env "NUTSNEWS_BACKEND_POSTGRES_PRIMARY_CONFIRMATION=$BACKEND_POSTGRES_PRIMARY_CONFIRMATION"', "Vercel production runtime must receive backend primary confirmation.");
 assert.ok(!vercelProductionWorkflow.includes('export SHELL="/bin/sh"'), "Vercel production must not rely on runner shell overrides for Vercel builds.");
 assert.ok(
   !vercelProductionWorkflow.includes("JSON.stringify(String(value))"),
@@ -166,10 +175,17 @@ requireText(vercelProductionWorkflow, "NUTSNEWS_SOURCE_COMMIT: ${{ env.SOURCE_CO
 requireText(vercelProductionWorkflow, "NUTSNEWS_BUILD_ID: ${{ env.BUILD_ID }}", "Vercel production must build with explicit build identity.");
 requireText(vercelProductionWorkflow, "NUTSNEWS_CONFIG_GENERATION: ${{ env.VERCEL_CONFIG_GENERATION }}", "Vercel production must expose a qualified config generation.");
 requireText(vercelProductionWorkflow, "NUTSNEWS_DEPLOYMENT_TARGET: vercel-production", "Vercel production must build with explicit target identity.");
+requireText(vercelProductionWorkflow, "DATABASE_PROVIDER_MODE: ${{ github.event.client_payload.database_provider_mode || 'supabase_primary' }}", "Vercel production must consume the database provider mode release payload.");
+requireText(vercelProductionWorkflow, "BACKEND_API_URL: ${{ github.event.client_payload.backend_api_url || '' }}", "Vercel production must consume the backend API URL release payload.");
+requireText(vercelProductionWorkflow, "PROVIDER_SWITCH_CONFIRMATION: ${{ github.event.client_payload.provider_switch_confirmation || '' }}", "Vercel production must consume the provider switch confirmation release payload.");
+requireText(vercelProductionWorkflow, "NUTSNEWS_BACKEND_API_TOKEN: ${{ secrets.NUTSNEWS_BACKEND_API_TOKEN }}", "Vercel production must consume the protected backend API token secret.");
+requireText(vercelProductionWorkflow, "Backend PostgreSQL primary release requires provider switch confirmation.", "Vercel production must validate backend primary confirmation.");
+requireText(vercelProductionWorkflow, "NUTSNEWS_BACKEND_API_TOKEN Production environment secret is required for backend PostgreSQL provider releases.", "Vercel production must fail closed when the backend API token is absent.");
 requireText(vercelProductionWorkflow, "PRODUCTION_WRITES_PAUSED: ${{ github.event.client_payload.production_writes_paused || 'false' }}", "Vercel production must consume the production writer-pause release payload.");
 requireText(vercelProductionWorkflow, "Production writes paused must be true or false.", "Vercel production must validate the production writer-pause value.");
 requireText(vercelProductionWorkflow, '--build-env "NUTSNEWS_PRODUCTION_WRITES_PAUSED=$PRODUCTION_WRITES_PAUSED"', "Vercel production remote build must receive the production writer-pause value.");
 requireText(vercelProductionWorkflow, '--env "NUTSNEWS_PRODUCTION_WRITES_PAUSED=$PRODUCTION_WRITES_PAUSED"', "Vercel production runtime must receive the production writer-pause value.");
+requireText(vercelProductionWorkflow, '--expected-database-provider-mode "$DATABASE_PROVIDER_MODE"', "Vercel production smoke must assert the database provider mode.");
 requireText(vercelProductionWorkflow, '--expected-production-writes-paused "$PRODUCTION_WRITES_PAUSED"', "Vercel production smoke must assert the production writer-pause value.");
 requireText(vercelProductionWorkflow, "Retain sanitized Vercel release evidence", "Vercel production must retain staged URL, deployment ID, and test evidence.");
 requireText(vercelProductionWorkflow, "https://www.nutsnews.com/healthz", "Vercel production must verify the public www alias.");
