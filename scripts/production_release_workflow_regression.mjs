@@ -98,6 +98,11 @@ assert.ok(
   "Vercel production aliases must be verified only after promotion.",
 );
 requireText(vercelProductionWorkflow, "localBuildControlEnv", "Vercel production must set local build control env names for the CI shell.");
+requireText(vercelProductionWorkflow, "safeControlEnvValuePattern", "Vercel production must validate local build control env values before writing them.");
+assert.ok(
+  !vercelProductionWorkflow.includes("JSON.stringify(String(value))"),
+  "Vercel production must not JSON-quote PATH/SHELL/HOME in .vercel env files.",
+);
 requireText(vercelProductionWorkflow, "Prepared Vercel local build control env names: HOME, PATH, SHELL.", "Vercel production must report when local build control env names were prepared.");
 requireText(vercelProductionWorkflow, "VERCEL_TOKEN", "Vercel production must use the scoped Vercel token secret.");
 requireText(vercelProductionWorkflow, "VERCEL_ORG_ID", "Vercel production must set the Vercel org identity.");
