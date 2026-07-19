@@ -27,6 +27,7 @@ jobs:
       VPS_STAGING_DEPLOYMENT_ID: ${{ github.event.client_payload.staging_deployment_id }}
       VPS_QUALIFICATION_RUN_ID: ${{ github.event.client_payload.qualification_run_id }}
       RELEASE_KIND: ${{ github.event.client_payload.release_kind }}
+      PRODUCTION_WRITES_PAUSED: ${{ github.event.client_payload.production_writes_paused || 'false' }}
       VERCEL_CONFIG_GENERATION: vercel-${{ github.event.client_payload.source_commit }}-${{ github.run_id }}-${{ github.run_attempt }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -61,6 +62,10 @@ jobs:
           release_kind="${RELEASE_KIND:-release}"
           if [[ "$release_kind" != "release" && "$release_kind" != "rollback" ]]; then
             echo "Release kind must be release or rollback." >&2
+            exit 1
+          fi
+          if [[ "$PRODUCTION_WRITES_PAUSED" != "true" && "$PRODUCTION_WRITES_PAUSED" != "false" ]]; then
+            echo "Production writes paused must be true or false." >&2
             exit 1
           fi
           if [[ "$release_kind" == "release" ]]; then
@@ -164,12 +169,14 @@ jobs:
             --build-env "NUTSNEWS_BUILD_ID=$BUILD_ID"
             --build-env "NUTSNEWS_CONFIG_GENERATION=$VERCEL_CONFIG_GENERATION"
             --build-env "NUTSNEWS_DEPLOYMENT_TARGET=vercel-production"
+            --build-env "NUTSNEWS_PRODUCTION_WRITES_PAUSED=$PRODUCTION_WRITES_PAUSED"
             --build-env "NUTSNEWS_SOURCE_COMMIT=$SOURCE_COMMIT"
             --build-env "NEXT_PUBLIC_NUTSNEWS_BUILD_ID=$BUILD_ID"
             --build-env "NEXT_PUBLIC_NUTSNEWS_SOURCE_COMMIT=$SOURCE_COMMIT"
             --env "NUTSNEWS_BUILD_ID=$BUILD_ID"
             --env "NUTSNEWS_CONFIG_GENERATION=$VERCEL_CONFIG_GENERATION"
             --env "NUTSNEWS_DEPLOYMENT_TARGET=vercel-production"
+            --env "NUTSNEWS_PRODUCTION_WRITES_PAUSED=$PRODUCTION_WRITES_PAUSED"
             --env "NUTSNEWS_SOURCE_COMMIT=$SOURCE_COMMIT"
             --env "NEXT_PUBLIC_NUTSNEWS_BUILD_ID=$BUILD_ID"
             --env "NEXT_PUBLIC_NUTSNEWS_SOURCE_COMMIT=$SOURCE_COMMIT"
@@ -251,6 +258,7 @@ jobs:
             --expected-runtime-env production \
             --expected-side-effects-mode live \
             --expected-config-generation "$VERCEL_CONFIG_GENERATION" \
+            --expected-production-writes-paused "$PRODUCTION_WRITES_PAUSED" \
             --production-safe-surfaces
           echo "result=pass" >> "$GITHUB_OUTPUT"
 

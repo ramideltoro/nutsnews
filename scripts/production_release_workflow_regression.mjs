@@ -166,6 +166,11 @@ requireText(vercelProductionWorkflow, "NUTSNEWS_SOURCE_COMMIT: ${{ env.SOURCE_CO
 requireText(vercelProductionWorkflow, "NUTSNEWS_BUILD_ID: ${{ env.BUILD_ID }}", "Vercel production must build with explicit build identity.");
 requireText(vercelProductionWorkflow, "NUTSNEWS_CONFIG_GENERATION: ${{ env.VERCEL_CONFIG_GENERATION }}", "Vercel production must expose a qualified config generation.");
 requireText(vercelProductionWorkflow, "NUTSNEWS_DEPLOYMENT_TARGET: vercel-production", "Vercel production must build with explicit target identity.");
+requireText(vercelProductionWorkflow, "PRODUCTION_WRITES_PAUSED: ${{ github.event.client_payload.production_writes_paused || 'false' }}", "Vercel production must consume the production writer-pause release payload.");
+requireText(vercelProductionWorkflow, "Production writes paused must be true or false.", "Vercel production must validate the production writer-pause value.");
+requireText(vercelProductionWorkflow, '--build-env "NUTSNEWS_PRODUCTION_WRITES_PAUSED=$PRODUCTION_WRITES_PAUSED"', "Vercel production remote build must receive the production writer-pause value.");
+requireText(vercelProductionWorkflow, '--env "NUTSNEWS_PRODUCTION_WRITES_PAUSED=$PRODUCTION_WRITES_PAUSED"', "Vercel production runtime must receive the production writer-pause value.");
+requireText(vercelProductionWorkflow, '--expected-production-writes-paused "$PRODUCTION_WRITES_PAUSED"', "Vercel production smoke must assert the production writer-pause value.");
 requireText(vercelProductionWorkflow, "Retain sanitized Vercel release evidence", "Vercel production must retain staged URL, deployment ID, and test evidence.");
 requireText(vercelProductionWorkflow, "https://www.nutsnews.com/healthz", "Vercel production must verify the public www alias.");
 requireText(vercelProductionWorkflow, "https://nutsnews.com/healthz", "Vercel production must verify the apex alias.");
@@ -196,6 +201,9 @@ requireText(dualTargetSmoke, "Auth session probe", "Post-production smoke must i
 requireText(dualTargetSmoke, "Next.js static asset", "Post-production smoke must include a public asset probe.");
 requireText(dualTargetSmoke, "Public articles CORS probe", "Post-production smoke must include a CORS-shape probe.");
 requireText(dualTargetSmoke, "VERCEL_SET_BYPASS_COOKIE", "Programmatic Vercel smoke must make bypass-cookie setup explicit.");
+requireText(dualTargetSmoke, "--expected-production-writes-paused", "Post-production smoke must expose a production writer-pause assertion.");
+requireText(dualTargetSmoke, "Readiness production writes paused header", "Post-production smoke must assert the readiness pause header.");
+requireText(dualTargetSmoke, "Runtime production writes paused", "Post-production smoke must assert the runtime config pause value.");
 assert.doesNotMatch(
   dualTargetSmoke,
   /"x-vercel-protection-bypass": bypassSecret,\s*"x-vercel-set-bypass-cookie": "true"/,
