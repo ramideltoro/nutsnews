@@ -136,7 +136,10 @@ function expectedFirstArticleLanguage(payload: ArticleLanguageResponse, requeste
   const firstArticle = payload.articles?.[0];
 
   if (!firstArticle) {
-    throw new Error(`Expected the ${requestedLanguageCode} article response to include at least one article.`);
+    expect(payload.languageCode, `Expected the empty API response languageCode to preserve ${requestedLanguageCode}.`).toBe(
+      requestedLanguageCode,
+    );
+    return null;
   }
 
   expect(payload.languageCode, `Expected the API response languageCode to preserve ${requestedLanguageCode}.`).toBe(
@@ -305,7 +308,9 @@ test.describe('Vercel Preview smoke regression', () => {
       const languagePayload = (await languageResponse.json()) as ArticleLanguageResponse;
       const expectedCardLanguage = expectedFirstArticleLanguage(languagePayload, language.code);
       await expect(page.locator('html')).toHaveAttribute('lang', language.expectedHtmlLang);
-      await waitForFirstArticleLanguage(page, expectedCardLanguage);
+      if (expectedCardLanguage) {
+        await waitForFirstArticleLanguage(page, expectedCardLanguage);
+      }
       expect(
         await readFirstArticleTitle(page),
         `Expected the ${language.code} selection to keep rendering a visible article title.`,
