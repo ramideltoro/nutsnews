@@ -24,14 +24,15 @@ assertProductionOperation('translation-audit');
 
 const SUPABASE_URL = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/+$/, '');
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || '';
+const SUPPORTED_LANGUAGE_CODES = new Set(['fr', 'ja', 'de-CH', 'de', 'el']);
 const LANGUAGE_CODES = parseLanguages(process.env.LANGUAGE_CODES ?? process.env.LANGUAGE_CODE ?? 'fr,ja,de-CH,de,el');
 const AUDIT_LIMIT = clampNumber(process.env.AUDIT_LIMIT, 100, 1, 500);
 const AUDIT_SOURCE = normalizeAuditSource(process.env.AUDIT_SOURCE ?? 'public_feed_snapshot');
 const SUMMARY_LOOKUP_LIMIT = clampNumber(process.env.SUMMARY_LOOKUP_LIMIT, 20000, 1, 50000);
 const REPORT_PATH = process.env.TRANSLATION_QUALITY_REPORT_PATH || '';
 const FAIL_ON_CRITICAL = /^(1|true|yes)$/i.test(process.env.TRANSLATION_QUALITY_FAIL_ON_CRITICAL || '');
+const DEBUG = /^(1|true|yes)$/i.test(process.env.TRANSLATION_QUALITY_DEBUG || '');
 
-const SUPPORTED_LANGUAGE_CODES = new Set(['fr', 'ja', 'de-CH', 'de', 'el']);
 const DEFAULT_LANGUAGE_CODE = 'en';
 const TITLE_MIN_CHARS = 6;
 const TITLE_MAX_CHARS = 220;
@@ -130,7 +131,11 @@ function parseLanguages(value) {
 }
 
 function clampNumber(value, fallback, min, max) {
-  const parsed = Number(value ?? '');
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return fallback;
+  }
+
+  const parsed = Number(value);
 
   if (!Number.isFinite(parsed)) {
     return fallback;
@@ -196,6 +201,12 @@ function getSummaryKey(originalUrl, languageCode) {
   return `${languageCode}::${originalUrl}`;
 }
 
+function encodePostgrestInFilter(values) {
+  return `in.(${values
+    .map((value) => `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`)
+    .join(',')})`;
+}
+
 async function supabaseFetch(path, options = {}) {
   const response = await fetch(`${SUPABASE_URL}${path}`, {
     ...options,
@@ -227,13 +238,47 @@ async function loadVisibleArticles() {
 }
 
 async function loadExistingSummaries(originalUrls) {
-  if (originalUrls.length === 0) {
+  const urls = Array.from(new Set((originalUrls ?? []).filter(Boolean)));
+
+  if (urls.length === 0) {
     return [];
   }
 
-  return supabaseFetch(
-    `/rest/v1/article_summaries?select=original_url,language_code,title,summary,updated_at,generated_by,model&language_code=in.(${LANGUAGE_CODES.join(',')})&limit=${SUMMARY_LOOKUP_LIMIT}`,
-  );
+  const rows = [];
+  const languageFilter = encodeURIComponent(encodePostgrestInFilter(LANGUAGE_CODES));
+  const batchSize = 50;
+
+  for (let index = 0; index < urls.length; index += batchSize) {
+    const urlBatch = urls.slice(index, index + batchSize);
+    const urlFilter = encodeURIComponent(encodePostgrestInFilter(urlBatch));
+    const limit = Math.min(SUMMARY_LOOKUP_LIMIT, Math.max(100, urlBatch.length * LANGUAGE_CODES.length + 10));
+    const page = await supabaseFetch(
+      `/rest/v1/article_summaries?select=original_url,language_code,title,summary,updated_at,generated_by,model&original_url=${urlFilter}&language_code=${languageFilter}&limit=${limit}`,
+    );
+
+    if (DEBUG) {
+      console.log(
+        `Debug: ${JSON.stringify({
+          summaryLookupBatch: index / batchSize + 1,
+          urlCount: urlBatch.length,
+          limit,
+          rowCount: page?.length ?? 0,
+        })}`,
+      );
+    }
+
+    rows.push(...(page ?? []));
+  }
+
+  const uniqueRows = new Map();
+
+  for (const row of rows) {
+    if (row?.original_url && row?.language_code) {
+      uniqueRows.set(getSummaryKey(row.original_url, row.language_code), row);
+    }
+  }
+
+  return Array.from(uniqueRows.values());
 }
 
 function validateTranslation({ article, summary, languageCode }) {
@@ -453,6 +498,19 @@ function printConsoleReport({ articles, languageSummaries, findings }) {
 const articles = (await loadVisibleArticles()) ?? [];
 const summaries = (await loadExistingSummaries(articles.map((article) => article.original_url).filter(Boolean))) ?? [];
 const summariesByKey = new Map(summaries.map((summary) => [getSummaryKey(summary.original_url, summary.language_code), summary]));
+if (DEBUG) {
+  const firstArticle = articles[0] ?? null;
+  console.log(
+    `Debug: ${JSON.stringify({
+      loadedArticles: articles.length,
+      loadedSummaries: summaries.length,
+      summaryKeyCount: summariesByKey.size,
+      firstArticleLanguageKeys: firstArticle
+        ? LANGUAGE_CODES.filter((languageCode) => summariesByKey.has(getSummaryKey(firstArticle.original_url, languageCode)))
+        : [],
+    })}`,
+  );
+}
 const languageSummaries = summarizeByLanguage({ articles, summariesByKey });
 const findings = languageSummaries
   .flatMap((language) => language.findings)

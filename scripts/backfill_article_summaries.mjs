@@ -53,6 +53,10 @@ const RETRY_FAILED = isTruthy(process.env.RETRY_FAILED);
 const FAILED_TRANSLATION_CACHE = String(process.env.FAILED_TRANSLATION_CACHE ?? '').trim();
 const SUMMARY_LOOKUP_LIMIT = clampNumber(process.env.SUMMARY_LOOKUP_LIMIT, 20000, 1, 50000);
 const TRANSLATED_SUMMARY_MAX_CHARS = 250;
+const TITLE_MIN_CHARS = 6;
+const SUMMARY_CRITICAL_MIN_CHARS = 40;
+const JAPANESE_SCRIPT_RE = /[\u3040-\u30ff\u3400-\u9fff]/;
+const GREEK_SCRIPT_RE = /[\u0370-\u03ff]/;
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error('Missing required env. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');
@@ -128,7 +132,11 @@ function isTruthy(value) {
 }
 
 function clampNumber(value, fallback, min, max) {
-  const parsed = Number(value ?? '');
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return fallback;
+  }
+
+  const parsed = Number(value);
 
   if (!Number.isFinite(parsed)) {
     return fallback;
@@ -147,6 +155,51 @@ function normalizeText(value, fallback = '') {
     .replace(/\s+/g, ' ')
     .replace(/\s+([,.;:!?。、！？])/g, '$1')
     .trim();
+}
+
+function normalizeComparable(value) {
+  return normalizeText(value)
+    .toLocaleLowerCase('en-US')
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+function isSameText(left, right) {
+  const normalizedLeft = normalizeComparable(left);
+  const normalizedRight = normalizeComparable(right);
+
+  return Boolean(normalizedLeft && normalizedRight && normalizedLeft === normalizedRight);
+}
+
+function validateGeneratedTranslation(article, translation) {
+  const title = normalizeText(translation?.title);
+  const summary = normalizeText(translation?.summary);
+
+  if (!title || title.length < TITLE_MIN_CHARS) {
+    throw new Error(`Generated translation title is critically short (${title.length} chars).`);
+  }
+
+  if (!summary || summary.length < SUMMARY_CRITICAL_MIN_CHARS) {
+    throw new Error(`Generated translation summary is critically short (${summary.length} chars).`);
+  }
+
+  if (isSameText(title, article.title)) {
+    throw new Error('Generated translation title matches the English source.');
+  }
+
+  if (isSameText(summary, article.ai_summary)) {
+    throw new Error('Generated translation summary matches the English source.');
+  }
+
+  if (translation.language_code === 'ja' && !JAPANESE_SCRIPT_RE.test(`${title} ${summary}`)) {
+    throw new Error('Generated Japanese translation does not contain Japanese script.');
+  }
+
+  if (translation.language_code === 'el' && !GREEK_SCRIPT_RE.test(`${title} ${summary}`)) {
+    throw new Error('Generated Greek translation does not contain Greek script.');
+  }
 }
 
 function trimSummary(value, maxChars = TRANSLATED_SUMMARY_MAX_CHARS) {
@@ -449,9 +502,11 @@ async function translateWithOpenAi(article, languageCode) {
 }
 
 async function translateArticle(article, languageCode) {
+  let translation = null;
+
   if (LOCAL_AI_URL && LOCAL_AI_API_KEY) {
     try {
-      return await translateWithLocalAi(article, languageCode);
+      translation = await translateWithLocalAi(article, languageCode);
     } catch (error) {
       console.warn(`Local AI failed for [${languageCode}] ${article.title}: ${error.message}`);
 
@@ -461,13 +516,32 @@ async function translateArticle(article, languageCode) {
     }
   }
 
-  const openAiTranslation = await translateWithOpenAi(article, languageCode);
+  if (!translation) {
+    translation = await translateWithOpenAi(article, languageCode);
+  }
 
-  if (!openAiTranslation) {
+  if (!translation) {
     throw new Error('No translation provider succeeded.');
   }
 
-  return openAiTranslation;
+  try {
+    validateGeneratedTranslation(article, translation);
+  } catch (error) {
+    if (translation.generated_by !== 'local' || !OPENAI_API_KEY) {
+      throw error;
+    }
+
+    console.warn(`Local AI generated an invalid row for [${languageCode}] ${article.title}: ${error.message}`);
+    translation = await translateWithOpenAi(article, languageCode);
+
+    if (!translation) {
+      throw new Error('No translation provider succeeded.');
+    }
+
+    validateGeneratedTranslation(article, translation);
+  }
+
+  return translation;
 }
 
 async function upsertSummaries(summaries) {
@@ -491,9 +565,30 @@ async function loadSummaryRowsForArticles(articles) {
     return [];
   }
 
-  return supabaseFetch(
-    `/rest/v1/article_summaries?select=original_url,language_code&original_url=${encodeURIComponent(encodePostgrestInFilter(urls))}&language_code=${encodeURIComponent(encodePostgrestInFilter(LANGUAGE_CODES))}&limit=${Math.max(SUMMARY_LOOKUP_LIMIT, urls.length * LANGUAGE_CODES.length)}`,
-  );
+  const rows = [];
+  const languageFilter = encodeURIComponent(encodePostgrestInFilter(LANGUAGE_CODES));
+  const batchSize = 50;
+
+  for (let index = 0; index < urls.length; index += batchSize) {
+    const urlBatch = urls.slice(index, index + batchSize);
+    const urlFilter = encodeURIComponent(encodePostgrestInFilter(urlBatch));
+    const limit = Math.min(SUMMARY_LOOKUP_LIMIT, Math.max(100, urlBatch.length * LANGUAGE_CODES.length + 10));
+    const page = await supabaseFetch(
+      `/rest/v1/article_summaries?select=original_url,language_code&original_url=${urlFilter}&language_code=${languageFilter}&limit=${limit}`,
+    );
+
+    rows.push(...(page ?? []));
+  }
+
+  const uniqueRows = new Map();
+
+  for (const row of rows) {
+    if (row?.original_url && row?.language_code) {
+      uniqueRows.set(getSummaryKey(row.original_url, row.language_code), row);
+    }
+  }
+
+  return Array.from(uniqueRows.values());
 }
 
 async function publishFullyTranslatedArticles(articles) {
@@ -526,13 +621,19 @@ async function publishFullyTranslatedArticles(articles) {
     return 0;
   }
 
-  await supabaseFetch(`/rest/v1/articles?original_url=${encodeURIComponent(encodePostgrestInFilter(readyUrls))}`, {
-    method: 'PATCH',
-    headers: {
-      Prefer: 'return=minimal',
-    },
-    body: JSON.stringify({ status: 'published' }),
-  });
+  const batchSize = 50;
+
+  for (let index = 0; index < readyUrls.length; index += batchSize) {
+    const urlBatch = readyUrls.slice(index, index + batchSize);
+
+    await supabaseFetch(`/rest/v1/articles?original_url=${encodeURIComponent(encodePostgrestInFilter(urlBatch))}`, {
+      method: 'PATCH',
+      headers: {
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({ status: 'published' }),
+    });
+  }
 
   return readyUrls.length;
 }
