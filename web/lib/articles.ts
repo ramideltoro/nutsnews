@@ -158,6 +158,10 @@ export type HomeFeedPayload = PublishedArticlesResult & {
   degradation?: FeedDegradationStatus | null;
 };
 
+function isBackendPostgresPrimary() {
+  return (getDatabaseProviderMode() as DatabaseProviderMode) === "backend_postgres_primary";
+}
+
 function encodeArticleCursor(article: Article) {
   const publishedOnSiteAt = article.published_on_site_at;
 
@@ -242,6 +246,15 @@ async function applyArticleSummaries(
     .filter(Boolean);
 
   if (originalUrls.length === 0) {
+    return articles.map((article) => ({
+      ...article,
+      language_code: DEFAULT_LANGUAGE_CODE,
+      requested_language_code: requestedLanguageCode,
+      translation_available: false,
+    }));
+  }
+
+  if (isBackendPostgresPrimary()) {
     return articles.map((article) => ({
       ...article,
       language_code: DEFAULT_LANGUAGE_CODE,
@@ -361,6 +374,27 @@ async function getPublishedArticlesFromSnapshot(
   const from = safePage * PAGE_SIZE;
   const to = from + PAGE_SIZE;
 
+  if (isBackendPostgresPrimary()) {
+    try {
+      const data = await callBackendDatabaseOperation<Article[]>("load-public-feed-snapshot", {
+        category: cleanCategory(category),
+        limit: PAGE_SIZE + 1,
+        offset: from,
+      });
+
+      return shapePublishedArticlesResult({
+        data,
+        page: safePage,
+        includeNextPage: true,
+        dataSource: "public_feed_snapshot",
+        languageCode,
+      });
+    } catch (error) {
+      console.warn("Backend public feed snapshot unavailable. Falling back to articles table.", error);
+      return null;
+    }
+  }
+
   const { data, error } = await basePublicFeedSnapshotQuery(category)
     .order("snapshot_rank", { ascending: true })
     .range(from, to);
@@ -389,6 +423,34 @@ async function getPublishedArticlesFromSourceTable(
 ): Promise<PublishedArticlesResult> {
   const from = safePage * PAGE_SIZE;
   const to = from + PAGE_SIZE;
+
+  if (isBackendPostgresPrimary()) {
+    try {
+      const data = await callBackendDatabaseOperation<Article[]>("load-published-articles", {
+        category: cleanCategory(category),
+        limit: PAGE_SIZE + 1,
+        offset: from,
+      });
+
+      return shapePublishedArticlesResult({
+        data,
+        page: safePage,
+        includeNextPage: true,
+        dataSource: "articles_fallback",
+        languageCode,
+      });
+    } catch (error) {
+      console.warn("Backend fallback articles table unavailable.", error);
+
+      return {
+        articles: [],
+        nextPage: null,
+        nextCursor: null,
+        dataSource: "articles_fallback",
+        languageCode,
+      };
+    }
+  }
 
   const { data, error } = await basePublishedArticleQuery(category)
     .order("published_on_site_at", { ascending: false })
@@ -463,6 +525,44 @@ export async function getPublishedArticlesForSection(
 
   if (!selectedCategory) {
     return [];
+  }
+
+  if (isBackendPostgresPrimary()) {
+    try {
+      const snapshotData = await callBackendDatabaseOperation<Article[]>(
+        "load-public-feed-snapshot",
+        {
+          category: selectedCategory,
+          limit: safeLimit,
+          offset: 0,
+        },
+      );
+
+      if (snapshotData.length > 0) {
+        return applyArticleSummaries(
+          dedupeArticlesByIdentity(snapshotData).slice(0, safeLimit),
+          languageCode,
+        );
+      }
+    } catch (error) {
+      console.warn("Backend category public feed snapshot unavailable. Falling back to articles table.", error);
+    }
+
+    try {
+      const data = await callBackendDatabaseOperation<Article[]>("load-published-articles", {
+        category: selectedCategory,
+        limit: safeLimit,
+        offset: 0,
+      });
+
+      return applyArticleSummaries(
+        dedupeArticlesByIdentity(data).slice(0, safeLimit),
+        languageCode,
+      );
+    } catch (error) {
+      console.warn("Backend category fallback articles table unavailable.", error);
+      return [];
+    }
   }
 
   const { data: snapshotData, error: snapshotError } =
@@ -569,22 +669,42 @@ export async function getHomeFeedFromSnapshot(
   requestedLanguageCode?: string | null,
 ): Promise<HomeFeedPayload | null> {
   const languageCode = normalizeLanguageCode(requestedLanguageCode);
-  const { data, error } = await basePublicFeedSnapshotQuery()
-    .order("snapshot_rank", { ascending: true })
-    .limit(HOME_FEED_SNAPSHOT_SCAN_LIMIT);
+  let data: Article[] | null = null;
 
-  if (error || !data || data.length === 0) {
-    if (error) {
-      console.warn("Homepage snapshot unavailable. Falling back to legacy feed reads.", {
-        code: error?.code,
-        message: error?.message,
+  if (isBackendPostgresPrimary()) {
+    try {
+      data = await callBackendDatabaseOperation<Article[]>("load-home-feed-snapshot", {
+        limit: HOME_FEED_SNAPSHOT_SCAN_LIMIT,
+        offset: 0,
       });
+    } catch (error) {
+      console.warn("Backend homepage snapshot unavailable. Falling back to legacy feed reads.", error);
+      return null;
+    }
+  } else {
+    const { data: snapshotData, error } = await basePublicFeedSnapshotQuery()
+      .order("snapshot_rank", { ascending: true })
+      .limit(HOME_FEED_SNAPSHOT_SCAN_LIMIT);
+
+    if (error || !snapshotData || snapshotData.length === 0) {
+      if (error) {
+        console.warn("Homepage snapshot unavailable. Falling back to legacy feed reads.", {
+          code: error?.code,
+          message: error?.message,
+        });
+      }
+
+      return null;
     }
 
+    data = snapshotData as Article[];
+  }
+
+  if (!data || data.length === 0) {
     return null;
   }
 
-  const rows = dedupeArticlesByIdentity(data as Article[]);
+  const rows = dedupeArticlesByIdentity(data);
   const mainBaseArticles = rows.slice(0, PAGE_SIZE);
   const seenArticleKeys = new Set(
     mainBaseArticles
@@ -689,6 +809,47 @@ async function getPublishedArticlesByCursorFromSourceTable(
   category?: string | null,
   languageCode: LanguageCode = DEFAULT_LANGUAGE_CODE,
 ): Promise<PublishedArticlesResult> {
+  if (isBackendPostgresPrimary()) {
+    if (decodedCursor) {
+      console.warn("Backend cursor pagination is unavailable; returning an empty cursor page.");
+
+      return {
+        articles: [],
+        nextPage: null,
+        nextCursor: null,
+        dataSource: "articles_fallback",
+        languageCode,
+      };
+    }
+
+    try {
+      const data = await callBackendDatabaseOperation<Article[]>("load-published-articles", {
+        category: cleanCategory(category),
+        limit: CURSOR_PAGE_SIZE + 1,
+        offset: 0,
+      });
+
+      return shapePublishedArticlesResult({
+        data,
+        page: 0,
+        includeNextPage: false,
+        dataSource: "articles_fallback",
+        languageCode,
+        pageSize: CURSOR_PAGE_SIZE,
+      });
+    } catch (error) {
+      console.error("Failed to load backend cursor-paginated published articles:", error);
+
+      return {
+        articles: [],
+        nextPage: null,
+        nextCursor: null,
+        dataSource: "articles_fallback",
+        languageCode,
+      };
+    }
+  }
+
   let query = basePublishedArticleQuery(category);
 
   if (decodedCursor) {
@@ -763,6 +924,25 @@ export async function searchPublishedArticles(
     };
   }
 
+  if (isBackendPostgresPrimary()) {
+    const rows = await callBackendDatabaseOperation<Article[]>("search-published-articles", {
+      query,
+      pageSize: safePageSize + 1,
+      pageOffset: safePage * safePageSize,
+    });
+    const baseArticles = rows.slice(0, safePageSize);
+    const articles = await applyArticleSummaries(baseArticles, languageCode);
+
+    return {
+      articles,
+      nextPage: rows.length > safePageSize ? safePage + 1 : null,
+      query,
+      page: safePage,
+      pageSize: safePageSize,
+      languageCode,
+    };
+  }
+
   const { data, error } = await getSupabase().rpc("search_articles", {
     search_query: query,
     page_size: safePageSize + 1,
@@ -789,6 +969,27 @@ export async function searchPublishedArticles(
 }
 
 export async function getPublishedCategories(limit = 1000) {
+  if (isBackendPostgresPrimary()) {
+    try {
+      const data = await callBackendDatabaseOperation<{ category: string | null }[]>(
+        "load-published-categories",
+        { limit },
+      );
+      const categories = new Set<string>();
+
+      data.forEach((article) => {
+        getCategoryBadges(article.category).forEach((category) => {
+          categories.add(category);
+        });
+      });
+
+      return Array.from(categories).sort((a, b) => a.localeCompare(b));
+    } catch (error) {
+      console.error("Failed to load article categories from backend.", error);
+      return [];
+    }
+  }
+
   const supabase = getSupabase();
   const { data: snapshotData, error: snapshotError } = await supabase
     .from(PUBLIC_FEED_SNAPSHOT_TABLE)
@@ -837,6 +1038,25 @@ export async function getPublishedCategories(limit = 1000) {
 
 const getCachedArticleById = unstable_cache(async (id: string, requestedLanguageCode?: string | null) => {
   const languageCode = normalizeLanguageCode(requestedLanguageCode);
+
+  if (isBackendPostgresPrimary()) {
+    try {
+      const data = await callBackendDatabaseOperation<Article | null>("load-article-detail", {
+        id,
+      });
+
+      if (!data) {
+        return null;
+      }
+
+      const [article] = await applyArticleSummaries([data], languageCode);
+      return article ?? null;
+    } catch (error) {
+      console.error("Failed to load backend article:", error);
+      return null;
+    }
+  }
+
   const { data, error } = await getSupabase()
     .from("articles")
     .select(ARTICLE_SELECT)

@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
+import { resolve } from "node:path";
 import test from "node:test";
 
 import { callBackendDatabaseOperation } from "../web/backendDatabase.mjs";
@@ -185,4 +187,34 @@ test("Backend primary smoke can call a mock compatibility endpoint without Supab
   } finally {
     await close(server);
   }
+});
+
+test("Backend primary public article reads use backend compatibility operations", async () => {
+  const articlesSource = await readFile(
+    resolve(import.meta.dirname, "../web/lib/articles.ts"),
+    "utf8",
+  );
+
+  for (const operation of [
+    "load-public-feed-snapshot",
+    "load-home-feed-snapshot",
+    "load-published-articles",
+    "load-published-categories",
+    "load-article-detail",
+    "load-recent-article-sitemap-items",
+    "load-published-article-sitemap-count",
+    "load-article-sitemap-items-page",
+    "search-published-articles",
+  ]) {
+    assert.match(articlesSource, new RegExp(`callBackendDatabaseOperation<[^>]+>\\(\\s*"${operation}"`));
+  }
+
+  assert.match(
+    articlesSource,
+    /if \(isBackendPostgresPrimary\(\)\) \{[\s\S]+load-article-detail/,
+  );
+  assert.match(
+    articlesSource,
+    /if \(isBackendPostgresPrimary\(\)\) \{[\s\S]+translation_available: false/,
+  );
 });
