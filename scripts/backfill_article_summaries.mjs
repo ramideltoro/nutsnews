@@ -678,6 +678,20 @@ console.log(`Scan all candidates: ${SCAN_ALL_CANDIDATES ? 'yes' : 'no'}`);
 console.log(`Failure cache: ${FAILED_TRANSLATION_CACHE || 'off'}`);
 
 if (tasks.length === 0) {
+  if (!DRY_RUN && PUBLISH_READY) {
+    let publishedCount = 0;
+
+    try {
+      publishedCount = await publishFullyTranslatedArticles(articles);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`Publish-ready check failed: ${message}`);
+      process.exit(1);
+    }
+
+    console.log(`Published/confirmed ${publishedCount} fully translated article(s).`);
+  }
+
   console.log('Nothing to backfill.');
   process.exit(0);
 }
