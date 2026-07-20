@@ -343,6 +343,8 @@ function runPlaywright(playwrightConfig = defaultPlaywrightConfig, extraArgs = [
         NUTSNEWS_SUPABASE_CREDENTIALS_ENV: "staging",
         NUTSNEWS_SUPABASE_PROJECT_REF: "public-smoke-fixture",
         NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: "production-fixture",
+        NUTSNEWS_PUBLIC_SUPABASE_URL: supabaseUrl,
+        NUTSNEWS_PUBLIC_SUPABASE_ANON_KEY: "public-smoke-anon-key",
         NEXT_PUBLIC_SUPABASE_URL: supabaseUrl,
         NEXT_PUBLIC_SUPABASE_ANON_KEY: "public-smoke-anon-key",
         SUPABASE_URL: supabaseUrl,

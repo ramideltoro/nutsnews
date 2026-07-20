@@ -35,6 +35,16 @@ type SearchResponse = {
   query?: string;
 };
 
+type ArticleLanguageResponse = {
+  articles?: Array<{
+    title?: unknown;
+    language_code?: unknown;
+    requested_language_code?: unknown;
+    translation_available?: unknown;
+  }>;
+  languageCode?: unknown;
+};
+
 test.beforeEach(async ({ context }) => {
   await context.addInitScript(
     ([languageStorageKey, themeStorageKey]) => {
@@ -109,18 +119,57 @@ async function readFirstArticleTitle(page: Page) {
   return (await firstTitle.innerText()).trim();
 }
 
-async function waitForFirstArticleLanguage(page: Page, requestedLanguageCode: string) {
+async function waitForFirstArticleLanguage(page: Page, expectedLanguageCode: string) {
   const firstCard = page.getByTestId('nutsnews-article-card').first();
-  const allowedLanguagePattern = new RegExp(`^(?:${requestedLanguageCode}|en)$`);
 
   await expect
     .poll(async () => firstCard.getAttribute('lang'), {
-      message: `Expected the first visible article card to render in ${requestedLanguageCode} or the documented English fallback.`,
+      message: `Expected the first visible article card to render in ${expectedLanguageCode}.`,
       timeout: 30_000,
     })
-    .toMatch(allowedLanguagePattern);
+    .toBe(expectedLanguageCode);
 
   return (await firstCard.getAttribute('lang')) ?? 'en';
+}
+
+function expectedFirstArticleLanguage(payload: ArticleLanguageResponse, requestedLanguageCode: string) {
+  const firstArticle = payload.articles?.[0];
+
+  if (!firstArticle) {
+    expect(payload.languageCode, `Expected the empty API response languageCode to preserve ${requestedLanguageCode}.`).toBe(
+      requestedLanguageCode,
+    );
+    return null;
+  }
+
+  expect(payload.languageCode, `Expected the API response languageCode to preserve ${requestedLanguageCode}.`).toBe(
+    requestedLanguageCode,
+  );
+  expect(
+    firstArticle.requested_language_code,
+    `Expected the first article to preserve requested_language_code=${requestedLanguageCode}.`,
+  ).toBe(requestedLanguageCode);
+
+  if (firstArticle.translation_available === true) {
+    expect(
+      firstArticle.language_code,
+      `Expected available ${requestedLanguageCode} translations to render as ${requestedLanguageCode}.`,
+    ).toBe(requestedLanguageCode);
+    return requestedLanguageCode;
+  }
+
+  if (firstArticle.translation_available === false && firstArticle.language_code === 'en') {
+    return 'en';
+  }
+
+  throw new Error(
+    `Unexpected ${requestedLanguageCode} article translation metadata: ${JSON.stringify({
+      language_code: firstArticle.language_code,
+      requested_language_code: firstArticle.requested_language_code,
+      translation_available: firstArticle.translation_available,
+      title: firstArticle.title,
+    })}`,
+  );
 }
 
 test.describe('Vercel Preview smoke regression', () => {
@@ -240,7 +289,13 @@ test.describe('Vercel Preview smoke regression', () => {
     for (const language of languageExpectations) {
       const responsePromise = page.waitForResponse((response) => {
         const url = response.url();
-        return url.includes('/api/articles') && url.includes(`lang=${language.code}`) && response.request().method() === 'GET';
+        const parsedUrl = new URL(url);
+        return (
+          parsedUrl.pathname === '/api/articles' &&
+          parsedUrl.searchParams.get('home') === '1' &&
+          parsedUrl.searchParams.get('lang') === language.code &&
+          response.request().method() === 'GET'
+        );
       });
 
       await page.getByTestId(language.optionTestId).click();
@@ -250,12 +305,12 @@ test.describe('Vercel Preview smoke regression', () => {
         `Expected the ${language.code} feed request to succeed, got ${languageResponse.status()}.`,
       ).toBeTruthy();
 
+      const languagePayload = (await languageResponse.json()) as ArticleLanguageResponse;
+      const expectedCardLanguage = expectedFirstArticleLanguage(languagePayload, language.code);
       await expect(page.locator('html')).toHaveAttribute('lang', language.expectedHtmlLang);
-      const renderedCardLanguage = await waitForFirstArticleLanguage(page, language.code);
-      expect(
-        renderedCardLanguage,
-        `Expected the first article card to use ${language.code} or documented English fallback.`,
-      ).toMatch(new RegExp(`^(?:${language.code}|en)$`));
+      if (expectedCardLanguage) {
+        await waitForFirstArticleLanguage(page, expectedCardLanguage);
+      }
       expect(
         await readFirstArticleTitle(page),
         `Expected the ${language.code} selection to keep rendering a visible article title.`,

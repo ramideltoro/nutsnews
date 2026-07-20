@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { assertProductionOperation } from '../web/runtimeSafety.mjs';
+import { assertDataRead, assertProductionOperation } from '../web/runtimeSafety.mjs';
 
 /**
  * Audit NutsNews translated article titles/summaries for coverage and quality.
@@ -15,16 +15,17 @@ import { assertProductionOperation } from '../web/runtimeSafety.mjs';
  *   AUDIT_SOURCE=public_feed_snapshot   # public_feed_snapshot or articles
  *   TRANSLATION_QUALITY_REPORT_PATH=reports/translations/translation-quality.md
  *   TRANSLATION_QUALITY_FAIL_ON_CRITICAL=false
+ *   TRANSLATION_QUALITY_FAIL_ON_MISSING=false
+ *   TRANSLATION_QUALITY_MIN_COVERAGE=0
  */
 
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-assertProductionOperation('translation-audit');
-
 const SUPABASE_URL = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/+$/, '');
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || '';
 const SUPPORTED_LANGUAGE_CODES = new Set(['fr', 'ja', 'de-CH', 'de', 'el']);
+const DEFAULT_LANGUAGE_CODE = 'en';
 const LANGUAGE_CODES = parseLanguages(process.env.LANGUAGE_CODES ?? process.env.LANGUAGE_CODE ?? 'fr,ja,de-CH,de,el');
 const AUDIT_LIMIT = clampNumber(process.env.AUDIT_LIMIT, 100, 1, 500);
 const AUDIT_SOURCE = normalizeAuditSource(process.env.AUDIT_SOURCE ?? 'public_feed_snapshot');
@@ -32,8 +33,10 @@ const SUMMARY_LOOKUP_LIMIT = clampNumber(process.env.SUMMARY_LOOKUP_LIMIT, 20000
 const REPORT_PATH = process.env.TRANSLATION_QUALITY_REPORT_PATH || '';
 const FAIL_ON_CRITICAL = /^(1|true|yes)$/i.test(process.env.TRANSLATION_QUALITY_FAIL_ON_CRITICAL || '');
 const DEBUG = /^(1|true|yes)$/i.test(process.env.TRANSLATION_QUALITY_DEBUG || '');
+const FAIL_ON_MISSING = /^(1|true|yes)$/i.test(process.env.TRANSLATION_QUALITY_FAIL_ON_MISSING || '');
+const MIN_COVERAGE_PERCENT = clampPercent(process.env.TRANSLATION_QUALITY_MIN_COVERAGE);
 
-const DEFAULT_LANGUAGE_CODE = 'en';
+assertTranslationAuditRuntime();
 const TITLE_MIN_CHARS = 6;
 const TITLE_MAX_CHARS = 220;
 const SUMMARY_MIN_CHARS = 80;
@@ -83,6 +86,24 @@ const TARGET_MARKERS = {
   de: new Set(['auf', 'aus', 'das', 'dem', 'den', 'der', 'des', 'die', 'ein', 'eine', 'einen', 'einer', 'für', 'im', 'ist', 'mit', 'und', 'von', 'zu', 'über']),
   el: new Set(),
 };
+
+function isFixtureSupabaseUrl(value) {
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.test');
+  } catch {
+    return false;
+  }
+}
+
+function assertTranslationAuditRuntime() {
+  if (isFixtureSupabaseUrl(SUPABASE_URL)) {
+    assertDataRead('translation-audit-fixture');
+    return;
+  }
+
+  assertProductionOperation('translation-audit');
+}
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error('Missing required env. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');
@@ -142,6 +163,16 @@ function clampNumber(value, fallback, min, max) {
   }
 
   return Math.max(min, Math.min(Math.floor(parsed), max));
+}
+
+function clampPercent(value) {
+  const parsed = Number(value ?? '');
+
+  if (!Number.isFinite(parsed)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(parsed, 100));
 }
 
 function normalizeAuditSource(value) {
@@ -515,6 +546,11 @@ const languageSummaries = summarizeByLanguage({ articles, summariesByKey });
 const findings = languageSummaries
   .flatMap((language) => language.findings)
   .sort((left, right) => severityRank(left.severity) - severityRank(right.severity) || left.title.localeCompare(right.title));
+const expectedCount = articles.length * LANGUAGE_CODES.length;
+const availableCount = languageSummaries.reduce((total, language) => total + language.availableCount, 0);
+const missingCount = languageSummaries.reduce((total, language) => total + language.missingCount, 0);
+const criticalCount = languageSummaries.reduce((total, language) => total + language.criticalCount, 0);
+const coveragePercent = expectedCount > 0 ? (availableCount / expectedCount) * 100 : 100;
 
 printConsoleReport({ articles, languageSummaries, findings });
 
@@ -524,7 +560,26 @@ if (REPORT_PATH) {
   console.log(`\nMarkdown report written to ${REPORT_PATH}`);
 }
 
-if (FAIL_ON_CRITICAL && findings.some((finding) => finding.severity === 'critical')) {
-  console.error('\nCritical translation quality issues found.');
+const releaseGateFailures = [];
+
+if (FAIL_ON_CRITICAL && criticalCount > 0) {
+  releaseGateFailures.push(`Critical translation quality issues found: ${criticalCount}.`);
+}
+
+if (FAIL_ON_MISSING && missingCount > 0) {
+  releaseGateFailures.push(`Missing translation rows found: ${missingCount}.`);
+}
+
+if (coveragePercent < MIN_COVERAGE_PERCENT) {
+  releaseGateFailures.push(
+    `Translation coverage ${coveragePercent.toFixed(2)}% is below required ${MIN_COVERAGE_PERCENT.toFixed(2)}%.`,
+  );
+}
+
+if (releaseGateFailures.length > 0) {
+  console.error('\nTranslation release gate failed:');
+  for (const failure of releaseGateFailures) {
+    console.error(`- ${failure}`);
+  }
   process.exit(1);
 }

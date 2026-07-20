@@ -20,6 +20,8 @@ const webUrl = `http://127.0.0.1:${webPort}`;
 
 const articleUrlOne = `https://mock.nutsnews.test/story/cotton-candy-planets-${runId}`;
 const articleUrlTwo = `https://mock.nutsnews.test/story/therapy-dogs-${runId}`;
+const articleUrlThree = `https://mock.nutsnews.test/story/english-only-fallback-${runId}`;
+const supportedLanguageCodes = new Set(["en", "fr", "ja", "de-CH", "de", "el"]);
 
 const articles = [
   {
@@ -49,6 +51,20 @@ const articles = [
     category: "Animals | Community | Wellness",
     positivity_score: 8,
     snapshot_rank: 2,
+  },
+  {
+    id: `web-e2e-article-3-${runId}`,
+    source: "NutsNews Mock Translation Fallback",
+    title: `Mock English-only fallback story ${runId}`,
+    original_url: articleUrlThree,
+    image_url: `${mockExternalUrl}/images/super-puff.png`,
+    published_at: "2026-06-27T23:00:00+00:00",
+    published_on_site_at: "2026-06-27T23:30:00+00:00",
+    ai_summary:
+      "An English-only fallback fixture verifies that missing translations stay explicit instead of masquerading as localized copy.",
+    category: "Fallback Only",
+    positivity_score: 7,
+    snapshot_rank: 3,
   },
 ];
 
@@ -174,6 +190,43 @@ function options(response) {
 function stripColumns(row) {
   const { snapshot_rank: _snapshotRank, ...article } = row;
   return article;
+}
+
+function normalizeMockLanguageCode(value) {
+  const languageCode = String(value ?? "").trim();
+  return supportedLanguageCodes.has(languageCode) ? languageCode : "en";
+}
+
+function localizeEdgeSnapshotArticle(article, requestedLanguageCode) {
+  const baseArticle = stripColumns(article);
+
+  if (requestedLanguageCode !== "en") {
+    const translatedSummary = articleSummaries.find(
+      (summary) =>
+        summary.original_url === article.original_url &&
+        summary.language_code === requestedLanguageCode &&
+        summary.title.trim() &&
+        summary.summary.trim(),
+    );
+
+    if (translatedSummary) {
+      return {
+        ...baseArticle,
+        title: translatedSummary.title,
+        ai_summary: translatedSummary.summary,
+        language_code: requestedLanguageCode,
+        requested_language_code: requestedLanguageCode,
+        translation_available: true,
+      };
+    }
+  }
+
+  return {
+    ...baseArticle,
+    language_code: "en",
+    requested_language_code: requestedLanguageCode,
+    translation_available: requestedLanguageCode === "en",
+  };
 }
 
 function applyRange(request, rows) {
@@ -381,11 +434,14 @@ function createExternalMockServer() {
         const page = Number(url.searchParams.get("page") ?? "0");
         const pageSize = Number(url.searchParams.get("pageSize") ?? "5");
         const category = (url.searchParams.get("category") ?? "").toLowerCase();
+        const requestedLanguageCode = normalizeMockLanguageCode(url.searchParams.get("lang"));
         const filteredArticles = category
           ? articles.filter((article) => article.category.toLowerCase().includes(category))
           : articles;
         const from = Math.max(0, page) * Math.max(1, pageSize);
-        const rows = filteredArticles.slice(from, from + Math.max(1, pageSize)).map(stripColumns);
+        const rows = filteredArticles
+          .slice(from, from + Math.max(1, pageSize))
+          .map((article) => localizeEdgeSnapshotArticle(article, requestedLanguageCode));
 
         json(
           response,
@@ -395,7 +451,7 @@ function createExternalMockServer() {
             nextPage: filteredArticles.length > from + pageSize ? page + 1 : null,
             nextCursor: null,
             dataSource: "edge_feed_snapshot",
-            languageCode: "en",
+            languageCode: requestedLanguageCode,
             edgeSnapshot: {
               status: "hit",
               updatedAt: "2026-06-28T02:00:00.000Z",
@@ -772,19 +828,57 @@ async function runBrowserChecks() {
   await expect.poll(async () => firstArticleTitle(), { timeout: 10000 }).toBe(englishTitle);
   logOk("Language changes rendered translated articles and returned to English");
 
-  logStep("Verifying /api/articles falls back to the edge snapshot during a Supabase outage");
+  logStep("Verifying /api/articles falls back to the localized edge snapshot during a Supabase outage");
+  const edgeFallbackLanguageCode = "fr";
+  const localizedEdgeSummary = articleSummaries.find(
+    (summary) => summary.original_url === articleUrlOne && summary.language_code === edgeFallbackLanguageCode,
+  );
+
+  if (!localizedEdgeSummary) {
+    fail(`Missing localized edge fallback summary for ${edgeFallbackLanguageCode}.`);
+  }
+
   supabaseOutageMode = true;
-  const fallbackResponse = await page.request.get(`/api/articles?page=0&category=Science&edgeFallbackTest=${runId}`);
-  expect(fallbackResponse.ok()).toBeTruthy();
-  const fallbackHeaders = fallbackResponse.headers();
-  expect(fallbackHeaders["x-nutsnews-article-data-source"]).toBe("edge_feed_snapshot");
-  expect(fallbackHeaders["x-nutsnews-feed-snapshot"]).toBe("edge-fallback");
-  expect(fallbackHeaders["x-nutsnews-edge-snapshot"]).toBe("hit");
-  const fallbackPayload = await fallbackResponse.json();
-  expect(fallbackPayload.articles.length).toBeGreaterThan(0);
-  expect(fallbackPayload.articles[0].title).toContain(runId);
-  supabaseOutageMode = false;
-  logOk("Article API recovered from the mocked edge snapshot fallback");
+  try {
+    const fallbackResponse = await page.request.get(
+      `/api/articles?page=0&category=Science&lang=${edgeFallbackLanguageCode}&edgeFallbackTest=${runId}`,
+    );
+    expect(fallbackResponse.ok()).toBeTruthy();
+    const fallbackHeaders = fallbackResponse.headers();
+    expect(fallbackHeaders["x-nutsnews-article-data-source"]).toBe("edge_feed_snapshot");
+    expect(fallbackHeaders["x-nutsnews-article-language"]).toBe(edgeFallbackLanguageCode);
+    expect(fallbackHeaders["x-nutsnews-feed-snapshot"]).toBe("edge-fallback");
+    expect(fallbackHeaders["x-nutsnews-edge-snapshot"]).toBe("hit");
+    const fallbackPayload = await fallbackResponse.json();
+    expect(fallbackPayload.languageCode).toBe(edgeFallbackLanguageCode);
+    expect(fallbackPayload.articles.length).toBeGreaterThan(0);
+    expect(fallbackPayload.articles[0].title).toBe(localizedEdgeSummary.title);
+    expect(fallbackPayload.articles[0].ai_summary).toBe(localizedEdgeSummary.summary);
+    expect(fallbackPayload.articles[0].language_code).toBe(edgeFallbackLanguageCode);
+    expect(fallbackPayload.articles[0].requested_language_code).toBe(edgeFallbackLanguageCode);
+    expect(fallbackPayload.articles[0].translation_available).toBe(true);
+
+    const missingTranslationResponse = await page.request.get(
+      `/api/articles?page=0&category=Fallback&lang=${edgeFallbackLanguageCode}&edgeFallbackMissingTest=${runId}`,
+    );
+    expect(missingTranslationResponse.ok()).toBeTruthy();
+    const missingTranslationHeaders = missingTranslationResponse.headers();
+    expect(missingTranslationHeaders["x-nutsnews-article-data-source"]).toBe("edge_feed_snapshot");
+    expect(missingTranslationHeaders["x-nutsnews-article-language"]).toBe(edgeFallbackLanguageCode);
+    expect(missingTranslationHeaders["x-nutsnews-feed-snapshot"]).toBe("edge-fallback");
+    expect(missingTranslationHeaders["x-nutsnews-edge-snapshot"]).toBe("hit");
+    const missingTranslationPayload = await missingTranslationResponse.json();
+    expect(missingTranslationPayload.languageCode).toBe(edgeFallbackLanguageCode);
+    expect(missingTranslationPayload.articles.length).toBeGreaterThan(0);
+    expect(missingTranslationPayload.articles[0].original_url).toBe(articleUrlThree);
+    expect(missingTranslationPayload.articles[0].title).toContain(`Mock English-only fallback story ${runId}`);
+    expect(missingTranslationPayload.articles[0].language_code).toBe("en");
+    expect(missingTranslationPayload.articles[0].requested_language_code).toBe(edgeFallbackLanguageCode);
+    expect(missingTranslationPayload.articles[0].translation_available).toBe(false);
+  } finally {
+    supabaseOutageMode = false;
+  }
+  logOk("Article API recovered from localized edge fallback and explicit missing-translation fallback");
 
   logStep("Verifying admin edge snapshot dashboard reflects Worker health");
   await page.goto("/admin/edge-snapshot", { waitUntil: "networkidle" });

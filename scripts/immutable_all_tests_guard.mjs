@@ -37,7 +37,11 @@ function isTestLikePath(filePath) {
 }
 
 try {
-  execFileSync("git", ["fetch", "origin", baseRef, "--depth=1"], { stdio: "ignore" });
+  execFileSync(
+    "git",
+    ["fetch", "--no-tags", "--prune", "origin", `+refs/heads/${baseRef}:refs/remotes/origin/${baseRef}`],
+    { stdio: "ignore" },
+  );
 } catch (error) {
   console.warn(`Could not fetch origin/${baseRef}; continuing with local refs. ${error.message}`);
 }
