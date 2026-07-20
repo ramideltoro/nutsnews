@@ -1,0 +1,134 @@
+name: Sync Vercel Backend API Token
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type sync-backend-api-token-to-vercel-production.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-vercel-backend-api-token
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync backend API token to Vercel production
+    if: inputs.confirmation == 'sync-backend-api-token-to-vercel-production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: Production
+
+    steps:
+      - name: Validate protected token sync inputs
+        shell: bash
+        env:
+          NUTSNEWS_BACKEND_API_TOKEN: ${{ secrets.NUTSNEWS_BACKEND_API_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for secret_name in NUTSNEWS_BACKEND_API_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID VERCEL_TOKEN; do
+            if [[ -z "${!secret_name}" ]]; then
+              echo "Missing required Production secret: ${secret_name}" >&2
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Upsert sensitive Vercel production token
+        shell: bash
+        env:
+          NUTSNEWS_BACKEND_API_TOKEN: ${{ secrets.NUTSNEWS_BACKEND_API_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          const tokenValue = process.env.NUTSNEWS_BACKEND_API_TOKEN ?? "";
+          const vercelToken = process.env.VERCEL_TOKEN ?? "";
+          const projectId = process.env.VERCEL_PROJECT_ID ?? "";
+          const teamId = process.env.VERCEL_ORG_ID ?? "";
+
+          if (!tokenValue || !vercelToken || !projectId || !teamId) {
+            throw new Error("Required protected inputs are missing.");
+          }
+
+          const url = new URL(`https://api.vercel.com/v10/projects/${encodeURIComponent(projectId)}/env`);
+          url.searchParams.set("teamId", teamId);
+          url.searchParams.set("upsert", "true");
+
+          const response = await fetch(url, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${vercelToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify([
+              {
+                key: "NUTSNEWS_BACKEND_API_TOKEN",
+                value: tokenValue,
+                type: "sensitive",
+                target: ["production"],
+                comment: "Backend PostgreSQL provider token for NutsNews protected VPS env sync.",
+              },
+            ]),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Vercel environment upsert failed with HTTP ${response.status}; response body omitted.`);
+          }
+
+          console.log("Upserted sensitive Vercel Production variable: NUTSNEWS_BACKEND_API_TOKEN.");
+          NODE
+
+      - name: Verify Vercel production token metadata
+        shell: bash
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          const vercelToken = process.env.VERCEL_TOKEN ?? "";
+          const projectId = process.env.VERCEL_PROJECT_ID ?? "";
+          const teamId = process.env.VERCEL_ORG_ID ?? "";
+
+          const url = new URL(`https://api.vercel.com/v10/projects/${encodeURIComponent(projectId)}/env`);
+          url.searchParams.set("teamId", teamId);
+          url.searchParams.set("source", "backend-token-sync");
+
+          const response = await fetch(url, {
+            headers: {
+              Authorization: `Bearer ${vercelToken}`,
+              "Content-Type": "application/json",
+            },
+          });
+          if (!response.ok) {
+            throw new Error(`Vercel environment metadata lookup failed with HTTP ${response.status}; response body omitted.`);
+          }
+
+          const payload = await response.json();
+          const records = Array.isArray(payload) ? payload : payload.envs ?? payload.data ?? [];
+          const tokenRecord = records.find((record) => {
+            const target = record?.target;
+            const targets = Array.isArray(target) ? target : [target];
+            return record?.key === "NUTSNEWS_BACKEND_API_TOKEN" && targets.includes("production");
+          });
+          if (!tokenRecord) {
+            throw new Error("NUTSNEWS_BACKEND_API_TOKEN metadata was not found in Vercel Production.");
+          }
+          if (!["sensitive", "encrypted", "secret"].includes(String(tokenRecord.type ?? ""))) {
+            throw new Error("NUTSNEWS_BACKEND_API_TOKEN must remain a sensitive Vercel variable.");
+          }
+
+          console.log("Verified Vercel Production metadata for NUTSNEWS_BACKEND_API_TOKEN.");
+          NODE
