@@ -482,6 +482,55 @@ jobs:
           node --input-type=module <<'NODE' &
           import http from "node:http";
 
+          const articleUrl = "https://mock.nutsnews.test/release-gate/community-garden";
+          const article = {
+            id: "translation-release-gate-article",
+            source: "NutsNews Release Gate Fixture",
+            title: "Release gate community garden story",
+            original_url: articleUrl,
+            ai_summary:
+              "Neighbors restore a community garden and share a calm public space with families, students, and local volunteers.",
+            category: "Community | Uplifting",
+            published_on_site_at: "2026-07-20T12:00:00+00:00",
+            snapshot_rank: 1,
+          };
+          const summaries = [
+            {
+              original_url: articleUrl,
+              language_code: "fr",
+              title: "Jardin communautaire pour la sortie",
+              summary:
+                "La communaute restaure un jardin local avec les voisins et les familles. Les benevoles partagent un espace calme pour les enfants, les etudiants et les lecteurs.",
+            },
+            {
+              original_url: articleUrl,
+              language_code: "ja",
+              title: "リリース確認用の地域庭園",
+              summary:
+                "地域の人々が庭園を整え、家族や学生やボランティアが安心して集まれる場所を作ります。この前向きな記事は翻訳ゲートの確認に使われます。",
+            },
+            {
+              original_url: articleUrl,
+              language_code: "de-CH",
+              title: "Gemeinschaftsgarten fuer die Freigabe",
+              summary:
+                "Die Nachbarschaft pflegt den Gemeinschaftsgarten und teilt einen ruhigen Ort mit Familien und Studierenden. Der Beitrag prueft die Uebersetzung sicher.",
+            },
+            {
+              original_url: articleUrl,
+              language_code: "de",
+              title: "Gemeinschaftsgarten fuer die Freigabe",
+              summary:
+                "Die Nachbarschaft pflegt den Gemeinschaftsgarten und teilt einen ruhigen Ort mit Familien und Studierenden. Der Beitrag prueft die Uebersetzung sicher.",
+            },
+            {
+              original_url: articleUrl,
+              language_code: "el",
+              title: "Κοινοτικός κήπος για έλεγχο",
+              summary:
+                "Οι γείτονες φροντίζουν έναν κοινοτικό κήπο και μοιράζονται έναν ήρεμο χώρο με οικογένειες, μαθητές και εθελοντές για μια θετική ιστορία.",
+            },
+          ];
           const server = http.createServer((request, response) => {
             if (request.method === "OPTIONS") {
               response.writeHead(204, {
@@ -490,6 +539,28 @@ jobs:
                 "Access-Control-Allow-Origin": "*",
               });
               response.end();
+              return;
+            }
+
+            const url = new URL(request.url ?? "/", "http://127.0.0.1:54321");
+
+            if (url.pathname === "/rest/v1/public_feed_snapshot") {
+              response.writeHead(200, {
+                "Access-Control-Allow-Origin": "*",
+                "Content-Range": "0-0/1",
+                "Content-Type": "application/json",
+              });
+              response.end(JSON.stringify([article]));
+              return;
+            }
+
+            if (url.pathname === "/rest/v1/article_summaries") {
+              response.writeHead(200, {
+                "Access-Control-Allow-Origin": "*",
+                "Content-Range": `0-${summaries.length - 1}/${summaries.length}`,
+                "Content-Type": "application/json",
+              });
+              response.end(JSON.stringify(summaries));
               return;
             }
 
@@ -514,9 +585,20 @@ jobs:
           trap 'kill "$fixture_pid" >/dev/null 2>&1 || true' EXIT
 
           npm ci
+          npm run test:translation-release-gate
           npx tsc --noEmit
           npm run lint
           npm run test:security-headers
+          npm run test:e2e:public-smoke
+          SUPABASE_URL=http://127.0.0.1:54321 \
+            SUPABASE_SERVICE_ROLE_KEY=ci-translation-release-gate-service-role \
+            LANGUAGE_CODES=fr,ja,de-CH,de,el \
+            AUDIT_LIMIT=1 \
+            AUDIT_SOURCE=public_feed_snapshot \
+            TRANSLATION_QUALITY_FAIL_ON_CRITICAL=true \
+            TRANSLATION_QUALITY_FAIL_ON_MISSING=true \
+            TRANSLATION_QUALITY_MIN_COVERAGE=100 \
+            npm run audit:translations
           npm run build
 
   publish:

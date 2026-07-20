@@ -80,6 +80,36 @@ requireText(
   "node scripts/main_ruleset_audit_regression.mjs",
   "Release candidate must validate the main-ruleset audit contract.",
 );
+requireText(
+  candidateJob,
+  "npm run test:translation-release-gate",
+  "Release candidate must prove the translation audit fails missing, critical, and below-threshold fixtures.",
+);
+requireText(
+  candidateJob,
+  "npm run test:e2e:public-smoke",
+  "Release candidate must include public reader language smoke coverage.",
+);
+requireText(
+  candidateJob,
+  "npm run audit:translations",
+  "Release candidate must run the strict translation audit.",
+);
+requireText(
+  candidateJob,
+  "TRANSLATION_QUALITY_FAIL_ON_CRITICAL=true",
+  "Release candidate translation audit must fail on critical quality issues.",
+);
+requireText(
+  candidateJob,
+  "TRANSLATION_QUALITY_FAIL_ON_MISSING=true",
+  "Release candidate translation audit must fail on missing translation rows.",
+);
+requireText(
+  candidateJob,
+  "TRANSLATION_QUALITY_MIN_COVERAGE=100",
+  "Release candidate translation audit must require full fixture coverage.",
+);
 requireText(candidateJob, "./actionlint -color", "Release candidate must lint workflow changes.");
 assert.doesNotMatch(candidateJob, /pull_request_target:|workflow_run:/, "Release candidate must not use privileged PR triggers.");
 assert.doesNotMatch(candidateJob, /pull-requests:|contents:\s*write/, "Release candidate must not request unnecessary token permissions.");
