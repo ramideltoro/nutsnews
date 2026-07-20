@@ -7,6 +7,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const containerWorkflow = await readFile(resolve(root, ".github/workflows/container-image.yml"), "utf8");
 const releaseWorkflow = await readFile(resolve(root, ".github/workflows/staging-release.yml"), "utf8");
 const regressionWorkflow = await readFile(resolve(root, ".github/workflows/staging-release-regression.yml"), "utf8");
+const vercelBackendTokenSyncWorkflow = await readFile(resolve(root, ".github/workflows/vercel-backend-token-sync.yml"), "utf8");
 const vercelProductionWorkflow = await readFile(resolve(root, ".github/workflows/vercel-production-release.yml"), "utf8");
 const dualTargetSmoke = await readFile(resolve(root, "scripts/dual_target_web_smoke.mjs"), "utf8");
 const vercelConfig = JSON.parse(await readFile(resolve(root, "web/vercel.json"), "utf8"));
@@ -81,6 +82,7 @@ requireText(
   "Staging handoff summary must document that Vercel Production is part of the protected release chain.",
 );
 requireText(regressionWorkflow, ".github/workflows/staging-release.yml", "Regression workflow must watch the staging handoff workflow.");
+requireText(regressionWorkflow, ".github/workflows/vercel-backend-token-sync.yml", "Regression workflow must watch the Vercel backend token sync workflow.");
 
 assert.equal(
   vercelConfig.git?.deploymentEnabled?.main,
@@ -195,9 +197,36 @@ requireText(vercelProductionWorkflow, "https://www.nutsnews.com/healthz", "Verce
 requireText(vercelProductionWorkflow, "https://nutsnews.com/healthz", "Vercel production must verify the apex alias.");
 requireText(vercelProductionWorkflow, "deploymentTarget !== \"vercel-production\"", "Vercel production health must verify the production target.");
 
+requireText(vercelBackendTokenSyncWorkflow, "workflow_dispatch:", "Backend token sync must require an explicit operator dispatch.");
+requireText(
+  vercelBackendTokenSyncWorkflow,
+  "sync-backend-api-token-to-vercel-production",
+  "Backend token sync must require a typed confirmation.",
+);
+requireText(vercelBackendTokenSyncWorkflow, "environment: Production", "Backend token sync must use the protected app Production environment.");
+requireText(
+  vercelBackendTokenSyncWorkflow,
+  "NUTSNEWS_BACKEND_API_TOKEN: ${{ secrets.NUTSNEWS_BACKEND_API_TOKEN }}",
+  "Backend token sync must consume the protected backend API token secret.",
+);
+requireText(vercelBackendTokenSyncWorkflow, 'url.searchParams.set("upsert", "true")', "Backend token sync must upsert rather than create duplicates.");
+requireText(vercelBackendTokenSyncWorkflow, 'type: "sensitive"', "Backend token sync must write a sensitive Vercel variable.");
+requireText(vercelBackendTokenSyncWorkflow, 'target: ["production"]', "Backend token sync must write only the Vercel Production target.");
+requireText(
+  vercelBackendTokenSyncWorkflow,
+  "response body omitted",
+  "Backend token sync must not print Vercel response bodies from secret-bearing requests.",
+);
+assert.doesNotMatch(
+  vercelBackendTokenSyncWorkflow,
+  /console\.log\([^)]*tokenValue|echo\s+["']?\$NUTSNEWS_BACKEND_API_TOKEN/,
+  "Backend token sync must not print the backend API token value.",
+);
+
 assert.ok(!workflowNames.includes("production-release.yml"), "Direct production release workflow file must not exist.");
 assert.ok(!workflowNames.includes("production-release-regression.yml"), "Old production release regression workflow file must not exist.");
 assert.ok(workflowNames.includes("vercel-production-release.yml"), "Vercel production must be an explicit post-VPS workflow.");
+assert.ok(workflowNames.includes("vercel-backend-token-sync.yml"), "Backend token sync must be an explicit protected workflow.");
 for (const [label, text] of [
   ["Container Image", containerWorkflow],
   ["Staging handoff", releaseWorkflow],
