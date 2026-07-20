@@ -6,6 +6,17 @@ const FIRST_ARTICLE_ID = 'public-smoke-article-01';
 const FIRST_ARTICLE_TITLE = 'Public smoke readers celebrate neighborhood gardens';
 const FIRST_ARTICLE_FRENCH_TITLE = 'Jardins de quartier pour le test public';
 
+type ArticlesResponse = {
+  articles?: Array<{
+    id?: unknown;
+    title?: unknown;
+    language_code?: unknown;
+    requested_language_code?: unknown;
+    translation_available?: unknown;
+  }>;
+  languageCode?: unknown;
+};
+
 test.beforeEach(async ({ context }) => {
   await context.addInitScript(
     ([languageStorageKey, themeStorageKey]) => {
@@ -125,7 +136,17 @@ test.describe('Public reader smoke flows', () => {
     });
 
     await panel.getByTestId('nutsnews-language-option-fr').click();
-    expect((await localizedResponse).ok()).toBeTruthy();
+    const response = await localizedResponse;
+    expect(response.ok()).toBeTruthy();
+    const payload = (await response.json()) as ArticlesResponse;
+    const firstArticle =
+      payload.articles?.find((article) => article.id === FIRST_ARTICLE_ID) ?? payload.articles?.[0];
+
+    expect(payload.languageCode).toBe('fr');
+    expect(firstArticle?.title).toBe(FIRST_ARTICLE_FRENCH_TITLE);
+    expect(firstArticle?.language_code).toBe('fr');
+    expect(firstArticle?.requested_language_code).toBe('fr');
+    expect(firstArticle?.translation_available).toBe(true);
 
     await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
     await expect(page.getByTestId('nutsnews-article-card').first()).toHaveAttribute('lang', 'fr');
