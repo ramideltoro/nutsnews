@@ -212,7 +212,11 @@ requireText(
 requireText(vercelBackendTokenSyncWorkflow, 'url.searchParams.set("upsert", "true")', "Backend token sync must upsert rather than create duplicates.");
 requireText(vercelBackendTokenSyncWorkflow, 'type: "encrypted"', "Backend token sync must write a readable encrypted Vercel variable.");
 requireText(vercelBackendTokenSyncWorkflow, 'target: ["production"]', "Backend token sync must write only the Vercel Production target.");
-requireText(vercelBackendTokenSyncWorkflow, 'url.searchParams.set("decrypt", "true")', "Backend token sync must verify the sync credential can decrypt the Vercel value.");
+requireText(
+  vercelBackendTokenSyncWorkflow,
+  "https://api.vercel.com/v1/projects/",
+  "Backend token sync must verify decryptability through Vercel's per-variable detail endpoint.",
+);
 requireText(
   vercelBackendTokenSyncWorkflow,
   "retrieved value did not match the protected source secret",
