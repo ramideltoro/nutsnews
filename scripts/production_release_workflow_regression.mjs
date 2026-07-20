@@ -210,12 +210,22 @@ requireText(
   "Backend token sync must consume the protected backend API token secret.",
 );
 requireText(vercelBackendTokenSyncWorkflow, 'url.searchParams.set("upsert", "true")', "Backend token sync must upsert rather than create duplicates.");
-requireText(vercelBackendTokenSyncWorkflow, 'type: "sensitive"', "Backend token sync must write a sensitive Vercel variable.");
+requireText(vercelBackendTokenSyncWorkflow, 'type: "encrypted"', "Backend token sync must write a readable encrypted Vercel variable.");
 requireText(vercelBackendTokenSyncWorkflow, 'target: ["production"]', "Backend token sync must write only the Vercel Production target.");
+requireText(vercelBackendTokenSyncWorkflow, 'url.searchParams.set("decrypt", "true")', "Backend token sync must verify the sync credential can decrypt the Vercel value.");
+requireText(
+  vercelBackendTokenSyncWorkflow,
+  "retrieved value did not match the protected source secret",
+  "Backend token sync must verify Vercel kept the exact protected source token without printing it.",
+);
 requireText(
   vercelBackendTokenSyncWorkflow,
   "response body omitted",
   "Backend token sync must not print Vercel response bodies from secret-bearing requests.",
+);
+assert.ok(
+  !vercelBackendTokenSyncWorkflow.includes('type: "sensitive"'),
+  "Backend token sync must not write a sensitive Vercel variable because protected VPS sync must retrieve the decrypted value.",
 );
 assert.doesNotMatch(
   vercelBackendTokenSyncWorkflow,
