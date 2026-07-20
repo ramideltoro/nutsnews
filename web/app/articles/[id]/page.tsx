@@ -6,10 +6,7 @@ import { SiteFooter } from "@/app/components/SiteFooter";
 import { getArticleById, getRecentArticleSitemapItems, SITE_URL } from "@/lib/articles";
 import { OptimizedArticleImage } from "@/app/components/OptimizedArticleImage";
 import { ARTICLE_DETAIL_IMAGE_SIZES } from "@/lib/imageDelivery";
-import {
-  type LanguageCode,
-  normalizeLanguageCode,
-} from "@/lib/languages";
+import { type LanguageCode } from "@/lib/languages";
 import { getPublisherAttribution } from "@/lib/publisherAttribution";
 
 export const revalidate = 3600;
@@ -18,29 +15,11 @@ type ArticlePageProps = {
   params: Promise<{
     id: string;
   }>;
-  searchParams?: Promise<{
-    lang?: string | string[];
-    language?: string | string[];
-    languageCode?: string | string[];
-  }>;
 };
 
 export async function generateStaticParams() {
   const articles = await getRecentArticleSitemapItems(100);
   return articles.map((article) => ({ id: article.id }));
-}
-
-function getFirstSearchParam(value?: string | string[]) {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-async function getArticlePageLanguage(searchParams?: ArticlePageProps["searchParams"]) {
-  const resolvedSearchParams = searchParams ? await searchParams : {};
-  return normalizeLanguageCode(
-    getFirstSearchParam(resolvedSearchParams.lang) ??
-      getFirstSearchParam(resolvedSearchParams.languageCode) ??
-      getFirstSearchParam(resolvedSearchParams.language),
-  );
 }
 
 function formatDate(dateValue: string | null, languageCode: LanguageCode) {
@@ -66,11 +45,9 @@ function formatDate(dateValue: string | null, languageCode: LanguageCode) {
 
 export async function generateMetadata({
                                          params,
-                                         searchParams,
                                        }: ArticlePageProps): Promise<Metadata> {
   const { id } = await params;
-  const languageCode = await getArticlePageLanguage(searchParams);
-  const article = await getArticleById(id, languageCode);
+  const article = await getArticleById(id);
 
   if (!article) {
     return {
@@ -135,15 +112,15 @@ export async function generateMetadata({
   };
 }
 
-export default async function ArticlePage({ params, searchParams }: ArticlePageProps) {
+export default async function ArticlePage({ params }: ArticlePageProps) {
   const { id } = await params;
-  const languageCode = await getArticlePageLanguage(searchParams);
-  const article = await getArticleById(id, languageCode);
+  const article = await getArticleById(id);
 
   if (!article) {
     notFound();
   }
 
+  const articleLanguageCode = article.language_code ?? "en";
   const articleUrl = `${SITE_URL}/articles/${article.id}`;
   const publisherAttribution = getPublisherAttribution(
     article.source,
@@ -180,7 +157,7 @@ export default async function ArticlePage({ params, searchParams }: ArticlePageP
 
   return (
       <main
-        lang={article.language_code ?? languageCode}
+        lang={articleLanguageCode}
         className="min-h-screen overflow-hidden bg-neutral-950 px-4 pb-28 pt-6 text-neutral-100"
       >
         <script
@@ -214,7 +191,7 @@ export default async function ArticlePage({ params, searchParams }: ArticlePageP
               <div className="p-6">
                 <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-amber-400">
                   {article.category ?? "Uplifting"} · {article.source} ·{" "}
-                  {formatDate(article.published_on_site_at, languageCode)}
+                  {formatDate(article.published_on_site_at, articleLanguageCode)}
                 </p>
 
                 <h1 className="text-4xl font-black leading-tight text-white">

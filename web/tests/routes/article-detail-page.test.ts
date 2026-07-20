@@ -53,28 +53,26 @@ beforeEach(() => {
   mocks.notFound.mockClear();
 });
 
-describe("article detail language routing", () => {
-  it("passes the normalized query language into metadata article lookup", async () => {
+describe("article detail static rendering", () => {
+  it("keeps metadata article lookup on the cached static detail path", async () => {
     const { generateMetadata } = await import("@/app/articles/[id]/page");
 
     const metadata = await generateMetadata({
       params: Promise.resolve({ id: "detail-1" }),
-      searchParams: Promise.resolve({ lang: "fr" }),
     });
 
-    expect(mocks.getArticleById).toHaveBeenCalledWith("detail-1", "fr");
+    expect(mocks.getArticleById).toHaveBeenCalledWith("detail-1");
     expect(metadata.title).toBe("Titre detail francais");
   });
 
-  it("passes array query language aliases into page article lookup", async () => {
+  it("keeps page article lookup on the cached static detail path", async () => {
     const { default: ArticlePage } = await import("@/app/articles/[id]/page");
 
     await ArticlePage({
       params: Promise.resolve({ id: "detail-1" }),
-      searchParams: Promise.resolve({ languageCode: ["ja"] }),
     });
 
-    expect(mocks.getArticleById).toHaveBeenCalledWith("detail-1", "ja");
+    expect(mocks.getArticleById).toHaveBeenCalledWith("detail-1");
     expect(mocks.notFound).not.toHaveBeenCalled();
   });
 });
