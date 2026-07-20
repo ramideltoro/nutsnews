@@ -28,7 +28,7 @@ jobs:
       VPS_STAGING_DEPLOYMENT_ID: ${{ github.event.client_payload.staging_deployment_id }}
       VPS_QUALIFICATION_RUN_ID: ${{ github.event.client_payload.qualification_run_id }}
       RELEASE_KIND: ${{ github.event.client_payload.release_kind }}
-      DATABASE_PROVIDER_MODE: ${{ github.event.client_payload.provider_switch.database_provider_mode || 'supabase_primary' }}
+      DATABASE_PROVIDER_MODE: ${{ github.event.client_payload.provider_switch.database_provider_mode }}
       BACKEND_API_URL: ${{ github.event.client_payload.provider_switch.backend_api_url || '' }}
       PROVIDER_SWITCH_CONFIRMATION: ${{ github.event.client_payload.provider_switch.provider_switch_confirmation || '' }}
       BACKEND_POSTGRES_PRIMARY_CONFIRMATION: enable-backend-postgres-primary
@@ -72,6 +72,10 @@ jobs:
           fi
           if [[ "$PRODUCTION_WRITES_PAUSED" != "true" && "$PRODUCTION_WRITES_PAUSED" != "false" ]]; then
             echo "Production writes paused must be true or false." >&2
+            exit 1
+          fi
+          if [[ -z "$DATABASE_PROVIDER_MODE" ]]; then
+            echo "Provider switch database provider mode is required for Vercel production releases." >&2
             exit 1
           fi
           if [[ "$DATABASE_PROVIDER_MODE" != "supabase_primary" && "$DATABASE_PROVIDER_MODE" != "backend_postgres_primary" ]]; then

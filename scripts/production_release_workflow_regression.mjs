@@ -180,10 +180,11 @@ requireText(vercelProductionWorkflow, "NUTSNEWS_SOURCE_COMMIT: ${{ env.SOURCE_CO
 requireText(vercelProductionWorkflow, "NUTSNEWS_BUILD_ID: ${{ env.BUILD_ID }}", "Vercel production must build with explicit build identity.");
 requireText(vercelProductionWorkflow, "NUTSNEWS_CONFIG_GENERATION: ${{ env.VERCEL_CONFIG_GENERATION }}", "Vercel production must expose a qualified config generation.");
 requireText(vercelProductionWorkflow, "NUTSNEWS_DEPLOYMENT_TARGET: vercel-production", "Vercel production must build with explicit target identity.");
-requireText(vercelProductionWorkflow, "DATABASE_PROVIDER_MODE: ${{ github.event.client_payload.provider_switch.database_provider_mode || 'supabase_primary' }}", "Vercel production must consume the database provider mode release payload.");
+requireText(vercelProductionWorkflow, "DATABASE_PROVIDER_MODE: ${{ github.event.client_payload.provider_switch.database_provider_mode }}", "Vercel production must consume the database provider mode release payload.");
 requireText(vercelProductionWorkflow, "BACKEND_API_URL: ${{ github.event.client_payload.provider_switch.backend_api_url || '' }}", "Vercel production must consume the backend API URL release payload.");
 requireText(vercelProductionWorkflow, "PROVIDER_SWITCH_CONFIRMATION: ${{ github.event.client_payload.provider_switch.provider_switch_confirmation || '' }}", "Vercel production must consume the provider switch confirmation release payload.");
 requireText(vercelProductionWorkflow, "NUTSNEWS_BACKEND_API_TOKEN: ${{ secrets.NUTSNEWS_BACKEND_API_TOKEN }}", "Vercel production must consume the protected backend API token secret.");
+requireText(vercelProductionWorkflow, "Provider switch database provider mode is required for Vercel production releases.", "Vercel production must fail closed when the provider mode payload is missing.");
 requireText(vercelProductionWorkflow, "Backend PostgreSQL primary release requires provider switch confirmation.", "Vercel production must validate backend primary confirmation.");
 requireText(vercelProductionWorkflow, "NUTSNEWS_BACKEND_API_TOKEN Production environment secret is required for backend PostgreSQL provider releases.", "Vercel production must fail closed when the backend API token is absent.");
 requireText(vercelProductionWorkflow, "PRODUCTION_WRITES_PAUSED: ${{ github.event.client_payload.production_writes_paused || 'false' }}", "Vercel production must consume the production writer-pause release payload.");
