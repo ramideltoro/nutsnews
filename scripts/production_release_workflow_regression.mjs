@@ -59,9 +59,12 @@ requireText(
   "github.event.workflow_run.head_repository.full_name == github.repository",
   "Staging handoff must reject untrusted fork workflow runs.",
 );
-requirePinnedWorkflowUse(releaseWorkflow, "actions/download-artifact", "v5", "Staging handoff must consume the image workflow artifact.");
-requireText(releaseWorkflow, "path: ${{ runner.temp }}/nutsnews-staging-release", "Release metadata must be downloaded outside the workspace.");
-requireText(releaseWorkflow, "run-id: ${{ github.event.workflow_run.id }}", "Release metadata must come from the triggering run.");
+requireText(releaseWorkflow, "Download immutable staging metadata with retries", "Staging handoff must retry transient artifact failures.");
+requireText(releaseWorkflow, "ARTIFACT_DIR: ${{ runner.temp }}/nutsnews-staging-release", "Release metadata must be downloaded outside the workspace.");
+requireText(releaseWorkflow, "SOURCE_WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}", "Release metadata must come from the triggering run.");
+requireText(releaseWorkflow, "archive_download_url", "Staging handoff must resolve the exact artifact archive URL.");
+requireText(releaseWorkflow, "for attempt in 1 2 3 4 5", "Staging handoff must use bounded artifact retries.");
+requireText(releaseWorkflow, "unzip -q \"$artifact_zip\" -d \"$ARTIFACT_DIR\"", "Staging handoff must unpack the immutable metadata artifact.");
 requireText(releaseWorkflow, "NUTSNEWS_INFRA_STAGING_TOKEN", "Cross-repository staging handoff must use the staging-only token.");
 requireText(releaseWorkflow, "nutsnews-staging-release", "The dispatch event must request staging only.");
 requireText(releaseWorkflow, "https://api.github.com/repos/ramideltoro/nutsnews-infra/dispatches", "Staging handoff must target only nutsnews-infra.");
