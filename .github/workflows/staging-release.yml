@@ -25,13 +25,64 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - name: Download immutable staging metadata
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0  # v5
-        with:
-          name: nutsnews-staging-release
-          path: ${{ runner.temp }}/nutsnews-staging-release
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download immutable staging metadata with retries
+        env:
+          ARTIFACT_DIR: ${{ runner.temp }}/nutsnews-staging-release
+          ARTIFACT_NAME: nutsnews-staging-release
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$ARTIFACT_DIR"
+          artifact_zip="${RUNNER_TEMP}/${ARTIFACT_NAME}.zip"
+          artifacts_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_WORKFLOW_RUN_ID}/artifacts?per_page=100"
+          archive_url=""
+
+          for attempt in 1 2 3 4 5; do
+            if artifacts_json="$(curl -fsSL \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "$artifacts_url")"; then
+              artifact_count="$(jq --arg name "$ARTIFACT_NAME" '[.artifacts[] | select(.name == $name and (.expired | not))] | length' <<<"$artifacts_json")"
+              if [[ "$artifact_count" == "1" ]]; then
+                archive_url="$(jq -r --arg name "$ARTIFACT_NAME" '.artifacts[] | select(.name == $name and (.expired | not)) | .archive_download_url' <<<"$artifacts_json")"
+                break
+              fi
+              if [[ "$artifact_count" != "0" || "$attempt" == "5" ]]; then
+                echo "Expected exactly one unexpired ${ARTIFACT_NAME} artifact for run ${SOURCE_WORKFLOW_RUN_ID}; found ${artifact_count}." >&2
+                exit 1
+              fi
+            fi
+            delay_seconds="$((attempt * 10))"
+            echo "Staging artifact lookup failed or was not visible on attempt ${attempt}/5; retrying in ${delay_seconds}s." >&2
+            sleep "$delay_seconds"
+          done
+
+          if [[ -z "$archive_url" ]]; then
+            echo "Could not resolve ${ARTIFACT_NAME} artifact archive URL for run ${SOURCE_WORKFLOW_RUN_ID}." >&2
+            exit 1
+          fi
+
+          for attempt in 1 2 3 4 5; do
+            if curl -fsSL \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "$archive_url" \
+              -o "$artifact_zip"; then
+              unzip -q "$artifact_zip" -d "$ARTIFACT_DIR"
+              test -s "$ARTIFACT_DIR/metadata.json"
+              exit 0
+            fi
+            delay_seconds="$((attempt * 10))"
+            echo "Staging artifact download failed on attempt ${attempt}/5; retrying in ${delay_seconds}s." >&2
+            sleep "$delay_seconds"
+          done
+
+          echo "Could not download ${ARTIFACT_NAME} artifact for run ${SOURCE_WORKFLOW_RUN_ID} after retries." >&2
+          exit 1
 
       - name: Validate staging metadata belongs to the completed main build
         id: candidate
