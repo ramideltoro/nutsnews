@@ -7,10 +7,12 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const containerWorkflow = await readFile(resolve(root, ".github/workflows/container-image.yml"), "utf8");
 const releaseWorkflow = await readFile(resolve(root, ".github/workflows/staging-release.yml"), "utf8");
 const regressionWorkflow = await readFile(resolve(root, ".github/workflows/staging-release-regression.yml"), "utf8");
+const translationCoverageWorkflow = await readFile(resolve(root, ".github/workflows/translation-coverage.yml"), "utf8");
 const vercelBackendTokenSyncWorkflow = await readFile(resolve(root, ".github/workflows/vercel-backend-token-sync.yml"), "utf8");
 const vercelProductionWorkflow = await readFile(resolve(root, ".github/workflows/vercel-production-release.yml"), "utf8");
 const dualTargetSmoke = await readFile(resolve(root, "scripts/dual_target_web_smoke.mjs"), "utf8");
 const vercelConfig = JSON.parse(await readFile(resolve(root, "web/vercel.json"), "utf8"));
+const packageJson = JSON.parse(await readFile(resolve(root, "web/package.json"), "utf8"));
 const workflowNames = await readdir(resolve(root, ".github/workflows"));
 
 function requireText(text, fragment, message) {
@@ -47,8 +49,27 @@ requireText(containerWorkflow, "schema_version: applicationContract.legacyVersio
 requireText(containerWorkflow, "supabase_project_ref: productionSupabaseProjectRef", "Release metadata must include the production Supabase project reference.");
 requireText(containerWorkflow, "source_repository: \"ramideltoro/nutsnews\"", "Release metadata must bind the source repository.");
 requireText(containerWorkflow, "source_workflow_run_id: sourceWorkflowRunId", "Release metadata must bind the source workflow run.");
+requireText(containerWorkflow, "npm run test:translation-release-gate", "Release candidate must run translation release-gate regression.");
+requireText(containerWorkflow, "npm run test:e2e:public-smoke", "Release candidate must run public reader language smoke coverage.");
+requireText(containerWorkflow, "npm run audit:translations", "Release candidate must run the strict translation audit.");
+requireText(containerWorkflow, "TRANSLATION_QUALITY_FAIL_ON_CRITICAL=true", "Release candidate audit must fail on critical translation quality issues.");
+requireText(containerWorkflow, "TRANSLATION_QUALITY_FAIL_ON_MISSING=true", "Release candidate audit must fail on missing translation rows.");
+requireText(containerWorkflow, "TRANSLATION_QUALITY_MIN_COVERAGE=100", "Release candidate audit must enforce complete fixture coverage.");
 requirePinnedWorkflowUse(containerWorkflow, "actions/upload-artifact", "v6", "Release metadata must be retained as an artifact.");
 requireText(containerWorkflow, "NUTSNEWS_DEPLOYMENT_TARGET=vps", "OCI provenance must keep the infra-approved VPS build target.");
+
+assert.equal(
+  packageJson.scripts?.["test:translation-release-gate"],
+  "node ../scripts/translation_release_gate_regression.mjs",
+  "web/package.json must expose the translation release-gate regression script.",
+);
+
+requireText(translationCoverageWorkflow, "name: Translation Coverage Report", "Scheduled translation workflow must stay identifiable.");
+requireText(translationCoverageWorkflow, "TRANSLATION_QUALITY_REPORT_PATH", "Scheduled translation workflow must keep writing a report artifact.");
+requireText(translationCoverageWorkflow, 'TRANSLATION_QUALITY_FAIL_ON_CRITICAL: "false"', "Scheduled translation workflow must remain report-only for critical findings.");
+requireText(translationCoverageWorkflow, 'TRANSLATION_QUALITY_FAIL_ON_MISSING: "false"', "Scheduled translation workflow must remain report-only for missing rows.");
+requireText(translationCoverageWorkflow, 'TRANSLATION_QUALITY_MIN_COVERAGE: "0"', "Scheduled translation workflow must not enforce the release-gate coverage threshold.");
+requireText(translationCoverageWorkflow, "Upload translation report", "Scheduled translation workflow must upload the operations report.");
 
 requireText(releaseWorkflow, "workflow_run:", "Staging handoff must wait for Container Image completion.");
 requireText(releaseWorkflow, 'workflows: ["Container Image"]', "Staging handoff must trust only the image workflow.");
