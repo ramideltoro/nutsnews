@@ -4,6 +4,11 @@ import {
   dedupeArticlesByIdentity,
   getArticleIdentityKey,
 } from "@/lib/articleIdentity";
+import {
+  callBackendDatabaseOperation,
+  type DatabaseProviderMode,
+} from "@/lib/backendDatabase";
+import { getDatabaseProviderMode } from "@/lib/runtimeSafety";
 import { getSupabase } from "@/lib/supabase";
 import { validateTranslatedSummary } from "@/lib/translationQuality";
 import {
@@ -114,6 +119,12 @@ export function getCategoryBadges(category: string | null) {
 type ArticleCursor = {
   publishedOnSiteAt: string;
   id: string;
+};
+
+type ArticleSitemapItem = {
+  id: string;
+  published_on_site_at: string | null;
+  published_at: string | null;
 };
 
 export type PublicFeedEdgeSnapshotMetadata = {
@@ -853,6 +864,13 @@ export async function getRecentArticleSitemapItems(limit = ROOT_SITEMAP_RECENT_A
     ? Math.min(Math.max(Math.floor(limit), 1), ARTICLE_SITEMAP_PAGE_SIZE)
     : ROOT_SITEMAP_RECENT_ARTICLE_LIMIT;
 
+  const providerMode = getDatabaseProviderMode() as DatabaseProviderMode;
+  if (providerMode === "backend_postgres_primary") {
+    return callBackendDatabaseOperation<ArticleSitemapItem[]>("load-recent-article-sitemap-items", {
+      limit: safeLimit,
+    });
+  }
+
   const { data, error } = await getSupabase()
     .from("articles")
     .select("id, published_on_site_at, published_at")
@@ -872,6 +890,14 @@ export async function getRecentArticleSitemapItems(limit = ROOT_SITEMAP_RECENT_A
 }
 
 export async function getPublishedArticleSitemapCount() {
+  const providerMode = getDatabaseProviderMode() as DatabaseProviderMode;
+  if (providerMode === "backend_postgres_primary") {
+    const result = await callBackendDatabaseOperation<{ articleCount?: number }>(
+      "load-published-article-sitemap-count",
+    );
+    return result.articleCount ?? 0;
+  }
+
   const { count, error } = await getSupabase()
     .from("articles")
     .select("id", { count: "exact", head: true })
@@ -889,6 +915,14 @@ export async function getPublishedArticleSitemapCount() {
 
 export async function getArticleSitemapItemsPage(shardId: number) {
   const { from, to } = getArticleSitemapRange(shardId);
+  const providerMode = getDatabaseProviderMode() as DatabaseProviderMode;
+  if (providerMode === "backend_postgres_primary") {
+    return callBackendDatabaseOperation<ArticleSitemapItem[]>("load-article-sitemap-items-page", {
+      offset: from,
+      limit: to - from + 1,
+    });
+  }
+
   const { data, error } = await getSupabase()
     .from("articles")
     .select("id, published_on_site_at, published_at")

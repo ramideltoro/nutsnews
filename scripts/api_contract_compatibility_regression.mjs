@@ -454,6 +454,21 @@ function testArticleSerializationBaseline() {
     ],
     "Database/query changes must not silently remove or rename serialized article fields",
   );
+  assert.match(
+    source,
+    /getRecentArticleSitemapItems[\s\S]*backend_postgres_primary[\s\S]*load-recent-article-sitemap-items/,
+    "Recent sitemap helper must use the backend DB API when backend PostgreSQL is primary.",
+  );
+  assert.match(
+    source,
+    /getPublishedArticleSitemapCount[\s\S]*backend_postgres_primary[\s\S]*load-published-article-sitemap-count/,
+    "Sitemap count helper must use the backend DB API when backend PostgreSQL is primary.",
+  );
+  assert.match(
+    source,
+    /getArticleSitemapItemsPage[\s\S]*backend_postgres_primary[\s\S]*load-article-sitemap-items-page/,
+    "Article sitemap page helper must use the backend DB API when backend PostgreSQL is primary.",
+  );
 
   const articleTypeMatch = source.match(/export type Article = \{([\s\S]*?)\n\};/);
   assert(articleTypeMatch, "Article response type must remain declared");
