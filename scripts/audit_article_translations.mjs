@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { assertDataRead } from '../web/runtimeSafety.mjs';
+import { assertDataRead, assertProductionOperation } from '../web/runtimeSafety.mjs';
 
 /**
  * Audit NutsNews translated article titles/summaries for coverage and quality.
@@ -22,8 +22,6 @@ import { assertDataRead } from '../web/runtimeSafety.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-assertDataRead('translation-audit');
-
 const SUPABASE_URL = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/+$/, '');
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || '';
 const SUPPORTED_LANGUAGE_CODES = new Set(['fr', 'ja', 'de-CH', 'de', 'el']);
@@ -36,6 +34,8 @@ const REPORT_PATH = process.env.TRANSLATION_QUALITY_REPORT_PATH || '';
 const FAIL_ON_CRITICAL = /^(1|true|yes)$/i.test(process.env.TRANSLATION_QUALITY_FAIL_ON_CRITICAL || '');
 const FAIL_ON_MISSING = /^(1|true|yes)$/i.test(process.env.TRANSLATION_QUALITY_FAIL_ON_MISSING || '');
 const MIN_COVERAGE_PERCENT = clampPercent(process.env.TRANSLATION_QUALITY_MIN_COVERAGE);
+
+assertTranslationAuditRuntime();
 
 const TITLE_MIN_CHARS = 6;
 const TITLE_MAX_CHARS = 220;
@@ -86,6 +86,24 @@ const TARGET_MARKERS = {
   de: new Set(['auf', 'aus', 'das', 'dem', 'den', 'der', 'des', 'die', 'ein', 'eine', 'einen', 'einer', 'für', 'im', 'ist', 'mit', 'und', 'von', 'zu', 'über']),
   el: new Set(),
 };
+
+function isFixtureSupabaseUrl(value) {
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.test');
+  } catch {
+    return false;
+  }
+}
+
+function assertTranslationAuditRuntime() {
+  if (isFixtureSupabaseUrl(SUPABASE_URL)) {
+    assertDataRead('translation-audit-fixture');
+    return;
+  }
+
+  assertProductionOperation('translation-audit');
+}
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error('Missing required env. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');

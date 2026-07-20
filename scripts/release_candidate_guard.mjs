@@ -92,6 +92,11 @@ requireText(
 );
 requireText(
   candidateJob,
+  "npx playwright install --with-deps chromium",
+  "Release candidate must install Chromium before running public reader language smoke coverage.",
+);
+requireText(
+  candidateJob,
   "npm run audit:translations",
   "Release candidate must run the strict translation audit.",
 );

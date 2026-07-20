@@ -589,6 +589,7 @@ jobs:
           npx tsc --noEmit
           npm run lint
           npm run test:security-headers
+          npx playwright install --with-deps chromium
           npm run test:e2e:public-smoke
           SUPABASE_URL=http://127.0.0.1:54321 \
             SUPABASE_SERVICE_ROLE_KEY=ci-translation-release-gate-service-role \
