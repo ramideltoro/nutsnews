@@ -11,6 +11,7 @@ import {
 import { getDatabaseProviderMode } from "@/lib/runtimeSafety";
 import { getSupabase } from "@/lib/supabase";
 import { validateTranslatedSummary } from "@/lib/translationQuality";
+import { logWarn } from "@/lib/logger";
 import {
   DEFAULT_LANGUAGE_CODE,
   type LanguageCode,
@@ -241,9 +242,13 @@ async function applyArticleSummaries(
     }));
   }
 
-  const originalUrls = articles
-    .map((article) => article.original_url)
-    .filter(Boolean);
+  const originalUrls = Array.from(
+    new Set(
+      articles
+        .map((article) => article.original_url)
+        .filter(Boolean),
+    ),
+  );
 
   if (originalUrls.length === 0) {
     return articles.map((article) => ({
@@ -282,6 +287,22 @@ async function applyArticleSummaries(
   const summariesByUrl = new Map(
     ((data ?? []) as ArticleSummaryRow[]).map((summary) => [summary.original_url, summary]),
   );
+  const missingOriginalUrls = originalUrls.filter((originalUrl) => !summariesByUrl.has(originalUrl));
+
+  if (missingOriginalUrls.length > 0) {
+    await logWarn(
+      "articles.localized_summaries_missing",
+      "Article summary translations are missing; falling back to English for affected cards.",
+      {
+        requestedLanguageCode,
+        articleCount: articles.length,
+        lookupOriginalUrlCount: originalUrls.length,
+        foundSummaryCount: summariesByUrl.size,
+        missingSummaryCount: missingOriginalUrls.length,
+        sampleOriginalUrls: missingOriginalUrls.slice(0, 10),
+      },
+    );
+  }
 
   return articles.map((article) => {
     const localizedSummary = summariesByUrl.get(article.original_url);

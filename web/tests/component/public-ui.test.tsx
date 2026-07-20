@@ -8,7 +8,7 @@ import { ThemeSwitcher } from "@/app/components/ThemeSwitcher";
 import { ContactForm } from "@/app/contact/ContactForm";
 import { SavedStoriesPage } from "@/app/saved/SavedStoriesPage";
 import type { Article } from "@/lib/articles";
-import { LANGUAGE_STORAGE_KEY } from "@/lib/languages";
+import { LANGUAGE_CHANGE_EVENT, LANGUAGE_STORAGE_KEY } from "@/lib/languages";
 import { SAVED_STORIES_STORAGE_KEY } from "@/lib/savedStories";
 
 vi.mock("@/lib/runtimePublicConfigClient", () => ({
@@ -119,6 +119,66 @@ describe("ArticleFeed", () => {
         "No uplifting stories are available yet. Please check back soon.",
       ).length,
     ).toBeGreaterThan(0);
+  });
+
+  test("refetches and renders localized card copy when the reader changes language", async () => {
+    const localizedArticle = article({
+      id: "localized-feed",
+      title: "Un quartier transforme un terrain vide en jardin",
+      ai_summary:
+        "Des voisins creent un jardin partage avec des bancs et des plantes locales.",
+      language_code: "fr",
+      requested_language_code: "fr",
+      translation_available: true,
+    });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        articles: [localizedArticle],
+        nextPage: null,
+        nextCursor: null,
+        sections: [
+          {
+            id: "community",
+            articles: [localizedArticle],
+          },
+        ],
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <ArticleFeed
+        initialArticles={[article({ id: "english-feed", title: "English feed title" })]}
+        initialNextPage={null}
+        initialNextCursor={null}
+        initialCategorySections={[]}
+      />,
+    );
+
+    window.dispatchEvent(
+      new CustomEvent(LANGUAGE_CHANGE_EVENT, {
+        detail: { languageCode: "fr" },
+      }),
+    );
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/articles?home=1&lang=fr", {
+        cache: "default",
+        headers: { Accept: "application/json" },
+      }),
+    );
+    expect(
+      await screen.findByRole("heading", {
+        name: "Un quartier transforme un terrain vide en jardin",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Des voisins creent un jardin partage avec des bancs et des plantes locales.",
+      ),
+    ).toBeInTheDocument();
+    expect(document.documentElement.lang).toBe("fr");
   });
 
   test("saves and unsaves story cards in local browser storage", async () => {
