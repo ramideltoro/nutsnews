@@ -108,13 +108,36 @@ function readHeaderText(headers: Headers, name: string) {
   return value && value.trim() ? value.trim() : null;
 }
 
+function hasUsableEdgeTranslation(article: Article, requestedLanguageCode: LanguageCode) {
+  if (requestedLanguageCode === DEFAULT_LANGUAGE_CODE) {
+    return false;
+  }
+
+  return (
+    article.translation_available === true &&
+    normalizeLanguageCode(article.language_code) === requestedLanguageCode &&
+    normalizeLanguageCode(article.requested_language_code) === requestedLanguageCode
+  );
+}
+
 function normalizeEdgeArticles(articles: Article[], requestedLanguageCode: LanguageCode) {
-  return dedupeArticlesByIdentity(articles).map((article) => ({
-    ...article,
-    language_code: DEFAULT_LANGUAGE_CODE,
-    requested_language_code: requestedLanguageCode,
-    translation_available: requestedLanguageCode === DEFAULT_LANGUAGE_CODE,
-  }));
+  return dedupeArticlesByIdentity(articles).map((article) => {
+    if (hasUsableEdgeTranslation(article, requestedLanguageCode)) {
+      return {
+        ...article,
+        language_code: requestedLanguageCode,
+        requested_language_code: requestedLanguageCode,
+        translation_available: true,
+      };
+    }
+
+    return {
+      ...article,
+      language_code: DEFAULT_LANGUAGE_CODE,
+      requested_language_code: requestedLanguageCode,
+      translation_available: requestedLanguageCode === DEFAULT_LANGUAGE_CODE,
+    };
+  });
 }
 
 function buildHomeFeedDegradationStatus({
@@ -229,6 +252,7 @@ export async function getEdgeFeedSnapshotPage({
 
   url.searchParams.set("page", String(safePage));
   url.searchParams.set("pageSize", String(safePageSize));
+  url.searchParams.set("lang", languageCode);
 
   if (category?.trim()) {
     url.searchParams.set("category", category.trim());

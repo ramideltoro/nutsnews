@@ -230,6 +230,59 @@ describe("public article route handlers", () => {
     expect(mocks.getPublishedArticlesWithEdgeFallback).toHaveBeenCalledWith(0, null, "en");
   });
 
+  it("returns localized edge fallback articles after an upstream article read failure", async () => {
+    const localizedEdgeArticle = {
+      ...article,
+      title: "Titre de secours depuis le bord",
+      ai_summary: "Resume de secours depuis le bord.",
+      language_code: "fr",
+      requested_language_code: "fr",
+      translation_available: true,
+    };
+    mocks.getPublishedArticlesWithEdgeFallback.mockRejectedValueOnce(new Error("fixture outage"));
+    mocks.getEdgeFeedSnapshotPage.mockResolvedValueOnce(
+      publicArticlesResult({
+        articles: [localizedEdgeArticle],
+        dataSource: "edge_feed_snapshot",
+        languageCode: "fr",
+        edgeSnapshot: {
+          status: "hit",
+          updatedAt: "2026-07-16T00:00:00.000Z",
+          ageSeconds: 120,
+          articleCount: 1,
+          version: 4,
+        },
+      }),
+    );
+
+    const { GET } = await import("@/app/api/articles/route");
+    const response = await GET(request("https://www.nutsnews.com/api/articles?page=0&lang=fr"));
+    const body = await json(response);
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      dataSource: "edge_feed_snapshot",
+      languageCode: "fr",
+      articles: [
+        {
+          title: "Titre de secours depuis le bord",
+          ai_summary: "Resume de secours depuis le bord.",
+          language_code: "fr",
+          requested_language_code: "fr",
+          translation_available: true,
+        },
+      ],
+    });
+    expect(response.headers.get("x-nutsnews-article-data-source")).toBe("edge_feed_snapshot");
+    expect(response.headers.get("x-nutsnews-feed-snapshot")).toBe("edge-fallback");
+    expect(response.headers.get("x-nutsnews-article-language")).toBe("fr");
+    expect(mocks.getEdgeFeedSnapshotPage).toHaveBeenCalledWith({
+      page: 0,
+      category: null,
+      requestedLanguageCode: "fr",
+    });
+  });
+
   it("returns home-feed shape with the home-feed cache policy", async () => {
     const { GET } = await import("@/app/api/home-feed/route");
 
