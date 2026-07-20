@@ -286,7 +286,13 @@ test.describe('Vercel Preview smoke regression', () => {
     for (const language of languageExpectations) {
       const responsePromise = page.waitForResponse((response) => {
         const url = response.url();
-        return url.includes('/api/articles') && url.includes(`lang=${language.code}`) && response.request().method() === 'GET';
+        const parsedUrl = new URL(url);
+        return (
+          parsedUrl.pathname === '/api/articles' &&
+          parsedUrl.searchParams.get('home') === '1' &&
+          parsedUrl.searchParams.get('lang') === language.code &&
+          response.request().method() === 'GET'
+        );
       });
 
       await page.getByTestId(language.optionTestId).click();
