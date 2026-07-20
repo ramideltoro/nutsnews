@@ -28,6 +28,42 @@ jobs:
           fetch-depth: 0
 
       - name: Run Gitleaks
+        id: gitleaks_action
+        continue-on-error: true
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7  # v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Go for fallback Gitleaks CLI
+        if: steps.gitleaks_action.outcome == 'failure'
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16  # v6
+        with:
+          go-version: "1.24.x"
+
+      - name: Install fallback Gitleaks CLI
+        if: steps.gitleaks_action.outcome == 'failure'
+        shell: bash
+        env:
+          GITLEAKS_VERSION: v8.24.3
+        run: |
+          set -euo pipefail
+          go install "github.com/zricethezav/gitleaks/v8@${GITLEAKS_VERSION}"
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+
+      - name: Run fallback Gitleaks CLI
+        if: steps.gitleaks_action.outcome == 'failure'
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            if [[ -z "${BASE_SHA}" || -z "${HEAD_SHA}" ]]; then
+              echo "Pull request secret scan requires base and head SHAs." >&2
+              exit 1
+            fi
+            gitleaks git --no-banner --redact --log-opts="${BASE_SHA}..${HEAD_SHA}"
+          else
+            gitleaks git --no-banner --redact
+          fi
