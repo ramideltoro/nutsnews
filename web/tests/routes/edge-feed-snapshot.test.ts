@@ -2,19 +2,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
+  getHomeFeedFromSnapshot: vi.fn(),
+  getPublishedArticles: vi.fn(),
+  getPublishedArticlesForSection: vi.fn(),
+  logWarn: vi.fn(),
 }));
 
 vi.mock("@/lib/articles", () => ({
   CATEGORY_SECTION_SIZE: 8,
-  HOME_FEED_SECTIONS: [],
+  HOME_FEED_SECTIONS: [{ id: "science", query: "science" }],
   PAGE_SIZE: 5,
-  getHomeFeedFromSnapshot: vi.fn(),
-  getPublishedArticles: vi.fn(),
-  getPublishedArticlesForSection: vi.fn(),
+  getHomeFeedFromSnapshot: mocks.getHomeFeedFromSnapshot,
+  getPublishedArticles: mocks.getPublishedArticles,
+  getPublishedArticlesForSection: mocks.getPublishedArticlesForSection,
 }));
 
 vi.mock("@/lib/logger", () => ({
-  logWarn: vi.fn(),
+  logWarn: mocks.logWarn,
 }));
 
 const edgeArticle = {
@@ -41,8 +45,25 @@ function edgeResponse(payload: Record<string, unknown>) {
   });
 }
 
+function publishedResult(overrides: Record<string, unknown> = {}) {
+  return {
+    articles: [edgeArticle],
+    nextPage: null,
+    nextCursor: null,
+    dataSource: "public_feed_snapshot",
+    languageCode: "fr",
+    edgeSnapshot: null,
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
   vi.resetModules();
+  mocks.fetch.mockReset();
+  mocks.getHomeFeedFromSnapshot.mockReset();
+  mocks.getPublishedArticles.mockReset();
+  mocks.getPublishedArticlesForSection.mockReset();
+  mocks.logWarn.mockReset();
   process.env.NUTSNEWS_EDGE_FEED_SNAPSHOT_URL = "https://edge.example";
   globalThis.fetch = mocks.fetch;
 });
@@ -133,5 +154,224 @@ describe("getEdgeFeedSnapshotPage", () => {
         translation_available: false,
       }),
     ]);
+  });
+});
+
+describe("localized edge snapshot preference", () => {
+  it("prefers a localized edge snapshot over a stale non-English public feed page", async () => {
+    const localizedArticle = {
+      ...edgeArticle,
+      title: "Titre francais de bord",
+      ai_summary: "Resume francais de bord.",
+      language_code: "fr",
+      requested_language_code: "fr",
+      translation_available: true,
+    };
+    mocks.fetch.mockResolvedValueOnce(
+      edgeResponse({
+        articles: [localizedArticle],
+        nextPage: null,
+        dataSource: "edge_feed_snapshot",
+        languageCode: "fr",
+      }),
+    );
+    mocks.getPublishedArticles.mockResolvedValueOnce(
+      publishedResult({
+        articles: [
+          {
+            ...edgeArticle,
+            language_code: "en",
+            requested_language_code: "fr",
+            translation_available: false,
+          },
+        ],
+      }),
+    );
+
+    const { getPublishedArticlesWithEdgeFallback } = await import("@/lib/edgeFeedSnapshot");
+    const result = await getPublishedArticlesWithEdgeFallback(0, null, "fr");
+
+    expect(result).toMatchObject({
+      dataSource: "edge_feed_snapshot",
+      languageCode: "fr",
+      articles: [
+        {
+          title: "Titre francais de bord",
+          ai_summary: "Resume francais de bord.",
+          language_code: "fr",
+          requested_language_code: "fr",
+          translation_available: true,
+        },
+      ],
+    });
+    expect(mocks.getPublishedArticles).not.toHaveBeenCalled();
+  });
+
+  it("keeps the existing public feed path when edge lacks usable translations", async () => {
+    const localArticle = {
+      ...edgeArticle,
+      title: "Titre francais local",
+      ai_summary: "Resume francais local.",
+      language_code: "fr",
+      requested_language_code: "fr",
+      translation_available: true,
+    };
+    mocks.fetch.mockResolvedValueOnce(
+      edgeResponse({
+        articles: [edgeArticle],
+        nextPage: null,
+        dataSource: "edge_feed_snapshot",
+        languageCode: "en",
+      }),
+    );
+    mocks.getPublishedArticles.mockResolvedValueOnce(
+      publishedResult({
+        articles: [localArticle],
+        languageCode: "fr",
+      }),
+    );
+
+    const { getPublishedArticlesWithEdgeFallback } = await import("@/lib/edgeFeedSnapshot");
+    const result = await getPublishedArticlesWithEdgeFallback(0, null, "fr");
+
+    expect(result).toMatchObject({
+      dataSource: "public_feed_snapshot",
+      languageCode: "fr",
+      articles: [
+        {
+          title: "Titre francais local",
+          ai_summary: "Resume francais local.",
+          language_code: "fr",
+          requested_language_code: "fr",
+          translation_available: true,
+        },
+      ],
+    });
+    expect(mocks.getPublishedArticles).toHaveBeenCalledWith(0, null, "fr");
+  });
+
+  it("prefers localized edge rows for category section reads", async () => {
+    const localizedArticle = {
+      ...edgeArticle,
+      title: "Article scientifique francais",
+      ai_summary: "Resume scientifique francais.",
+      language_code: "fr",
+      requested_language_code: "fr",
+      translation_available: true,
+    };
+    mocks.fetch.mockResolvedValueOnce(
+      edgeResponse({
+        articles: [localizedArticle],
+        nextPage: null,
+        dataSource: "edge_feed_snapshot",
+        languageCode: "fr",
+      }),
+    );
+
+    const { getPublishedArticlesForSectionWithEdgeFallback } = await import("@/lib/edgeFeedSnapshot");
+    const articles = await getPublishedArticlesForSectionWithEdgeFallback("science", "fr", 8);
+
+    expect(articles).toEqual([
+      expect.objectContaining({
+        title: "Article scientifique francais",
+        ai_summary: "Resume scientifique francais.",
+        language_code: "fr",
+        requested_language_code: "fr",
+        translation_available: true,
+      }),
+    ]);
+    expect(mocks.getPublishedArticlesForSection).not.toHaveBeenCalled();
+
+    const requestedUrl = new URL(String(mocks.fetch.mock.calls[0]?.[0]));
+    expect(requestedUrl.searchParams.get("category")).toBe("science");
+    expect(requestedUrl.searchParams.get("pageSize")).toBe("8");
+    expect(requestedUrl.searchParams.get("lang")).toBe("fr");
+  });
+
+  it("prefers localized edge rows for home feed before using the local snapshot", async () => {
+    const localizedMainArticle = {
+      ...edgeArticle,
+      title: "Accueil francais de bord",
+      ai_summary: "Resume d'accueil francais.",
+      language_code: "fr",
+      requested_language_code: "fr",
+      translation_available: true,
+    };
+    const localizedSectionArticle = {
+      ...edgeArticle,
+      id: "edge-article-2",
+      title: "Science francaise de bord",
+      original_url: "https://example.test/edge-article-2",
+      ai_summary: "Resume de science francais.",
+      language_code: "fr",
+      requested_language_code: "fr",
+      translation_available: true,
+    };
+    mocks.fetch
+      .mockResolvedValueOnce(
+        edgeResponse({
+          articles: [localizedMainArticle],
+          nextPage: null,
+          dataSource: "edge_feed_snapshot",
+          languageCode: "fr",
+        }),
+      )
+      .mockResolvedValueOnce(
+        edgeResponse({
+          articles: [localizedSectionArticle],
+          nextPage: null,
+          dataSource: "edge_feed_snapshot",
+          languageCode: "fr",
+        }),
+      );
+    mocks.getHomeFeedFromSnapshot.mockResolvedValueOnce(
+      publishedResult({
+        articles: [
+          {
+            ...edgeArticle,
+            language_code: "en",
+            requested_language_code: "fr",
+            translation_available: false,
+          },
+        ],
+        sections: [{ id: "science", articles: [] }],
+      }),
+    );
+
+    const { getHomeFeedDataWithEdgeFallback } = await import("@/lib/edgeFeedSnapshot");
+    const result = await getHomeFeedDataWithEdgeFallback("fr");
+
+    expect(result).toMatchObject({
+      dataSource: "edge_feed_snapshot",
+      languageCode: "fr",
+      degradation: {
+        mode: "degraded",
+        reason: "localized_edge_snapshot_preferred",
+      },
+      articles: [
+        {
+          title: "Accueil francais de bord",
+          ai_summary: "Resume d'accueil francais.",
+          language_code: "fr",
+          requested_language_code: "fr",
+          translation_available: true,
+        },
+      ],
+      sections: [
+        {
+          id: "science",
+          articles: [
+            {
+              title: "Science francaise de bord",
+              ai_summary: "Resume de science francais.",
+              language_code: "fr",
+              requested_language_code: "fr",
+              translation_available: true,
+            },
+          ],
+        },
+      ],
+    });
+    expect(mocks.getHomeFeedFromSnapshot).not.toHaveBeenCalled();
   });
 });
