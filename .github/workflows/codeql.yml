@@ -5,6 +5,13 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+    paths:
+      - "web/**"
+      - "scripts/**"
+      - ".github/workflows/**"
+      - ".github/codeql/**"
+      - ".github/actions/**"
+      - ".github/dependabot.yml"
   schedule:
     # Weekly scan, even if no code changed.
     - cron: "37 10 * * 2"

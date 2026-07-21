@@ -166,6 +166,14 @@ for (const requiredOsvPath of ["**/package.json", "**/package-lock.json", ".gith
 assert.ok(hasTrigger(osvWorkflow, "schedule"), "OSV Scanner must keep scheduled full scans.");
 assert.ok(osvWorkflow.includes("scan-scheduled:"), "OSV Scanner must keep its non-PR full scan job.");
 
+const codeqlWorkflow = await readFile(resolve(workflowDir, "codeql.yml"), "utf8");
+const codeqlPullRequest = workflowTriggerBlock(codeqlWorkflow, "pull_request");
+assert.ok(codeqlPullRequest.includes("paths:"), "CodeQL pull_request trigger must be path-filtered.");
+for (const requiredCodeqlPath of ["web/**", "scripts/**", ".github/workflows/**", ".github/codeql/**"]) {
+  assert.ok(codeqlPullRequest.includes(requiredCodeqlPath), `CodeQL pull_request trigger must cover ${requiredCodeqlPath}.`);
+}
+assert.ok(hasTrigger(codeqlWorkflow, "schedule"), "CodeQL must keep scheduled full scans.");
+
 for (const workflow of workflowFiles) {
   const row = rows.get(workflow);
   assert.ok(row, `Inventory is missing ${workflow}.`);

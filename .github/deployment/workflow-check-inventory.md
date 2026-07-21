@@ -25,7 +25,7 @@ No deployment work is hidden inside a workflow classified as an existing check. 
 | `cloudflare-cache-observability.yml` | scheduled/operational | Runs scheduled or manually requested live Cloudflare/Vercel cache policy probes and uploads observability artifacts. | No deployment. |
 | `cloudflare-production-cache-purge-regression.yml` | PR-required | Guards the production cache purge workflow contract before purge automation changes merge. | No deployment. |
 | `cloudflare-production-cache-purge.yml` | manual recovery | Typed operator workflow for manual production cache purge recovery; it no longer reacts to deployment statuses after merge. | Mutates production cache only on manual dispatch. |
-| `codeql.yml` | PR-required | Runs CodeQL before merge while keeping default-branch and scheduled security reporting. | No deployment. |
+| `codeql.yml` | PR-required | Runs CodeQL for source, script, workflow, and security-config PRs while keeping default-branch and scheduled security reporting. | No deployment. |
 | `container-image.yml` | default-branch/manual | Builds, smoke-tests, and publishes immutable images only from main pushes or operator dispatches. Ordinary PRs no longer enter the container/release workflow, and database migration validation lives in `database-migration-gate.yml`. | No ordinary PR deployment. Main image publish remains artifact work. |
 | `database-migration-gate.yml` | PR-required | Runs Supabase migration naming, reset, drift, lock, RLS, fixture, and migration request checks only for database-related changes. | No deployment. |
 | `db-size-warning.yml` | scheduled/operational | Reports production database growth from protected production credentials on a schedule or operator request. | No deployment. |
