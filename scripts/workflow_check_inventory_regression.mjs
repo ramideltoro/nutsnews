@@ -62,6 +62,16 @@ assert.match(
   /main pushes or operator dispatches.*Ordinary PRs no longer enter the container\/release workflow/,
   "Container Image inventory row must document that ordinary PRs no longer run it.",
 );
+assert.equal(
+  rows.get("lighthouse-ci.yml")?.classification,
+  "scheduled/operational",
+  "Lighthouse CI must stay out of default PR-required checks.",
+);
+assert.equal(
+  rows.get("homepage-performance-budget.yml")?.classification,
+  "PR-required",
+  "Homepage Performance Budget must remain the merge-critical performance check.",
+);
 
 for (const workflow of workflowFiles) {
   const row = rows.get(workflow);

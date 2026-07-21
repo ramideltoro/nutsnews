@@ -36,7 +36,7 @@ No deployment work is hidden inside a workflow classified as an existing check. 
 | `image-coverage-report.yml` | scheduled/operational | Reports live article image coverage from production data on a schedule or operator request. | No deployment. |
 | `immutable-all-tests-guard.yml` | PR-required | Ensures required all-test guard configuration cannot be weakened before merge. | No deployment. |
 | `immutable-tests-guard.yml` | PR-required | Ensures required test guard configuration cannot be weakened before merge. | No deployment. |
-| `lighthouse-ci.yml` | PR-required | Builds the app and runs Lighthouse CI before merge. | No deployment. |
+| `lighthouse-ci.yml` | scheduled/operational | Runs scheduled or manually requested Lighthouse audits; lighter merge-critical performance coverage remains in `homepage-performance-budget.yml`. | No deployment. |
 | `link-check.yml` | PR-required | Checks Markdown links for documentation changes before merge; scheduled runs catch remote link rot. | No deployment. |
 | `main-ruleset-audit.yml` | scheduled/operational | Uses an administration-read token to detect remote branch protection drift on schedule or operator request. | No deployment. |
 | `merge-gate.yml` | PR-required | Provides the required lean merge check for dependency install, TypeScript, lint, focused web regressions, security headers, and production build. | No deployment. |
