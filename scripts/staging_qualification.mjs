@@ -377,7 +377,7 @@ export function deploymentSmokeEnvironment(input, env = process.env) {
     NUTSNEWS_EXPECTED_SOURCE_COMMIT: input.expectedSourceCommit,
     NUTSNEWS_EXPECTED_BUILD_ID: input.expectedBuildId,
     NUTSNEWS_EXPECTED_DEPLOYMENT_TARGET: input.expectedDeploymentTarget,
-    NUTSNEWS_EXPECTED_HEALTH_DEPLOYMENT_TARGET: "vps-staging",
+    NUTSNEWS_EXPECTED_HEALTH_DEPLOYMENT_TARGET: "vps",
     NUTSNEWS_EXPECTED_RUNTIME_ENV: input.expectedRuntimeEnv,
     NUTSNEWS_EXPECTED_IMAGE_DIGEST: input.expectedImageDigest,
     NUTSNEWS_EXPECTED_CONFIG_GENERATION: input.expectedConfigGeneration,
