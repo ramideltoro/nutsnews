@@ -1423,6 +1423,76 @@ jobs:
           if-no-files-found: ignore
           retention-days: 90
 
+  deploy-vps-production:
+    name: Deploy PR candidate to VPS production
+    if: >-
+      github.event_name == 'pull_request' &&
+      needs.trusted-pr-deployment-eligibility.outputs.eligible == 'true'
+    needs: [ui-smoke-vercel-production, deploy-vercel-production, pr-release-artifact, trusted-pr-deployment-eligibility]
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: Production
+    concurrency:
+      group: nutsnews-premerge-deploy-pr-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      deployment_id: ${{ steps.deploy.outputs.deployment_id }}
+      target_url: ${{ steps.deploy.outputs.target_url }}
+      infra_run_id: ${{ steps.deploy.outputs.infra_run_id }}
+      evidence_path: ${{ steps.deploy.outputs.evidence_path }}
+
+    steps:
+      - name: Checkout exact PR release source
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
+        with:
+          ref: ${{ needs.pr-release-artifact.outputs.source_commit }}
+          persist-credentials: false
+
+      - name: Use Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5
+        with:
+          node-version: 22
+
+      - name: Mask VPS production protected secrets
+        run: |
+          set -euo pipefail
+          for value in \
+            "${NUTSNEWS_INFRA_PRODUCTION_TOKEN:-}" \
+            "${CF_ACCESS_CLIENT_ID:-}" \
+            "${CF_ACCESS_CLIENT_SECRET:-}"; do
+            if [ -n "$value" ]; then
+              echo "::add-mask::$value"
+            fi
+          done
+        env:
+          NUTSNEWS_INFRA_PRODUCTION_TOKEN: ${{ secrets.NUTSNEWS_INFRA_PRODUCTION_TOKEN }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+
+      - name: Dispatch and wait for VPS production deployment
+        id: deploy
+        env:
+          PR_RELEASE_METADATA_JSON: ${{ needs.pr-release-artifact.outputs.metadata_json }}
+          NUTSNEWS_INFRA_PRODUCTION_TOKEN: ${{ secrets.NUTSNEWS_INFRA_PRODUCTION_TOKEN }}
+          NUTSNEWS_VPS_PRODUCTION_URL: ${{ vars.NUTSNEWS_VPS_PRODUCTION_URL || 'https://www.nutsnews.com/' }}
+          NUTSNEWS_VPS_PRODUCTION_EVIDENCE_PATH: ${{ runner.temp }}/vps-production-deploy/evidence.json
+          VERCEL_PRODUCTION_DEPLOYMENT_ID: ${{ needs.deploy-vercel-production.outputs.deployment_id }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: node scripts/pr_vps_production_deploy.mjs
+
+      - name: Upload VPS production deploy evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6
+        with:
+          name: nutsnews-vps-production-deploy-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/vps-production-deploy/evidence.json
+          if-no-files-found: ignore
+          retention-days: 90
+
   release-candidate:
     name: Release candidate
     if: always() && github.event_name == 'pull_request'
@@ -1493,6 +1563,7 @@ jobs:
           node --test tests/pr-vps-staging-deploy.test.mjs
           node --test tests/pr-vercel-staging-deploy.test.mjs
           node --test tests/pr-vercel-production-deploy.test.mjs
+          node --test tests/pr-vps-production-deploy.test.mjs
           node scripts/immutable_all_tests_guard_regression.mjs
           node scripts/immutable_all_tests_guard.mjs
           node scripts/verify_github_actions_pinned.mjs

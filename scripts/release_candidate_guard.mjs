@@ -132,6 +132,11 @@ requireText(
 );
 requireText(
   candidateJob,
+  "node --test tests/pr-vps-production-deploy.test.mjs",
+  "Release candidate must validate PR VPS production deployment evidence and idempotency.",
+);
+requireText(
+  candidateJob,
   "npm run test:translation-release-gate",
   "Release candidate must prove the translation audit fails missing, critical, and below-threshold fixtures.",
 );

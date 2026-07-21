@@ -145,6 +145,12 @@ The `ui-smoke-vercel-production` PR job starts only after `deploy-vercel-product
 
 The stage uses the shared `node ../scripts/run_deployed_ui_smoke_with_evidence.mjs` wrapper and sets `NUTSNEWS_PRODUCTION_SAFE_SURFACES=true` for the smoke profile. Production UI smoke must avoid destructive writes and retain the standardized `nutsnews-ui-smoke-vercel-production-...` evidence artifact.
 
+## VPS Production Deploy
+
+The `deploy-vps-production` PR job starts only after `ui-smoke-vercel-production` succeeds. It dispatches `nutsnews-production-vps-release` to `ramideltoro/nutsnews-infra` with the same immutable PR artifact identity, the Vercel production deployment ID that already passed UI smoke, deterministic `prod-<sha24>` deployment ID, and idempotency key `pr-<pr_number>-<source_commit>-production-vps`.
+
+The stage waits for terminal production GitHub deployment evidence from infra, records infra run ID, target URL, source commit, build ID, image digest, workflow run ID, and run attempt, and verifies `/readyz` reports runtime env `production` and deployment target `production-vps` before succeeding.
+
 ## Merge And Main Behavior
 
 All deployment stages complete before merge into `main`.
