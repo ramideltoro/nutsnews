@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { unstable_cache } from "next/cache";
 import { connection } from "next/server";
 
@@ -6,7 +5,7 @@ export const revalidate = 900;
 
 import { ArticleFeed } from "./components/ArticleFeed";
 import { HomeArrivalAnimation } from "./components/HomeArrivalAnimation";
-import { NewspaperPrimaryNav } from "./components/NewspaperPrimaryNav";
+import { HomeSiteHeader } from "./components/HomeSiteHeader";
 import { SiteFooter } from "./components/SiteFooter";
 import { SITE_URL } from "@/lib/articles";
 import {
@@ -110,28 +109,7 @@ export default async function Home({ searchParams }: HomePageProps) {
       />
 
       <div className="newspaper-page-wrap">
-        <header className="newspaper-site-header" aria-label="NutsNews header">
-          <div className="newspaper-masthead">
-            <h1 className="newspaper-logo" aria-label="NutsNews">
-              <span>Nuts</span>
-              <span className="newspaper-logo__mark">
-                <Image
-                  src="/nutsnews-logo.png"
-                  alt=""
-                  width={96}
-                  height={96}
-                  priority
-                  unoptimized
-                  className="h-full w-full object-contain"
-                />
-              </span>
-              <span>News</span>
-            </h1>
-            <p className="newspaper-tagline">Positive news, Simplified</p>
-          </div>
-
-          <NewspaperPrimaryNav />
-        </header>
+        <HomeSiteHeader />
 
         <ArticleFeed
           initialArticles={articles}

@@ -3,6 +3,8 @@ import { describe, expect, test } from "vitest";
 import { aboutCopyByLanguage } from "@/app/about/LocalizedAboutPage";
 import { appsCopyByLanguage } from "@/app/apps/LocalizedAppsPage";
 import { copyByLanguage as articleFeedCopyByLanguage, dateLocaleByLanguage } from "@/app/components/ArticleFeed";
+import { heroTaglineCopyByLanguage } from "@/app/components/HeroTagline";
+import { homeHeaderCopyByLanguage } from "@/app/components/HomeSiteHeader";
 import { navCopyByLanguage } from "@/app/components/NewspaperPrimaryNav";
 import { footerCopyByLanguage } from "@/app/components/SiteFooter";
 import { settingsCopyByLanguage } from "@/app/components/ThemeSwitcher";
@@ -32,6 +34,8 @@ const copyMaps: { name: string; value: CopyMap }[] = [
   { name: "contactForm", value: formCopyByLanguage },
   { name: "contactPage", value: contactCopyByLanguage },
   { name: "footer", value: footerCopyByLanguage },
+  { name: "heroTagline", value: heroTaglineCopyByLanguage },
+  { name: "homeHeader", value: homeHeaderCopyByLanguage },
   { name: "nav", value: navCopyByLanguage },
   { name: "privacy", value: privacyCopyByLanguage },
   { name: "savedStories", value: savedStoriesCopyByLanguage },
@@ -50,6 +54,8 @@ const criticalTranslatedPaths = [
   { map: "contactPage", path: ["backButton"] },
   { map: "footer", path: ["searchTitle"] },
   { map: "footer", path: ["emptyTitle"] },
+  { map: "heroTagline", path: ["ariaLabel"] },
+  { map: "homeHeader", path: ["ariaLabel"] },
   { map: "nav", path: ["ariaLabel"] },
   { map: "nav", path: ["labels", "community"] },
   { map: "privacy", path: ["title"] },

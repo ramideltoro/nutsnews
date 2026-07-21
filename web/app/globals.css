@@ -1522,6 +1522,8 @@ body {
   font-weight: 900;
   letter-spacing: 0.18em;
   line-height: 1.2;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   text-transform: uppercase;
 }
 

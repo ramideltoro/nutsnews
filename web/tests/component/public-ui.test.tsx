@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 
 import { ArticleFeed } from "@/app/components/ArticleFeed";
+import { HeroTagline } from "@/app/components/HeroTagline";
 import { SiteFooter } from "@/app/components/SiteFooter";
 import { ThemeSwitcher } from "@/app/components/ThemeSwitcher";
 import { LocalizedArticleDetail } from "@/app/articles/[id]/LocalizedArticleDetail";
@@ -448,6 +449,24 @@ describe("ThemeSwitcher", () => {
     expect(document.documentElement.lang).toBe("fr");
     expect(window.localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe("fr");
     expect(screen.getAllByText("Français").length).toBeGreaterThan(0);
+  });
+});
+
+describe("HeroTagline", () => {
+  test("updates the masthead tagline when the reader changes language", async () => {
+    render(<HeroTagline variant="masthead" />);
+
+    expect(screen.getByText("Positive News, Simplified")).toBeInTheDocument();
+
+    window.dispatchEvent(
+      new CustomEvent(LANGUAGE_CHANGE_EVENT, {
+        detail: { languageCode: "fr" },
+      }),
+    );
+
+    expect(
+      await screen.findByText("Actualités positives, simplifiées"),
+    ).toBeInTheDocument();
   });
 });
 
