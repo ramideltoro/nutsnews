@@ -7,6 +7,10 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const containerWorkflow = await readFile(resolve(root, ".github/workflows/container-image.yml"), "utf8");
 const releaseWorkflow = await readFile(resolve(root, ".github/workflows/staging-release.yml"), "utf8");
 const regressionWorkflow = await readFile(resolve(root, ".github/workflows/staging-release-regression.yml"), "utf8");
+const preMergeDeploymentContract = await readFile(
+  resolve(root, ".github/deployment/pre-merge-deployment-gate-contract.md"),
+  "utf8",
+);
 const translationCoverageWorkflow = await readFile(resolve(root, ".github/workflows/translation-coverage.yml"), "utf8");
 const vercelBackendTokenSyncWorkflow = await readFile(resolve(root, ".github/workflows/vercel-backend-token-sync.yml"), "utf8");
 const vercelProductionWorkflow = await readFile(resolve(root, ".github/workflows/vercel-production-release.yml"), "utf8");
@@ -17,6 +21,15 @@ const workflowNames = await readdir(resolve(root, ".github/workflows"));
 
 function requireText(text, fragment, message) {
   assert.ok(text.includes(fragment), message);
+}
+
+function requireOrderedText(text, fragments, message) {
+  let cursor = -1;
+  for (const fragment of fragments) {
+    const index = text.indexOf(fragment, cursor + 1);
+    assert.ok(index > cursor, `${message}: missing or out of order fragment ${JSON.stringify(fragment)}.`);
+    cursor = index;
+  }
 }
 
 function escapeRegExp(value) {
@@ -57,6 +70,44 @@ requireText(containerWorkflow, "TRANSLATION_QUALITY_FAIL_ON_MISSING=true", "Rele
 requireText(containerWorkflow, "TRANSLATION_QUALITY_MIN_COVERAGE=100", "Release candidate audit must enforce complete fixture coverage.");
 requirePinnedWorkflowUse(containerWorkflow, "actions/upload-artifact", "v6", "Release metadata must be retained as an artifact.");
 requireText(containerWorkflow, "NUTSNEWS_DEPLOYMENT_TARGET=vps", "OCI provenance must keep the infra-approved VPS build target.");
+
+requireOrderedText(
+  preMergeDeploymentContract,
+  [
+    "VPS staging",
+    "UI tests",
+    "Vercel staging",
+    "UI tests",
+    "Vercel production",
+    "UI tests",
+    "VPS production",
+    "UI tests",
+  ],
+  "Pre-merge deployment contract must preserve the required stage order",
+);
+for (const field of [
+  "source_commit",
+  "build_id",
+  "image_digest",
+  "deployment_id",
+  "target_url",
+  "runtime_env",
+  "deployment_target",
+  "workflow_run_id",
+  "test_artifact_links",
+]) {
+  requireText(preMergeDeploymentContract, field, `Pre-merge deployment contract must name ${field}.`);
+}
+for (const fragment of [
+  "Merge to `main` is a handoff after all deployment gates have passed.",
+  "A merge to `main` must not trigger deployment work.",
+  "All deployment stages complete before merge into `main`.",
+  "Reusable UI test evidence",
+  "Target-specific deploy evidence",
+  "Pre-merge deployment gate",
+]) {
+  requireText(preMergeDeploymentContract, fragment, `Pre-merge deployment contract must define: ${fragment}`);
+}
 
 assert.equal(
   packageJson.scripts?.["test:translation-release-gate"],

@@ -9,6 +9,7 @@ on:
       - ".github/workflows/staging-release-regression.yml"
       - ".github/workflows/vercel-backend-token-sync.yml"
       - ".github/workflows/vercel-production-release.yml"
+      - ".github/deployment/pre-merge-deployment-gate-contract.md"
       - "scripts/dual_target_web_smoke.mjs"
       - "scripts/production_release_workflow_regression.mjs"
   push:
@@ -19,6 +20,7 @@ on:
       - ".github/workflows/staging-release-regression.yml"
       - ".github/workflows/vercel-backend-token-sync.yml"
       - ".github/workflows/vercel-production-release.yml"
+      - ".github/deployment/pre-merge-deployment-gate-contract.md"
       - "scripts/dual_target_web_smoke.mjs"
       - "scripts/production_release_workflow_regression.mjs"
 
