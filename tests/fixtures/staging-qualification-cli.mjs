@@ -39,7 +39,7 @@ async function fetchFixture(value, init = {}) {
   if (!new Headers(init.headers).has("cf-access-client-secret") && url.pathname === "/") {
     return new Response("", { status: 302, headers: { location: "https://fixture.cloudflareaccess.com/login" } });
   }
-  if (url.pathname === "/healthz") return json({ ok: true }, { ...security, "x-nutsnews-source-commit": commit, "x-nutsnews-build-id": "123456789-1", "x-nutsnews-deployment-target": "vps-staging" });
+  if (url.pathname === "/healthz") return json({ ok: true }, { ...security, "x-nutsnews-source-commit": commit, "x-nutsnews-build-id": "123456789-1", "x-nutsnews-deployment-target": "vps" });
   if (url.pathname === "/readyz") return json({ ok: true, code: "ready" }, { ...security, "cache-control": "no-store", "x-nutsnews-expected-image-digest": digest, "x-nutsnews-runtime-environment": "staging", "x-nutsnews-deployment-target": "vps-staging", "x-nutsnews-config-generation": configGeneration });
   if (url.pathname === "/api/runtime-config") return json({ sourceCommit: commit, buildId: "123456789-1", expectedImageDigest: digest, runtimeEnv: "staging", deploymentTarget: "vps-staging", configGeneration, sideEffectsMode: "disabled", telemetryEnabled: false, supabaseUrl: "https://staging-fixture.supabase.co" }, { "cache-control": "no-store" });
   if (url.pathname === "/") return new Response('<title>NutsNews</title><footer><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a></footer><script src="/_next/static/test.js"></script>', { status: 200, headers: security });
