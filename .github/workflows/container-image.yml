@@ -1425,7 +1425,7 @@ jobs:
         env:
           PR_RELEASE_METADATA_JSON: ${{ needs.pr-release-artifact.outputs.metadata_json }}
           NUTSNEWS_INFRA_PRODUCTION_TOKEN: ${{ secrets.NUTSNEWS_INFRA_PRODUCTION_TOKEN }}
-          NUTSNEWS_VPS_PRODUCTION_URL: ${{ vars.NUTSNEWS_VPS_PRODUCTION_URL || 'https://www.nutsnews.com/' }}
+          NUTSNEWS_VPS_PRODUCTION_URL: ${{ vars.NUTSNEWS_VPS_PRODUCTION_URL || 'https://vps.nutsnews.com/' }}
           NUTSNEWS_VPS_PRODUCTION_EVIDENCE_PATH: ${{ runner.temp }}/vps-production-deploy/evidence.json
           VERCEL_PRODUCTION_DEPLOYMENT_ID: ${{ needs.deploy-vercel-production.outputs.deployment_id }}
           CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}

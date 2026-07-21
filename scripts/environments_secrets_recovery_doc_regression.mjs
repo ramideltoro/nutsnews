@@ -81,6 +81,7 @@ for (const fragment of [
   "https://www.nutsnews.com/",
   "https://nutsnews.com/",
   "`NUTSNEWS_VPS_PRODUCTION_URL`",
+  "https://vps.nutsnews.com/",
 ]) {
   requireText(doc, fragment, `${docPath} must document target URL source ${fragment}.`);
 }

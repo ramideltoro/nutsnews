@@ -149,9 +149,9 @@ The stage uses the shared `node ../scripts/run_deployed_ui_smoke_with_evidence.m
 
 ## VPS Production Deploy
 
-The `deploy-vps-production` PR job starts only after `ui-smoke-vercel-production` succeeds. It dispatches `nutsnews-production-vps-release` to `ramideltoro/nutsnews-infra` with the same immutable PR artifact identity, the Vercel production deployment ID that already passed UI smoke, deterministic `prod-<sha24>` deployment ID, and idempotency key `pr-<pr_number>-<source_commit>-production-vps`.
+The `deploy-vps-production` PR job starts only after `ui-smoke-vercel-production` succeeds. It dispatches `nutsnews-production-vps-release` to `ramideltoro/nutsnews-infra` with a compact versioned payload containing the same immutable PR artifact identity, the Vercel production deployment ID that already passed UI smoke, deterministic `prod-<sha24>` deployment ID, and idempotency key `pr-<pr_number>-<source_commit>-production-vps`.
 
-The stage waits for terminal production GitHub deployment evidence from infra, records infra run ID, target URL, source commit, build ID, image digest, workflow run ID, and run attempt, and verifies `/readyz` reports runtime env `production` and deployment target `production-vps` before succeeding.
+The stage waits for the protected infra pre-merge VPS production workflow to complete, records infra run ID, target URL, source commit, build ID, image digest, workflow run ID, and run attempt, and verifies `/readyz` reports runtime env `production` and deployment target `production-vps` before succeeding. The default VPS production target URL is `https://vps.nutsnews.com/`.
 
 ## VPS Production UI Smoke
 

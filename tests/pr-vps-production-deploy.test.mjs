@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
   buildVpsProductionPayload,
   computeVpsProductionDeploymentId,
+  findInfraPremergeProductionRun,
   runPrVpsProductionDeploy,
   selectVpsProductionRuntimeTargetUrl,
 } from "../scripts/pr_vps_production_deploy.mjs";
@@ -44,46 +45,70 @@ function env(overrides = {}) {
 
 function fakeClock() {
   let current = 0;
-  return { now: () => current, sleep: async (ms) => { current += ms; } };
+  const sleeps = [];
+  return {
+    sleeps,
+    now: () => current,
+    sleep: async (ms) => {
+      sleeps.push(ms);
+      current += ms;
+    },
+  };
 }
 
 test("VPS production payload binds artifact identity and idempotency", () => {
   const deploymentId = computeVpsProductionDeploymentId(metadata);
   const payload = buildVpsProductionPayload({ metadata, deploymentId, vercelProductionDeploymentId: "dpl_prod123" });
   assert.match(deploymentId, /^prod-[0-9a-f]{24}$/);
-  assert.equal(payload.source_commit, sourceCommit);
-  assert.equal(payload.image_digest, imageDigest);
-  assert.equal(payload.deployment_target, "production-vps");
-  assert.equal(payload.idempotency_key, `pr-42-${sourceCommit}-production-vps`);
-  assert.equal(payload.vercel_production_deployment_id, "dpl_prod123");
+  assert.equal(Object.keys(payload).length <= 10, true);
+  assert.equal(payload.schema_version, "nutsnews.premerge.production_vps.v1");
+  assert.equal(payload.source.commit, sourceCommit);
+  assert.equal(payload.image.digest, imageDigest);
+  assert.equal(payload.release.build_id, "123-1");
+  assert.equal(payload.deployment.target, "production-vps");
+  assert.equal(payload.deployment.idempotency_key, `pr-42-${sourceCommit}-production-vps`);
+  assert.equal(payload.vercel.production_deployment_id, "dpl_prod123");
 });
 
 test("PR VPS production deploy dispatches, waits, verifies runtime identity, and writes evidence", async () => {
   const deploymentId = computeVpsProductionDeploymentId(metadata);
   const dispatches = [];
+  let runPolls = 0;
   const fetchImpl = async (url, init = {}) => {
     const parsed = new URL(url);
     if (parsed.pathname === "/repos/ramideltoro/nutsnews-infra/dispatches") {
       dispatches.push(JSON.parse(init.body));
       return new Response(null, { status: 204 });
     }
-    if (parsed.pathname === "/repos/ramideltoro/nutsnews-infra/deployments") {
-      return json([{ id: 99, statuses_url: "https://api.github.com/repos/ramideltoro/nutsnews-infra/deployments/99/statuses", payload: { deployment_id: deploymentId, source_commit: sourceCommit, build_id: "123-1", requested_digest: imageDigest } }]);
+    if (parsed.pathname === "/repos/ramideltoro/nutsnews-infra/actions/workflows/nutsnews-premerge-production-vps-deploy.yml/runs") {
+      return json({
+        workflow_runs: [
+          {
+            id: 888,
+            display_title: `Deploy pre-merge VPS production ${sourceCommit}`,
+            status: "in_progress",
+            conclusion: null,
+            head_sha: "f".repeat(40),
+            html_url: "https://github.com/ramideltoro/nutsnews-infra/actions/runs/888",
+            created_at: "1970-01-01T00:00:01Z",
+          },
+        ],
+      });
     }
-    if (parsed.pathname === "/repos/ramideltoro/nutsnews-infra/deployments/99/statuses") {
-      return json([
-        {
-          state: "success",
-          log_url: "https://github.com/ramideltoro/nutsnews-infra/actions/runs/888",
-          target_url: "https://github.com/ramideltoro/nutsnews-infra/actions/runs/888",
-          environment_url: "https://www.nutsnews.com",
-        },
-      ]);
+    if (parsed.pathname === "/repos/ramideltoro/nutsnews-infra/actions/runs/888") {
+      runPolls += 1;
+      return json({
+        id: 888,
+        status: runPolls === 1 ? "in_progress" : "completed",
+        conclusion: runPolls === 1 ? null : "success",
+        head_sha: "f".repeat(40),
+        html_url: "https://github.com/ramideltoro/nutsnews-infra/actions/runs/888",
+      });
     }
-    if (parsed.hostname === "www.nutsnews.com" && parsed.pathname === "/healthz") {
+    if (parsed.hostname === "vps.nutsnews.com" && parsed.pathname === "/healthz") {
       return json({ ok: true, sourceCommit, buildId: "123-1" }, 200, { "x-nutsnews-source-commit": sourceCommit, "x-nutsnews-build-id": "123-1" });
     }
-    if (parsed.hostname === "www.nutsnews.com" && parsed.pathname === "/readyz") {
+    if (parsed.hostname === "vps.nutsnews.com" && parsed.pathname === "/readyz") {
       return json({ ok: true, runtimeEnv: "production" }, 200, { "x-nutsnews-runtime-environment": "production", "x-nutsnews-deployment-target": "production-vps", "x-nutsnews-source-commit": sourceCommit, "x-nutsnews-build-id": "123-1", "x-nutsnews-expected-image-digest": imageDigest });
     }
     throw new Error(`Unexpected fetch ${parsed}`);
@@ -91,6 +116,8 @@ test("PR VPS production deploy dispatches, waits, verifies runtime identity, and
 
   const evidence = await runPrVpsProductionDeploy(env(), { fetchImpl, ...fakeClock() });
   assert.equal(dispatches[0].event_type, "nutsnews-production-vps-release");
+  assert.equal(Object.keys(dispatches[0].client_payload).length <= 10, true);
+  assert.equal(dispatches[0].client_payload.deployment.id, deploymentId);
   assert.equal(evidence.result, "success");
   assert.equal(evidence.target_type, "production-vps");
   assert.equal(evidence.deployment_id, deploymentId);
@@ -100,17 +127,49 @@ test("PR VPS production deploy dispatches, waits, verifies runtime identity, and
   assert.equal(evidence.image_digest, imageDigest);
 });
 
+test("findInfraPremergeProductionRun waits for the matching repository dispatch workflow", async () => {
+  const clock = fakeClock();
+  let lookups = 0;
+  const result = await findInfraPremergeProductionRun({
+    token: "infra-token",
+    sourceCommit,
+    dispatchStartedAt: "2026-07-21T00:00:00Z",
+    timeoutMs: 30_000,
+    fetchImpl: async (url) => {
+      const parsed = new URL(url);
+      assert.equal(parsed.pathname, "/repos/ramideltoro/nutsnews-infra/actions/workflows/nutsnews-premerge-production-vps-deploy.yml/runs");
+      lookups += 1;
+      return json({
+        workflow_runs:
+          lookups === 1
+            ? []
+            : [
+                {
+                  id: 999,
+                  display_title: `Deploy pre-merge VPS production ${sourceCommit}`,
+                  created_at: "2026-07-21T00:00:02Z",
+                  html_url: "https://github.com/run/999",
+                },
+              ],
+      });
+    },
+    ...clock,
+  });
+  assert.equal(result.run_id, "999");
+  assert.deepEqual(clock.sleeps, [2000]);
+});
+
 test("VPS production runtime target prefers environment_url over GitHub status target_url", () => {
   assert.equal(
     selectVpsProductionRuntimeTargetUrl({
-      configuredTargetUrl: "https://www.nutsnews.com/",
+      configuredTargetUrl: "https://vps.nutsnews.com/",
       pollResult: {
         status: {
           target_url: "https://github.com/ramideltoro/nutsnews-infra/actions/runs/888",
-          environment_url: "https://www.nutsnews.com",
+          environment_url: "https://vps.nutsnews.com",
         },
       },
     }),
-    "https://www.nutsnews.com/",
+    "https://vps.nutsnews.com/",
   );
 });

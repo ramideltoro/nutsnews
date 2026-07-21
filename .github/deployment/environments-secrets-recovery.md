@@ -11,7 +11,7 @@ Normal release deployment happens before merge. The `Container Image` pull-reque
 | 1 | `deploy-vps-staging`, `ui-smoke-vps-staging` | `vps-staging` | `staging` | None | `NUTSNEWS_VPS_STAGING_URL`, or the infra deployment status `environment_url` when returned; UI smoke waits for the matching infra staging qualification artifact | Defaults to `https://staging.nutsnews.com/` |
 | 2 | `deploy-vercel-staging`, `ui-smoke-vercel-staging` | `vercel-staging` | `staging` | None | `deploy-vercel-staging.outputs.target_url` from `vercel deploy --target "$VERCEL_STAGING_TARGET"` | Exact immutable Vercel deployment URL returned by the deploy job; it must not be `nutsnews.com` or `www.nutsnews.com` |
 | 3 | `deploy-vercel-production`, `ui-smoke-vercel-production` | `vercel-production` | `production` | `Production` | `NUTSNEWS_VERCEL_PRODUCTION_ALIASES`; deploy evidence selects the first validated alias as `target_url` | Defaults to `https://www.nutsnews.com/` and also validates `https://nutsnews.com/` |
-| 4 | `deploy-vps-production`, `ui-smoke-vps-production` | `production-vps` | `production` | `Production` | `NUTSNEWS_VPS_PRODUCTION_URL`, or the infra deployment status `target_url` when returned | Defaults to `https://www.nutsnews.com/` |
+| 4 | `deploy-vps-production`, `ui-smoke-vps-production` | `production-vps` | `production` | `Production` | `NUTSNEWS_VPS_PRODUCTION_URL`, or the infra deployment status `target_url` when returned | Defaults to `https://vps.nutsnews.com/` |
 
 The staging deployment jobs intentionally do not use a GitHub environment. Secrets needed by VPS staging or Vercel staging must be repository secrets because those jobs do not enter an environment before reading them.
 
@@ -45,7 +45,7 @@ These secrets should be scoped to the `Production` environment unless a staging 
 
 | Secret | Used by | Notes |
 | --- | --- | --- |
-| `NUTSNEWS_INFRA_PRODUCTION_TOKEN` | `deploy-vps-production` | Dispatches event `nutsnews-production-vps-release` to `ramideltoro/nutsnews-infra` after Vercel production UI smoke has passed. |
+| `NUTSNEWS_INFRA_PRODUCTION_TOKEN` | `deploy-vps-production` | Dispatches event `nutsnews-production-vps-release` to `ramideltoro/nutsnews-infra` after Vercel production UI smoke has passed, then waits for the protected pre-merge VPS production workflow run. |
 | `NUTSNEWS_BACKEND_API_TOKEN` | `vercel-production-release.yml`, `vercel-backend-token-sync.yml` | Required for backend PostgreSQL primary production releases and for syncing the readable encrypted Vercel Production variable. |
 
 ## Recovery And Operations Secrets
@@ -72,7 +72,7 @@ These are not normal VPS/Vercel stage inputs, but operators need them for recove
 | `VERCEL_STAGING_TARGET` | Vercel staging deploy | Optional; defaults to `staging` for `vercel deploy --target`. |
 | `NUTSNEWS_PR_PRODUCTION_WRITES_PAUSED` | Vercel production deploy | Optional; defaults to `false`. Set to `true` only when production write surfaces must remain paused while validating the PR candidate. |
 | `NUTSNEWS_VERCEL_PRODUCTION_ALIASES` | Vercel production deploy/UI smoke | Optional comma-separated HTTPS aliases; defaults to `https://www.nutsnews.com/,https://nutsnews.com/`. |
-| `NUTSNEWS_VPS_PRODUCTION_URL` | VPS production deploy/UI smoke | Optional; defaults to `https://www.nutsnews.com/`. |
+| `NUTSNEWS_VPS_PRODUCTION_URL` | VPS production deploy/UI smoke | Optional; defaults to `https://vps.nutsnews.com/`. |
 
 ## Protected Target Authentication
 
