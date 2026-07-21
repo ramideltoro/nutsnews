@@ -27,6 +27,8 @@ const EDGE_SNAPSHOT_URL_ENV_KEYS = [
   "NUTSNEWS_EDGE_FEED_SNAPSHOT_URL",
   "NUTSNEWS_EDGE_SNAPSHOT_URL",
 ] as const;
+const DEFAULT_PRODUCTION_EDGE_SNAPSHOT_BASE_URL =
+  "https://nutsnews-worker-0.nutsnews.workers.dev";
 const MAX_EDGE_SNAPSHOT_PAGE_SIZE = 50;
 
 type EdgeSnapshotPayload = {
@@ -73,6 +75,13 @@ function getConfiguredEdgeSnapshotBaseUrl() {
     if (value) {
       return value.replace(/\/+$/, "");
     }
+  }
+
+  if (
+    process.env.NUTSNEWS_RUNTIME_ENV?.trim() === "production" &&
+    process.env.NUTSNEWS_SIDE_EFFECTS_MODE?.trim() === "live"
+  ) {
+    return DEFAULT_PRODUCTION_EDGE_SNAPSHOT_BASE_URL;
   }
 
   return null;
