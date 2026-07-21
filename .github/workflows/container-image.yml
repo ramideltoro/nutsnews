@@ -21,6 +21,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Use Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5
@@ -30,8 +33,8 @@ jobs:
       - name: Build and smoke-test without production services
         env:
           BUILD_ID: ${{ github.run_id }}-${{ github.run_attempt }}
-          IMAGE_TAG: 127.0.0.1:5000/nutsnews-ci:${{ github.sha }}
-          SOURCE_COMMIT: ${{ github.sha }}
+          IMAGE_TAG: 127.0.0.1:5000/nutsnews-ci:${{ github.event.pull_request.head.sha || github.sha }}
+          SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
 
@@ -498,6 +501,232 @@ jobs:
           appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary.join("\n")}\n`, "utf8");
           NODE
 
+  pr-release-artifact:
+    name: Publish immutable PR release artifact
+    if: >-
+      github.event_name == 'pull_request' &&
+      needs.trusted-pr-deployment-eligibility.outputs.eligible == 'true'
+    needs: [build-test, migration-gate, trusted-pr-deployment-eligibility]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+      pull-requests: read
+    outputs:
+      artifact_name: ${{ steps.metadata.outputs.artifact_name }}
+      metadata_json: ${{ steps.metadata.outputs.metadata_json }}
+      source_commit: ${{ steps.metadata.outputs.source_commit }}
+      build_id: ${{ steps.metadata.outputs.build_id }}
+      image_digest: ${{ steps.metadata.outputs.image_digest }}
+      image: ${{ steps.metadata.outputs.image }}
+      migration_head: ${{ steps.metadata.outputs.migration_head }}
+      schema_version: ${{ steps.metadata.outputs.schema_version }}
+
+    steps:
+      - name: Revalidate current PR head before publishing
+        id: revalidate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+          TRUSTED_PR_HEAD_SHA: ${{ needs.trusted-pr-deployment-eligibility.outputs.trusted_pr_head_sha }}
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from "node:fs";
+
+          const repository = process.env.REPOSITORY ?? "";
+          const prNumber = process.env.PR_NUMBER ?? "";
+          const trustedHeadSha = process.env.TRUSTED_PR_HEAD_SHA ?? "";
+          const token = process.env.GITHUB_TOKEN ?? "";
+
+          if (!/^[0-9a-f]{40}$/.test(trustedHeadSha)) {
+            throw new Error("Trusted PR head SHA is missing or invalid.");
+          }
+          const response = await fetch(`https://api.github.com/repos/${repository}/pulls/${prNumber}`, {
+            headers: {
+              Accept: "application/vnd.github+json",
+              Authorization: `Bearer ${token}`,
+              "X-GitHub-Api-Version": "2022-11-28",
+            },
+          });
+          if (!response.ok) {
+            throw new Error(`Pull request lookup returned HTTP ${response.status}.`);
+          }
+          const pullRequest = await response.json();
+          const currentHeadSha = String(pullRequest?.head?.sha ?? "");
+          if (currentHeadSha !== trustedHeadSha) {
+            appendFileSync(
+              process.env.GITHUB_STEP_SUMMARY,
+              [
+                "## PR release artifact skipped",
+                "",
+                "The PR head changed after deployment eligibility was evaluated.",
+                "",
+                `- Trusted PR head SHA: \`${trustedHeadSha}\``,
+                `- Current PR head SHA: \`${currentHeadSha || "unknown"}\``,
+                "",
+              ].join("\n"),
+              "utf8",
+            );
+            throw new Error("Refusing to publish a stale PR release artifact.");
+          }
+          appendFileSync(process.env.GITHUB_OUTPUT, `source_commit=${trustedHeadSha}\n`, "utf8");
+          NODE
+
+      - name: Checkout exact PR source commit
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
+        with:
+          ref: ${{ steps.revalidate.outputs.source_commit }}
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish full-commit PR image
+        id: publish
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6
+        with:
+          context: web
+          file: web/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/ramideltoro/nutsnews:${{ steps.revalidate.outputs.source_commit }}
+          build-args: |
+            SOURCE_REPOSITORY=https://github.com/${{ github.repository }}
+            NUTSNEWS_SOURCE_COMMIT=${{ steps.revalidate.outputs.source_commit }}
+            NUTSNEWS_BUILD_ID=${{ github.run_id }}-${{ github.run_attempt }}
+            NUTSNEWS_DEPLOYMENT_TARGET=vps
+          provenance: mode=max
+          sbom: true
+
+      - name: Write PR release artifact metadata
+        id: metadata
+        env:
+          IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PRODUCTION_SUPABASE_PROJECT_REF: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF }}
+          RELEASE_METADATA_PATH: ${{ runner.temp }}/nutsnews-pr-release/metadata.json
+          SOURCE_COMMIT: ${{ steps.revalidate.outputs.source_commit }}
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE'
+          import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+          import { dirname } from "node:path";
+          import { getMigrationContract, readApplicationMigrationContract } from "./scripts/migration_contract.mjs";
+
+          const digest = process.env.IMAGE_DIGEST ?? "";
+          const sourceCommit = process.env.SOURCE_COMMIT ?? "";
+          const sourceWorkflowRunId = process.env.GITHUB_RUN_ID ?? "";
+          const buildId = `${process.env.GITHUB_RUN_ID ?? ""}-${process.env.GITHUB_RUN_ATTEMPT ?? ""}`;
+          const prNumber = process.env.PR_NUMBER ?? "";
+          const productionSupabaseProjectRef = process.env.PRODUCTION_SUPABASE_PROJECT_REF ?? "";
+          const metadataPath = process.env.RELEASE_METADATA_PATH ?? "";
+
+          if (!/^[0-9a-f]{40}$/.test(sourceCommit)) {
+            throw new Error("PR release metadata requires a full source commit SHA.");
+          }
+          if (!/^sha256:[0-9a-f]{64}$/.test(digest)) {
+            throw new Error("PR release metadata requires an immutable sha256 image digest.");
+          }
+          if (!/^[1-9][0-9]{0,19}$/.test(sourceWorkflowRunId) || !/^\d+-\d+$/.test(buildId) || !metadataPath) {
+            throw new Error("PR release metadata requires a valid build ID and output path.");
+          }
+          if (!/^[1-9][0-9]{0,19}$/.test(prNumber)) {
+            throw new Error("PR release metadata requires a pull request number.");
+          }
+          if (buildId.split("-", 1)[0] !== sourceWorkflowRunId) {
+            throw new Error("PR release metadata build ID must belong to the source workflow run.");
+          }
+          if (!/^[a-z0-9]{20}$/.test(productionSupabaseProjectRef)) {
+            throw new Error("PR release metadata requires the production Supabase project reference.");
+          }
+
+          const [migrationContract, applicationContract] = await Promise.all([
+            getMigrationContract(),
+            readApplicationMigrationContract(),
+          ]);
+          if (migrationContract.head !== applicationContract.migrationHead) {
+            throw new Error("PR release metadata requires matching repository and application migration heads.");
+          }
+
+          const imageRepository = "ghcr.io/ramideltoro/nutsnews";
+          const artifactName = `nutsnews-pr-release-${prNumber}-${sourceCommit}`;
+          const release = {
+            artifact_kind: "pr-release-candidate",
+            artifact_name: artifactName,
+            source_repository: "ramideltoro/nutsnews",
+            source_commit: sourceCommit,
+            source_workflow_run_id: sourceWorkflowRunId,
+            build_id: buildId,
+            pr_number: prNumber,
+            image_repository: imageRepository,
+            image_tag: sourceCommit,
+            image_digest: digest,
+            image: `${imageRepository}@${digest}`,
+            migration_head: migrationContract.head,
+            schema_version: applicationContract.legacyVersion,
+            supabase_project_ref: productionSupabaseProjectRef,
+            retention_days: 7,
+          };
+          const metadataJson = JSON.stringify(release, null, 2);
+
+          mkdirSync(dirname(metadataPath), { recursive: true });
+          writeFileSync(metadataPath, `${metadataJson}\n`, "utf8");
+          appendFileSync(
+            process.env.GITHUB_OUTPUT,
+            [
+              `artifact_name=${artifactName}`,
+              `source_commit=${sourceCommit}`,
+              `build_id=${buildId}`,
+              `image_digest=${digest}`,
+              `image=${release.image}`,
+              `migration_head=${release.migration_head}`,
+              `schema_version=${release.schema_version}`,
+              "metadata_json<<NUTSNEWS_PR_RELEASE_METADATA",
+              metadataJson,
+              "NUTSNEWS_PR_RELEASE_METADATA",
+              "",
+            ].join("\n"),
+            "utf8",
+          );
+          NODE
+
+      - name: Upload PR release metadata
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6
+        with:
+          name: ${{ steps.metadata.outputs.artifact_name }}
+          path: ${{ runner.temp }}/nutsnews-pr-release/metadata.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Summarize immutable PR release artifact
+        env:
+          ARTIFACT_NAME: ${{ steps.metadata.outputs.artifact_name }}
+          IMAGE: ${{ steps.metadata.outputs.image }}
+          BUILD_ID: ${{ steps.metadata.outputs.build_id }}
+          SOURCE_COMMIT: ${{ steps.metadata.outputs.source_commit }}
+        run: |
+          {
+            echo "## Immutable PR release artifact"
+            echo
+            echo "- Source commit: \`${SOURCE_COMMIT}\`"
+            echo "- Build ID: \`${BUILD_ID}\`"
+            echo "- Image: \`${IMAGE}\`"
+            echo "- Metadata artifact: \`${ARTIFACT_NAME}\`"
+            echo "- Retention: 7 days"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   release-candidate:
     name: Release candidate
     if: always() && github.event_name == 'pull_request'
@@ -560,6 +789,7 @@ jobs:
           node scripts/main_ruleset_audit_regression.mjs
           node scripts/workflow_check_inventory_regression.mjs
           node scripts/trusted_pr_deployment_eligibility_regression.mjs
+          node scripts/pr_release_artifact_regression.mjs
           node scripts/immutable_all_tests_guard_regression.mjs
           node scripts/immutable_all_tests_guard.mjs
           node scripts/verify_github_actions_pinned.mjs

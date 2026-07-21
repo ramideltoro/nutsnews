@@ -92,6 +92,11 @@ requireText(
 );
 requireText(
   candidateJob,
+  "node scripts/pr_release_artifact_regression.mjs",
+  "Release candidate must validate the immutable PR release artifact contract.",
+);
+requireText(
+  candidateJob,
   "npm run test:translation-release-gate",
   "Release candidate must prove the translation audit fails missing, critical, and below-threshold fixtures.",
 );

@@ -71,6 +71,16 @@ The eligibility gate must compare the event PR head SHA with the current PR head
 
 Every protected deployment stage must re-check that the live PR head SHA still matches the trusted PR head SHA before reading protected environment secrets or changing a target. Deployment workflows must not use `pull_request_target` or an equivalent pattern that checks out untrusted PR code with production secrets.
 
+## PR Release Artifact
+
+The pre-merge pipeline must publish one immutable PR release artifact before any deployment stage starts. The artifact is built from the exact current PR head SHA after trusted PR eligibility has passed and after the live PR head is rechecked.
+
+Downstream deployment jobs must consume `needs.pr-release-artifact.outputs.metadata_json` or the matching scalar outputs from that same job. They must not rebuild, retag, or infer a different artifact identity.
+
+The artifact identity is the full source commit SHA plus the immutable image digest. PR images are tagged only with the full source commit SHA and are consumed as `ghcr.io/ramideltoro/nutsnews@sha256:<digest>`; the pipeline must never use a mutable `latest` tag.
+
+The PR metadata artifact is retained for 7 days. PR images are tagged only with the full source commit SHA so registry cleanup can safely remove unreferenced PR candidates after PR close or after no deployment evidence references the digest.
+
 ## Merge And Main Behavior
 
 All deployment stages complete before merge into `main`.
