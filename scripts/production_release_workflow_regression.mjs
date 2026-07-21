@@ -73,6 +73,7 @@ const vercelProductionDeployJob = workflowJob(containerWorkflow, "deploy-vercel-
 const vercelProductionUiSmokeJob = workflowJob(containerWorkflow, "ui-smoke-vercel-production");
 const vpsProductionDeployJob = workflowJob(containerWorkflow, "deploy-vps-production");
 const vpsProductionUiSmokeJob = workflowJob(containerWorkflow, "ui-smoke-vps-production");
+const preMergeDeploymentGateJob = workflowJob(containerWorkflow, "pre-merge-deployment-gate");
 
 assert.doesNotMatch(containerWorkflow, /^\s+paths:\s*$/m, "Container Image must run for every main merge, not a path subset.");
 requireText(containerWorkflow, "cancel-in-progress: ${{ github.event_name == 'pull_request' }}", "Container Image must cancel stale PR attempts without skipping merged releases.");
@@ -138,6 +139,7 @@ for (const fragment of [
   "ui-smoke-vercel-production",
   "deploy-vps-production",
   "ui-smoke-vps-production",
+  "pre-merge-deployment-gate",
   "nutsnews-staging-release",
   "runtime env `staging`, deployment target `vps-staging`",
   "deployment target `vercel-staging`",
@@ -148,6 +150,7 @@ for (const fragment of [
   "node ../scripts/run_deployed_ui_smoke_with_evidence.mjs",
   "nutsnews-ui-smoke-vps-staging",
   "nutsnews-ui-smoke-production-vps",
+  "stage order, target URLs, deployment IDs, result, and GitHub artifact links",
   "Pre-merge deployment gate",
 ]) {
   requireText(preMergeDeploymentContract, fragment, `Pre-merge deployment contract must define: ${fragment}`);
@@ -265,6 +268,15 @@ requireText(vpsProductionUiSmokeJob, 'NUTSNEWS_PRODUCTION_SAFE_SURFACES: "true"'
 requireText(vpsProductionUiSmokeJob, "CF_ACCESS_CLIENT_ID", "VPS production UI smoke must support protected VPS auth headers.");
 requireText(vpsProductionUiSmokeJob, "run: node ../scripts/run_deployed_ui_smoke_with_evidence.mjs", "VPS production UI smoke must use the standardized evidence runner.");
 requireText(vpsProductionUiSmokeJob, "web/test-results/deployed-ui-smoke", "VPS production UI smoke must upload standardized evidence output.");
+requireText(preMergeDeploymentGateJob, "name: Pre-merge deployment gate", "PR pipeline must expose the final pre-merge deployment gate check.");
+requireText(preMergeDeploymentGateJob, "if: always() && github.event_name == 'pull_request'", "Final pre-merge gate must run even when upstream deployment stages fail.");
+requireText(preMergeDeploymentGateJob, "needs: [trusted-pr-deployment-eligibility, pr-release-artifact, deploy-vps-staging, ui-smoke-vps-staging, deploy-vercel-staging, ui-smoke-vercel-staging, deploy-vercel-production, ui-smoke-vercel-production, deploy-vps-production, ui-smoke-vps-production]", "Final pre-merge gate must depend on all deploy and UI smoke stages.");
+requireText(preMergeDeploymentGateJob, "actions: read", "Final pre-merge gate must be able to read retained workflow artifacts.");
+requireText(preMergeDeploymentGateJob, "Summarize intentionally ineligible PR", "Final pre-merge gate must pass intentionally ineligible PRs without deployment evidence.");
+requireText(preMergeDeploymentGateJob, "PRE_MERGE_DEPLOYMENT_GATE_STAGES_JSON", "Final pre-merge gate must receive ordered stage result and artifact inputs.");
+requireText(preMergeDeploymentGateJob, "node scripts/pre_merge_deployment_gate.mjs", "Final pre-merge gate must use the tested evidence validator.");
+requireText(preMergeDeploymentGateJob, "Upload pre-merge deployment gate evidence", "Final pre-merge gate must retain its aggregate evidence.");
+requireText(containerWorkflow, "node --test tests/pre-merge-deployment-gate.test.mjs", "Release candidate must run final pre-merge deployment gate tests.");
 
 assert.equal(
   packageJson.scripts?.["test:translation-release-gate"],

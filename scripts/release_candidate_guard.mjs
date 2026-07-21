@@ -117,6 +117,11 @@ requireText(
 );
 requireText(
   candidateJob,
+  "node --test tests/pre-merge-deployment-gate.test.mjs",
+  "Release candidate must validate the final pre-merge deployment gate evidence contract.",
+);
+requireText(
+  candidateJob,
   "node --test tests/pr-vps-staging-deploy.test.mjs",
   "Release candidate must validate PR VPS staging deployment evidence and idempotency.",
 );

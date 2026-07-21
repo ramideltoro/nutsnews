@@ -174,3 +174,9 @@ Pre-merge deployment gate
 ```
 
 That check passes only after all eight ordered stages have passed and the aggregated evidence contains the required fields for every deployment target.
+
+The `pre-merge-deployment-gate` job depends on the trusted eligibility gate, the immutable PR release artifact, all four deployment jobs, and all four shared UI smoke jobs. For deployment-eligible PRs it downloads each retained evidence artifact, verifies every stage concluded `success`, verifies UI smoke evidence concluded `pass`, and fails closed on cancelled, skipped, stale, or missing evidence.
+
+Every evidence file must reference the current live PR head SHA, build ID, workflow run ID, and run attempt. The gate re-reads the current PR head from the GitHub API before validating evidence. If the trusted eligibility gate marked the PR intentionally ineligible, the final check may pass with a skipped deployment summary and no target evidence.
+
+The check summary must list the stage order, target URLs, deployment IDs, result, and GitHub artifact links for every retained deploy and UI smoke evidence artifact.

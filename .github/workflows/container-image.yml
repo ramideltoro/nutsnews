@@ -1596,6 +1596,83 @@ jobs:
           if-no-files-found: ignore
           retention-days: 90
 
+  pre-merge-deployment-gate:
+    name: Pre-merge deployment gate
+    if: always() && github.event_name == 'pull_request'
+    needs: [trusted-pr-deployment-eligibility, pr-release-artifact, deploy-vps-staging, ui-smoke-vps-staging, deploy-vercel-staging, ui-smoke-vercel-staging, deploy-vercel-production, ui-smoke-vercel-production, deploy-vps-production, ui-smoke-vps-production]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    outputs:
+      result: ${{ steps.gate.outputs.result }}
+      evidence_path: ${{ steps.gate.outputs.evidence_path }}
+
+    steps:
+      - name: Summarize intentionally ineligible PR
+        if: needs.trusted-pr-deployment-eligibility.outputs.eligible != 'true'
+        env:
+          INELIGIBLE_REASON: ${{ needs.trusted-pr-deployment-eligibility.outputs.reason }}
+          CURRENT_PR_HEAD_SHA: ${{ needs.trusted-pr-deployment-eligibility.outputs.current_pr_head_sha || github.event.pull_request.head.sha }}
+        run: |
+          {
+            echo "## Pre-merge deployment gate"
+            echo
+            echo "Deployment eligibility: skipped"
+            echo
+            echo "- Reason: \`${INELIGIBLE_REASON:-not deployment eligible}\`"
+            echo "- Current PR head SHA: \`${CURRENT_PR_HEAD_SHA:-unknown}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Checkout exact PR release source
+        if: needs.trusted-pr-deployment-eligibility.outputs.eligible == 'true'
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
+        with:
+          ref: ${{ needs.pr-release-artifact.outputs.source_commit }}
+          persist-credentials: false
+
+      - name: Use Node.js
+        if: needs.trusted-pr-deployment-eligibility.outputs.eligible == 'true'
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5
+        with:
+          node-version: 22
+
+      - name: Validate completed pre-merge deployment stages
+        if: needs.trusted-pr-deployment-eligibility.outputs.eligible == 'true'
+        id: gate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_BUILD_ID: ${{ needs.pr-release-artifact.outputs.build_id }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_SOURCE_COMMIT: ${{ needs.pr-release-artifact.outputs.source_commit }}
+          PRE_MERGE_DEPLOYMENT_ELIGIBLE: ${{ needs.trusted-pr-deployment-eligibility.outputs.eligible }}
+          PRE_MERGE_DEPLOYMENT_GATE_ARTIFACT_DIR: ${{ runner.temp }}/pre-merge-deployment-gate/artifacts
+          PRE_MERGE_DEPLOYMENT_GATE_EVIDENCE_PATH: ${{ runner.temp }}/pre-merge-deployment-gate/evidence.json
+          PRE_MERGE_DEPLOYMENT_GATE_STAGES_JSON: >-
+            [
+              {"stage":"deploy-vps-staging","job_result":"${{ needs.deploy-vps-staging.result }}","artifact_name":"nutsnews-vps-staging-deploy-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}"},
+              {"stage":"ui-smoke-vps-staging","job_result":"${{ needs.ui-smoke-vps-staging.result }}","artifact_name":"nutsnews-ui-smoke-vps-staging-pr-${{ github.event.pull_request.number }}-attempt-${{ github.run_attempt }}"},
+              {"stage":"deploy-vercel-staging","job_result":"${{ needs.deploy-vercel-staging.result }}","artifact_name":"nutsnews-vercel-staging-deploy-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}"},
+              {"stage":"ui-smoke-vercel-staging","job_result":"${{ needs.ui-smoke-vercel-staging.result }}","artifact_name":"nutsnews-ui-smoke-vercel-staging-pr-${{ github.event.pull_request.number }}-attempt-${{ github.run_attempt }}"},
+              {"stage":"deploy-vercel-production","job_result":"${{ needs.deploy-vercel-production.result }}","artifact_name":"nutsnews-vercel-production-deploy-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}"},
+              {"stage":"ui-smoke-vercel-production","job_result":"${{ needs.ui-smoke-vercel-production.result }}","artifact_name":"nutsnews-ui-smoke-vercel-production-pr-${{ github.event.pull_request.number }}-attempt-${{ github.run_attempt }}"},
+              {"stage":"deploy-vps-production","job_result":"${{ needs.deploy-vps-production.result }}","artifact_name":"nutsnews-vps-production-deploy-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}"},
+              {"stage":"ui-smoke-vps-production","job_result":"${{ needs.ui-smoke-vps-production.result }}","artifact_name":"nutsnews-ui-smoke-production-vps-pr-${{ github.event.pull_request.number }}-attempt-${{ github.run_attempt }}"}
+            ]
+        run: node scripts/pre_merge_deployment_gate.mjs
+
+      - name: Upload pre-merge deployment gate evidence
+        if: always() && needs.trusted-pr-deployment-eligibility.outputs.eligible == 'true'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6
+        with:
+          name: nutsnews-pre-merge-deployment-gate-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pre-merge-deployment-gate/evidence.json
+          if-no-files-found: ignore
+          retention-days: 90
+
   release-candidate:
     name: Release candidate
     if: always() && github.event_name == 'pull_request'
@@ -1663,6 +1740,7 @@ jobs:
           node --test tests/protected-target-headers.test.mjs
           node --test tests/deployed-ui-smoke-evidence.test.mjs
           node --test tests/deployment-hardening.test.mjs
+          node --test tests/pre-merge-deployment-gate.test.mjs
           node --test tests/pr-vps-staging-deploy.test.mjs
           node --test tests/pr-vercel-staging-deploy.test.mjs
           node --test tests/pr-vercel-production-deploy.test.mjs
