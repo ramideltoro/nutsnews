@@ -12,6 +12,7 @@ const workflowFiles = (await readdir(workflowDir)).filter((file) => file.endsWit
 const allowedClassifications = new Set([
   "PR-required",
   "optional PR",
+  "default-branch/manual",
   "scheduled/operational",
   "manual recovery",
   "dispatch-only recovery",
@@ -43,9 +44,9 @@ for (const match of inventory.matchAll(/^\| `([^`]+\.yml)` \| ([^|]+?) \| ([^|]+
   });
 }
 
-assert.ok(inventory.includes("issue #310"), "Inventory must reference branch protection issue #310.");
-assert.ok(inventory.includes("Pre-merge deployment gate"), "Inventory must name the final required branch-protection check.");
-assert.ok(inventory.includes("intentionally retain `Release candidate`"), "Inventory must document retaining the Release candidate aggregate check.");
+assert.ok(inventory.includes("issue #333"), "Inventory must reference branch protection issue #333.");
+assert.ok(inventory.includes("`Merge Gate`"), "Inventory must name the required branch-protection check.");
+assert.ok(inventory.includes("`Release candidate` is no longer a direct branch-protection check"), "Inventory must document removing the Release candidate aggregate check from branch protection.");
 assert.ok(
   inventory.includes("No deployment work is hidden inside a workflow classified as an existing check."),
   "Inventory must state that deployment work is not hidden inside existing checks.",
@@ -58,13 +59,8 @@ assert.equal(
 );
 assert.match(
   rows.get("container-image.yml")?.reason ?? "",
-  /immutable PR artifact.*Pre-merge deployment gate.*VPS staging deploy.*VPS staging UI smoke.*Vercel staging deploy.*Vercel staging UI smoke.*Vercel production deploy.*Vercel production UI smoke.*VPS production deploy.*VPS production UI smoke/,
-  "Container Image inventory row must explicitly mention all trusted PR deployment stages wired so far.",
-);
-assert.match(
-  rows.get("container-image.yml")?.deploymentNote ?? "",
-  /trusted PR candidate to VPS staging, Vercel staging, Vercel production, and VPS production.*shared UI smoke evidence after each deployed target.*aggregate final gate/,
-  "Container Image inventory row must identify every deployment target wired so far.",
+  /main pushes or operator dispatches.*Ordinary PRs no longer enter the container\/release workflow/,
+  "Container Image inventory row must document that ordinary PRs no longer run it.",
 );
 
 for (const workflow of workflowFiles) {
@@ -88,18 +84,19 @@ for (const workflow of workflowFiles) {
     assert.ok(!repositoryDispatch, `${workflow} is PR-required but listens to repository_dispatch.`);
     assert.ok(!workflowRun, `${workflow} is PR-required but listens to workflow_run.`);
     const protectedDeploymentEnvironment = /environment:\s*(Production|production-supabase|staging-supabase)/.test(text);
-    if (workflow === "container-image.yml") {
-      assert.ok(
-        protectedDeploymentEnvironment,
-        "Container Image must explicitly use the protected Production environment for the pre-merge Vercel production deploy stage.",
-      );
-    } else {
-      assert.equal(protectedDeploymentEnvironment, false, `${workflow} is PR-required but uses a protected deployment environment.`);
-    }
+    assert.equal(protectedDeploymentEnvironment, false, `${workflow} is PR-required but uses a protected deployment environment.`);
   }
 
   if (row.classification === "optional PR") {
     assert.ok(pullRequest || deploymentStatus, `${workflow} is optional PR but has no PR or deployment-status trigger.`);
+  }
+
+  if (row.classification === "default-branch/manual") {
+    assert.ok(!pullRequest, `${workflow} is default-branch/manual but still has a pull_request trigger.`);
+    assert.ok(!deploymentStatus, `${workflow} is default-branch/manual but listens to deployment_status.`);
+    assert.ok(!repositoryDispatch, `${workflow} is default-branch/manual but listens to repository_dispatch.`);
+    assert.ok(!workflowRun, `${workflow} is default-branch/manual but listens to workflow_run.`);
+    assert.ok(mainPush || workflowDispatch, `${workflow} is default-branch/manual but has no main push or manual trigger.`);
   }
 
   if (row.classification === "scheduled/operational") {

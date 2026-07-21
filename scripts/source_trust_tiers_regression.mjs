@@ -19,7 +19,7 @@ function assertIncludes(content, needle, label) {
 
 const migration = read("supabase/migrations/20260717093000_add_source_trust_tiers.sql");
 const migrationContract = read("web/migrationContract.mjs");
-const containerWorkflow = read(".github/workflows/container-image.yml");
+const databaseWorkflow = read(".github/workflows/database-migration-gate.yml");
 const feedManagement = read("web/lib/adminFeedManagement.ts");
 const feedsPage = read("web/app/admin/(protected)/feeds/page.tsx");
 const auditLog = read("web/lib/adminAuditLog.ts");
@@ -74,7 +74,7 @@ for (const required of [
 assertIncludes(auditLog, "RSS source trust tier updated", "adminAuditLog.ts");
 assertIncludes(adminHome, "source trust tiers", "admin home");
 assertIncludes(migrationContract, 'MIGRATION_HEAD = "20260717113000"', "web/migrationContract.mjs");
-assertIncludes(containerWorkflow, '"migration_head":"20260717113000"', ".github/workflows/container-image.yml");
+assertIncludes(databaseWorkflow, "tests/migration-contract.test.mjs", ".github/workflows/database-migration-gate.yml");
 
 assert.equal(
   packageJson.scripts?.["test:source-trust-tiers"],

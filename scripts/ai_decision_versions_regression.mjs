@@ -23,7 +23,7 @@ const migration = read(
   "supabase/migrations/20260717103000_add_ai_decision_versions.sql",
 );
 const migrationContract = read("web/migrationContract.mjs");
-const containerWorkflow = read(".github/workflows/container-image.yml");
+const databaseWorkflow = read(".github/workflows/database-migration-gate.yml");
 const adminReviewLib = read("web/lib/adminArticleReviews.ts");
 const adminArticlesPage = read("web/app/admin/(protected)/articles/page.tsx");
 const packageJson = read("web/package.json");
@@ -74,9 +74,9 @@ assertIncludes(
   "web/migrationContract.mjs",
 );
 assertIncludes(
-  containerWorkflow,
-  '"migration_head":"20260717113000"',
-  ".github/workflows/container-image.yml",
+  databaseWorkflow,
+  "tests/migration-contract.test.mjs",
+  ".github/workflows/database-migration-gate.yml",
 );
 assertIncludes(
   packageJson,

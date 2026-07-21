@@ -1,0 +1,140 @@
+name: Database Migration Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "supabase/**"
+      - "web/migrationContract.mjs"
+      - "web/runtimeReadiness.mjs"
+      - "scripts/assert_migration_contract.mjs"
+      - "scripts/migration_contract.mjs"
+      - "scripts/locked_migration_workflow.mjs"
+      - "scripts/production_migration_request.mjs"
+      - "scripts/staging_fixtures.mjs"
+      - "scripts/staging_migration_request.mjs"
+      - "scripts/supabase_local.mjs"
+      - "scripts/supabase_rls_regression.mjs"
+      - "scripts/verify_migration_lock.mjs"
+      - "scripts/verify_migration_schema.mjs"
+      - "scripts/verify_old_digest_compatibility.mjs"
+      - "tests/migration-contract.test.mjs"
+      - "tests/migration-workflow.test.mjs"
+      - "tests/old-digest-compatibility.test.mjs"
+      - "tests/production-migration-request.test.mjs"
+      - "tests/runtime-readiness.test.mjs"
+      - "tests/staging-fixtures.test.mjs"
+      - "tests/staging-migration-request.test.mjs"
+      - ".github/workflows/database-migration-gate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "supabase/**"
+      - "web/migrationContract.mjs"
+      - "web/runtimeReadiness.mjs"
+      - "scripts/assert_migration_contract.mjs"
+      - "scripts/migration_contract.mjs"
+      - "scripts/locked_migration_workflow.mjs"
+      - "scripts/production_migration_request.mjs"
+      - "scripts/staging_fixtures.mjs"
+      - "scripts/staging_migration_request.mjs"
+      - "scripts/supabase_local.mjs"
+      - "scripts/supabase_rls_regression.mjs"
+      - "scripts/verify_migration_lock.mjs"
+      - "scripts/verify_migration_schema.mjs"
+      - "scripts/verify_old_digest_compatibility.mjs"
+      - "tests/migration-contract.test.mjs"
+      - "tests/migration-workflow.test.mjs"
+      - "tests/old-digest-compatibility.test.mjs"
+      - "tests/production-migration-request.test.mjs"
+      - "tests/runtime-readiness.test.mjs"
+      - "tests/staging-fixtures.test.mjs"
+      - "tests/staging-migration-request.test.mjs"
+      - ".github/workflows/database-migration-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  migration-gate:
+    name: Database Migration Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      NUTSNEWS_RUNTIME_ENV: staging
+      NUTSNEWS_SIDE_EFFECTS_MODE: sandbox
+      NUTSNEWS_DATA_ENVIRONMENT: staging
+      NUTSNEWS_SUPABASE_CREDENTIALS_ENV: staging
+      NUTSNEWS_SUPABASE_PROJECT_REF: ci-staging-fixture
+      NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: ci-production-fixture
+      NUTSNEWS_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NUTSNEWS_PUBLIC_SUPABASE_ANON_KEY: ci-public-anon-key
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
+
+      - name: Use Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5
+        with:
+          node-version: 22
+
+      - name: Use Supabase CLI
+        uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1  # v1
+        with:
+          version: 2.105.0
+
+      - name: Install disposable database client
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Validate migration naming and the compiled migration contract
+        run: node scripts/assert_migration_contract.mjs
+
+      - name: Reset a disposable database through the complete migration set
+        run: |
+          set -euo pipefail
+          supabase start -x studio,imgproxy,logflare,vector
+          supabase db reset --local
+
+      - name: Verify migration head, catalog drift, and advisory-lock serialization
+        run: |
+          set -euo pipefail
+          node scripts/verify_migration_schema.mjs --negative-drift
+          node scripts/verify_migration_lock.mjs
+          node scripts/verify_old_digest_compatibility.mjs
+
+      - name: Seed and reset deterministic synthetic staging fixtures
+        run: |
+          set -euo pipefail
+          node scripts/staging_fixtures.mjs exercise --local --namespace nutsnews-test-ci-fixture-run-123456
+
+      - name: Verify Supabase RLS and database access policies
+        run: |
+          set -euo pipefail
+          node scripts/supabase_rls_regression.mjs --namespace=nutsnews-test-ci-rls-policy-123456
+
+      - name: Run migration, old-digest, lock, and fixture regressions
+        run: |
+          set -euo pipefail
+          node --test \
+            tests/migration-contract.test.mjs \
+            tests/migration-workflow.test.mjs \
+            tests/old-digest-compatibility.test.mjs \
+            tests/staging-fixtures.test.mjs \
+            tests/staging-migration-request.test.mjs \
+            tests/production-migration-request.test.mjs \
+            tests/runtime-readiness.test.mjs
+
+      - name: Stop disposable Supabase services
+        if: always()
+        run: supabase stop --no-backup

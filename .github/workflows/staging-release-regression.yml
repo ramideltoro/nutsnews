@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/container-image.yml"
+      - ".github/workflows/database-migration-gate.yml"
       - ".github/workflows/staging-release.yml"
       - ".github/workflows/staging-release-regression.yml"
       - ".github/workflows/vercel-backend-token-sync.yml"
@@ -16,6 +17,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/container-image.yml"
+      - ".github/workflows/database-migration-gate.yml"
       - ".github/workflows/staging-release.yml"
       - ".github/workflows/staging-release-regression.yml"
       - ".github/workflows/vercel-backend-token-sync.yml"
@@ -26,6 +28,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   regression:

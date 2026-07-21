@@ -1,8 +1,8 @@
 # Deployment Environments, Secrets, And Recovery Runbook
 
-This runbook is the maintainer checklist for the pre-merge deployment pipeline. It covers the GitHub environments, repository secrets, environment secrets, repository variables, target URLs, protected-target authentication, reruns, stale PR heads, and manual recovery paths used by NutsNews releases.
+This runbook is the maintainer checklist for explicit deployment and recovery paths. It covers the GitHub environments, repository secrets, environment secrets, repository variables, target URLs, protected-target authentication, reruns, stale source revisions, and manual recovery paths used by NutsNews releases.
 
-Normal release deployment happens before merge. The `Container Image` pull-request workflow deploys and smokes the immutable PR candidate across VPS staging, Vercel staging, Vercel production, and VPS production, then reports `Pre-merge deployment gate`. A `main` merge is not a deployment trigger; it is only the maintainer handoff that records the already-deployed candidate on `main`.
+Normal PR merges do not deploy. The `Container Image` workflow no longer runs on ordinary pull requests; it archives immutable images from `main` pushes or explicit operator dispatches. Protected staging and production deployment validation must stay manual or explicit release-only.
 
 ## Normal Release Targets
 
@@ -84,7 +84,7 @@ All protected values are masked before use. Playwright traces are disabled when 
 
 ## Rerun And Stale Head Recovery
 
-If a normal pre-merge stage fails, rerun the failed job or rerun the `Container Image` workflow for the current PR head. The deploy jobs share concurrency group `nutsnews-premerge-deploy-pr-<pr_number>` with `cancel-in-progress: true`, so a newer run supersedes older active work for the same PR. Each deploy stage uses idempotency key `pr-<pr_number>-<source_commit>-<target_type>`, which lets the same PR head reconcile or supersede the same provider-side candidate instead of creating an unrelated release identity.
+If an explicit deployment or recovery stage fails, rerun the failed operator workflow with the same reviewed source commit and immutable image identity. Historical pre-merge deployment jobs used concurrency group `nutsnews-premerge-deploy-pr-<pr_number>` and idempotency key `pr-<pr_number>-<source_commit>-<target_type>`; new release-only validation should keep the same stale-source and idempotency discipline without re-entering ordinary PR checks.
 
 If the workflow reports a stale PR head, do not merge that run. Push, rebase, or otherwise update the PR branch, then rerun from the latest head SHA. The trusted eligibility gate, each protected deploy stage, and the final `Pre-merge deployment gate` re-check the live PR head before accepting evidence, so stale deployment evidence cannot satisfy branch protection.
 
@@ -103,8 +103,8 @@ Use these paths only for operator recovery. They are not branch-protection check
 | Apply production Supabase forward migrations | `production-supabase-migration.yml` | `workflow_dispatch` with `confirmation` set to `apply-production-supabase-migrations` | `source_commit`, `migration_head`, fresh `backup_run_id`; requires `NUTSNEWS_PRODUCTION_SUPABASE_ACCESS_TOKEN` in `production-supabase` and `NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF` |
 | Verify backup/restore readiness | `supabase-backup.yml` | Schedule or `workflow_dispatch` | Produces `supabase-rest-backup` and `supabase-restore-fire-drill-report` artifacts retained for 14 days |
 
-Use final gate deploy/UI evidence to choose recovery inputs. The useful identity fields are `source_commit`, `build_id`, `image_digest`, `deployment_id`, `target_url`, `runtime_env`, `deployment_target`, `workflow_run_id`, and `workflow_run_attempt`.
+Use deploy/UI evidence from explicit release or recovery runs to choose recovery inputs. The useful identity fields are `source_commit`, `build_id`, `image_digest`, `deployment_id`, `target_url`, `runtime_env`, `deployment_target`, `workflow_run_id`, and `workflow_run_attempt`.
 
 ## Merge Handoff
 
-Branch protection must require `Pre-merge deployment gate` and `Release candidate` for the current PR head with strict up-to-date checks enabled. After those gates pass, the maintainer may merge or enable GitHub native auto-merge. Do not add a custom workflow that pushes to `main`, merges the PR, or deploys from `main` after merge.
+Branch protection must require `Merge Gate` for the current PR head with strict up-to-date checks enabled. `Release candidate` is no longer required for ordinary PR merges. A `main` merge is not a deployment trigger. After required checks pass, the maintainer may merge or enable GitHub native auto-merge. Do not add a custom workflow that pushes to `main`, merges the PR, or deploys from `main` after merge.

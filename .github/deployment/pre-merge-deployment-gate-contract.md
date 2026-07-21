@@ -1,6 +1,6 @@
-# Pre-Merge Deployment Gate Contract
+# Retired Pre-Merge Deployment Gate Contract
 
-This contract defines the required PR deployment pipeline before workflow rewiring starts. It is the source of truth for stage order, evidence names, merge timing, and the final branch-protection check.
+This document preserves the historical PR deployment pipeline contract for recovery reference. The default PR path no longer runs these stages from `container-image.yml`; retained deployment validation must be manual or explicit release-only.
 
 For maintainer setup, target URLs, secrets, protected-target authentication, reruns, stale PR heads, rollback, and manual recovery paths, see [Deployment Environments, Secrets, And Recovery Runbook](./environments-secrets-recovery.md).
 
@@ -8,7 +8,7 @@ For maintainer setup, target URLs, secrets, protected-target authentication, rer
 
 The PR candidate is the only release unit. Every deployment stage must deploy the same immutable candidate identity, and every UI test stage must verify that the live target reports that same identity.
 
-Merge to `main` is a handoff after all deployment gates have passed. A merge to `main` must not trigger deployment work.
+Merge to `main` is a handoff after `Merge Gate` has passed. A merge to `main` must not trigger deployment work.
 
 ## Required Stage Order
 
@@ -161,25 +161,25 @@ The stage uses the same `node ../scripts/run_deployed_ui_smoke_with_evidence.mjs
 
 ## Merge And Main Behavior
 
-All deployment stages complete before merge into `main`. Merge remains a maintainer handoff by default: the maintainer merges the PR only after GitHub shows `Pre-merge deployment gate`, `Release candidate`, and any other required checks green for the current PR head.
+Ordinary PRs no longer run deployment stages before merge into `main`. Merge remains a maintainer handoff by default: the maintainer merges the PR only after GitHub shows `Merge Gate` and any other required checks green for the current PR head. The legacy `Release candidate` check is no longer a required status for ordinary PR merges.
 
 GitHub native auto-merge may be enabled on a PR, but it must rely only on the required branch-protection checks and GitHub's current-head enforcement. The repo must not add a custom workflow, PAT, deploy key, or GitHub App token that pushes to `main` or merges the PR after deployments pass.
 
-Branch protection must block merge until the final pre-merge deployment gate check passes for the current PR head. Strict up-to-date required status checks and the final gate's live PR-head recheck refuse stale PR heads. The configured pull-request rule continues to enforce the repo's solo-maintainer review policy. After merge, `main` may run audits, metadata checks, and reporting, but it must not deploy VPS staging, Vercel staging, Vercel production, or VPS production.
+Branch protection must block merge until `Merge Gate` passes for the current PR head. Strict up-to-date required status checks remain enabled. The configured pull-request rule continues to enforce the repo's solo-maintainer review policy. After merge, `main` may run audits, metadata checks, and reporting, but it must not deploy VPS staging, Vercel staging, Vercel production, or VPS production.
 
-The merge handoff records that `main` now points at the already-deployed candidate. It is not a deployment trigger.
+The merge handoff records that `main` now points at a candidate that passed `Merge Gate`. It is not a deployment trigger.
 
-## Final Required Check
+## Required Merge Check
 
-The final branch-protection check is:
+The required branch-protection check for ordinary PR merges is:
 
 ```text
-Pre-merge deployment gate
+Merge Gate
 ```
 
-That check passes only after all eight ordered stages have passed and the aggregated evidence contains the required fields for every deployment target.
+`Merge Gate` is the lean PR check that covers dependency install, TypeScript, lint, focused web regressions, security headers, and production build without coupling branch protection to image publishing or deployment jobs.
 
-The main branch ruleset also intentionally retains `Release candidate` as the aggregate non-deployment release blocker for build, migration, workflow contract, translation, security-header, and public reader smoke checks. Branch protection must require both `Pre-merge deployment gate` and `Release candidate`, with strict up-to-date required status checks enabled.
+`Release candidate` is no longer a direct branch-protection check, and the ruleset audit must fail if it is re-added as an ordinary merge requirement.
 
 The `pre-merge-deployment-gate` job depends on the trusted eligibility gate, the immutable PR release artifact, all four deployment jobs, and all four shared UI smoke jobs. For deployment-eligible PRs it downloads each retained evidence artifact, verifies every stage concluded `success`, verifies UI smoke evidence concluded `pass`, and fails closed on cancelled, skipped, stale, or missing evidence.
 

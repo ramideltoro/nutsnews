@@ -9,7 +9,8 @@ const docPath = ".github/deployment/environments-secrets-recovery.md";
 const doc = await readFile(resolve(root, docPath), "utf8");
 const containerWorkflow = await readFile(resolve(root, ".github/workflows/container-image.yml"), "utf8");
 
-const targetJobs = [
+const removedContainerJobs = [
+  "trusted-pr-deployment-eligibility",
   "pr-release-artifact",
   "deploy-vps-staging",
   "ui-smoke-vps-staging",
@@ -19,44 +20,27 @@ const targetJobs = [
   "ui-smoke-vercel-production",
   "deploy-vps-production",
   "ui-smoke-vps-production",
+  "pre-merge-deployment-gate",
+  "release-candidate",
 ];
 
 function requireText(text, fragment, message) {
   assert.ok(text.includes(fragment), message);
 }
 
-function collectMatches(text, pattern) {
-  return [...text.matchAll(pattern)].map((match) => match[1]);
-}
+requireText(doc, "Normal PR merges do not deploy", `${docPath} must document that ordinary PRs do not deploy.`);
+requireText(doc, "manual or explicit release-only", `${docPath} must keep deployment validation out of default PR checks.`);
+requireText(doc, "`Merge Gate`", `${docPath} must name the required merge check.`);
+requireText(doc, "`Release candidate` is no longer required", `${docPath} must document that Release candidate is no longer required.`);
+assert.doesNotMatch(doc, /Container Image` pull-request workflow/, `${docPath} must not describe Container Image as a pull-request deployment workflow.`);
 
-function workflowJob(text, name) {
-  const marker = `  ${name}:\n`;
-  const start = text.indexOf(marker);
-  assert.notEqual(start, -1, `Workflow job not found: ${name}`);
-  const rest = text.slice(start + marker.length);
-  const next = rest.search(/\n  [A-Za-z0-9_-]+:\n/);
-  return text.slice(start, next === -1 ? text.length : start + marker.length + next);
+for (const job of removedContainerJobs) {
+  assert.doesNotMatch(containerWorkflow, new RegExp(`^  ${job}:`, "m"), `.github/workflows/container-image.yml must not contain removed PR job ${job}.`);
 }
-
-const targetWorkflowText = targetJobs.map((jobName) => workflowJob(containerWorkflow, jobName)).join("\n");
-const targetSecrets = new Set(collectMatches(targetWorkflowText, /secrets\.([A-Z0-9_]+)/g).filter((name) => name !== "GITHUB_TOKEN"));
-const targetVariables = new Set(collectMatches(targetWorkflowText, /vars\.([A-Z0-9_]+)/g));
-const targetEnvironments = new Set(collectMatches(targetWorkflowText, /^\s+environment:\s+(.+)$/gm).map((name) => name.trim()));
-
-for (const secretName of [...targetSecrets].sort()) {
-  requireText(doc, `\`${secretName}\``, `${docPath} must list normal VPS/Vercel secret ${secretName}.`);
-}
-
-for (const variableName of [...targetVariables].sort()) {
-  requireText(doc, `\`${variableName}\``, `${docPath} must list normal VPS/Vercel repository variable ${variableName}.`);
-}
-
-for (const environmentName of [...targetEnvironments].sort()) {
-  requireText(doc, `\`${environmentName}\``, `${docPath} must list normal VPS/Vercel GitHub environment ${environmentName}.`);
-}
+assert.doesNotMatch(containerWorkflow, /^\s+pull_request:/m, ".github/workflows/container-image.yml must not run on pull_request.");
+assert.doesNotMatch(containerWorkflow, /^\s+environment:\s+Production\b/m, ".github/workflows/container-image.yml must not invoke Production.");
 
 for (const fragment of [
-  "The staging deployment jobs intentionally do not use a GitHub environment.",
   "`staging-supabase`",
   "`production-supabase`",
   "`NUTSNEWS_INFRA_STAGING_TOKEN`",
@@ -100,13 +84,12 @@ for (const fragment of [
 }
 
 for (const fragment of [
-  "rerun the `Container Image` workflow",
+  "explicit deployment or recovery stage fails",
   "`nutsnews-premerge-deploy-pr-<pr_number>`",
   "`pr-<pr_number>-<source_commit>-<target_type>`",
-  "stale PR head",
-  "`Pre-merge deployment gate`",
+  "same stale-source and idempotency discipline",
 ]) {
-  requireText(doc, fragment, `${docPath} must document rerun and stale-head recovery ${fragment}.`);
+  requireText(doc, fragment, `${docPath} must document rerun and stale-source recovery ${fragment}.`);
 }
 
 for (const fragment of [
@@ -132,7 +115,6 @@ for (const fragment of [
 }
 
 for (const fragment of [
-  "Normal release deployment happens before merge.",
   "A `main` merge is not a deployment trigger",
   "Do not add a custom workflow that pushes to `main`, merges the PR, or deploys from `main` after merge.",
 ]) {

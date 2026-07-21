@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/staging-supabase-migration.yml"
       - ".github/workflows/staging-supabase-migration-regression.yml"
+      - ".github/workflows/database-migration-gate.yml"
       - "scripts/locked_migration_workflow.mjs"
       - "scripts/staging_migration_request.mjs"
       - "scripts/staging_migration_workflow_regression.mjs"
@@ -16,6 +17,7 @@ on:
     paths:
       - ".github/workflows/staging-supabase-migration.yml"
       - ".github/workflows/staging-supabase-migration-regression.yml"
+      - ".github/workflows/database-migration-gate.yml"
       - "scripts/locked_migration_workflow.mjs"
       - "scripts/staging_migration_request.mjs"
       - "scripts/staging_migration_workflow_regression.mjs"
@@ -24,6 +26,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   regression:

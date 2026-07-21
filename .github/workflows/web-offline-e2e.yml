@@ -15,6 +15,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   web-offline-e2e:
     name: Mocked public web flow
@@ -39,14 +43,6 @@ jobs:
       - name: Install Playwright Chromium
         working-directory: web
         run: npx playwright install --with-deps chromium
-
-      - name: TypeScript check
-        working-directory: web
-        run: npx tsc --noEmit
-
-      - name: Lint
-        working-directory: web
-        run: npm run lint
 
       - name: Run fully offline web E2E regression
         working-directory: web

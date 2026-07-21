@@ -1,6 +1,6 @@
 # Workflow Check Inventory
 
-This inventory supports issue #309 and is the input for the branch protection update in issue #310. Branch protection should use the final required check `Pre-merge deployment gate` and the PR-required checks listed here when the new pre-merge release pipeline is wired.
+This inventory supports issue #309 and the branch protection update in issue #333. Branch protection should require the lean `Merge Gate` check for ordinary PR merges.
 
 No deployment work is hidden inside a workflow classified as an existing check. Workflows that mutate environments, purge production cache, sync protected provider secrets, or dispatch deployments are classified as manual recovery or deprecated post-main work instead of PR-required checks.
 
@@ -25,7 +25,8 @@ No deployment work is hidden inside a workflow classified as an existing check. 
 | `cloudflare-production-cache-purge-regression.yml` | PR-required | Guards the production cache purge workflow contract before purge automation changes merge. | No deployment. |
 | `cloudflare-production-cache-purge.yml` | manual recovery | Typed operator workflow for manual production cache purge recovery; it no longer reacts to deployment statuses after merge. | Mutates production cache only on manual dispatch. |
 | `codeql.yml` | PR-required | Runs CodeQL before merge while keeping default-branch and scheduled security reporting. | No deployment. |
-| `container-image.yml` | PR-required | Builds, smoke-tests, runs migration gates, publishes the immutable PR artifact, emits `Release candidate` and the final `Pre-merge deployment gate` check, and for trusted same-repository PRs runs the pre-merge VPS staging deploy, VPS staging UI smoke, Vercel staging deploy, Vercel staging UI smoke, Vercel production deploy, Vercel production UI smoke, VPS production deploy, and VPS production UI smoke stages. | Deploys only the trusted PR candidate to VPS staging, Vercel staging, Vercel production, and VPS production before merge, with shared UI smoke evidence after each deployed target and one aggregate final gate; main image publish is artifact work. |
+| `container-image.yml` | default-branch/manual | Builds, smoke-tests, and publishes immutable images only from main pushes or operator dispatches. Ordinary PRs no longer enter the container/release workflow, and database migration validation lives in `database-migration-gate.yml`. | No ordinary PR deployment. Main image publish remains artifact work. |
+| `database-migration-gate.yml` | PR-required | Runs Supabase migration naming, reset, drift, lock, RLS, fixture, and migration request checks only for database-related changes. | No deployment. |
 | `db-size-warning.yml` | scheduled/operational | Reports production database growth from protected production credentials on a schedule or operator request. | No deployment. |
 | `dependency-review.yml` | PR-required | Blocks vulnerable dependency changes before merge. | No deployment. |
 | `feed-health-report.yml` | scheduled/operational | Reports live feed and worker health from production data on a schedule or operator request. | No deployment. |
@@ -38,6 +39,7 @@ No deployment work is hidden inside a workflow classified as an existing check. 
 | `lighthouse-ci.yml` | PR-required | Builds the app and runs Lighthouse CI before merge. | No deployment. |
 | `link-check.yml` | PR-required | Checks Markdown links for documentation changes before merge; scheduled runs catch remote link rot. | No deployment. |
 | `main-ruleset-audit.yml` | scheduled/operational | Uses an administration-read token to detect remote branch protection drift on schedule or operator request. | No deployment. |
+| `merge-gate.yml` | PR-required | Provides the required lean merge check for dependency install, TypeScript, lint, focused web regressions, security headers, and production build. | No deployment. |
 | `openssf-scorecard.yml` | scheduled/operational | Publishes repository security posture and SARIF on schedule or operator request; it is not a per-release blocker. | No deployment. |
 | `osv-scanner.yml` | PR-required | Scans dependency vulnerability changes before merge while keeping default-branch and scheduled reporting. | No deployment. |
 | `owasp-zap-baseline.yml` | scheduled/operational | Passively scans live public targets on schedule or operator request without blocking every release. | No deployment. |
@@ -60,11 +62,11 @@ No deployment work is hidden inside a workflow classified as an existing check. 
 | `vercel-preview-smoke.yml` | optional PR | Runs against Vercel preview deployment statuses or manual preview URLs; shared target-agnostic UI smoke evidence replaces it for required deployment gates. | No production deployment. |
 | `vercel-production-release.yml` | dispatch-only recovery | Dispatch-only Vercel production recovery path accepted from the protected infra chain; normal PR releases use the pre-merge Vercel production deploy job. | Deploys Vercel production only from protected repository dispatch. |
 | `visual-regression.yml` | PR-required | Runs Playwright visual regression before web changes merge. | No deployment. |
-| `web-ci.yml` | PR-required | Runs typecheck, lint, route tests, runtime safety, security, and build before web changes merge. | No deployment. |
+| `web-ci.yml` | default-branch/manual | Keeps the Web CI command set available for default-branch and operator-triggered validation after PR coverage moved to `Merge Gate`. | No deployment. |
 | `web-offline-e2e.yml` | PR-required | Runs offline end-to-end coverage before web changes merge. | No deployment. |
 
 ## Branch Protection Hand-Off
 
-Issue #310 should reference this inventory when updating branch protection. The main ruleset must require `Pre-merge deployment gate` for the current PR head and intentionally retain `Release candidate` as the aggregate build, migration, release-contract, and release-critical web check. Strict required status checks must stay enabled so a stale PR head cannot merge after deployment. Scheduled/operational, manual recovery, and dispatch-only recovery workflows must not be direct merge checks.
+The main ruleset must require `Merge Gate` for the current PR head. `Release candidate` is no longer a direct branch-protection check, and strict required status checks must stay enabled so a stale PR head cannot merge. Scheduled/operational, default-branch/manual, manual recovery, and dispatch-only recovery workflows must not be direct merge checks.
 
 Automatic post-main deployment workflows have been removed or rewired behind manual/dispatch-only recovery paths.
