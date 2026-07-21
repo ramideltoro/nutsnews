@@ -19,6 +19,8 @@ const deploymentHardening = await readFile(resolve(root, "scripts/deployment_har
 const deploymentHardeningTest = await readFile(resolve(root, "tests/deployment-hardening.test.mjs"), "utf8");
 const prVpsStagingDeploy = await readFile(resolve(root, "scripts/pr_vps_staging_deploy.mjs"), "utf8");
 const prVpsStagingDeployTest = await readFile(resolve(root, "tests/pr-vps-staging-deploy.test.mjs"), "utf8");
+const prVpsStagingQualification = await readFile(resolve(root, "scripts/pr_vps_staging_qualification.mjs"), "utf8");
+const prVpsStagingQualificationTest = await readFile(resolve(root, "tests/pr-vps-staging-qualification.test.mjs"), "utf8");
 const vercelConfig = JSON.parse(await readFile(resolve(root, "web/vercel.json"), "utf8"));
 const packageJson = JSON.parse(await readFile(resolve(root, "web/package.json"), "utf8"));
 const workflowNames = await readdir(resolve(root, ".github/workflows"));
@@ -143,12 +145,14 @@ for (const fragment of [
   "pre-merge-deployment-gate",
   "nutsnews-staging-release",
   "runtime env `staging`, deployment target `vps-staging`",
+  "infra staging qualification",
   "deployment target `vercel-staging`",
   "deployment target `vercel-production`",
   "deployment target `production-vps`",
   "NUTSNEWS_PRODUCTION_SAFE_SURFACES=true",
   "nutsnews-production-vps-release",
   "node ../scripts/run_deployed_ui_smoke_with_evidence.mjs",
+  "node scripts/pr_vps_staging_qualification.mjs",
   "nutsnews-ui-smoke-vps-staging",
   "nutsnews-ui-smoke-production-vps",
   "pre_merge_deployment_workflow_order_regression.mjs",
@@ -181,12 +185,14 @@ requireText(prVpsStagingJob, "NUTSNEWS_INFRA_STAGING_TOKEN", "VPS staging deploy
 requireText(prVpsStagingJob, "node scripts/pr_vps_staging_deploy.mjs", "VPS staging deploy must use the tested deploy helper.");
 requireText(prVpsStagingJob, "Upload VPS staging deploy evidence", "VPS staging deploy must retain deploy evidence.");
 requireText(containerWorkflow, "node --test tests/pr-vps-staging-deploy.test.mjs", "Release candidate must run PR VPS staging deployment tests.");
+requireText(containerWorkflow, "node --test tests/pr-vps-staging-qualification.test.mjs", "Release candidate must run delegated PR VPS staging qualification tests.");
 for (const fragment of [
   "parsePrReleaseMetadata",
   "buildVpsStagingCandidate",
   "computeVpsStagingDeploymentId",
   "pollInfraGitHubDeployment",
   "verifyVpsStagingRuntime",
+  "verifiedVpsStagingRuntimeIdentity",
   "deploymentStageIdempotencyKey",
   "buildVpsStagingEvidence",
 ]) {
@@ -197,14 +203,26 @@ requireText(vpsStagingUiSmokeJob, "name: UI smoke VPS staging", "PR pipeline mus
 requireText(vpsStagingUiSmokeJob, "needs: [deploy-vps-staging, pr-release-artifact, trusted-pr-deployment-eligibility]", "VPS staging UI smoke must run after the VPS staging deploy.");
 requireText(vpsStagingUiSmokeJob, "timeout-minutes: 20", "VPS staging UI smoke must have an explicit timeout.");
 requireText(vpsStagingUiSmokeJob, "group: nutsnews-premerge-deploy-pr-${{ github.event.pull_request.number }}", "VPS staging UI smoke must serialize by PR number.");
-requireText(vpsStagingUiSmokeJob, "Verify VPS staging identity before browser tests", "VPS staging UI smoke must preflight runtime identity.");
-requireText(vpsStagingUiSmokeJob, "verifyVpsStagingRuntime", "VPS staging UI smoke must verify source, build, image, and runtime identity before browser tests.");
-requireText(vpsStagingUiSmokeJob, "run: node ../scripts/run_deployed_ui_smoke_with_evidence.mjs", "VPS staging UI smoke must use the standardized evidence runner.");
+requireText(vpsStagingUiSmokeJob, "Wait for infra staging qualification and write UI smoke evidence", "VPS staging UI smoke must wait for the protected infra qualification.");
+requireText(vpsStagingUiSmokeJob, "run: node scripts/pr_vps_staging_qualification.mjs", "VPS staging UI smoke must use the delegated qualification evidence helper.");
+requireText(vpsStagingUiSmokeJob, "NUTSNEWS_INFRA_STAGING_TOKEN", "VPS staging UI smoke must read infra qualification evidence through the staging token.");
+requireText(vpsStagingUiSmokeJob, "NUTSNEWS_VPS_STAGING_INFRA_RUN_ID: ${{ needs.deploy-vps-staging.outputs.infra_run_id }}", "VPS staging UI smoke must bind qualification evidence to the VPS staging infra run.");
 requireText(vpsStagingUiSmokeJob, "NUTSNEWS_UI_SMOKE_TARGET_TYPE: vps-staging", "VPS staging UI smoke evidence must use the vps-staging target type.");
 requireText(vpsStagingUiSmokeJob, "NUTSNEWS_UI_SMOKE_SOURCE_COMMIT: ${{ needs.pr-release-artifact.outputs.source_commit }}", "VPS staging UI smoke must bind source commit evidence to the PR artifact.");
 requireText(vpsStagingUiSmokeJob, "NUTSNEWS_UI_SMOKE_BUILD_ID: ${{ needs.pr-release-artifact.outputs.build_id }}", "VPS staging UI smoke must bind build evidence to the PR artifact.");
 requireText(vpsStagingUiSmokeJob, "NUTSNEWS_UI_SMOKE_DEPLOYMENT_ID: ${{ needs.deploy-vps-staging.outputs.deployment_id }}", "VPS staging UI smoke must bind evidence to the VPS staging deployment ID.");
 requireText(vpsStagingUiSmokeJob, "web/test-results/deployed-ui-smoke", "VPS staging UI smoke must upload standardized evidence output.");
+for (const fragment of [
+  "findInfraStagingQualification",
+  "writeDelegatedVpsStagingSmokeEvidence",
+  "staging-qualification-${deploymentId}-",
+  "writeUiSmokeEvidence",
+]) {
+  requireText(prVpsStagingQualification, fragment, `Delegated VPS staging qualification helper must implement ${fragment}.`);
+}
+for (const fragment of ["findInfraStagingQualification", "concluded failure", "staging-qualification-${deploymentId}-"]) {
+  requireText(prVpsStagingQualificationTest, fragment, `Delegated VPS staging qualification regression must cover ${fragment}.`);
+}
 requireText(vercelStagingDeployJob, "name: Deploy PR candidate to Vercel staging", "PR pipeline must include the Vercel staging deploy stage.");
 requireText(vercelStagingDeployJob, "needs: [ui-smoke-vps-staging, deploy-vps-staging, pr-release-artifact, trusted-pr-deployment-eligibility]", "Vercel staging deploy must wait for VPS staging UI smoke.");
 requireText(vercelStagingDeployJob, "timeout-minutes: 30", "Vercel staging deploy must have an explicit timeout.");

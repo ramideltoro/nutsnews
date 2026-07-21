@@ -93,9 +93,15 @@ for (const stage of orderedStages) {
 
 for (const [jobName, deployJobName, targetType] of uiSmokeStages) {
   const job = workflowJob(containerWorkflow, jobName).text;
-  requireText(job, "working-directory: web", `${jobName} must run from web/.`);
-  requireText(job, "run: node ../scripts/run_deployed_ui_smoke_with_evidence.mjs", `${jobName} must use the shared deployed UI smoke evidence runner.`);
-  requireText(job, `PLAYWRIGHT_BASE_URL: \${{ needs.${deployJobName}.outputs.target_url }}`, `${jobName} must target the paired deploy job URL.`);
+  if (jobName === "ui-smoke-vps-staging") {
+    requireText(job, "run: node scripts/pr_vps_staging_qualification.mjs", `${jobName} must use the delegated infra qualification helper.`);
+    requireText(job, "NUTSNEWS_VPS_STAGING_INFRA_RUN_ID", `${jobName} must bind to the infra staging deploy run.`);
+    requireText(job, `NUTSNEWS_UI_SMOKE_TARGET_URL: \${{ needs.${deployJobName}.outputs.target_url }}`, `${jobName} must target the paired deploy job URL.`);
+  } else {
+    requireText(job, "working-directory: web", `${jobName} must run from web/.`);
+    requireText(job, "run: node ../scripts/run_deployed_ui_smoke_with_evidence.mjs", `${jobName} must use the shared deployed UI smoke evidence runner.`);
+    requireText(job, `PLAYWRIGHT_BASE_URL: \${{ needs.${deployJobName}.outputs.target_url }}`, `${jobName} must target the paired deploy job URL.`);
+  }
   requireText(job, `NUTSNEWS_UI_SMOKE_TARGET_TYPE: ${targetType}`, `${jobName} must write comparable target_type evidence.`);
   requireText(job, `NUTSNEWS_UI_SMOKE_DEPLOYMENT_ID: \${{ needs.${deployJobName}.outputs.deployment_id }}`, `${jobName} must bind UI evidence to the paired deployment ID.`);
   requireText(job, "web/test-results/deployed-ui-smoke", `${jobName} must upload standardized UI smoke evidence.`);

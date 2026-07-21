@@ -30,6 +30,22 @@ function protectedHeaders(env) {
   return clientId ? { "CF-Access-Client-Id": clientId, "CF-Access-Client-Secret": clientSecret } : {};
 }
 
+function normalizeRuntimeUrl(value, label) {
+  const text = clean(value);
+  if (!text) throw new DeploymentValidationError(`${label} runtime URL is required.`);
+  try {
+    const url = new URL(text.endsWith("/") ? text : `${text}/`);
+    if (!["http:", "https:"].includes(url.protocol)) throw new Error("unsupported protocol");
+    return url.toString();
+  } catch {
+    throw new DeploymentValidationError(`${label} runtime URL must be an http or https URL.`);
+  }
+}
+
+export function selectVpsProductionRuntimeTargetUrl({ pollResult, configuredTargetUrl = "", defaultUrl = defaultTargetUrl } = {}) {
+  return normalizeRuntimeUrl(clean(pollResult?.status?.environment_url) || clean(configuredTargetUrl) || defaultUrl, "VPS production");
+}
+
 async function responseJson(response, label) {
   if (!response.ok) {
     if (isTransientHttpStatus(response.status)) throw new DeploymentTransientError(`${label} returned transient HTTP ${response.status}.`);
@@ -208,7 +224,10 @@ export async function runPrVpsProductionDeploy(env = process.env, adapters = {})
     sleep: adapters.sleep,
     now: adapters.now,
   });
-  const targetUrl = clean(pollResult.status?.target_url) || clean(env.NUTSNEWS_VPS_PRODUCTION_URL) || defaultTargetUrl;
+  const targetUrl = selectVpsProductionRuntimeTargetUrl({
+    pollResult,
+    configuredTargetUrl: clean(env.NUTSNEWS_VPS_PRODUCTION_URL),
+  });
   const runtimeIdentity = await verifyVpsProductionRuntime({
     fetchImpl: adapters.fetchImpl,
     env,

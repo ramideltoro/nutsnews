@@ -781,18 +781,11 @@ jobs:
       - name: Mask VPS staging protected secrets
         run: |
           set -euo pipefail
-          for value in \
-            "${NUTSNEWS_INFRA_STAGING_TOKEN:-}" \
-            "${CF_ACCESS_CLIENT_ID:-}" \
-            "${CF_ACCESS_CLIENT_SECRET:-}"; do
-            if [ -n "$value" ]; then
-              echo "::add-mask::$value"
-            fi
-          done
+          if [ -n "${NUTSNEWS_INFRA_STAGING_TOKEN:-}" ]; then
+            echo "::add-mask::$NUTSNEWS_INFRA_STAGING_TOKEN"
+          fi
         env:
           NUTSNEWS_INFRA_STAGING_TOKEN: ${{ secrets.NUTSNEWS_INFRA_STAGING_TOKEN }}
-          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
 
       - name: Dispatch and wait for VPS staging deployment
         id: deploy
@@ -803,8 +796,6 @@ jobs:
           NUTSNEWS_INFRA_STAGING_TOKEN: ${{ secrets.NUTSNEWS_INFRA_STAGING_TOKEN }}
           NUTSNEWS_VPS_STAGING_URL: ${{ vars.NUTSNEWS_VPS_STAGING_URL || 'https://staging.nutsnews.com/' }}
           NUTSNEWS_VPS_STAGING_EVIDENCE_PATH: ${{ runner.temp }}/vps-staging-deploy/evidence.json
-          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: node scripts/pr_vps_staging_deploy.mjs
 
       - name: Upload VPS staging deploy evidence
@@ -845,67 +836,30 @@ jobs:
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: web/package-lock.json
 
       - name: Mask VPS staging UI smoke secrets
         run: |
           set -euo pipefail
-          for value in \
-            "${CF_ACCESS_CLIENT_ID:-}" \
-            "${CF_ACCESS_CLIENT_SECRET:-}"; do
-            if [ -n "$value" ]; then
-              echo "::add-mask::$value"
-            fi
-          done
+          if [ -n "${NUTSNEWS_INFRA_STAGING_TOKEN:-}" ]; then
+            echo "::add-mask::$NUTSNEWS_INFRA_STAGING_TOKEN"
+          fi
         env:
-          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          NUTSNEWS_INFRA_STAGING_TOKEN: ${{ secrets.NUTSNEWS_INFRA_STAGING_TOKEN }}
 
-      - name: Install web dependencies
-        working-directory: web
-        run: npm ci
-
-      - name: Verify VPS staging identity before browser tests
-        env:
-          PR_RELEASE_METADATA_JSON: ${{ needs.pr-release-artifact.outputs.metadata_json }}
-          NUTSNEWS_VPS_STAGING_URL: ${{ needs.deploy-vps-staging.outputs.target_url }}
-          NUTSNEWS_VPS_STAGING_DEPLOYMENT_ID: ${{ needs.deploy-vps-staging.outputs.deployment_id }}
-          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
-        run: |
-          set -euo pipefail
-          node --input-type=module <<'NODE'
-          import { parsePrReleaseMetadata, verifyVpsStagingRuntime } from "./scripts/pr_vps_staging_deploy.mjs";
-
-          const metadata = parsePrReleaseMetadata(process.env.PR_RELEASE_METADATA_JSON);
-          await verifyVpsStagingRuntime({
-            env: process.env,
-            metadata,
-            deploymentId: process.env.NUTSNEWS_VPS_STAGING_DEPLOYMENT_ID,
-            targetUrl: process.env.NUTSNEWS_VPS_STAGING_URL,
-            timeoutMs: 120_000,
-          });
-          NODE
-
-      - name: Install Playwright Chromium
-        working-directory: web
-        run: npx playwright install --with-deps chromium
-
-      - name: Run shared UI smoke against VPS staging
+      - name: Wait for infra staging qualification and write UI smoke evidence
         id: smoke
-        working-directory: web
         env:
-          PLAYWRIGHT_BASE_URL: ${{ needs.deploy-vps-staging.outputs.target_url }}
+          NUTSNEWS_INFRA_STAGING_TOKEN: ${{ secrets.NUTSNEWS_INFRA_STAGING_TOKEN }}
+          NUTSNEWS_VPS_STAGING_INFRA_RUN_ID: ${{ needs.deploy-vps-staging.outputs.infra_run_id }}
+          NUTSNEWS_VPS_STAGING_DEPLOYMENT_ID: ${{ needs.deploy-vps-staging.outputs.deployment_id }}
           NUTSNEWS_UI_SMOKE_TARGET_URL: ${{ needs.deploy-vps-staging.outputs.target_url }}
           NUTSNEWS_UI_SMOKE_TARGET_TYPE: vps-staging
           NUTSNEWS_UI_SMOKE_SOURCE_COMMIT: ${{ needs.pr-release-artifact.outputs.source_commit }}
           NUTSNEWS_UI_SMOKE_BUILD_ID: ${{ needs.pr-release-artifact.outputs.build_id }}
           NUTSNEWS_UI_SMOKE_DEPLOYMENT_ID: ${{ needs.deploy-vps-staging.outputs.deployment_id }}
           NUTSNEWS_UI_SMOKE_PR_NUMBER: ${{ github.event.pull_request.number }}
-          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
-        run: node ../scripts/run_deployed_ui_smoke_with_evidence.mjs
+          NUTSNEWS_DEPLOY_HARDENING_TIMEOUT_MS: "900000"
+        run: node scripts/pr_vps_staging_qualification.mjs
 
       - name: Upload VPS staging UI smoke evidence
         if: always()
@@ -1738,6 +1692,7 @@ jobs:
           node --test tests/deployment-hardening.test.mjs
           node --test tests/pre-merge-deployment-gate.test.mjs
           node --test tests/pr-vps-staging-deploy.test.mjs
+          node --test tests/pr-vps-staging-qualification.test.mjs
           node --test tests/pr-vercel-staging-deploy.test.mjs
           node --test tests/pr-vercel-production-deploy.test.mjs
           node --test tests/pr-vps-production-deploy.test.mjs

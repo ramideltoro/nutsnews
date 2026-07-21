@@ -8,6 +8,8 @@ import {
   computeVpsStagingDeploymentId,
   parsePrReleaseMetadata,
   runPrVpsStagingDeploy,
+  selectVpsStagingRuntimeTargetUrl,
+  verifiedVpsStagingRuntimeIdentity,
   verifyVpsStagingRuntime,
 } from "../scripts/pr_vps_staging_deploy.mjs";
 
@@ -80,11 +82,12 @@ test("VPS staging candidate uses the immutable PR release artifact identity", ()
   assert.match(computeVpsStagingDeploymentId(candidate), /^stg-[0-9a-f]{24}$/);
 });
 
-test("PR VPS staging deploy dispatches, waits, verifies runtime identity, and writes evidence shape", async () => {
+test("PR VPS staging deploy dispatches, waits for infra-verified runtime identity, and writes evidence shape", async () => {
   const parsed = parsePrReleaseMetadata(JSON.stringify(metadata));
   const candidate = buildVpsStagingCandidate(parsed);
   const deploymentId = computeVpsStagingDeploymentId(candidate);
   const dispatches = [];
+  let directRuntimeFetches = 0;
   const clock = fakeClock();
 
   const fetchImpl = async (url, init = {}) => {
@@ -106,6 +109,8 @@ test("PR VPS staging deploy dispatches, waits, verifies runtime identity, and wr
             source_commit: sourceCommit,
             build_id: "123-1",
             requested_digest: imageDigest,
+            target_hostname: "staging.nutsnews.com",
+            config_generation: `staging-${deploymentId}-123456789abc`,
           },
         },
       ]);
@@ -115,12 +120,14 @@ test("PR VPS staging deploy dispatches, waits, verifies runtime identity, and wr
         {
           state: "success",
           log_url: "https://github.com/ramideltoro/nutsnews-infra/actions/runs/777",
-          target_url: "https://staging.nutsnews.com/",
+          target_url: "https://github.com/ramideltoro/nutsnews-infra/actions/runs/777",
+          environment_url: "https://staging.nutsnews.com",
           description: `actual=${imageDigest}`,
         },
       ]);
     }
     if (parsedUrl.hostname === "staging.nutsnews.com" && parsedUrl.pathname === "/healthz") {
+      directRuntimeFetches += 1;
       return json(
         { ok: true, sourceCommit, buildId: "123-1" },
         200,
@@ -131,6 +138,7 @@ test("PR VPS staging deploy dispatches, waits, verifies runtime identity, and wr
       );
     }
     if (parsedUrl.hostname === "staging.nutsnews.com" && parsedUrl.pathname === "/readyz") {
+      directRuntimeFetches += 1;
       return json(
         { ok: true, runtimeEnv: "staging" },
         200,
@@ -148,6 +156,7 @@ test("PR VPS staging deploy dispatches, waits, verifies runtime identity, and wr
 
   const evidence = await runPrVpsStagingDeploy(baseEnv(), { fetchImpl, sleep: clock.sleep, now: clock.now });
   assert.equal(dispatches.length, 1);
+  assert.equal(directRuntimeFetches, 0);
   assert.equal(dispatches[0].event_type, "nutsnews-staging-release");
   assert.deepEqual(dispatches[0].client_payload, candidate);
   assert.equal(evidence.result, "success");
@@ -160,6 +169,44 @@ test("PR VPS staging deploy dispatches, waits, verifies runtime identity, and wr
   assert.equal(evidence.source_commit, sourceCommit);
   assert.equal(evidence.image_digest, imageDigest);
   assert.equal(evidence.idempotency_key, `pr-42-${sourceCommit}-vps-staging`);
+});
+
+test("infra-verified VPS staging runtime identity requires staging hostname, config generation, and digest", () => {
+  const parsed = parsePrReleaseMetadata(JSON.stringify(metadata));
+  const deploymentId = computeVpsStagingDeploymentId(buildVpsStagingCandidate(parsed));
+  assert.deepEqual(
+    verifiedVpsStagingRuntimeIdentity({
+      metadata: parsed,
+      deploymentId,
+      pollResult: {
+        deployment: {
+          payload: {
+            target_hostname: "staging.nutsnews.com",
+            config_generation: `staging-${deploymentId}-abcdef123456`,
+          },
+        },
+        status: { description: `verified actual=${imageDigest}` },
+      },
+    }),
+    { runtime_env: "staging", deployment_target: "vps-staging" },
+  );
+  assert.throws(
+    () =>
+      verifiedVpsStagingRuntimeIdentity({
+        metadata: parsed,
+        deploymentId,
+        pollResult: {
+          deployment: {
+            payload: {
+              target_hostname: "www.nutsnews.com",
+              config_generation: `staging-${deploymentId}-abcdef123456`,
+            },
+          },
+          status: { description: `verified actual=${imageDigest}` },
+        },
+      }),
+    /target hostname/,
+  );
 });
 
 test("PR VPS staging deploy fails before dispatch when the PR head is stale", async () => {
@@ -180,4 +227,19 @@ test("PR VPS staging deploy fails before dispatch when the PR head is stale", as
     /Current PR head changed/,
   );
   assert.equal(dispatched, false);
+});
+
+test("VPS staging runtime target prefers environment_url over GitHub status target_url", () => {
+  assert.equal(
+    selectVpsStagingRuntimeTargetUrl({
+      configuredTargetUrl: "https://staging.nutsnews.com/",
+      pollResult: {
+        status: {
+          target_url: "https://github.com/ramideltoro/nutsnews-infra/actions/runs/777",
+          environment_url: "https://staging.nutsnews.com",
+        },
+      },
+    }),
+    "https://staging.nutsnews.com/",
+  );
 });

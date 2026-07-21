@@ -5,6 +5,7 @@ import {
   buildVpsProductionPayload,
   computeVpsProductionDeploymentId,
   runPrVpsProductionDeploy,
+  selectVpsProductionRuntimeTargetUrl,
 } from "../scripts/pr_vps_production_deploy.mjs";
 
 const sourceCommit = "a".repeat(40);
@@ -70,7 +71,14 @@ test("PR VPS production deploy dispatches, waits, verifies runtime identity, and
       return json([{ id: 99, statuses_url: "https://api.github.com/repos/ramideltoro/nutsnews-infra/deployments/99/statuses", payload: { deployment_id: deploymentId, source_commit: sourceCommit, build_id: "123-1", requested_digest: imageDigest } }]);
     }
     if (parsed.pathname === "/repos/ramideltoro/nutsnews-infra/deployments/99/statuses") {
-      return json([{ state: "success", log_url: "https://github.com/ramideltoro/nutsnews-infra/actions/runs/888", target_url: "https://www.nutsnews.com/" }]);
+      return json([
+        {
+          state: "success",
+          log_url: "https://github.com/ramideltoro/nutsnews-infra/actions/runs/888",
+          target_url: "https://github.com/ramideltoro/nutsnews-infra/actions/runs/888",
+          environment_url: "https://www.nutsnews.com",
+        },
+      ]);
     }
     if (parsed.hostname === "www.nutsnews.com" && parsed.pathname === "/healthz") {
       return json({ ok: true, sourceCommit, buildId: "123-1" }, 200, { "x-nutsnews-source-commit": sourceCommit, "x-nutsnews-build-id": "123-1" });
@@ -90,4 +98,19 @@ test("PR VPS production deploy dispatches, waits, verifies runtime identity, and
   assert.equal(evidence.runtime_env, "production");
   assert.equal(evidence.deployment_target, "production-vps");
   assert.equal(evidence.image_digest, imageDigest);
+});
+
+test("VPS production runtime target prefers environment_url over GitHub status target_url", () => {
+  assert.equal(
+    selectVpsProductionRuntimeTargetUrl({
+      configuredTargetUrl: "https://www.nutsnews.com/",
+      pollResult: {
+        status: {
+          target_url: "https://github.com/ramideltoro/nutsnews-infra/actions/runs/888",
+          environment_url: "https://www.nutsnews.com",
+        },
+      },
+    }),
+    "https://www.nutsnews.com/",
+  );
 });

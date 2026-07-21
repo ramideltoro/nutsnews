@@ -8,7 +8,7 @@ Normal release deployment happens before merge. The `Container Image` pull-reque
 
 | Order | Jobs | Target type | Runtime env | GitHub environment | Target URL source | Expected target URL |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `deploy-vps-staging`, `ui-smoke-vps-staging` | `vps-staging` | `staging` | None | `NUTSNEWS_VPS_STAGING_URL`, or the infra deployment status `target_url` when returned | Defaults to `https://staging.nutsnews.com/` |
+| 1 | `deploy-vps-staging`, `ui-smoke-vps-staging` | `vps-staging` | `staging` | None | `NUTSNEWS_VPS_STAGING_URL`, or the infra deployment status `environment_url` when returned; UI smoke waits for the matching infra staging qualification artifact | Defaults to `https://staging.nutsnews.com/` |
 | 2 | `deploy-vercel-staging`, `ui-smoke-vercel-staging` | `vercel-staging` | `staging` | None | `deploy-vercel-staging.outputs.target_url` from `vercel deploy --target "$VERCEL_STAGING_TARGET"` | Exact immutable Vercel deployment URL returned by the deploy job; it must not be `nutsnews.com` or `www.nutsnews.com` |
 | 3 | `deploy-vercel-production`, `ui-smoke-vercel-production` | `vercel-production` | `production` | `Production` | `NUTSNEWS_VERCEL_PRODUCTION_ALIASES`; deploy evidence selects the first validated alias as `target_url` | Defaults to `https://www.nutsnews.com/` and also validates `https://nutsnews.com/` |
 | 4 | `deploy-vps-production`, `ui-smoke-vps-production` | `production-vps` | `production` | `Production` | `NUTSNEWS_VPS_PRODUCTION_URL`, or the infra deployment status `target_url` when returned | Defaults to `https://www.nutsnews.com/` |
@@ -29,13 +29,13 @@ These secrets must be available at repository scope because at least one normal 
 
 | Secret | Used by | Notes |
 | --- | --- | --- |
-| `NUTSNEWS_INFRA_STAGING_TOKEN` | `deploy-vps-staging`, `staging-release.yml` | Dispatches the immutable candidate to `ramideltoro/nutsnews-infra` with event `nutsnews-staging-release`. |
+| `NUTSNEWS_INFRA_STAGING_TOKEN` | `deploy-vps-staging`, `ui-smoke-vps-staging`, `staging-release.yml` | Dispatches the immutable candidate to `ramideltoro/nutsnews-infra` with event `nutsnews-staging-release` and lets app-side VPS staging smoke wait for the protected infra qualification artifact. |
 | `VERCEL_TOKEN` | Vercel staging deploy, Vercel production deploy/recovery, `vercel-backend-token-sync.yml` | Vercel API/CLI token for the configured project. The same name is used by staging and production workflows. |
 | `VERCEL_ORG_ID` | Vercel staging deploy, Vercel production deploy/recovery, `vercel-backend-token-sync.yml` | Vercel team or org ID passed to deployment lookups. |
 | `VERCEL_PROJECT_ID` | Vercel staging deploy, Vercel production deploy/recovery, `vercel-backend-token-sync.yml` | Vercel project ID used by `vercel pull`, deploy validation, and token sync. |
 | `VERCEL_AUTOMATION_BYPASS_SECRET` | Vercel staging and Vercel production deploy/UI smoke jobs | Required when Vercel Deployment Protection is enabled for the target. The validation helpers still accept legacy `VERCEL_PROTECTION_BYPASS_SECRET`, but the GitHub workflows read `VERCEL_AUTOMATION_BYPASS_SECRET`. |
-| `CF_ACCESS_CLIENT_ID` | VPS staging and VPS production deploy/UI smoke jobs | Required only when a VPS target is protected by Cloudflare Access. Must be configured with `CF_ACCESS_CLIENT_SECRET`. |
-| `CF_ACCESS_CLIENT_SECRET` | VPS staging and VPS production deploy/UI smoke jobs | Required only when a VPS target is protected by Cloudflare Access. Must be configured with `CF_ACCESS_CLIENT_ID`. |
+| `CF_ACCESS_CLIENT_ID` | VPS production deploy/UI smoke jobs when production is Cloudflare-protected | Required only when a VPS target tested by this app workflow is protected by Cloudflare Access. Must be configured with `CF_ACCESS_CLIENT_SECRET`. VPS staging browser qualification uses infra repo environment secrets instead. |
+| `CF_ACCESS_CLIENT_SECRET` | VPS production deploy/UI smoke jobs when production is Cloudflare-protected | Required only when a VPS target tested by this app workflow is protected by Cloudflare Access. Must be configured with `CF_ACCESS_CLIENT_ID`. VPS staging browser qualification uses infra repo environment secrets instead. |
 
 `GITHUB_TOKEN` is the built-in Actions token and does not need to be configured as a repository secret.
 
@@ -76,7 +76,7 @@ These are not normal VPS/Vercel stage inputs, but operators need them for recove
 
 ## Protected Target Authentication
 
-Cloudflare Access is handled through service-token headers. When `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET` are both configured, deploy validation and the shared UI smoke wrapper send `CF-Access-Client-Id` and `CF-Access-Client-Secret` to the VPS target. The two values must be supplied together. If the target is public, omit both.
+Cloudflare Access is handled through service-token headers. When `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET` are both configured, deploy validation and the shared UI smoke wrapper send `CF-Access-Client-Id` and `CF-Access-Client-Secret` to the VPS target. The two values must be supplied together. If the target is public, omit both. VPS staging is qualified through the infra repo's protected `staging-tests` environment, which stores `NUTSNEWS_STAGING_ACCESS_CLIENT_ID` and `NUTSNEWS_STAGING_ACCESS_CLIENT_SECRET`; the app repo's `ui-smoke-vps-staging` job reads only the resulting qualification artifact through `NUTSNEWS_INFRA_STAGING_TOKEN`.
 
 Vercel Deployment Protection is handled through `VERCEL_AUTOMATION_BYPASS_SECRET`. Deploy validation and the shared UI smoke wrapper send `x-vercel-protection-bypass`; staging helpers also set `x-vercel-set-bypass-cookie` when needed. The deploy helper still recognizes legacy `VERCEL_PROTECTION_BYPASS_SECRET`, but the workflow contract is `VERCEL_AUTOMATION_BYPASS_SECRET`.
 

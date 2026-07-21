@@ -52,6 +52,22 @@ function protectedHeaders(env) {
     : {};
 }
 
+function normalizeRuntimeUrl(value, label) {
+  const text = clean(value);
+  if (!text) throw new DeploymentValidationError(`${label} runtime URL is required.`);
+  try {
+    const url = new URL(text.endsWith("/") ? text : `${text}/`);
+    if (!["http:", "https:"].includes(url.protocol)) throw new Error("unsupported protocol");
+    return url.toString();
+  } catch {
+    throw new DeploymentValidationError(`${label} runtime URL must be an http or https URL.`);
+  }
+}
+
+export function selectVpsStagingRuntimeTargetUrl({ pollResult, configuredTargetUrl = "", defaultUrl = defaultTargetUrl } = {}) {
+  return normalizeRuntimeUrl(clean(pollResult?.status?.environment_url) || clean(configuredTargetUrl) || defaultUrl, "VPS staging");
+}
+
 async function responseJson(response, label) {
   if (!response.ok) throw new DeploymentValidationError(`${label} returned HTTP ${response.status}.`);
   try {
@@ -222,6 +238,25 @@ export async function verifyVpsStagingRuntime({ fetchImpl = fetch, env, metadata
   );
 }
 
+export function verifiedVpsStagingRuntimeIdentity({ metadata, deploymentId, pollResult }) {
+  const payload = pollResult?.deployment?.payload ?? {};
+  const configGeneration = clean(payload.config_generation);
+  const targetHostname = clean(payload.target_hostname);
+  const description = clean(pollResult?.status?.description);
+
+  assertEqual(targetHostname, "staging.nutsnews.com", "Infra staging target hostname");
+  requirePattern(
+    configGeneration,
+    new RegExp(`^staging-${deploymentId}-[0-9a-f]{12}$`),
+    "Infra staging deployment status must include the verified config generation.",
+  );
+  if (!description.includes(`actual=${metadata.image_digest}`)) {
+    throw new DeploymentValidationError("Infra staging deployment status did not confirm the running image digest.");
+  }
+
+  return { runtime_env: "staging", deployment_target: "vps-staging" };
+}
+
 function extractInfraRunId(pollResult) {
   const candidates = [
     pollResult?.status?.log_url,
@@ -320,17 +355,8 @@ export async function runPrVpsStagingDeploy(env = process.env, adapters = {}) {
     sleep: adapters.sleep,
     now: adapters.now,
   });
-  const verifiedTargetUrl = clean(pollResult.status?.target_url) || targetUrl;
-  const runtimeIdentity = await verifyVpsStagingRuntime({
-    fetchImpl: adapters.fetchImpl,
-    env,
-    metadata,
-    deploymentId,
-    targetUrl: verifiedTargetUrl,
-    timeoutMs,
-    sleep: adapters.sleep,
-    now: adapters.now,
-  });
+  const verifiedTargetUrl = selectVpsStagingRuntimeTargetUrl({ pollResult, configuredTargetUrl: targetUrl });
+  const runtimeIdentity = verifiedVpsStagingRuntimeIdentity({ metadata, deploymentId, pollResult });
 
   return buildVpsStagingEvidence({ env, metadata, deploymentId, targetUrl: verifiedTargetUrl, pollResult, runtimeIdentity });
 }

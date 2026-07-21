@@ -115,13 +115,13 @@ The `deploy-vps-staging` PR job dispatches the exact `needs.pr-release-artifact.
 
 The stage computes a deterministic `stg-<sha24>` deployment ID from that payload and uses `pr-<pr_number>-<source_commit>-vps-staging` as its idempotency key. Reruns of the same PR head and run attempt reuse the same build ID, deployment ID, and idempotency key.
 
-The stage must wait for a terminal GitHub infra deployment status before succeeding. Its deploy evidence must include target URL, deployment ID, infra run ID, source commit, build ID, image digest, runtime env `staging`, deployment target `vps-staging`, workflow run ID, and run attempt. The deployed `/readyz` runtime identity must report `staging` and `vps-staging` before later deployment stages may start.
+The stage must wait for a terminal GitHub infra deployment status before succeeding. Infra creates that success status only after its fixed-command deploy has verified the deployed `/readyz` runtime identity, config generation, and running image digest from inside the protected staging boundary. App-side deploy evidence must include target URL, deployment ID, infra run ID, source commit, build ID, image digest, runtime env `staging`, deployment target `vps-staging`, workflow run ID, and run attempt. The verified infra status must report runtime env `staging`, deployment target `vps-staging`, and `infra staging qualification` readiness before later deployment stages may start.
 
 ## VPS Staging UI Smoke
 
-The `ui-smoke-vps-staging` PR job starts only after `deploy-vps-staging` succeeds. Before launching browser tests it verifies the VPS staging target URL still reports the immutable PR source commit, build ID, image digest, runtime env `staging`, and deployment target `vps-staging`.
+The `ui-smoke-vps-staging` PR job starts only after `deploy-vps-staging` succeeds. Because VPS staging is protected by Cloudflare Access credentials stored in `ramideltoro/nutsnews-infra`, the app repo does not browser-hit staging directly. It waits for the protected infra `Qualify Verified NutsNews Staging Candidate` workflow to publish a passing `staging-qualification-...` artifact for the same staging deployment ID and then writes standardized app-side smoke evidence.
 
-The stage must call `node ../scripts/run_deployed_ui_smoke_with_evidence.mjs` from `web/`, which delegates to the shared `npm run test:e2e:deployed` command. It must upload the standardized `nutsnews-ui-smoke-vps-staging-...` artifact containing JUnit, HTML report, trace-on-failure output when safe, and `web/test-results/deployed-ui-smoke/evidence.json`.
+The stage must call `node scripts/pr_vps_staging_qualification.mjs`, which delegates the browser qualification to infra while still emitting `web/test-results/deployed-ui-smoke/evidence.json` through the shared evidence schema. It must upload the standardized `nutsnews-ui-smoke-vps-staging-...` artifact and include a `delegated_to` block with the infra qualification repository, workflow, run ID, deploy run ID, artifact name, and URL.
 
 ## Vercel Staging Deploy
 
