@@ -329,6 +329,51 @@ describe("LocalizedArticleDetail", () => {
     expect(screen.getByText("English fallback summary.")).toBeInTheDocument();
     expect(screen.getByRole("main")).toHaveAttribute("lang", "en");
   });
+
+  test("keeps the server-rendered article when the detail API has no usable translation", async () => {
+    const englishArticle = article({
+      id: "detail-translation-missing",
+      source: "Google News - Happy Times",
+      title: "Server-rendered English title",
+      ai_summary: "Server-rendered English summary.",
+      published_on_site_at: "2026-07-02T12:00:00Z",
+    });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ...englishArticle,
+        title: "API English fallback title",
+        ai_summary: "API English fallback summary.",
+        language_code: "en",
+        requested_language_code: "fr",
+        translation_available: false,
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<LocalizedArticleDetail initialArticle={englishArticle} />);
+
+    window.dispatchEvent(
+      new CustomEvent(LANGUAGE_CHANGE_EVENT, {
+        detail: { languageCode: "fr" },
+      }),
+    );
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(
+      screen.getByRole("heading", { name: "Server-rendered English title" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Server-rendered English summary.")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "API English fallback title" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("main")).toHaveAttribute("lang", "en");
+    expect(
+      screen.getByLabelText(
+        "community | Google News - Happy Times | July 2, 2026",
+      ),
+    ).toBeInTheDocument();
+  });
 });
 
 describe("SavedStoriesPage", () => {
