@@ -2,6 +2,8 @@
 
 This contract defines the required PR deployment pipeline before workflow rewiring starts. It is the source of truth for stage order, evidence names, merge timing, and the final branch-protection check.
 
+For maintainer setup, target URLs, secrets, protected-target authentication, reruns, stale PR heads, rollback, and manual recovery paths, see [Deployment Environments, Secrets, And Recovery Runbook](./environments-secrets-recovery.md).
+
 ## Scope
 
 The PR candidate is the only release unit. Every deployment stage must deploy the same immutable candidate identity, and every UI test stage must verify that the live target reports that same identity.

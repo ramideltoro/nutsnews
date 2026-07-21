@@ -107,6 +107,11 @@ requireText(
 );
 requireText(
   candidateJob,
+  "node scripts/environments_secrets_recovery_doc_regression.mjs",
+  "Release candidate must validate the deployment environments, secrets, and recovery runbook.",
+);
+requireText(
+  candidateJob,
   "node --test tests/protected-target-headers.test.mjs",
   "Release candidate must validate protected-target UI smoke headers.",
 );

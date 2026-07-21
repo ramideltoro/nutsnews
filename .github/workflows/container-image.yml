@@ -1738,6 +1738,7 @@ jobs:
           node scripts/pr_release_artifact_regression.mjs
           node scripts/deployed_ui_smoke_regression.mjs
           node scripts/pre_merge_deployment_workflow_order_regression.mjs
+          node scripts/environments_secrets_recovery_doc_regression.mjs
           node --test tests/protected-target-headers.test.mjs
           node --test tests/deployed-ui-smoke-evidence.test.mjs
           node --test tests/deployment-hardening.test.mjs
