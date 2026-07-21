@@ -44,6 +44,7 @@ for (const match of inventory.matchAll(/^\| `([^`]+\.yml)` \| ([^|]+?) \| ([^|]+
 
 assert.ok(inventory.includes("issue #310"), "Inventory must reference branch protection issue #310.");
 assert.ok(inventory.includes("Pre-merge deployment gate"), "Inventory must name the final required branch-protection check.");
+assert.ok(inventory.includes("intentionally retain `Release candidate`"), "Inventory must document retaining the Release candidate aggregate check.");
 assert.ok(
   inventory.includes("No deployment work is hidden inside a workflow classified as an existing check."),
   "Inventory must state that deployment work is not hidden inside existing checks.",

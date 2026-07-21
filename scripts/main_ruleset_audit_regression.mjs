@@ -9,7 +9,7 @@ const audit = resolve("scripts/main_ruleset_audit.mjs");
 
 function validRuleset() {
   return [{
-    name: "Require PRs and Release candidate on main",
+    name: "Require PRs and pre-merge gates on main",
     target: "branch",
     enforcement: "active",
     bypass_actors: [],
@@ -22,7 +22,10 @@ function validRuleset() {
         type: "required_status_checks",
         parameters: {
           strict_required_status_checks_policy: true,
-          required_status_checks: [{ context: "Release candidate", integration_id: 15368 }],
+          required_status_checks: [
+            { context: "Release candidate", integration_id: 15368 },
+            { context: "Pre-merge deployment gate", integration_id: 15368 },
+          ],
         },
       },
     ],
@@ -43,8 +46,10 @@ for (const [message, mutate] of [
   ["active administrator enforcement", (ruleset) => { ruleset[0].enforcement = "evaluate"; }],
   ["main ref target", (ruleset) => { ruleset[0].conditions.ref_name.include = ["~DEFAULT_BRANCH"]; }],
   ["pull-request rule", (ruleset) => { ruleset[0].rules = ruleset[0].rules.filter((rule) => rule.type !== "pull_request"); }],
-  ["Release candidate context", (ruleset) => { ruleset[0].rules[3].parameters.required_status_checks = []; }],
+  ["Release candidate context", (ruleset) => { ruleset[0].rules[3].parameters.required_status_checks = ruleset[0].rules[3].parameters.required_status_checks.filter((check) => check.context !== "Release candidate"); }],
+  ["Pre-merge deployment gate context", (ruleset) => { ruleset[0].rules[3].parameters.required_status_checks = ruleset[0].rules[3].parameters.required_status_checks.filter((check) => check.context !== "Pre-merge deployment gate"); }],
   ["Release candidate GitHub Actions integration", (ruleset) => { delete ruleset[0].rules[3].parameters.required_status_checks[0].integration_id; }],
+  ["Pre-merge deployment gate GitHub Actions integration", (ruleset) => { delete ruleset[0].rules[3].parameters.required_status_checks[1].integration_id; }],
   ["administrator bypass", (ruleset) => { ruleset[0].bypass_actors = [{ actor_id: 1, actor_type: "RepositoryRole", bypass_mode: "always" }]; }],
   ["deletion protection", (ruleset) => { ruleset[0].rules = ruleset[0].rules.filter((rule) => rule.type !== "deletion"); }],
   ["non-fast-forward protection", (ruleset) => { ruleset[0].rules = ruleset[0].rules.filter((rule) => rule.type !== "non_fast_forward"); }],

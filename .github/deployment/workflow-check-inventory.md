@@ -65,6 +65,6 @@ No deployment work is hidden inside a workflow classified as an existing check. 
 
 ## Branch Protection Hand-Off
 
-Issue #310 should reference this inventory when updating branch protection. At minimum, it must require `Pre-merge deployment gate` for the current PR head and must not require scheduled/operational, manual recovery, or deprecated post-main workflows as direct merge checks.
+Issue #310 should reference this inventory when updating branch protection. The main ruleset must require `Pre-merge deployment gate` for the current PR head and intentionally retain `Release candidate` as the aggregate build, migration, release-contract, and release-critical web check. Strict required status checks must stay enabled so a stale PR head cannot merge after deployment. Scheduled/operational, manual recovery, and deprecated post-main workflows must not be direct merge checks.
 
 Deprecated post-main workflows must be removed or rewired by the deployment uplift issues before this inventory can be considered fully enforced.
