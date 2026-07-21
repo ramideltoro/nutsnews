@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Response } from '@playwright/test';
 
 const LANGUAGE_STORAGE_KEY = 'nutsnews.web.language';
 const THEME_STORAGE_KEY = 'nutsnews.web.theme';
@@ -37,12 +37,35 @@ type SearchResponse = {
 
 type ArticleLanguageResponse = {
   articles?: Array<{
+    id?: unknown;
     title?: unknown;
     language_code?: unknown;
     requested_language_code?: unknown;
     translation_available?: unknown;
   }>;
+  dataSource?: unknown;
+  edgeSnapshot?: unknown;
   languageCode?: unknown;
+};
+
+type ArticleResponseMetadata = {
+  languageCode: unknown;
+  firstArticle: {
+    id?: unknown;
+    title?: unknown;
+    language_code?: unknown;
+    requested_language_code?: unknown;
+    translation_available?: unknown;
+  } | null;
+  dataSource: unknown;
+  edgeSnapshot: unknown;
+  headers: Record<string, string>;
+};
+
+type VisibleArticleCard = {
+  index: number;
+  lang: string | null;
+  title: string;
 };
 
 test.beforeEach(async ({ context }) => {
@@ -101,12 +124,61 @@ async function openSettingsPanel(page: Page) {
   const toggle = page.getByTestId('nutsnews-settings-toggle');
   const panel = page.getByTestId('nutsnews-settings-panel');
 
-  if (!(await panel.isVisible().catch(() => false))) {
-    await toggle.click();
+  await expect(toggle).toBeVisible({ timeout: 15_000 });
+  await toggle.scrollIntoViewIfNeeded();
+
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    if (await panel.isVisible().catch(() => false)) {
+      return panel;
+    }
+
+    await toggle.click({ force: true });
+
+    try {
+      await expect(toggle).toHaveAttribute('aria-expanded', 'true', { timeout: 3_000 });
+      await expect(panel).toBeVisible({ timeout: 3_000 });
+      return panel;
+    } catch {
+      if (attempt === 4) {
+        break;
+      }
+
+      await page.waitForTimeout(500);
+    }
   }
 
   await expect(panel).toBeVisible({ timeout: 15_000 });
   return panel;
+}
+
+async function openSearchDialog(page: Page) {
+  const searchButton = page.getByTestId('nutsnews-footer-search');
+  const dialog = page.getByTestId('nutsnews-search-dialog');
+
+  await expect(searchButton).toBeVisible({ timeout: 15_000 });
+  await searchButton.scrollIntoViewIfNeeded();
+
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    if (await dialog.isVisible().catch(() => false)) {
+      return dialog;
+    }
+
+    await searchButton.click({ force: true });
+
+    try {
+      await expect(dialog).toBeVisible({ timeout: 3_000 });
+      return dialog;
+    } catch {
+      if (attempt === 4) {
+        break;
+      }
+
+      await page.waitForTimeout(500);
+    }
+  }
+
+  await expect(dialog).toBeVisible({ timeout: 15_000 });
+  return dialog;
 }
 
 async function readFirstArticleTitle(page: Page) {
@@ -117,6 +189,37 @@ async function readFirstArticleTitle(page: Page) {
 
   await expect(firstTitle).not.toHaveText('', { timeout: 15_000 });
   return (await firstTitle.innerText()).trim();
+}
+
+async function readVisibleArticleCards(page: Page): Promise<VisibleArticleCard[]> {
+  const cards = page.getByTestId('nutsnews-article-card');
+  const count = await cards.count();
+  const visibleCards: VisibleArticleCard[] = [];
+
+  for (let index = 0; index < count; index += 1) {
+    const card = cards.nth(index);
+
+    if (!(await card.isVisible().catch(() => false))) {
+      continue;
+    }
+
+    const title = (
+      await card
+        .locator('.wp-article-card__title')
+        .innerText()
+        .catch(() => '')
+    ).trim();
+
+    if (title) {
+      visibleCards.push({
+        index,
+        lang: await card.getAttribute('lang'),
+        title,
+      });
+    }
+  }
+
+  return visibleCards;
 }
 
 async function waitForFirstArticleLanguage(page: Page, expectedLanguageCode: string) {
@@ -132,44 +235,161 @@ async function waitForFirstArticleLanguage(page: Page, expectedLanguageCode: str
   return (await firstCard.getAttribute('lang')) ?? 'en';
 }
 
-function expectedFirstArticleLanguage(payload: ArticleLanguageResponse, requestedLanguageCode: string) {
-  const firstArticle = payload.articles?.[0];
+function normalizedTitle(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
 
-  if (!firstArticle) {
-    expect(payload.languageCode, `Expected the empty API response languageCode to preserve ${requestedLanguageCode}.`).toBe(
-      requestedLanguageCode,
-    );
-    return null;
-  }
+async function buildArticleResponseMetadata(
+  response: Response,
+  payload: ArticleLanguageResponse,
+): Promise<ArticleResponseMetadata> {
+  const headers = await response.allHeaders();
+  const selectedHeaders = [
+    'x-nutsnews-article-data-source',
+    'x-nutsnews-feed-snapshot',
+    'x-nutsnews-edge-snapshot',
+    'x-nutsnews-edge-snapshot-updated-at',
+    'x-nutsnews-edge-snapshot-age-seconds',
+    'x-nutsnews-edge-snapshot-article-count',
+    'x-nutsnews-edge-snapshot-version',
+    'x-nutsnews-degradation-mode',
+    'x-nutsnews-degradation-reason',
+  ].reduce<Record<string, string>>((metadataHeaders, headerName) => {
+    const value = headers[headerName];
 
-  expect(payload.languageCode, `Expected the API response languageCode to preserve ${requestedLanguageCode}.`).toBe(
+    if (value) {
+      metadataHeaders[headerName] = value;
+    }
+
+    return metadataHeaders;
+  }, {});
+
+  const firstArticle = payload.articles?.[0] ?? null;
+
+  return {
+    languageCode: payload.languageCode ?? null,
+    firstArticle: firstArticle
+      ? {
+          id: firstArticle.id,
+          title: firstArticle.title,
+          language_code: firstArticle.language_code,
+          requested_language_code: firstArticle.requested_language_code,
+          translation_available: firstArticle.translation_available,
+        }
+      : null,
+    dataSource: payload.dataSource ?? null,
+    edgeSnapshot: payload.edgeSnapshot ?? null,
+    headers: selectedHeaders,
+  };
+}
+
+function formatArticleResponseMetadata(metadata: ArticleResponseMetadata) {
+  return JSON.stringify(metadata, null, 2);
+}
+
+function translatedArticleTitles(
+  payload: ArticleLanguageResponse,
+  requestedLanguageCode: string,
+  metadata: ArticleResponseMetadata,
+) {
+  const metadataText = formatArticleResponseMetadata(metadata);
+  const articles = payload.articles ?? [];
+
+  expect(payload.languageCode, `Expected the API response languageCode to preserve ${requestedLanguageCode}.\n${metadataText}`).toBe(
     requestedLanguageCode,
   );
-  expect(
-    firstArticle.requested_language_code,
-    `Expected the first article to preserve requested_language_code=${requestedLanguageCode}.`,
-  ).toBe(requestedLanguageCode);
+  expect(articles.length, `Expected the ${requestedLanguageCode} API response to include articles.\n${metadataText}`).toBeGreaterThan(0);
 
-  if (firstArticle.translation_available === true) {
+  for (const [index, article] of articles.entries()) {
+    if (article.translation_available === true) {
+      expect(
+        article.requested_language_code,
+        `Expected translated ${requestedLanguageCode} article ${index} to preserve requested_language_code.\n${metadataText}`,
+      ).toBe(requestedLanguageCode);
+      expect(
+        article.language_code,
+        `Expected translated ${requestedLanguageCode} article ${index} to render as ${requestedLanguageCode}.\n${metadataText}`,
+      ).toBe(requestedLanguageCode);
+      continue;
+    }
+
     expect(
-      firstArticle.language_code,
-      `Expected available ${requestedLanguageCode} translations to render as ${requestedLanguageCode}.`,
+      article.translation_available,
+      `Expected ${requestedLanguageCode} article ${index} to declare either translated content or English fallback metadata.\n${metadataText}`,
+    ).toBe(false);
+    expect(
+      article.requested_language_code,
+      `Expected English fallback ${requestedLanguageCode} article ${index} to preserve the requested language.\n${metadataText}`,
     ).toBe(requestedLanguageCode);
-    return requestedLanguageCode;
+    expect(
+      article.language_code,
+      `Expected English fallback ${requestedLanguageCode} article ${index} to declare language_code=en.\n${metadataText}`,
+    ).toBe('en');
   }
 
-  if (firstArticle.translation_available === false && firstArticle.language_code === 'en') {
-    return 'en';
-  }
-
-  throw new Error(
-    `Unexpected ${requestedLanguageCode} article translation metadata: ${JSON.stringify({
-      language_code: firstArticle.language_code,
-      requested_language_code: firstArticle.requested_language_code,
-      translation_available: firstArticle.translation_available,
-      title: firstArticle.title,
-    })}`,
+  const translatedTitles = Array.from(
+    new Set(
+      articles
+        .filter(
+          (article) =>
+            article.translation_available === true &&
+            article.language_code === requestedLanguageCode &&
+            article.requested_language_code === requestedLanguageCode,
+        )
+        .map((article) => normalizedTitle(article.title))
+        .filter(Boolean),
+    ),
   );
+
+  expect(
+    translatedTitles.length,
+    `Expected the ${requestedLanguageCode} feed to include at least one translated article title; all-English non-English feeds are unhealthy.\n${metadataText}`,
+  ).toBeGreaterThan(0);
+
+  return translatedTitles;
+}
+
+async function waitForVisibleTranslatedArticleCard({
+  page,
+  languageCode,
+  translatedTitles,
+  metadata,
+}: {
+  page: Page;
+  languageCode: string;
+  translatedTitles: string[];
+  metadata: ArticleResponseMetadata;
+}) {
+  const translatedTitleSet = new Set(translatedTitles);
+  const metadataText = formatArticleResponseMetadata(metadata);
+
+  await expect
+    .poll(
+      async () => {
+        const visibleCards = await readVisibleArticleCards(page);
+        return visibleCards.some(
+          (card) => card.lang === languageCode && translatedTitleSet.has(card.title),
+        );
+      },
+      {
+        message: `Expected at least one visible ${languageCode} article card to render a translated API title.\n${metadataText}`,
+        timeout: 30_000,
+      },
+    )
+    .toBe(true);
+
+  const visibleCards = await readVisibleArticleCards(page);
+  const translatedCard = visibleCards.find(
+    (card) => card.lang === languageCode && translatedTitleSet.has(card.title),
+  );
+
+  if (!translatedCard) {
+    throw new Error(
+      `Expected a visible ${languageCode} translated article card after polling.\n${metadataText}`,
+    );
+  }
+
+  return translatedCard;
 }
 
 test.describe('Deployed UI smoke regression', () => {
@@ -230,8 +450,7 @@ test.describe('Deployed UI smoke regression', () => {
       throw new Error(`Could not derive a searchable term from the visible article title: ${firstTitle}`);
     }
 
-    await page.getByTestId('nutsnews-footer-search').click();
-    await expect(page.getByTestId('nutsnews-search-dialog')).toBeVisible({ timeout: 15_000 });
+    await openSearchDialog(page);
     await page.getByTestId('nutsnews-search-input').fill(searchQuery);
 
     const searchResponsePromise = page.waitForResponse((response) => {
@@ -282,6 +501,7 @@ test.describe('Deployed UI smoke regression', () => {
 
   test('language menu honors translations and English fallback through every supported language', async ({ page }) => {
     await openHomeWithCards(page);
+    const initialEnglishTitle = await readFirstArticleTitle(page);
 
     await openSettingsPanel(page);
     await page.getByTestId('nutsnews-settings-language').click();
@@ -306,15 +526,20 @@ test.describe('Deployed UI smoke regression', () => {
       ).toBeTruthy();
 
       const languagePayload = (await languageResponse.json()) as ArticleLanguageResponse;
-      const expectedCardLanguage = expectedFirstArticleLanguage(languagePayload, language.code);
+      const responseMetadata = await buildArticleResponseMetadata(languageResponse, languagePayload);
+      const translatedTitles = translatedArticleTitles(languagePayload, language.code, responseMetadata);
       await expect(page.locator('html')).toHaveAttribute('lang', language.expectedHtmlLang);
-      if (expectedCardLanguage) {
-        await waitForFirstArticleLanguage(page, expectedCardLanguage);
-      }
+      const translatedCard = await waitForVisibleTranslatedArticleCard({
+        page,
+        languageCode: language.code,
+        translatedTitles,
+        metadata: responseMetadata,
+      });
+
       expect(
-        await readFirstArticleTitle(page),
-        `Expected the ${language.code} selection to keep rendering a visible article title.`,
-      ).not.toBe('');
+        translatedCard.title,
+        `Expected the first visible translated ${language.code} title to change from the initial English title.\n${formatArticleResponseMetadata(responseMetadata)}`,
+      ).not.toBe(initialEnglishTitle);
     }
 
     await page.getByTestId('nutsnews-language-option-en').click();
