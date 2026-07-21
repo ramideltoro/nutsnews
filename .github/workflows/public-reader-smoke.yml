@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "web/**"
+      - "scripts/web_public_reader_smoke.mjs"
+      - ".github/workflows/public-reader-smoke.yml"
   pull_request:
     branches:
       - main
@@ -15,6 +19,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   public-reader-smoke:

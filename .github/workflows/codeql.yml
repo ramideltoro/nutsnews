@@ -5,6 +5,13 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+    paths:
+      - "web/**"
+      - "scripts/**"
+      - ".github/workflows/**"
+      - ".github/codeql/**"
+      - ".github/actions/**"
+      - ".github/dependabot.yml"
   schedule:
     # Weekly scan, even if no code changed.
     - cron: "37 10 * * 2"
@@ -14,6 +21,10 @@ permissions:
   actions: read
   contents: read
   security-events: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   analyze:

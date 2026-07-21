@@ -4,8 +4,36 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "web/app/*.tsx"
+      - "web/app/**/*.tsx"
+      - "web/app/*.css"
+      - "web/app/**/*.css"
+      - "web/app/components/**"
+      - "web/components/**"
+      - "web/tests/accessibility.spec.ts"
+      - "web/tests/accessibility/**"
+      - "web/playwright.accessibility.config.ts"
+      - ".github/workflows/accessibility-ci.yml"
   pull_request:
+    branches:
+      - main
+    paths:
+      - "web/app/*.tsx"
+      - "web/app/**/*.tsx"
+      - "web/app/*.css"
+      - "web/app/**/*.css"
+      - "web/app/components/**"
+      - "web/components/**"
+      - "web/tests/accessibility.spec.ts"
+      - "web/tests/accessibility/**"
+      - "web/playwright.accessibility.config.ts"
+      - ".github/workflows/accessibility-ci.yml"
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   axe-playwright:

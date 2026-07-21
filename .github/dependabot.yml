@@ -7,10 +7,18 @@ updates:
       day: "monday"
       time: "08:45"
       timezone: "America/New_York"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 2
     labels:
       - "type:maintenance"
       - "area:security"
+    groups:
+      github-actions-safe-updates:
+        update-types:
+          - "minor"
+          - "patch"
+      github-actions-major-updates:
+        update-types:
+          - "major"
 
   - package-ecosystem: "npm"
     directory: "/web"
@@ -19,11 +27,52 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "America/New_York"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     labels:
       - "type:maintenance"
       - "area:security"
     groups:
+      # Major framework, lint, TypeScript, and Playwright updates need a focused
+      # compatibility branch instead of being mixed into routine dependency churn.
+      web-major-toolchain-updates:
+        patterns:
+          - "next"
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+          - "@types/node"
+          - "typescript"
+          - "eslint"
+          - "eslint-*"
+          - "@eslint/*"
+          - "@typescript-eslint/*"
+          - "typescript-eslint"
+          - "eslint-config-next"
+          - "@playwright/test"
+          - "playwright"
+        update-types:
+          - "major"
+      web-toolchain-safe-updates:
+        patterns:
+          - "next"
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+          - "@types/node"
+          - "typescript"
+          - "eslint"
+          - "eslint-*"
+          - "@eslint/*"
+          - "@typescript-eslint/*"
+          - "typescript-eslint"
+          - "eslint-config-next"
+          - "@playwright/test"
+          - "playwright"
+        update-types:
+          - "minor"
+          - "patch"
       web-safe-updates:
         update-types:
           - "minor"

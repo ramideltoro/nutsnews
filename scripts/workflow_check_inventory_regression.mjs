@@ -12,6 +12,7 @@ const workflowFiles = (await readdir(workflowDir)).filter((file) => file.endsWit
 const allowedClassifications = new Set([
   "PR-required",
   "optional PR",
+  "default-branch/manual",
   "scheduled/operational",
   "manual recovery",
   "dispatch-only recovery",
@@ -43,12 +44,17 @@ for (const match of inventory.matchAll(/^\| `([^`]+\.yml)` \| ([^|]+?) \| ([^|]+
   });
 }
 
-assert.ok(inventory.includes("issue #310"), "Inventory must reference branch protection issue #310.");
-assert.ok(inventory.includes("Pre-merge deployment gate"), "Inventory must name the final required branch-protection check.");
-assert.ok(inventory.includes("intentionally retain `Release candidate`"), "Inventory must document retaining the Release candidate aggregate check.");
+assert.ok(inventory.includes("issue #333"), "Inventory must reference branch protection issue #333.");
+assert.ok(inventory.includes("`Merge Gate`"), "Inventory must name the required branch-protection check.");
+assert.ok(inventory.includes("`Release candidate` is no longer a direct branch-protection check"), "Inventory must document removing the Release candidate aggregate check from branch protection.");
 assert.ok(
   inventory.includes("No deployment work is hidden inside a workflow classified as an existing check."),
   "Inventory must state that deployment work is not hidden inside existing checks.",
+);
+assert.ok(inventory.includes("## PR Pipeline Budget"), "Inventory must document the PR pipeline budget policy.");
+assert.ok(
+  inventory.includes("default PR workflow budget is at most 8 workflows"),
+  "Inventory must document the default PR workflow budget.",
 );
 assert.equal(rows.size, workflowFiles.length, "Inventory must contain exactly one row for every workflow.");
 assert.equal(
@@ -58,14 +64,218 @@ assert.equal(
 );
 assert.match(
   rows.get("container-image.yml")?.reason ?? "",
-  /immutable PR artifact.*Pre-merge deployment gate.*VPS staging deploy.*VPS staging UI smoke.*Vercel staging deploy.*Vercel staging UI smoke.*Vercel production deploy.*Vercel production UI smoke.*VPS production deploy.*VPS production UI smoke/,
-  "Container Image inventory row must explicitly mention all trusted PR deployment stages wired so far.",
+  /main pushes or operator dispatches.*Ordinary PRs no longer enter the container\/release workflow/,
+  "Container Image inventory row must document that ordinary PRs no longer run it.",
 );
-assert.match(
-  rows.get("container-image.yml")?.deploymentNote ?? "",
-  /trusted PR candidate to VPS staging, Vercel staging, Vercel production, and VPS production.*shared UI smoke evidence after each deployed target.*aggregate final gate/,
-  "Container Image inventory row must identify every deployment target wired so far.",
+assert.equal(
+  rows.get("lighthouse-ci.yml")?.classification,
+  "scheduled/operational",
+  "Lighthouse CI must stay out of default PR-required checks.",
 );
+assert.equal(
+  rows.get("homepage-performance-budget.yml")?.classification,
+  "PR-required",
+  "Homepage Performance Budget must remain the merge-critical performance check.",
+);
+
+const accessibilityWorkflow = await readFile(resolve(workflowDir, "accessibility-ci.yml"), "utf8");
+const accessibilityPullRequest = workflowTriggerBlock(accessibilityWorkflow, "pull_request");
+assert.ok(accessibilityPullRequest.includes("paths:"), "Accessibility CI pull_request trigger must be path-filtered.");
+assert.ok(accessibilityPullRequest.includes("web/app/**/*.tsx"), "Accessibility CI must run for app UI changes.");
+assert.ok(accessibilityPullRequest.includes("web/tests/accessibility.spec.ts"), "Accessibility CI must run for accessibility test changes.");
+assert.ok(
+  !accessibilityPullRequest.includes("web/package"),
+  "Accessibility CI must not run for dependency-only package changes by default.",
+);
+
+const visualRegressionWorkflow = await readFile(resolve(workflowDir, "visual-regression.yml"), "utf8");
+const visualRegressionPush = workflowTriggerBlock(visualRegressionWorkflow, "push");
+const visualRegressionPullRequest = workflowTriggerBlock(visualRegressionWorkflow, "pull_request");
+for (const [triggerName, triggerBlock] of [
+  ["push", visualRegressionPush],
+  ["pull_request", visualRegressionPullRequest],
+]) {
+  assert.ok(triggerBlock.includes("paths:"), `Visual Regression ${triggerName} trigger must be path-filtered.`);
+  assert.ok(
+    !triggerBlock.includes('"web/**"') && !triggerBlock.includes("'web/**'"),
+    `Visual Regression ${triggerName} trigger must not run for every web change.`,
+  );
+  assert.ok(triggerBlock.includes("web/public/**"), `Visual Regression ${triggerName} trigger must cover public assets.`);
+  assert.ok(
+    triggerBlock.includes("web/tests/visual-regression.spec.ts"),
+    `Visual Regression ${triggerName} trigger must cover visual test changes.`,
+  );
+}
+
+const publicReaderSmokeWorkflow = await readFile(resolve(workflowDir, "public-reader-smoke.yml"), "utf8");
+const publicReaderSmokePush = workflowTriggerBlock(publicReaderSmokeWorkflow, "push");
+assert.ok(publicReaderSmokePush.includes("paths:"), "Public Reader Smoke push trigger must be path-filtered.");
+assert.ok(publicReaderSmokePush.includes("web/**"), "Public Reader Smoke push trigger must cover web changes.");
+assert.ok(
+  publicReaderSmokePush.includes("scripts/web_public_reader_smoke.mjs"),
+  "Public Reader Smoke push trigger must cover its smoke harness.",
+);
+
+assert.equal(
+  rows.get("cloudflare-cache-config.yml")?.classification,
+  "PR-required",
+  "Cloudflare Cache Config must be the PR-required deterministic cache check.",
+);
+assert.equal(
+  rows.get("cloudflare-cache-observability.yml")?.classification,
+  "scheduled/operational",
+  "Cloudflare Cache Observability live probes must stay out of PR-required checks.",
+);
+const cloudflareCacheConfigWorkflow = await readFile(resolve(workflowDir, "cloudflare-cache-config.yml"), "utf8");
+assert.ok(hasTrigger(cloudflareCacheConfigWorkflow, "pull_request"), "Cloudflare Cache Config must run on pull_request.");
+assert.ok(
+  cloudflareCacheConfigWorkflow.includes("npm run audit:cache:config"),
+  "Cloudflare Cache Config must run deterministic config validation.",
+);
+assert.ok(
+  cloudflareCacheConfigWorkflow.includes("npm run test:public-cache"),
+  "Cloudflare Cache Config must run deterministic public cache policy regression.",
+);
+assert.ok(
+  !cloudflareCacheConfigWorkflow.includes('npm run audit:cache -- --url "$NUTSNEWS_CACHE_OBSERVABILITY_URL"'),
+  "Cloudflare Cache Config must not call live production URLs.",
+);
+const cloudflareCacheObservabilityWorkflow = await readFile(resolve(workflowDir, "cloudflare-cache-observability.yml"), "utf8");
+assert.ok(
+  !hasTrigger(cloudflareCacheObservabilityWorkflow, "pull_request"),
+  "Cloudflare Cache Observability live probes must not run on pull_request.",
+);
+assert.ok(hasTrigger(cloudflareCacheObservabilityWorkflow, "schedule"), "Cloudflare Cache Observability must remain scheduled.");
+assert.ok(
+  cloudflareCacheObservabilityWorkflow.includes('npm run audit:cache -- --url "$NUTSNEWS_CACHE_OBSERVABILITY_URL"'),
+  "Cloudflare Cache Observability must keep the live cache probe.",
+);
+
+const snykWorkflow = await readFile(resolve(workflowDir, "snyk.yml"), "utf8");
+const snykPullRequest = workflowTriggerBlock(snykWorkflow, "pull_request");
+assert.ok(snykPullRequest.includes("paths:"), "Snyk pull_request trigger must be path-filtered.");
+for (const requiredSnykPath of ["web/package.json", "web/package-lock.json", ".github/workflows/snyk.yml"]) {
+  assert.ok(snykPullRequest.includes(requiredSnykPath), `Snyk pull_request trigger must cover ${requiredSnykPath}.`);
+}
+assert.ok(
+  snykWorkflow.includes("if: github.event_name == 'push' && github.ref == 'refs/heads/main'"),
+  "Snyk monitor upload must remain main-push only.",
+);
+
+const osvWorkflow = await readFile(resolve(workflowDir, "osv-scanner.yml"), "utf8");
+const osvPullRequest = workflowTriggerBlock(osvWorkflow, "pull_request");
+assert.ok(osvPullRequest.includes("paths:"), "OSV Scanner pull_request trigger must be path-filtered.");
+for (const requiredOsvPath of ["**/package.json", "**/package-lock.json", ".github/workflows/osv-scanner.yml"]) {
+  assert.ok(osvPullRequest.includes(requiredOsvPath), `OSV Scanner pull_request trigger must cover ${requiredOsvPath}.`);
+}
+assert.ok(hasTrigger(osvWorkflow, "schedule"), "OSV Scanner must keep scheduled full scans.");
+assert.ok(osvWorkflow.includes("scan-scheduled:"), "OSV Scanner must keep its non-PR full scan job.");
+
+const codeqlWorkflow = await readFile(resolve(workflowDir, "codeql.yml"), "utf8");
+const codeqlPullRequest = workflowTriggerBlock(codeqlWorkflow, "pull_request");
+assert.ok(codeqlPullRequest.includes("paths:"), "CodeQL pull_request trigger must be path-filtered.");
+for (const requiredCodeqlPath of ["web/**", "scripts/**", ".github/workflows/**", ".github/codeql/**"]) {
+  assert.ok(codeqlPullRequest.includes(requiredCodeqlPath), `CodeQL pull_request trigger must cover ${requiredCodeqlPath}.`);
+}
+assert.ok(hasTrigger(codeqlWorkflow, "schedule"), "CodeQL must keep scheduled full scans.");
+
+const appStoreDocsWorkflow = await readFile(resolve(workflowDir, "app-store-docs-check.yml"), "utf8");
+const appStoreDocsPullRequest = workflowTriggerBlock(appStoreDocsWorkflow, "pull_request");
+assert.ok(appStoreDocsPullRequest.includes("paths:"), "App Store Docs Check pull_request trigger must be path-filtered.");
+for (const requiredAppStoreDocsPath of [
+  "web/app/privacy/**",
+  "web/app/contact/**",
+  "web/app/layout.tsx",
+  "scripts/app_store_docs_check.mjs",
+]) {
+  assert.ok(
+    appStoreDocsPullRequest.includes(requiredAppStoreDocsPath),
+    `App Store Docs Check pull_request trigger must cover ${requiredAppStoreDocsPath}.`,
+  );
+}
+assert.ok(hasTrigger(appStoreDocsWorkflow, "workflow_dispatch"), "App Store Docs Check must remain manually runnable.");
+
+const fluidCpuWorkflow = await readFile(resolve(workflowDir, "fluid-active-cpu-regression.yml"), "utf8");
+const requiredFluidCpuPaths = [
+  "web/app/components/ArticleFeed.tsx",
+  "web/app/api/articles/route.ts",
+  "web/app/api/home-feed/route.ts",
+  "web/lib/articles.ts",
+  "web/lib/cacheHeaders.ts",
+  "web/lib/adminCostGuardrails.ts",
+  "web/next.config.ts",
+  "web/vercel.json",
+  "scripts/fluid_active_cpu_regression.mjs",
+];
+for (const [triggerName, triggerBlock] of [
+  ["push", workflowTriggerBlock(fluidCpuWorkflow, "push")],
+  ["pull_request", workflowTriggerBlock(fluidCpuWorkflow, "pull_request")],
+]) {
+  assert.ok(triggerBlock.includes("paths:"), `Fluid Active CPU ${triggerName} trigger must be path-filtered.`);
+  for (const requiredFluidCpuPath of requiredFluidCpuPaths) {
+    assert.ok(
+      triggerBlock.includes(requiredFluidCpuPath),
+      `Fluid Active CPU ${triggerName} trigger must cover ${requiredFluidCpuPath}.`,
+    );
+  }
+}
+assert.ok(hasTrigger(fluidCpuWorkflow, "workflow_dispatch"), "Fluid Active CPU Regression must remain manually runnable.");
+
+const immutableTestsWorkflow = await readFile(resolve(workflowDir, "immutable-tests-guard.yml"), "utf8");
+const immutableTestsPullRequest = workflowTriggerBlock(immutableTestsWorkflow, "pull_request");
+assert.ok(immutableTestsPullRequest.includes("paths:"), "Immutable Test Guard pull_request trigger must be path-filtered.");
+for (const requiredImmutableTestPath of [
+  ".github/workflows/immutable-tests-guard.yml",
+  ".github/workflows/vercel-preview-smoke.yml",
+  "scripts/immutable_preview_smoke_guard.mjs",
+  "web/tests/deployed-ui-smoke.spec.ts",
+]) {
+  assert.ok(
+    immutableTestsPullRequest.includes(requiredImmutableTestPath),
+    `Immutable Test Guard pull_request trigger must cover ${requiredImmutableTestPath}.`,
+  );
+}
+assert.ok(hasTrigger(immutableTestsWorkflow, "workflow_dispatch"), "Immutable Test Guard must remain manually runnable.");
+
+const immutableAllTestsWorkflow = await readFile(resolve(workflowDir, "immutable-all-tests-guard.yml"), "utf8");
+const immutableAllTestsPullRequest = workflowTriggerBlock(immutableAllTestsWorkflow, "pull_request");
+assert.ok(
+  immutableAllTestsPullRequest.includes("paths:"),
+  "Immutable All Tests Guard pull_request trigger must be path-filtered.",
+);
+for (const requiredImmutableAllTestsPath of [
+  ".github/workflows/**",
+  "scripts/*guard*.mjs",
+  "scripts/*regression*.mjs",
+  "web/tests/**",
+  "web/playwright*.config.ts",
+  "web/vitest*.config.ts",
+  "web/package.json",
+]) {
+  assert.ok(
+    immutableAllTestsPullRequest.includes(requiredImmutableAllTestsPath),
+    `Immutable All Tests Guard pull_request trigger must cover ${requiredImmutableAllTestsPath}.`,
+  );
+}
+assert.ok(hasTrigger(immutableAllTestsWorkflow, "workflow_dispatch"), "Immutable All Tests Guard must remain manually runnable.");
+
+const prPipelineBudgetWorkflow = await readFile(resolve(workflowDir, "pr-pipeline-budget.yml"), "utf8");
+const prPipelineBudgetPullRequest = workflowTriggerBlock(prPipelineBudgetWorkflow, "pull_request");
+assert.equal(
+  rows.get("pr-pipeline-budget.yml")?.classification,
+  "PR-required",
+  "PR Pipeline Budget must be classified as a relevant PR policy check.",
+);
+assert.ok(prPipelineBudgetPullRequest.includes("paths:"), "PR Pipeline Budget pull_request trigger must be path-filtered.");
+assert.ok(
+  prPipelineBudgetPullRequest.includes(".github/workflows/**"),
+  "PR Pipeline Budget must run when workflow files change.",
+);
+assert.ok(
+  prPipelineBudgetWorkflow.includes("node scripts/pr_pipeline_budget_guard.mjs"),
+  "PR Pipeline Budget workflow must run the budget guard script.",
+);
+assert.ok(hasTrigger(prPipelineBudgetWorkflow, "workflow_dispatch"), "PR Pipeline Budget must remain manually runnable.");
 
 for (const workflow of workflowFiles) {
   const row = rows.get(workflow);
@@ -88,18 +298,19 @@ for (const workflow of workflowFiles) {
     assert.ok(!repositoryDispatch, `${workflow} is PR-required but listens to repository_dispatch.`);
     assert.ok(!workflowRun, `${workflow} is PR-required but listens to workflow_run.`);
     const protectedDeploymentEnvironment = /environment:\s*(Production|production-supabase|staging-supabase)/.test(text);
-    if (workflow === "container-image.yml") {
-      assert.ok(
-        protectedDeploymentEnvironment,
-        "Container Image must explicitly use the protected Production environment for the pre-merge Vercel production deploy stage.",
-      );
-    } else {
-      assert.equal(protectedDeploymentEnvironment, false, `${workflow} is PR-required but uses a protected deployment environment.`);
-    }
+    assert.equal(protectedDeploymentEnvironment, false, `${workflow} is PR-required but uses a protected deployment environment.`);
   }
 
   if (row.classification === "optional PR") {
     assert.ok(pullRequest || deploymentStatus, `${workflow} is optional PR but has no PR or deployment-status trigger.`);
+  }
+
+  if (row.classification === "default-branch/manual") {
+    assert.ok(!pullRequest, `${workflow} is default-branch/manual but still has a pull_request trigger.`);
+    assert.ok(!deploymentStatus, `${workflow} is default-branch/manual but listens to deployment_status.`);
+    assert.ok(!repositoryDispatch, `${workflow} is default-branch/manual but listens to repository_dispatch.`);
+    assert.ok(!workflowRun, `${workflow} is default-branch/manual but listens to workflow_run.`);
+    assert.ok(mainPush || workflowDispatch, `${workflow} is default-branch/manual but has no main push or manual trigger.`);
   }
 
   if (row.classification === "scheduled/operational") {

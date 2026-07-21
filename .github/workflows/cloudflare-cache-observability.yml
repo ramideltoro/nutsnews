@@ -1,16 +1,6 @@
 name: Cloudflare Cache Observability
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - "web/**"
-      - ".github/workflows/cloudflare-cache-observability.yml"
-  push:
-    branches: [main]
-    paths:
-      - "web/**"
-      - ".github/workflows/cloudflare-cache-observability.yml"
   schedule:
     - cron: "17 */6 * * *"
   workflow_dispatch:
@@ -27,44 +17,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  config:
-    name: Cache config regression check
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    defaults:
-      run:
-        working-directory: web
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
-
-      - name: Use Node.js
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Validate cache observability config
-        run: npm run audit:cache:config
-
-      - name: Upload config report
-        if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6
-        with:
-          name: cache-observability-config-report
-          path: web/reports/cache-observability
-          if-no-files-found: ignore
-
   live:
     name: Live cache policy and alert check
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 

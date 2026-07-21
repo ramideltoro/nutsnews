@@ -6,7 +6,8 @@ const repository = process.env.GITHUB_REPOSITORY || "ramideltoro/nutsnews";
 const token = process.env.NUTSNEWS_RULESET_AUDIT_TOKEN || "";
 const fixtureIndex = process.argv.indexOf("--rulesets-file");
 const fixturePath = fixtureIndex === -1 ? "" : process.argv[fixtureIndex + 1] || "";
-const requiredStatusCheckContexts = ["Pre-merge deployment gate", "Release candidate"];
+const requiredStatusCheckContexts = ["Merge Gate"];
+const forbiddenStatusCheckContexts = ["Pre-merge deployment gate", "Release candidate"];
 
 function rule(ruleset, type) {
   return (ruleset.rules || []).find((candidate) => candidate.type === type);
@@ -22,7 +23,7 @@ function validate(rulesets) {
 
   assert.equal(mainRulesets.length, 1, "Expected exactly one ruleset targeting refs/heads/main.");
   const main = mainRulesets[0];
-  assert.equal(main.name, "Require PRs and pre-merge gates on main", "Main ruleset name is inaccurate.");
+  assert.equal(main.name, "Require PRs and Merge Gate on main", "Main ruleset name is inaccurate.");
   assert.equal(main.enforcement, "active", "Main ruleset must be actively enforced for administrators.");
   assert.deepEqual(main.bypass_actors || [], [], "Main ruleset must not allow bypass actors.");
   assert.ok(rule(main, "deletion"), "Main ruleset must prevent branch deletion.");
@@ -52,6 +53,10 @@ function validate(rulesets) {
       "number",
       `${context} must be pinned to its GitHub Actions integration.`,
     );
+  }
+  for (const context of forbiddenStatusCheckContexts) {
+    const matches = required.filter((check) => check.context === context);
+    assert.equal(matches.length, 0, `Main ruleset must not require ${context}.`);
   }
 
   return main;

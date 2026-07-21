@@ -7,13 +7,13 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path) => readFile(resolve(root, path), "utf8");
-const [workflow, regressionWorkflow, requestValidator, migrationRunner, verifier, containerWorkflow] = await Promise.all([
+const [workflow, regressionWorkflow, requestValidator, migrationRunner, verifier, databaseWorkflow] = await Promise.all([
   read(".github/workflows/staging-supabase-migration.yml"),
   read(".github/workflows/staging-supabase-migration-regression.yml"),
   read("scripts/staging_migration_request.mjs"),
   read("scripts/locked_migration_workflow.mjs"),
   read("scripts/verify_staging_migration_contract.mjs"),
-  read(".github/workflows/container-image.yml"),
+  read(".github/workflows/database-migration-gate.yml"),
 ]);
 
 function requireText(text, fragment, message) {
@@ -61,6 +61,6 @@ requireText(migrationRunner, "--file", "The migration lock client must execute t
 assert.doesNotMatch(migrationRunner, /stdbuf|--output=L/, "The migration lock client must not leave the psql lock holder behind a wrapper process.");
 requireText(verifier, "nutsnews_migration_schema_contract", "Staging migration verifier must query the migration contract.");
 requireText(regressionWorkflow, "node scripts/staging_migration_workflow_regression.mjs", "Regression workflow must run the staging migration workflow guard.");
-requireText(containerWorkflow, "tests/staging-migration-request.test.mjs", "The container-image migration gate must run staging migration request tests.");
+requireText(databaseWorkflow, "tests/staging-migration-request.test.mjs", "The database migration gate must run staging migration request tests.");
 
 console.log("Staging Supabase migration workflow regression checks passed.");

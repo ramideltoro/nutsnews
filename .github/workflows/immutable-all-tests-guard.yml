@@ -3,11 +3,36 @@ name: Immutable All Tests Guard
 on:
   pull_request:
     branches: [main]
+    paths:
+      - ".github/workflows/**"
+      - "scripts/*assert*.mjs"
+      - "scripts/*check*.mjs"
+      - "scripts/*guard*.mjs"
+      - "scripts/*regression*.mjs"
+      - "scripts/*smoke*.mjs"
+      - "scripts/*spec*.mjs"
+      - "scripts/*test*.mjs"
+      - "scripts/*tests*.mjs"
+      - "scripts/*validate*.mjs"
+      - "tests/**"
+      - "web/tests/**"
+      - "web/**/__tests__/**"
+      - "web/**/*.spec.ts"
+      - "web/**/*.spec.tsx"
+      - "web/**/*.test.ts"
+      - "web/**/*.test.tsx"
+      - "web/playwright*.config.ts"
+      - "web/vitest*.config.ts"
+      - "web/package.json"
   workflow_dispatch:
 
 permissions:
   contents: read
   pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   immutable-all-tests:

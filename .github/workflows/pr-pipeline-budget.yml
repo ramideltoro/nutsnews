@@ -1,22 +1,13 @@
-name: App Store Docs Check
+name: PR Pipeline Budget
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "web/app/privacy/**"
-      - "web/app/contact/**"
-      - "web/app/layout.tsx"
-      - "scripts/app_store_docs_check.mjs"
-      - ".github/workflows/app-store-docs-check.yml"
   pull_request:
     branches: [main]
     paths:
-      - "web/app/privacy/**"
-      - "web/app/contact/**"
-      - "web/app/layout.tsx"
-      - "scripts/app_store_docs_check.mjs"
-      - ".github/workflows/app-store-docs-check.yml"
+      - ".github/workflows/**"
+      - ".github/deployment/workflow-check-inventory.md"
+      - "scripts/pr_pipeline_budget_guard.mjs"
+      - "scripts/workflow_check_inventory_regression.mjs"
   workflow_dispatch:
 
 permissions:
@@ -27,16 +18,19 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  app-store-docs:
-    name: Check App Store support docs
+  budget:
+    name: PR pipeline budget
     runs-on: ubuntu-latest
     timeout-minutes: 10
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
+
       - name: Use Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5
         with:
           node-version: 22
-      - name: Check App Store docs readiness
-        run: node scripts/app_store_docs_check.mjs
+
+      - name: Check PR pipeline budget
+        run: node scripts/pr_pipeline_budget_guard.mjs

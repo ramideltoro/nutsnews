@@ -31,7 +31,7 @@ const migration = read(
   "supabase/migrations/20260717113000_add_article_engagement_analytics.sql",
 );
 const migrationContract = read("web/migrationContract.mjs");
-const containerWorkflow = read(".github/workflows/container-image.yml");
+const databaseWorkflow = read(".github/workflows/database-migration-gate.yml");
 const apiRoute = read("web/app/api/engagement/route.ts");
 const serverHelper = read("web/lib/articleEngagement.ts");
 const clientHelper = read("web/lib/engagementAnalytics.ts");
@@ -154,9 +154,9 @@ assertIncludes(
   "web/migrationContract.mjs",
 );
 assertIncludes(
-  containerWorkflow,
-  '"migration_head":"20260717113000"',
-  ".github/workflows/container-image.yml",
+  databaseWorkflow,
+  "tests/migration-contract.test.mjs",
+  ".github/workflows/database-migration-gate.yml",
 );
 assertIncludes(
   packageJson,

@@ -3,11 +3,26 @@ name: Immutable Test Guard
 on:
   pull_request:
     branches: [main]
+    paths:
+      - ".github/workflows/immutable-tests-guard.yml"
+      - ".github/workflows/vercel-preview-smoke.yml"
+      - ".github/workflows/cloudflare-production-cache-purge.yml"
+      - ".github/workflows/cloudflare-production-cache-purge-regression.yml"
+      - "scripts/immutable_preview_smoke_guard.mjs"
+      - "scripts/cloudflare_purge_cache.mjs"
+      - "scripts/cloudflare_production_cache_purge_regression.mjs"
+      - "scripts/web_offline_e2e_regression.mjs"
+      - "web/playwright.deployed.config.ts"
+      - "web/tests/deployed-ui-smoke.spec.ts"
   workflow_dispatch:
 
 permissions:
   contents: read
   pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   immutable-tests:

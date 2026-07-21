@@ -1,0 +1,85 @@
+name: Cloudflare Cache Config
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "web/cache-observability.config.json"
+      - "web/scripts/cache-observability.mjs"
+      - "web/lib/cacheHeaders.ts"
+      - "web/lib/cacheObservability.ts"
+      - "web/next.config.ts"
+      - "web/middleware.ts"
+      - "web/app/api/articles/**"
+      - "web/app/api/home-feed/**"
+      - "web/app/healthz/**"
+      - "web/app/sitemap.ts"
+      - "web/app/articles/sitemap.ts"
+      - "web/app/sitemap-index.xml/**"
+      - "web/app/robots.ts"
+      - "scripts/public_cache_policy_regression.mjs"
+      - ".github/workflows/cloudflare-cache-config.yml"
+  push:
+    branches: [main]
+    paths:
+      - "web/cache-observability.config.json"
+      - "web/scripts/cache-observability.mjs"
+      - "web/lib/cacheHeaders.ts"
+      - "web/lib/cacheObservability.ts"
+      - "web/next.config.ts"
+      - "web/middleware.ts"
+      - "web/app/api/articles/**"
+      - "web/app/api/home-feed/**"
+      - "web/app/healthz/**"
+      - "web/app/sitemap.ts"
+      - "web/app/articles/sitemap.ts"
+      - "web/app/sitemap-index.xml/**"
+      - "web/app/robots.ts"
+      - "scripts/public_cache_policy_regression.mjs"
+      - ".github/workflows/cloudflare-cache-config.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  config:
+    name: Cache config regression check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
+
+      - name: Use Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate cache observability config
+        run: npm run audit:cache:config
+
+      - name: Run public cache policy regression
+        run: npm run test:public-cache
+
+      - name: Upload config report
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6
+        with:
+          name: cache-observability-config-report
+          path: web/reports/cache-observability
+          if-no-files-found: ignore
