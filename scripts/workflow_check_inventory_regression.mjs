@@ -49,6 +49,16 @@ assert.ok(
   "Inventory must state that deployment work is not hidden inside existing checks.",
 );
 assert.equal(rows.size, workflowFiles.length, "Inventory must contain exactly one row for every workflow.");
+assert.match(
+  rows.get("container-image.yml")?.reason ?? "",
+  /immutable PR artifact.*VPS staging deployment stage/,
+  "Container Image inventory row must explicitly mention the trusted PR VPS staging deployment stage.",
+);
+assert.match(
+  rows.get("container-image.yml")?.deploymentNote ?? "",
+  /trusted PR candidate to VPS staging/,
+  "Container Image inventory row must identify the VPS staging deployment target.",
+);
 
 for (const workflow of workflowFiles) {
   const row = rows.get(workflow);

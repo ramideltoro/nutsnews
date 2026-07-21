@@ -17,6 +17,8 @@ const vercelProductionWorkflow = await readFile(resolve(root, ".github/workflows
 const dualTargetSmoke = await readFile(resolve(root, "scripts/dual_target_web_smoke.mjs"), "utf8");
 const deploymentHardening = await readFile(resolve(root, "scripts/deployment_hardening.mjs"), "utf8");
 const deploymentHardeningTest = await readFile(resolve(root, "tests/deployment-hardening.test.mjs"), "utf8");
+const prVpsStagingDeploy = await readFile(resolve(root, "scripts/pr_vps_staging_deploy.mjs"), "utf8");
+const prVpsStagingDeployTest = await readFile(resolve(root, "tests/pr-vps-staging-deploy.test.mjs"), "utf8");
 const vercelConfig = JSON.parse(await readFile(resolve(root, "web/vercel.json"), "utf8"));
 const packageJson = JSON.parse(await readFile(resolve(root, "web/package.json"), "utf8"));
 const workflowNames = await readdir(resolve(root, ".github/workflows"));
@@ -53,6 +55,17 @@ function workflowStep(text, name) {
   const next = text.indexOf("\n      - name:", start + marker.length);
   return text.slice(start, next === -1 ? text.length : next);
 }
+
+function workflowJob(text, name) {
+  const marker = `  ${name}:\n`;
+  const start = text.indexOf(marker);
+  assert.notEqual(start, -1, `Workflow job not found: ${name}`);
+  const rest = text.slice(start + marker.length);
+  const next = rest.search(/\n  [A-Za-z0-9_-]+:\n/);
+  return text.slice(start, next === -1 ? text.length : start + marker.length + next);
+}
+
+const prVpsStagingJob = workflowJob(containerWorkflow, "deploy-vps-staging");
 
 assert.doesNotMatch(containerWorkflow, /^\s+paths:\s*$/m, "Container Image must run for every main merge, not a path subset.");
 requireText(containerWorkflow, "cancel-in-progress: ${{ github.event_name == 'pull_request' }}", "Container Image must cancel stale PR attempts without skipping merged releases.");
@@ -110,6 +123,9 @@ for (const fragment of [
   "bounded exponential backoff",
   "nutsnews-premerge-deploy-pr-<pr_number>",
   "pr-<pr_number>-<source_commit>-<target_type>",
+  "deploy-vps-staging",
+  "nutsnews-staging-release",
+  "runtime env `staging`, deployment target `vps-staging`",
   "Pre-merge deployment gate",
 ]) {
   requireText(preMergeDeploymentContract, fragment, `Pre-merge deployment contract must define: ${fragment}`);
@@ -127,6 +143,28 @@ for (const fragment of [
 ]) {
   requireText(deploymentHardening, fragment, `Deployment hardening helper must export ${fragment}.`);
   requireText(deploymentHardeningTest, fragment, `Deployment hardening regression must cover ${fragment}.`);
+}
+requireText(prVpsStagingJob, "name: Deploy PR candidate to VPS staging", "PR pipeline must include the VPS staging deploy stage.");
+requireText(prVpsStagingJob, "needs: [pr-release-artifact, trusted-pr-deployment-eligibility]", "VPS staging deploy must consume the immutable PR artifact after eligibility.");
+requireText(prVpsStagingJob, "timeout-minutes: 30", "VPS staging deploy must have an explicit timeout.");
+requireText(prVpsStagingJob, "group: nutsnews-premerge-deploy-pr-${{ github.event.pull_request.number }}", "VPS staging deploy must serialize by PR number.");
+requireText(prVpsStagingJob, "cancel-in-progress: true", "VPS staging deploy reruns must supersede older active attempts.");
+requireText(prVpsStagingJob, "PR_RELEASE_METADATA_JSON: ${{ needs.pr-release-artifact.outputs.metadata_json }}", "VPS staging deploy must consume PR artifact metadata.");
+requireText(prVpsStagingJob, "NUTSNEWS_INFRA_STAGING_TOKEN", "VPS staging deploy must use the staging infra dispatch token.");
+requireText(prVpsStagingJob, "node scripts/pr_vps_staging_deploy.mjs", "VPS staging deploy must use the tested deploy helper.");
+requireText(prVpsStagingJob, "Upload VPS staging deploy evidence", "VPS staging deploy must retain deploy evidence.");
+requireText(containerWorkflow, "node --test tests/pr-vps-staging-deploy.test.mjs", "Release candidate must run PR VPS staging deployment tests.");
+for (const fragment of [
+  "parsePrReleaseMetadata",
+  "buildVpsStagingCandidate",
+  "computeVpsStagingDeploymentId",
+  "pollInfraGitHubDeployment",
+  "verifyVpsStagingRuntime",
+  "deploymentStageIdempotencyKey",
+  "buildVpsStagingEvidence",
+]) {
+  requireText(prVpsStagingDeploy, fragment, `PR VPS staging deploy helper must implement ${fragment}.`);
+  requireText(prVpsStagingDeployTest, fragment, `PR VPS staging deploy regression must cover ${fragment}.`);
 }
 
 assert.equal(

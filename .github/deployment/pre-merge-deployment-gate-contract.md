@@ -107,6 +107,14 @@ The artifact identity is the full source commit SHA plus the immutable image dig
 
 The PR metadata artifact is retained for 7 days. PR images are tagged only with the full source commit SHA so registry cleanup can safely remove unreferenced PR candidates after PR close or after no deployment evidence references the digest.
 
+## VPS Staging Deploy
+
+The `deploy-vps-staging` PR job dispatches the exact `needs.pr-release-artifact.outputs.metadata_json` identity to `ramideltoro/nutsnews-infra` using the existing `nutsnews-staging-release` event. The dispatch payload is limited to schema version, migration head, Supabase project ref, source repository, source commit, image repository, image digest, build ID, and source workflow run ID.
+
+The stage computes a deterministic `stg-<sha24>` deployment ID from that payload and uses `pr-<pr_number>-<source_commit>-vps-staging` as its idempotency key. Reruns of the same PR head and run attempt reuse the same build ID, deployment ID, and idempotency key.
+
+The stage must wait for a terminal GitHub infra deployment status before succeeding. Its deploy evidence must include target URL, deployment ID, infra run ID, source commit, build ID, image digest, runtime env `staging`, deployment target `vps-staging`, workflow run ID, and run attempt. The deployed `/readyz` runtime identity must report `staging` and `vps-staging` before later deployment stages may start.
+
 ## Merge And Main Behavior
 
 All deployment stages complete before merge into `main`.

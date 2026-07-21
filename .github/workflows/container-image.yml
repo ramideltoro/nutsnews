@@ -727,6 +727,95 @@ jobs:
             echo "- Retention: 7 days"
           } >> "$GITHUB_STEP_SUMMARY"
 
+  deploy-vps-staging:
+    name: Deploy PR candidate to VPS staging
+    if: >-
+      github.event_name == 'pull_request' &&
+      needs.trusted-pr-deployment-eligibility.outputs.eligible == 'true'
+    needs: [pr-release-artifact, trusted-pr-deployment-eligibility]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: nutsnews-premerge-deploy-pr-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      deployment_id: ${{ steps.deploy.outputs.deployment_id }}
+      target_url: ${{ steps.deploy.outputs.target_url }}
+      infra_run_id: ${{ steps.deploy.outputs.infra_run_id }}
+      evidence_path: ${{ steps.deploy.outputs.evidence_path }}
+
+    steps:
+      - name: Checkout exact PR release source
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
+        with:
+          ref: ${{ needs.pr-release-artifact.outputs.source_commit }}
+          persist-credentials: false
+
+      - name: Use Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5
+        with:
+          node-version: 22
+
+      - name: Revalidate current PR head before VPS staging deploy
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+          SOURCE_COMMIT: ${{ needs.pr-release-artifact.outputs.source_commit }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { revalidateCurrentPrHead } from "./scripts/pr_vps_staging_deploy.mjs";
+
+          await revalidateCurrentPrHead({
+            repository: process.env.REPOSITORY,
+            prNumber: process.env.PR_NUMBER,
+            expectedHeadSha: process.env.SOURCE_COMMIT,
+            token: process.env.GITHUB_TOKEN,
+          });
+          NODE
+
+      - name: Mask VPS staging protected secrets
+        run: |
+          set -euo pipefail
+          for value in \
+            "${NUTSNEWS_INFRA_STAGING_TOKEN:-}" \
+            "${CF_ACCESS_CLIENT_ID:-}" \
+            "${CF_ACCESS_CLIENT_SECRET:-}"; do
+            if [ -n "$value" ]; then
+              echo "::add-mask::$value"
+            fi
+          done
+        env:
+          NUTSNEWS_INFRA_STAGING_TOKEN: ${{ secrets.NUTSNEWS_INFRA_STAGING_TOKEN }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+
+      - name: Dispatch and wait for VPS staging deployment
+        id: deploy
+        env:
+          PR_RELEASE_METADATA_JSON: ${{ needs.pr-release-artifact.outputs.metadata_json }}
+          TRUSTED_PR_HEAD_SHA: ${{ needs.pr-release-artifact.outputs.source_commit }}
+          GITHUB_TOKEN: ${{ github.token }}
+          NUTSNEWS_INFRA_STAGING_TOKEN: ${{ secrets.NUTSNEWS_INFRA_STAGING_TOKEN }}
+          NUTSNEWS_VPS_STAGING_URL: ${{ vars.NUTSNEWS_VPS_STAGING_URL || 'https://staging.nutsnews.com/' }}
+          NUTSNEWS_VPS_STAGING_EVIDENCE_PATH: ${{ runner.temp }}/vps-staging-deploy/evidence.json
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: node scripts/pr_vps_staging_deploy.mjs
+
+      - name: Upload VPS staging deploy evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6
+        with:
+          name: nutsnews-vps-staging-deploy-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/vps-staging-deploy/evidence.json
+          if-no-files-found: ignore
+          retention-days: 30
+
   release-candidate:
     name: Release candidate
     if: always() && github.event_name == 'pull_request'
@@ -794,6 +883,7 @@ jobs:
           node --test tests/protected-target-headers.test.mjs
           node --test tests/deployed-ui-smoke-evidence.test.mjs
           node --test tests/deployment-hardening.test.mjs
+          node --test tests/pr-vps-staging-deploy.test.mjs
           node scripts/immutable_all_tests_guard_regression.mjs
           node scripts/immutable_all_tests_guard.mjs
           node scripts/verify_github_actions_pinned.mjs
