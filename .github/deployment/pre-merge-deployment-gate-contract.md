@@ -159,9 +159,11 @@ The stage uses the same `node ../scripts/run_deployed_ui_smoke_with_evidence.mjs
 
 ## Merge And Main Behavior
 
-All deployment stages complete before merge into `main`.
+All deployment stages complete before merge into `main`. Merge remains a maintainer handoff by default: the maintainer merges the PR only after GitHub shows `Pre-merge deployment gate`, `Release candidate`, and any other required checks green for the current PR head.
 
-Branch protection must block merge until the final pre-merge deployment gate check passes for the current PR head. After merge, `main` may run audits, metadata checks, and reporting, but it must not deploy VPS staging, Vercel staging, Vercel production, or VPS production.
+GitHub native auto-merge may be enabled on a PR, but it must rely only on the required branch-protection checks and GitHub's current-head enforcement. The repo must not add a custom workflow, PAT, deploy key, or GitHub App token that pushes to `main` or merges the PR after deployments pass.
+
+Branch protection must block merge until the final pre-merge deployment gate check passes for the current PR head. Strict up-to-date required status checks and the final gate's live PR-head recheck refuse stale PR heads. The configured pull-request rule continues to enforce the repo's solo-maintainer review policy. After merge, `main` may run audits, metadata checks, and reporting, but it must not deploy VPS staging, Vercel staging, Vercel production, or VPS production.
 
 The merge handoff records that `main` now points at the already-deployed candidate. It is not a deployment trigger.
 

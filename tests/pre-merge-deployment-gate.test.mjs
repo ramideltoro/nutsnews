@@ -84,6 +84,7 @@ test("pre-merge deployment gate validates all ordered stage evidence", (t) => {
   assert.deepEqual(evidence.stages.map((stage) => stage.stage), preMergeDeploymentStages.map((stage) => stage.stage));
   assert.equal(evidence.stages.at(-1).target_type, "production-vps");
   assert.match(buildGateSummary(evidence), /Pre-merge deployment gate/);
+  assert.match(buildGateSummary(evidence), /Merge readiness: all deployment evidence passed for this PR head/);
   assert.match(buildGateSummary(evidence), /actions\/runs\/123\/artifacts\/1000/);
 });
 

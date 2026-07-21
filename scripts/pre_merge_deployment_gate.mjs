@@ -402,6 +402,8 @@ export function buildGateSummary(evidence) {
     "",
     `- Source commit: \`${evidence.source_commit}\``,
     `- Build ID: \`${evidence.build_id}\``,
+    "- Merge readiness: all deployment evidence passed for this PR head. Merge manually, or enable GitHub native auto-merge, after GitHub shows every required check green for this exact head.",
+    "- Main handoff: merging records that `main` points at the already-deployed candidate; no workflow should push to `main` or deploy again after this gate.",
     "",
     "| Order | Stage | Target | Target URL | Deployment ID | Result | Evidence artifact |",
     "| --- | --- | --- | --- | --- | --- | --- |",

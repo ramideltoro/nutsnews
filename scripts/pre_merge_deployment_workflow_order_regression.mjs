@@ -125,13 +125,18 @@ requireText(finalGate, "node scripts/pre_merge_deployment_gate.mjs", "Final gate
 
 const workflowNames = (await readdir(workflowDir)).filter((name) => name.endsWith(".yml")).sort();
 const unexpectedPostMainDeploymentTriggers = [];
+const customMainMergeWorkflows = [];
 for (const workflowName of workflowNames) {
   const workflowText = await readFile(resolve(workflowDir, workflowName), "utf8");
+  if (/git\s+push[^\n]*(?:origin\s+)?main\b|gh\s+pr\s+merge|pulls\/\$\{[^}]+}\/merge|enable-pull-request-automerge|automerge-action/i.test(workflowText)) {
+    customMainMergeWorkflows.push(workflowName);
+  }
   if (!hasAutomaticPostMainDeploymentTrigger(workflowName, workflowText)) continue;
   const classification = inventoryClassification(workflowName);
   if (deprecatedPostMainDeploymentWorkflows.has(workflowName) && classification === "deprecated post-main work") continue;
   unexpectedPostMainDeploymentTriggers.push(`${workflowName} (${classification || "unclassified"})`);
 }
+assert.deepEqual(customMainMergeWorkflows, [], "Merge handoff must use maintainer merge or GitHub native auto-merge, not a custom workflow that pushes or merges to main.");
 assert.deepEqual(
   unexpectedPostMainDeploymentTriggers,
   [],
