@@ -151,6 +151,12 @@ The `deploy-vps-production` PR job starts only after `ui-smoke-vercel-production
 
 The stage waits for terminal production GitHub deployment evidence from infra, records infra run ID, target URL, source commit, build ID, image digest, workflow run ID, and run attempt, and verifies `/readyz` reports runtime env `production` and deployment target `production-vps` before succeeding.
 
+## VPS Production UI Smoke
+
+The `ui-smoke-vps-production` PR job starts only after `deploy-vps-production` succeeds. The base URL is the VPS production target URL from deploy evidence, and the identity preflight must confirm the expected PR source commit, build ID, image digest, runtime env `production`, and deployment target `production-vps` before browser tests start.
+
+The stage uses the same `node ../scripts/run_deployed_ui_smoke_with_evidence.mjs` wrapper as the other deployed targets, sets `NUTSNEWS_UI_SMOKE_TARGET_TYPE=production-vps`, sets `NUTSNEWS_PRODUCTION_SAFE_SURFACES=true`, and retains the standardized `nutsnews-ui-smoke-production-vps-...` evidence artifact. The shared production smoke profile is limited to public read-only surfaces, search `GET` requests, and browser-local theme/language changes; destructive flows such as contact submission, admin mutations, feed controls, cache purges, and ingestion controls are intentionally skipped.
+
 ## Merge And Main Behavior
 
 All deployment stages complete before merge into `main`.

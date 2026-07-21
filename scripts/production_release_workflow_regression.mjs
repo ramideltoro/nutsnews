@@ -72,6 +72,7 @@ const vercelStagingUiSmokeJob = workflowJob(containerWorkflow, "ui-smoke-vercel-
 const vercelProductionDeployJob = workflowJob(containerWorkflow, "deploy-vercel-production");
 const vercelProductionUiSmokeJob = workflowJob(containerWorkflow, "ui-smoke-vercel-production");
 const vpsProductionDeployJob = workflowJob(containerWorkflow, "deploy-vps-production");
+const vpsProductionUiSmokeJob = workflowJob(containerWorkflow, "ui-smoke-vps-production");
 
 assert.doesNotMatch(containerWorkflow, /^\s+paths:\s*$/m, "Container Image must run for every main merge, not a path subset.");
 requireText(containerWorkflow, "cancel-in-progress: ${{ github.event_name == 'pull_request' }}", "Container Image must cancel stale PR attempts without skipping merged releases.");
@@ -136,14 +137,17 @@ for (const fragment of [
   "deploy-vercel-production",
   "ui-smoke-vercel-production",
   "deploy-vps-production",
+  "ui-smoke-vps-production",
   "nutsnews-staging-release",
   "runtime env `staging`, deployment target `vps-staging`",
   "deployment target `vercel-staging`",
   "deployment target `vercel-production`",
+  "deployment target `production-vps`",
   "NUTSNEWS_PRODUCTION_SAFE_SURFACES=true",
   "nutsnews-production-vps-release",
   "node ../scripts/run_deployed_ui_smoke_with_evidence.mjs",
   "nutsnews-ui-smoke-vps-staging",
+  "nutsnews-ui-smoke-production-vps",
   "Pre-merge deployment gate",
 ]) {
   requireText(preMergeDeploymentContract, fragment, `Pre-merge deployment contract must define: ${fragment}`);
@@ -248,6 +252,19 @@ requireText(vpsProductionDeployJob, "NUTSNEWS_INFRA_PRODUCTION_TOKEN", "VPS prod
 requireText(vpsProductionDeployJob, "node scripts/pr_vps_production_deploy.mjs", "VPS production deploy must use the tested validation and evidence helper.");
 requireText(vpsProductionDeployJob, "Upload VPS production deploy evidence", "VPS production deploy must retain deploy evidence.");
 requireText(containerWorkflow, "node --test tests/pr-vps-production-deploy.test.mjs", "Release candidate must run PR VPS production deployment tests.");
+requireText(vpsProductionUiSmokeJob, "name: UI smoke VPS production", "PR pipeline must include the VPS production UI smoke stage.");
+requireText(vpsProductionUiSmokeJob, "needs: [deploy-vps-production, ui-smoke-vercel-production, pr-release-artifact, trusted-pr-deployment-eligibility]", "VPS production UI smoke must run after the VPS production deploy.");
+requireText(vpsProductionUiSmokeJob, "environment: Production", "VPS production UI smoke must use the protected Production environment.");
+requireText(vpsProductionUiSmokeJob, "timeout-minutes: 20", "VPS production UI smoke must have an explicit timeout.");
+requireText(vpsProductionUiSmokeJob, "Verify VPS production identity before browser tests", "VPS production UI smoke must preflight runtime identity.");
+requireText(vpsProductionUiSmokeJob, "verifyVpsProductionRuntime", "VPS production UI smoke must verify source, build, image, and target identity before browser tests.");
+requireText(vpsProductionUiSmokeJob, "PLAYWRIGHT_BASE_URL: ${{ needs.deploy-vps-production.outputs.target_url }}", "VPS production UI smoke must target the VPS production deploy URL.");
+requireText(vpsProductionUiSmokeJob, "NUTSNEWS_UI_SMOKE_TARGET_TYPE: production-vps", "VPS production UI smoke evidence must use the production-vps target type.");
+requireText(vpsProductionUiSmokeJob, "NUTSNEWS_UI_SMOKE_DEPLOYMENT_ID: ${{ needs.deploy-vps-production.outputs.deployment_id }}", "VPS production UI smoke must bind evidence to the VPS production deployment ID.");
+requireText(vpsProductionUiSmokeJob, 'NUTSNEWS_PRODUCTION_SAFE_SURFACES: "true"', "VPS production UI smoke must use the safe production smoke profile.");
+requireText(vpsProductionUiSmokeJob, "CF_ACCESS_CLIENT_ID", "VPS production UI smoke must support protected VPS auth headers.");
+requireText(vpsProductionUiSmokeJob, "run: node ../scripts/run_deployed_ui_smoke_with_evidence.mjs", "VPS production UI smoke must use the standardized evidence runner.");
+requireText(vpsProductionUiSmokeJob, "web/test-results/deployed-ui-smoke", "VPS production UI smoke must upload standardized evidence output.");
 
 assert.equal(
   packageJson.scripts?.["test:translation-release-gate"],
