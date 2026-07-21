@@ -115,6 +115,12 @@ The stage computes a deterministic `stg-<sha24>` deployment ID from that payload
 
 The stage must wait for a terminal GitHub infra deployment status before succeeding. Its deploy evidence must include target URL, deployment ID, infra run ID, source commit, build ID, image digest, runtime env `staging`, deployment target `vps-staging`, workflow run ID, and run attempt. The deployed `/readyz` runtime identity must report `staging` and `vps-staging` before later deployment stages may start.
 
+## VPS Staging UI Smoke
+
+The `ui-smoke-vps-staging` PR job starts only after `deploy-vps-staging` succeeds. Before launching browser tests it verifies the VPS staging target URL still reports the immutable PR source commit, build ID, image digest, runtime env `staging`, and deployment target `vps-staging`.
+
+The stage must call `node ../scripts/run_deployed_ui_smoke_with_evidence.mjs` from `web/`, which delegates to the shared `npm run test:e2e:deployed` command. It must upload the standardized `nutsnews-ui-smoke-vps-staging-...` artifact containing JUnit, HTML report, trace-on-failure output when safe, and `web/test-results/deployed-ui-smoke/evidence.json`.
+
 ## Merge And Main Behavior
 
 All deployment stages complete before merge into `main`.
