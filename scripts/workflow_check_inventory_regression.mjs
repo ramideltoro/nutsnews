@@ -51,6 +51,11 @@ assert.ok(
   inventory.includes("No deployment work is hidden inside a workflow classified as an existing check."),
   "Inventory must state that deployment work is not hidden inside existing checks.",
 );
+assert.ok(inventory.includes("## PR Pipeline Budget"), "Inventory must document the PR pipeline budget policy.");
+assert.ok(
+  inventory.includes("default PR workflow budget is at most 8 workflows"),
+  "Inventory must document the default PR workflow budget.",
+);
 assert.equal(rows.size, workflowFiles.length, "Inventory must contain exactly one row for every workflow.");
 assert.equal(
   [...rows.values()].filter((row) => row.classification === "deprecated post-main work").length,
@@ -253,6 +258,24 @@ for (const requiredImmutableAllTestsPath of [
   );
 }
 assert.ok(hasTrigger(immutableAllTestsWorkflow, "workflow_dispatch"), "Immutable All Tests Guard must remain manually runnable.");
+
+const prPipelineBudgetWorkflow = await readFile(resolve(workflowDir, "pr-pipeline-budget.yml"), "utf8");
+const prPipelineBudgetPullRequest = workflowTriggerBlock(prPipelineBudgetWorkflow, "pull_request");
+assert.equal(
+  rows.get("pr-pipeline-budget.yml")?.classification,
+  "PR-required",
+  "PR Pipeline Budget must be classified as a relevant PR policy check.",
+);
+assert.ok(prPipelineBudgetPullRequest.includes("paths:"), "PR Pipeline Budget pull_request trigger must be path-filtered.");
+assert.ok(
+  prPipelineBudgetPullRequest.includes(".github/workflows/**"),
+  "PR Pipeline Budget must run when workflow files change.",
+);
+assert.ok(
+  prPipelineBudgetWorkflow.includes("node scripts/pr_pipeline_budget_guard.mjs"),
+  "PR Pipeline Budget workflow must run the budget guard script.",
+);
+assert.ok(hasTrigger(prPipelineBudgetWorkflow, "workflow_dispatch"), "PR Pipeline Budget must remain manually runnable.");
 
 for (const workflow of workflowFiles) {
   const row = rows.get(workflow);

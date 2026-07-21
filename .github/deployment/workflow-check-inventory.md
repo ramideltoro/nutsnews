@@ -12,6 +12,14 @@ No deployment work is hidden inside a workflow classified as an existing check. 
 - manual recovery: protected operator workflow for data, token, cache, or recovery work; never a hidden merge check.
 - dispatch-only recovery: repository dispatch workflow accepted only from a protected recovery chain; never a hidden merge check and never triggered by `main`.
 
+## PR Pipeline Budget
+
+A default PR-triggered workflow is a workflow with a `pull_request` trigger that has no trigger-level `paths` or `paths-ignore` constraint and is not label-only. The default PR workflow budget is at most 8 workflows. The target operating range is 5-8, but the guard enforces the maximum only so path-filtered checks are not added back just to satisfy a lower bound.
+
+Ordinary PR workflows must not use protected production or deployment environments. `Merge Gate` is the single default PR owner for TypeScript, lint, and production build failures. Heavyweight checks such as Lighthouse, Playwright smoke, visual regression, accessibility, CodeQL, Snyk, OSV, deployment, and live cache observability must be path-filtered, scheduled, manual, or label-triggered rather than broad default PR checks.
+
+Manual recovery and dispatch-only release workflows are outside this budget because they do not run on ordinary PRs.
+
 ## Inventory
 
 | Workflow | Classification | Why it belongs there | Deployment note |
@@ -47,6 +55,7 @@ No deployment work is hidden inside a workflow classified as an existing check. 
 | `pagespeed-insights.yml` | scheduled/operational | Runs operator-requested PageSpeed audits against public URLs for monitoring and investigation. | No deployment. |
 | `production-supabase-migration-regression.yml` | PR-required | Guards production migration workflow behavior before migration automation changes merge. | No deployment. |
 | `production-supabase-migration.yml` | manual recovery | Protected, typed-confirmation workflow for applying production Supabase migrations. | Mutates production data schema. |
+| `pr-pipeline-budget.yml` | PR-required | Reports default PR workflow count and blocks pipeline budget drift when workflow policy inputs change. | No deployment. |
 | `public-reader-smoke.yml` | PR-required | Runs public reader Playwright smoke coverage for web and smoke harness changes before merge or after relevant main pushes. | No deployment. |
 | `release-notes.yml` | scheduled/operational | Creates GitHub releases for tags or operator requests; it is release documentation, not a merge blocker. | No deployment. |
 | `seo-structured-data.yml` | scheduled/operational | Audits currently live production structured data on schedule or operator request; local route coverage is already PR-gated by API contracts. | No deployment. |
