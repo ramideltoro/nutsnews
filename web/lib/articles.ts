@@ -159,6 +159,31 @@ export type HomeFeedPayload = PublishedArticlesResult & {
   degradation?: FeedDegradationStatus | null;
 };
 
+type BackendLocalizedArticleReadRequest = {
+  requestedLanguageCode: LanguageCode;
+};
+
+type BackendPagedArticleReadRequest = BackendLocalizedArticleReadRequest & {
+  category: string | null;
+  limit: number;
+  offset: number;
+};
+
+type BackendHomeFeedSnapshotReadRequest = BackendLocalizedArticleReadRequest & {
+  limit: number;
+  offset: number;
+};
+
+type BackendArticleDetailReadRequest = BackendLocalizedArticleReadRequest & {
+  id: string;
+};
+
+type BackendSearchArticleReadRequest = BackendLocalizedArticleReadRequest & {
+  query: string;
+  pageSize: number;
+  pageOffset: number;
+};
+
 function isBackendPostgresPrimary() {
   return (getDatabaseProviderMode() as DatabaseProviderMode) === "backend_postgres_primary";
 }
@@ -227,6 +252,71 @@ function basePublicFeedSnapshotQuery(category?: string | null) {
   }
 
   return query;
+}
+
+function hasUsableBackendTranslation(
+  article: Article,
+  requestedLanguageCode: LanguageCode,
+) {
+  if (requestedLanguageCode === DEFAULT_LANGUAGE_CODE) {
+    return true;
+  }
+
+  return (
+    article.translation_available === true &&
+    normalizeLanguageCode(article.language_code) === requestedLanguageCode &&
+    normalizeLanguageCode(article.requested_language_code) === requestedLanguageCode
+  );
+}
+
+function normalizeBackendArticleLocalization(
+  article: Article,
+  requestedLanguageCode: LanguageCode,
+): Article {
+  if (requestedLanguageCode === DEFAULT_LANGUAGE_CODE) {
+    return {
+      ...article,
+      language_code: DEFAULT_LANGUAGE_CODE,
+      requested_language_code: requestedLanguageCode,
+      translation_available: true,
+    };
+  }
+
+  if (hasUsableBackendTranslation(article, requestedLanguageCode)) {
+    return {
+      ...article,
+      language_code: requestedLanguageCode,
+      requested_language_code: requestedLanguageCode,
+      translation_available: true,
+    };
+  }
+
+  return {
+    ...article,
+    language_code: DEFAULT_LANGUAGE_CODE,
+    requested_language_code: requestedLanguageCode,
+    translation_available: false,
+  };
+}
+
+function normalizeBackendArticlesLocalization(
+  articles: Article[],
+  requestedLanguageCode: LanguageCode,
+) {
+  return articles.map((article) =>
+    normalizeBackendArticleLocalization(article, requestedLanguageCode),
+  );
+}
+
+async function localizeArticleRows(
+  articles: Article[],
+  requestedLanguageCode: LanguageCode,
+) {
+  if (isBackendPostgresPrimary()) {
+    return normalizeBackendArticlesLocalization(articles, requestedLanguageCode);
+  }
+
+  return applyArticleSummaries(articles, requestedLanguageCode);
 }
 
 async function applyArticleSummaries(
@@ -375,7 +465,7 @@ async function shapePublishedArticlesResult({
   const uniqueRows = dedupeArticlesByIdentity(rows);
   const hasMore = rows.length > pageSize || uniqueRows.length > pageSize;
   const baseArticles = uniqueRows.slice(0, pageSize);
-  const articles = await applyArticleSummaries(baseArticles, languageCode);
+  const articles = await localizeArticleRows(baseArticles, languageCode);
   const lastArticle = baseArticles.at(-1);
 
   return {
@@ -401,7 +491,8 @@ async function getPublishedArticlesFromSnapshot(
         category: cleanCategory(category),
         limit: PAGE_SIZE + 1,
         offset: from,
-      });
+        requestedLanguageCode: languageCode,
+      } satisfies BackendPagedArticleReadRequest);
 
       return shapePublishedArticlesResult({
         data,
@@ -451,7 +542,8 @@ async function getPublishedArticlesFromSourceTable(
         category: cleanCategory(category),
         limit: PAGE_SIZE + 1,
         offset: from,
-      });
+        requestedLanguageCode: languageCode,
+      } satisfies BackendPagedArticleReadRequest);
 
       return shapePublishedArticlesResult({
         data,
@@ -556,11 +648,12 @@ export async function getPublishedArticlesForSection(
           category: selectedCategory,
           limit: safeLimit,
           offset: 0,
-        },
+          requestedLanguageCode: languageCode,
+        } satisfies BackendPagedArticleReadRequest,
       );
 
       if (snapshotData.length > 0) {
-        return applyArticleSummaries(
+        return localizeArticleRows(
           dedupeArticlesByIdentity(snapshotData).slice(0, safeLimit),
           languageCode,
         );
@@ -574,9 +667,10 @@ export async function getPublishedArticlesForSection(
         category: selectedCategory,
         limit: safeLimit,
         offset: 0,
-      });
+        requestedLanguageCode: languageCode,
+      } satisfies BackendPagedArticleReadRequest);
 
-      return applyArticleSummaries(
+      return localizeArticleRows(
         dedupeArticlesByIdentity(data).slice(0, safeLimit),
         languageCode,
       );
@@ -697,7 +791,8 @@ export async function getHomeFeedFromSnapshot(
       data = await callBackendDatabaseOperation<Article[]>("load-home-feed-snapshot", {
         limit: HOME_FEED_SNAPSHOT_SCAN_LIMIT,
         offset: 0,
-      });
+        requestedLanguageCode: languageCode,
+      } satisfies BackendHomeFeedSnapshotReadRequest);
     } catch (error) {
       console.warn("Backend homepage snapshot unavailable. Falling back to legacy feed reads.", error);
       return null;
@@ -787,7 +882,7 @@ export async function getHomeFeedFromSnapshot(
     }
   }
 
-  const localizedArticles = await applyArticleSummaries(
+  const localizedArticles = await localizeArticleRows(
     Array.from(uniqueArticlesByKey.values()),
     languageCode,
   );
@@ -848,7 +943,8 @@ async function getPublishedArticlesByCursorFromSourceTable(
         category: cleanCategory(category),
         limit: CURSOR_PAGE_SIZE + 1,
         offset: 0,
-      });
+        requestedLanguageCode: languageCode,
+      } satisfies BackendPagedArticleReadRequest);
 
       return shapePublishedArticlesResult({
         data,
@@ -950,9 +1046,10 @@ export async function searchPublishedArticles(
       query,
       pageSize: safePageSize + 1,
       pageOffset: safePage * safePageSize,
-    });
+      requestedLanguageCode: languageCode,
+    } satisfies BackendSearchArticleReadRequest);
     const baseArticles = rows.slice(0, safePageSize);
-    const articles = await applyArticleSummaries(baseArticles, languageCode);
+    const articles = await localizeArticleRows(baseArticles, languageCode);
 
     return {
       articles,
@@ -1064,14 +1161,14 @@ const getCachedArticleById = unstable_cache(async (id: string, requestedLanguage
     try {
       const data = await callBackendDatabaseOperation<Article | null>("load-article-detail", {
         id,
-      });
+        requestedLanguageCode: languageCode,
+      } satisfies BackendArticleDetailReadRequest);
 
       if (!data) {
         return null;
       }
 
-      const [article] = await applyArticleSummaries([data], languageCode);
-      return article ?? null;
+      return normalizeBackendArticleLocalization(data, languageCode);
     } catch (error) {
       console.error("Failed to load backend article:", error);
       return null;
