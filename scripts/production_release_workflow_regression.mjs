@@ -8,6 +8,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const workflowDir = resolve(root, ".github/workflows");
 const containerWorkflow = await readFile(resolve(workflowDir, "container-image.yml"), "utf8");
 const databaseWorkflow = await readFile(resolve(workflowDir, "database-migration-gate.yml"), "utf8");
+const vercelRecoveryWorkflow = await readFile(resolve(workflowDir, "vercel-production-release.yml"), "utf8");
 const inventory = await readFile(resolve(root, ".github/deployment/workflow-check-inventory.md"), "utf8");
 const recoveryRunbook = await readFile(resolve(root, ".github/deployment/environments-secrets-recovery.md"), "utf8");
 
@@ -97,6 +98,27 @@ requireText(databaseWorkflow, "node scripts/staging_fixtures.mjs exercise --loca
 requireText(databaseWorkflow, "node scripts/supabase_rls_regression.mjs", "Database workflow must validate RLS policies.");
 requireText(databaseWorkflow, "tests/staging-migration-request.test.mjs", "Database workflow must run staging migration request tests.");
 requireText(databaseWorkflow, "tests/production-migration-request.test.mjs", "Database workflow must run production migration request tests.");
+
+requireText(
+  vercelRecoveryWorkflow,
+  "NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS",
+  "Vercel production recovery must expose secondary Vercel target configuration.",
+);
+requireText(
+  vercelRecoveryWorkflow,
+  "NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES",
+  "Vercel production recovery must require an explicit flag before checking failover aliases.",
+);
+requireText(
+  vercelRecoveryWorkflow,
+  "NUTSNEWS_VERCEL_FAILOVER_PRODUCTION_ALIASES",
+  "Vercel production recovery must name controlled failover aliases separately from secondary targets.",
+);
+assert.doesNotMatch(
+  vercelRecoveryWorkflow,
+  /"https:\/\/www\.nutsnews\.com\/healthz"|"https:\/\/nutsnews\.com\/healthz"/,
+  "Vercel production recovery must not hard-code apex/www health checks as normal validation targets.",
+);
 
 const workflowNames = (await readdir(workflowDir)).filter((name) => name.endsWith(".yml")).sort();
 const unexpectedPostMainDeploymentTriggers = [];

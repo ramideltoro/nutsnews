@@ -126,6 +126,11 @@ assert.equal(
   "scheduled/operational",
   "Cloudflare Cache Observability live probes must stay out of PR-required checks.",
 );
+assert.match(
+  rows.get("cloudflare-cache-observability.yml")?.reason ?? "",
+  /Cloudflare\/VPS-primary/,
+  "Cloudflare Cache Observability inventory row must name the VPS-primary live probe.",
+);
 const cloudflareCacheConfigWorkflow = await readFile(resolve(workflowDir, "cloudflare-cache-config.yml"), "utf8");
 assert.ok(hasTrigger(cloudflareCacheConfigWorkflow, "pull_request"), "Cloudflare Cache Config must run on pull_request.");
 assert.ok(
@@ -149,6 +154,10 @@ assert.ok(hasTrigger(cloudflareCacheObservabilityWorkflow, "schedule"), "Cloudfl
 assert.ok(
   cloudflareCacheObservabilityWorkflow.includes('npm run audit:cache -- --url "$NUTSNEWS_CACHE_OBSERVABILITY_URL"'),
   "Cloudflare Cache Observability must keep the live cache probe.",
+);
+assert.ok(
+  cloudflareCacheObservabilityWorkflow.includes("NUTSNEWS_PRIMARY_PRODUCTION_URL"),
+  "Cloudflare Cache Observability must default through the VPS-primary production URL variable.",
 );
 
 const snykWorkflow = await readFile(resolve(workflowDir, "snyk.yml"), "utf8");

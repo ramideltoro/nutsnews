@@ -13,26 +13,14 @@ import {
   withBoundedExponentialBackoff,
 } from "./deployment_hardening.mjs";
 import { parsePrReleaseMetadata } from "./pr_vps_staging_deploy.mjs";
-
-const defaultProductionAliases = ["https://www.nutsnews.com/", "https://nutsnews.com/"];
+import {
+  configuredVercelProductionRuntimeTargets,
+  normalizeHttpsUrl,
+  requireHttpsUrl,
+} from "./production_topology.mjs";
 
 function clean(value) {
   return String(value ?? "").trim();
-}
-
-function requireHttpsUrl(value, label) {
-  try {
-    const url = new URL(clean(value));
-    if (url.protocol !== "https:") throw new Error("not https");
-    return url;
-  } catch {
-    throw new DeploymentValidationError(`${label} must be an https URL.`);
-  }
-}
-
-function configuredAliases(env) {
-  const raw = clean(env.NUTSNEWS_VERCEL_PRODUCTION_ALIASES);
-  return (raw ? raw.split(",") : defaultProductionAliases).map((value) => requireHttpsUrl(value, "Vercel production alias").toString());
 }
 
 function protectedHeaders(env) {
@@ -85,15 +73,17 @@ export function assertVercelProductionAliases({ deployment, aliases }) {
   return true;
 }
 
-export async function verifyVercelProductionRuntime({ fetchImpl = fetch, env, metadata, aliases, timeoutMs = 180_000, sleep, now }) {
+export async function verifyVercelProductionRuntime({ fetchImpl = fetch, env, metadata, targets, aliases, timeoutMs = 180_000, sleep, now }) {
   const headers = { Accept: "application/json", ...protectedHeaders(env) };
+  const runtimeTargets = targets ?? aliases ?? [];
   const checked = [];
+  if (runtimeTargets.length === 0) throw new DeploymentValidationError("At least one Vercel production runtime target is required.");
 
   await withBoundedExponentialBackoff(
     async () => {
       checked.length = 0;
-      for (const alias of aliases) {
-        const baseUrl = requireHttpsUrl(alias, "Vercel production alias");
+      for (const target of runtimeTargets) {
+        const baseUrl = requireHttpsUrl(target, "Vercel production runtime target");
         const [healthResponse, readyResponse] = await Promise.all([
           fetchImpl(new URL("healthz", baseUrl), { headers, signal: AbortSignal.timeout(15_000) }),
           fetchImpl(new URL(`readyz?cache-bust=${encodeURIComponent(metadata.build_id)}`, baseUrl), {
@@ -115,25 +105,32 @@ export async function verifyVercelProductionRuntime({ fetchImpl = fetch, env, me
         checked.push(baseUrl.toString());
       }
     },
-    { label: "Vercel production alias runtime identity", timeoutMs, initialDelayMs: 10_000, maxDelayMs: 30_000, sleep, now },
+    { label: "Vercel production runtime identity", timeoutMs, initialDelayMs: 10_000, maxDelayMs: 30_000, sleep, now },
   );
 
-  return { runtime_env: "production", deployment_target: "vercel-production", aliases_checked: checked };
+  return { runtime_env: "production", deployment_target: "vercel-production", targets_checked: checked, aliases_checked: checked };
 }
 
-export function buildVercelProductionEvidence({ env, metadata, deploymentUrl, deployment, runtimeIdentity, aliases, result = "success" }) {
+export function buildVercelProductionEvidence({ env, metadata, deploymentUrl, deployment, runtimeIdentity, targetConfig, aliases, result = "success" }) {
   const deploymentId = clean(env.VERCEL_DEPLOYMENT_ID || deployment.id || deployment.uid);
   if (!/^dpl_[A-Za-z0-9]+$/.test(deploymentId)) throw new DeploymentValidationError("Vercel production deployment ID is missing or malformed.");
   const sourceSha = clean(deployment.sourceSha ?? deployment.meta?.githubCommitSha ?? deployment.gitSource?.sha ?? metadata.source_commit);
+  const runtimeTargets = targetConfig?.targets ?? aliases ?? [];
+  if (runtimeTargets.length === 0) throw new DeploymentValidationError("Vercel production evidence requires at least one runtime target.");
+  const secondaryTargets = targetConfig?.secondaryTargets ?? runtimeTargets;
+  const failoverAliases = targetConfig?.failoverAliases ?? [];
   return {
     schema_version: 1,
     stage: "deploy-vercel-production",
     result,
     pr_number: metadata.pr_number,
     target_type: "vercel-production",
-    target_url: aliases[0],
+    target_url: normalizeHttpsUrl(runtimeTargets[0], "Vercel production target URL"),
     deployment_url: deploymentUrl,
-    production_aliases: aliases,
+    vercel_secondary_targets: secondaryTargets,
+    vercel_failover_aliases: failoverAliases,
+    vercel_failover_alias_verification: Boolean(targetConfig?.verifyFailoverAliases),
+    production_aliases: failoverAliases,
     runtime_env: runtimeIdentity.runtime_env,
     deployment_target: runtimeIdentity.deployment_target,
     source_commit: metadata.source_commit,
@@ -162,7 +159,7 @@ export async function runPrVercelProductionDeploy(env = process.env, adapters = 
   const deploymentUrl = requireHttpsUrl(env.VERCEL_PRODUCTION_DEPLOYMENT_URL, "Vercel production deployment URL").toString();
   const token = clean(env.VERCEL_TOKEN);
   if (!token) throw new DeploymentValidationError("VERCEL_TOKEN is required to validate Vercel production deployment.");
-  const aliases = configuredAliases(env);
+  const targetConfig = configuredVercelProductionRuntimeTargets(env, { deploymentUrl });
   const timeoutMs = Number(env.NUTSNEWS_DEPLOY_HARDENING_TIMEOUT_MS || 900_000);
   const deployment = await pollVercelDeployment({
     fetchImpl: adapters.fetchImpl,
@@ -181,12 +178,12 @@ export async function runPrVercelProductionDeploy(env = process.env, adapters = 
     fetchImpl: adapters.fetchImpl,
     env,
     metadata,
-    aliases,
+    targets: targetConfig.targets,
     timeoutMs,
     sleep: adapters.sleep,
     now: adapters.now,
   });
-  return buildVercelProductionEvidence({ env, metadata, deploymentUrl, deployment, runtimeIdentity, aliases });
+  return buildVercelProductionEvidence({ env, metadata, deploymentUrl, deployment, runtimeIdentity, targetConfig });
 }
 
 const invokedDirectly = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);

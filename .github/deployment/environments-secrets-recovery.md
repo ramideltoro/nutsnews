@@ -10,8 +10,8 @@ Normal PR merges do not deploy. The `Container Image` workflow no longer runs on
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `deploy-vps-staging`, `ui-smoke-vps-staging` | `vps-staging` | `staging` | None | `NUTSNEWS_VPS_STAGING_URL`, or the infra deployment status `environment_url` when returned; UI smoke waits for the matching infra staging qualification artifact | Defaults to `https://staging.nutsnews.com/` |
 | 2 | `deploy-vercel-staging`, `ui-smoke-vercel-staging` | `vercel-staging` | `staging` | None | `deploy-vercel-staging.outputs.target_url` from `vercel deploy --target "$VERCEL_STAGING_TARGET"` | Exact immutable Vercel deployment URL returned by the deploy job; it must not be `nutsnews.com` or `www.nutsnews.com` |
-| 3 | `deploy-vercel-production`, `ui-smoke-vercel-production` | `vercel-production` | `production` | `Production` | `NUTSNEWS_VERCEL_PRODUCTION_ALIASES`; deploy evidence selects the first validated alias as `target_url` | Defaults to `https://www.nutsnews.com/` and also validates `https://nutsnews.com/` |
-| 4 | `deploy-vps-production`, `ui-smoke-vps-production` | `production-vps` | `production` | `Production` | `NUTSNEWS_VPS_PRODUCTION_URL`, or the infra deployment status `target_url` when returned | Defaults to `https://vps.nutsnews.com/` |
+| 3 | `deploy-vercel-production`, `ui-smoke-vercel-production` | `vercel-production` | `production` | `Production` | `VERCEL_PRODUCTION_DEPLOYMENT_URL`, or `NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS` when an operator names secondary recovery URLs | Defaults to the generated immutable Vercel deployment URL; `https://www.nutsnews.com/` and `https://nutsnews.com/` are checked only when `NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES=true` |
+| 4 | `deploy-vps-production`, `ui-smoke-vps-production` | `production-vps` | `production` | `Production` | `NUTSNEWS_VPS_PRODUCTION_URL`, then `NUTSNEWS_PRIMARY_PRODUCTION_URL`, or the infra deployment status `target_url` when returned | Defaults to `https://www.nutsnews.com/`; use `NUTSNEWS_VPS_PRODUCTION_DIRECT_URL` defaulting to `https://vps.nutsnews.com/` for direct-origin checks outside the normal primary smoke |
 
 The staging deployment jobs intentionally do not use a GitHub environment. Secrets needed by VPS staging or Vercel staging must be repository secrets because those jobs do not enter an environment before reading them.
 
@@ -71,8 +71,23 @@ These are not normal VPS/Vercel stage inputs, but operators need them for recove
 | `VERCEL_STAGING_ENVIRONMENT` | Vercel staging deploy | Optional; defaults to `preview` for `vercel pull`. |
 | `VERCEL_STAGING_TARGET` | Vercel staging deploy | Optional; defaults to `staging` for `vercel deploy --target`. |
 | `NUTSNEWS_PR_PRODUCTION_WRITES_PAUSED` | Vercel production deploy | Optional; defaults to `false`. Set to `true` only when production write surfaces must remain paused while validating the PR candidate. |
-| `NUTSNEWS_VERCEL_PRODUCTION_ALIASES` | Vercel production deploy/UI smoke | Optional comma-separated HTTPS aliases; defaults to `https://www.nutsnews.com/,https://nutsnews.com/`. |
-| `NUTSNEWS_VPS_PRODUCTION_URL` | VPS production deploy/UI smoke | Optional; defaults to `https://vps.nutsnews.com/`. |
+| `NUTSNEWS_PRIMARY_PRODUCTION_URL` | VPS production deploy/UI smoke, cache observability | Optional shared primary entrypoint; defaults to `https://www.nutsnews.com/`. |
+| `NUTSNEWS_VPS_PRODUCTION_URL` | VPS production deploy/UI smoke | Optional override for the primary VPS smoke URL. After cutover it should be `https://www.nutsnews.com/` or omitted so the default applies. |
+| `NUTSNEWS_VPS_PRODUCTION_DIRECT_URL` | Direct-origin VPS validation | Optional direct origin URL for pre-cutover or origin-only checks; defaults to `https://vps.nutsnews.com/`. |
+| `NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS` | Vercel production deploy/UI smoke and dispatch-only recovery | Optional comma-separated HTTPS secondary Vercel URLs. If omitted, Vercel validation uses the generated immutable deployment URL. Must not contain `https://www.nutsnews.com/` or `https://nutsnews.com/`. |
+| `NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES` | Controlled DNS failover validation | Optional boolean; defaults to `false`. Set to `true` only during a controlled DNS failover test where apex and `www` intentionally route to Vercel. |
+| `NUTSNEWS_VERCEL_FAILOVER_PRODUCTION_ALIASES` | Controlled DNS failover validation | Optional comma-separated HTTPS aliases; defaults to `https://www.nutsnews.com/,https://nutsnews.com/` only when `NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES=true`. Legacy `NUTSNEWS_VERCEL_PRODUCTION_ALIASES` is accepted by the script only as a failover alias source. |
+| `NUTSNEWS_CACHE_OBSERVABILITY_URL` | Cloudflare cache observability | Optional live cache audit URL; falls back to `NUTSNEWS_PRIMARY_PRODUCTION_URL` and then `https://www.nutsnews.com`. |
+
+## Failover Controller Configuration
+
+The DNS failover controller uses these named settings. Keep the values synchronized across app docs, infra automation, and Cloudflare worker/controller configuration:
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `NUTSNEWS_FAILOVER_HEALTH_CHECK_INTERVAL_SECONDS` | `15` seconds | Check the direct VPS readiness endpoint on a 15-second cadence with no-store/cache-busting requests. |
+| `NUTSNEWS_FAILOVER_CONSECUTIVE_VPS_FAILURES` | `3` consecutive VPS failures | Move apex and `www` DNS to Vercel only after three consecutive failed VPS readiness checks. |
+| `NUTSNEWS_FAILBACK_DNS_STATE_GATE` | `current_dns_state_is_vercel_fallback_and_vps_ready` | Fail back to VPS only when the current Cloudflare DNS state still matches the Vercel fallback records and the direct VPS readiness probe is healthy. |
 
 ## Protected Target Authentication
 

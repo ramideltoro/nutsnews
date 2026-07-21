@@ -48,7 +48,6 @@ function env(overrides = {}) {
     VERCEL_DEPLOYMENT_ID: "dpl_prod123",
     VERCEL_TOKEN: "vercel-token",
     VERCEL_ORG_ID: "team_123",
-    NUTSNEWS_VERCEL_PRODUCTION_ALIASES: "https://www.nutsnews.com/,https://nutsnews.com/",
     GITHUB_RUN_ID: "456",
     GITHUB_RUN_ATTEMPT: "1",
     NUTSNEWS_DEPLOY_HARDENING_TIMEOUT_MS: "30000",
@@ -74,7 +73,7 @@ test("Vercel production alias validation requires production target aliases", ()
   );
 });
 
-test("PR Vercel production deploy validates aliases and writes evidence shape", async () => {
+test("PR Vercel production deploy validates the secondary target and writes evidence shape", async () => {
   const fetchImpl = async (url) => {
     const parsed = new URL(url);
     if (parsed.hostname === "api.vercel.com") {
@@ -82,17 +81,17 @@ test("PR Vercel production deploy validates aliases and writes evidence shape", 
         id: "dpl_prod123",
         readyState: "READY",
         target: "production",
-        alias: ["www.nutsnews.com", "nutsnews.com"],
+        alias: ["nutsnews-prod-candidate.vercel.app"],
         meta: { githubCommitSha: sourceCommit },
       });
     }
-    if (["www.nutsnews.com", "nutsnews.com"].includes(parsed.hostname) && parsed.pathname === "/healthz") {
+    if (parsed.hostname === "nutsnews-prod-candidate.vercel.app" && parsed.pathname === "/healthz") {
       return json({ ok: true, sourceCommit, buildId: "123-1" }, 200, {
         "x-nutsnews-source-commit": sourceCommit,
         "x-nutsnews-build-id": "123-1",
       });
     }
-    if (["www.nutsnews.com", "nutsnews.com"].includes(parsed.hostname) && parsed.pathname === "/readyz") {
+    if (parsed.hostname === "nutsnews-prod-candidate.vercel.app" && parsed.pathname === "/readyz") {
       return json({ ok: true, runtimeEnv: "production" }, 200, {
         "x-nutsnews-runtime-environment": "production",
         "x-nutsnews-deployment-target": "vercel-production",
@@ -106,17 +105,20 @@ test("PR Vercel production deploy validates aliases and writes evidence shape", 
   const evidence = await runPrVercelProductionDeploy(env(), { fetchImpl, ...fakeClock() });
   assert.equal(evidence.result, "success");
   assert.equal(evidence.target_type, "vercel-production");
-  assert.equal(evidence.target_url, "https://www.nutsnews.com/");
+  assert.equal(evidence.target_url, "https://nutsnews-prod-candidate.vercel.app/");
   assert.equal(evidence.deployment_url, "https://nutsnews-prod-candidate.vercel.app/");
   assert.equal(evidence.deployment_id, "dpl_prod123");
   assert.equal(evidence.vercel_source_sha, sourceCommit);
   assert.equal(evidence.runtime_env, "production");
   assert.equal(evidence.deployment_target, "vercel-production");
-  assert.deepEqual(evidence.production_aliases, ["https://www.nutsnews.com/", "https://nutsnews.com/"]);
+  assert.deepEqual(evidence.vercel_secondary_targets, ["https://nutsnews-prod-candidate.vercel.app/"]);
+  assert.deepEqual(evidence.vercel_failover_aliases, []);
+  assert.equal(evidence.vercel_failover_alias_verification, false);
+  assert.deepEqual(evidence.production_aliases, []);
   assert.equal(evidence.idempotency_key, `pr-42-${sourceCommit}-vercel-production`);
 });
 
-test("PR Vercel production deploy accepts runtime-verified aliases when Vercel metadata lists only generated alias", async () => {
+test("PR Vercel production deploy verifies apex and www only during controlled failover", async () => {
   const fetchImpl = async (url) => {
     const parsed = new URL(url);
     if (parsed.hostname === "api.vercel.com") {
@@ -128,13 +130,13 @@ test("PR Vercel production deploy accepts runtime-verified aliases when Vercel m
         meta: { githubCommitSha: sourceCommit },
       });
     }
-    if (["www.nutsnews.com", "nutsnews.com"].includes(parsed.hostname) && parsed.pathname === "/healthz") {
+    if (["nutsnews-prod-candidate.vercel.app", "www.nutsnews.com", "nutsnews.com"].includes(parsed.hostname) && parsed.pathname === "/healthz") {
       return json({ ok: true, sourceCommit, buildId: "123-1" }, 200, {
         "x-nutsnews-source-commit": sourceCommit,
         "x-nutsnews-build-id": "123-1",
       });
     }
-    if (["www.nutsnews.com", "nutsnews.com"].includes(parsed.hostname) && parsed.pathname === "/readyz") {
+    if (["nutsnews-prod-candidate.vercel.app", "www.nutsnews.com", "nutsnews.com"].includes(parsed.hostname) && parsed.pathname === "/readyz") {
       return json({ ok: true, runtimeEnv: "production" }, 200, {
         "x-nutsnews-runtime-environment": "production",
         "x-nutsnews-deployment-target": "vercel-production",
@@ -145,10 +147,33 @@ test("PR Vercel production deploy accepts runtime-verified aliases when Vercel m
     throw new Error(`Unexpected fetch ${parsed}`);
   };
 
-  const evidence = await runPrVercelProductionDeploy(env(), { fetchImpl, ...fakeClock() });
+  const evidence = await runPrVercelProductionDeploy(
+    env({
+      NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES: "true",
+      NUTSNEWS_VERCEL_FAILOVER_PRODUCTION_ALIASES: "https://www.nutsnews.com/,https://nutsnews.com/",
+    }),
+    { fetchImpl, ...fakeClock() },
+  );
   assert.equal(evidence.result, "success");
   assert.equal(evidence.deployment_id, "dpl_prod123");
+  assert.equal(evidence.target_url, "https://nutsnews-prod-candidate.vercel.app/");
+  assert.deepEqual(evidence.vercel_secondary_targets, ["https://nutsnews-prod-candidate.vercel.app/"]);
+  assert.deepEqual(evidence.vercel_failover_aliases, ["https://www.nutsnews.com/", "https://nutsnews.com/"]);
+  assert.equal(evidence.vercel_failover_alias_verification, true);
   assert.deepEqual(evidence.production_aliases, ["https://www.nutsnews.com/", "https://nutsnews.com/"]);
+});
+
+test("PR Vercel production deploy rejects canonical production URLs as secondary targets", async () => {
+  await assert.rejects(
+    () =>
+      runPrVercelProductionDeploy(
+        env({
+          NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS: "https://www.nutsnews.com/",
+        }),
+        { fetchImpl: async () => json({}), ...fakeClock() },
+      ),
+    /must not include canonical production domains/,
+  );
 });
 
 test("Vercel production runtime validation catches target drift", async () => {
@@ -157,7 +182,7 @@ test("Vercel production runtime validation catches target drift", async () => {
       verifyVercelProductionRuntime({
         env: {},
         metadata,
-        aliases: ["https://www.nutsnews.com/"],
+        targets: ["https://nutsnews-prod-candidate.vercel.app/"],
         timeoutMs: 10_000,
         ...fakeClock(),
         fetchImpl: async (url) => {

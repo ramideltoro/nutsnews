@@ -61,13 +61,28 @@ for (const fragment of [
   "`NUTSNEWS_VPS_STAGING_URL`",
   "https://staging.nutsnews.com/",
   "`deploy-vercel-staging.outputs.target_url`",
-  "`NUTSNEWS_VERCEL_PRODUCTION_ALIASES`",
+  "`NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS`",
+  "`NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES`",
+  "`NUTSNEWS_VERCEL_FAILOVER_PRODUCTION_ALIASES`",
+  "`NUTSNEWS_VPS_PRODUCTION_URL`",
+  "`NUTSNEWS_PRIMARY_PRODUCTION_URL`",
   "https://www.nutsnews.com/",
   "https://nutsnews.com/",
-  "`NUTSNEWS_VPS_PRODUCTION_URL`",
+  "`NUTSNEWS_VPS_PRODUCTION_DIRECT_URL`",
   "https://vps.nutsnews.com/",
 ]) {
   requireText(doc, fragment, `${docPath} must document target URL source ${fragment}.`);
+}
+
+for (const fragment of [
+  "`NUTSNEWS_FAILOVER_HEALTH_CHECK_INTERVAL_SECONDS`",
+  "`15` seconds",
+  "`NUTSNEWS_FAILOVER_CONSECUTIVE_VPS_FAILURES`",
+  "`3` consecutive VPS failures",
+  "`NUTSNEWS_FAILBACK_DNS_STATE_GATE`",
+  "`current_dns_state_is_vercel_fallback_and_vps_ready`",
+]) {
+  requireText(doc, fragment, `${docPath} must document failover controller setting ${fragment}.`);
 }
 
 for (const fragment of [

@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       url:
-        description: Base URL to audit
+        description: Base URL to audit; defaults to the VPS-primary public entrypoint
         required: false
         default: https://www.nutsnews.com
       article_path:
@@ -39,7 +39,8 @@ jobs:
       NUTSNEWS_SUPABASE_PROJECT_REF: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF }}
       NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF }}
       NUTSNEWS_PUBLIC_SUPABASE_URL: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_URL }}
-      NUTSNEWS_CACHE_OBSERVABILITY_URL: ${{ inputs.url || vars.NUTSNEWS_CACHE_OBSERVABILITY_URL || 'https://www.nutsnews.com' }}
+      NUTSNEWS_PRIMARY_PRODUCTION_URL: ${{ vars.NUTSNEWS_PRIMARY_PRODUCTION_URL || 'https://www.nutsnews.com' }}
+      NUTSNEWS_CACHE_OBSERVABILITY_URL: ${{ inputs.url || vars.NUTSNEWS_CACHE_OBSERVABILITY_URL || vars.NUTSNEWS_PRIMARY_PRODUCTION_URL || 'https://www.nutsnews.com' }}
       NUTSNEWS_CACHE_ARTICLE_PATH: ${{ inputs.article_path || vars.NUTSNEWS_CACHE_ARTICLE_PATH || '' }}
 
     steps:
@@ -56,7 +57,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check live Cloudflare/Vercel cache headers
+      - name: Check live Cloudflare/VPS-primary cache headers
         run: npm run audit:cache -- --url "$NUTSNEWS_CACHE_OBSERVABILITY_URL" --article-path "$NUTSNEWS_CACHE_ARTICLE_PATH"
 
       - name: Upload live cache report
