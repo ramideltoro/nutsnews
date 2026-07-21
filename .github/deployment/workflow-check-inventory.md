@@ -16,7 +16,7 @@ No deployment work is hidden inside a workflow classified as an existing check. 
 
 | Workflow | Classification | Why it belongs there | Deployment note |
 | --- | --- | --- | --- |
-| `accessibility-ci.yml` | PR-required | Runs local axe and Playwright accessibility coverage before web changes merge. | No deployment. |
+| `accessibility-ci.yml` | PR-required | Runs local axe and Playwright accessibility coverage only for UI or accessibility-test changes before merge. | No deployment. |
 | `actionlint.yml` | PR-required | Lints GitHub Actions changes before workflow changes merge. | No deployment. |
 | `admin-access-denied-contract.yml` | PR-required | Verifies the protected admin access-denied contract before merge. | No deployment. |
 | `api-contracts.yml` | PR-required | Verifies API, route, sitemap, robots, and runtime compatibility before merge. | No deployment. |

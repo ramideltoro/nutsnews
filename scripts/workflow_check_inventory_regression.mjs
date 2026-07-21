@@ -73,6 +73,16 @@ assert.equal(
   "Homepage Performance Budget must remain the merge-critical performance check.",
 );
 
+const accessibilityWorkflow = await readFile(resolve(workflowDir, "accessibility-ci.yml"), "utf8");
+const accessibilityPullRequest = workflowTriggerBlock(accessibilityWorkflow, "pull_request");
+assert.ok(accessibilityPullRequest.includes("paths:"), "Accessibility CI pull_request trigger must be path-filtered.");
+assert.ok(accessibilityPullRequest.includes("web/app/**/*.tsx"), "Accessibility CI must run for app UI changes.");
+assert.ok(accessibilityPullRequest.includes("web/tests/accessibility.spec.ts"), "Accessibility CI must run for accessibility test changes.");
+assert.ok(
+  !accessibilityPullRequest.includes("web/package"),
+  "Accessibility CI must not run for dependency-only package changes by default.",
+);
+
 for (const workflow of workflowFiles) {
   const row = rows.get(workflow);
   assert.ok(row, `Inventory is missing ${workflow}.`);
