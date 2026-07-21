@@ -157,6 +157,15 @@ assert.ok(
   "Snyk monitor upload must remain main-push only.",
 );
 
+const osvWorkflow = await readFile(resolve(workflowDir, "osv-scanner.yml"), "utf8");
+const osvPullRequest = workflowTriggerBlock(osvWorkflow, "pull_request");
+assert.ok(osvPullRequest.includes("paths:"), "OSV Scanner pull_request trigger must be path-filtered.");
+for (const requiredOsvPath of ["**/package.json", "**/package-lock.json", ".github/workflows/osv-scanner.yml"]) {
+  assert.ok(osvPullRequest.includes(requiredOsvPath), `OSV Scanner pull_request trigger must cover ${requiredOsvPath}.`);
+}
+assert.ok(hasTrigger(osvWorkflow, "schedule"), "OSV Scanner must keep scheduled full scans.");
+assert.ok(osvWorkflow.includes("scan-scheduled:"), "OSV Scanner must keep its non-PR full scan job.");
+
 for (const workflow of workflowFiles) {
   const row = rows.get(workflow);
   assert.ok(row, `Inventory is missing ${workflow}.`);

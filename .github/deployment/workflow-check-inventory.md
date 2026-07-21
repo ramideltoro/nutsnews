@@ -42,7 +42,7 @@ No deployment work is hidden inside a workflow classified as an existing check. 
 | `main-ruleset-audit.yml` | scheduled/operational | Uses an administration-read token to detect remote branch protection drift on schedule or operator request. | No deployment. |
 | `merge-gate.yml` | PR-required | Provides the required lean merge check for dependency install, TypeScript, lint, focused web regressions, security headers, and production build. | No deployment. |
 | `openssf-scorecard.yml` | scheduled/operational | Publishes repository security posture and SARIF on schedule or operator request; it is not a per-release blocker. | No deployment. |
-| `osv-scanner.yml` | PR-required | Scans dependency vulnerability changes before merge while keeping default-branch and scheduled reporting. | No deployment. |
+| `osv-scanner.yml` | PR-required | Scans dependency-risk PRs before merge while keeping default-branch and scheduled full-repository reporting. | No deployment. |
 | `owasp-zap-baseline.yml` | scheduled/operational | Passively scans live public targets on schedule or operator request without blocking every release. | No deployment. |
 | `pagespeed-insights.yml` | scheduled/operational | Runs operator-requested PageSpeed audits against public URLs for monitoring and investigation. | No deployment. |
 | `production-supabase-migration-regression.yml` | PR-required | Guards production migration workflow behavior before migration automation changes merge. | No deployment. |
