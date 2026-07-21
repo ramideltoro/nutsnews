@@ -102,6 +102,15 @@ for (const [triggerName, triggerBlock] of [
   );
 }
 
+const publicReaderSmokeWorkflow = await readFile(resolve(workflowDir, "public-reader-smoke.yml"), "utf8");
+const publicReaderSmokePush = workflowTriggerBlock(publicReaderSmokeWorkflow, "push");
+assert.ok(publicReaderSmokePush.includes("paths:"), "Public Reader Smoke push trigger must be path-filtered.");
+assert.ok(publicReaderSmokePush.includes("web/**"), "Public Reader Smoke push trigger must cover web changes.");
+assert.ok(
+  publicReaderSmokePush.includes("scripts/web_public_reader_smoke.mjs"),
+  "Public Reader Smoke push trigger must cover its smoke harness.",
+);
+
 for (const workflow of workflowFiles) {
   const row = rows.get(workflow);
   assert.ok(row, `Inventory is missing ${workflow}.`);

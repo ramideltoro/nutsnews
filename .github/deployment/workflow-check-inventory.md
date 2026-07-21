@@ -46,7 +46,7 @@ No deployment work is hidden inside a workflow classified as an existing check. 
 | `pagespeed-insights.yml` | scheduled/operational | Runs operator-requested PageSpeed audits against public URLs for monitoring and investigation. | No deployment. |
 | `production-supabase-migration-regression.yml` | PR-required | Guards production migration workflow behavior before migration automation changes merge. | No deployment. |
 | `production-supabase-migration.yml` | manual recovery | Protected, typed-confirmation workflow for applying production Supabase migrations. | Mutates production data schema. |
-| `public-reader-smoke.yml` | PR-required | Runs public reader Playwright smoke coverage before web changes merge. | No deployment. |
+| `public-reader-smoke.yml` | PR-required | Runs public reader Playwright smoke coverage for web and smoke harness changes before merge or after relevant main pushes. | No deployment. |
 | `release-notes.yml` | scheduled/operational | Creates GitHub releases for tags or operator requests; it is release documentation, not a merge blocker. | No deployment. |
 | `seo-structured-data.yml` | scheduled/operational | Audits currently live production structured data on schedule or operator request; local route coverage is already PR-gated by API contracts. | No deployment. |
 | `sitemap-robots-check.yml` | PR-required | Runs local sitemap/robots contract coverage before merge and keeps live URL probing scheduled/manual. | No deployment. |

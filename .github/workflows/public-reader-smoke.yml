@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "web/**"
+      - "scripts/web_public_reader_smoke.mjs"
+      - ".github/workflows/public-reader-smoke.yml"
   pull_request:
     branches:
       - main
