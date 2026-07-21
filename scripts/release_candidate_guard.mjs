@@ -82,6 +82,11 @@ requireText(
 );
 requireText(
   candidateJob,
+  "node scripts/workflow_check_inventory_regression.mjs",
+  "Release candidate must validate the workflow check inventory contract.",
+);
+requireText(
+  candidateJob,
   "npm run test:translation-release-gate",
   "Release candidate must prove the translation audit fails missing, critical, and below-threshold fixtures.",
 );
