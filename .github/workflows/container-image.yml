@@ -1095,12 +1095,9 @@ jobs:
       - name: Mask Vercel staging UI smoke secrets
         run: |
           set -euo pipefail
-          for value in \
-            "${VERCEL_AUTOMATION_BYPASS_SECRET:-}"; do
-            if [ -n "$value" ]; then
-              echo "::add-mask::$value"
-            fi
-          done
+          if [ -n "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
+            echo "::add-mask::$VERCEL_AUTOMATION_BYPASS_SECRET"
+          fi
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
@@ -1360,12 +1357,9 @@ jobs:
       - name: Mask Vercel production UI smoke secrets
         run: |
           set -euo pipefail
-          for value in \
-            "${VERCEL_AUTOMATION_BYPASS_SECRET:-}"; do
-            if [ -n "$value" ]; then
-              echo "::add-mask::$value"
-            fi
-          done
+          if [ -n "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
+            echo "::add-mask::$VERCEL_AUTOMATION_BYPASS_SECRET"
+          fi
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
