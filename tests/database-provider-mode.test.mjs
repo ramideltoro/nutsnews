@@ -217,4 +217,18 @@ test("Backend primary public article reads use backend compatibility operations"
     articlesSource,
     /if \(isBackendPostgresPrimary\(\)\) \{[\s\S]+translation_available: false/,
   );
+
+  for (const operation of [
+    "load-public-feed-snapshot",
+    "load-home-feed-snapshot",
+    "load-published-articles",
+    "load-article-detail",
+    "search-published-articles",
+  ]) {
+    assert.match(
+      articlesSource,
+      new RegExp(`"${operation}"[\\s\\S]{0,500}requestedLanguageCode: languageCode`),
+      `${operation} must pass the normalized requested language to backend PostgreSQL reads.`,
+    );
+  }
 });

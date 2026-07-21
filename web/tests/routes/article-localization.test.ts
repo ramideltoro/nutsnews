@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  callBackendDatabaseOperation: vi.fn(),
+  providerMode: "supabase_primary",
   snapshotRows: [] as Array<Record<string, unknown>>,
   summaryRows: [] as Array<Record<string, unknown>>,
   logWarn: vi.fn(),
@@ -9,8 +11,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 
+vi.mock("next/cache", () => ({
+  unstable_cache: (operation: unknown) => operation,
+}));
+
 vi.mock("@/lib/backendDatabase", () => ({
-  callBackendDatabaseOperation: vi.fn(),
+  callBackendDatabaseOperation: mocks.callBackendDatabaseOperation,
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -18,7 +24,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 vi.mock("@/lib/runtimeSafety", () => ({
-  getDatabaseProviderMode: () => "supabase_primary",
+  getDatabaseProviderMode: () => mocks.providerMode,
 }));
 
 vi.mock("@/lib/translationQuality", () => ({
@@ -106,8 +112,10 @@ function snapshotArticle(index: number) {
 
 beforeEach(() => {
   vi.resetModules();
+  mocks.providerMode = "supabase_primary";
   mocks.snapshotRows = Array.from({ length: 6 }, (_, index) => snapshotArticle(index + 1));
   mocks.summaryRows = [];
+  mocks.callBackendDatabaseOperation.mockReset();
   mocks.logWarn.mockReset();
   mocks.validateTranslatedSummary.mockClear();
   mocks.validateTranslatedSummary.mockReturnValue({ usable: true, warnings: [] });
@@ -162,5 +170,127 @@ describe("published article localization", () => {
         missingSummaryCount: 5,
       }),
     );
+  });
+});
+
+describe("backend primary article localization", () => {
+  it("passes requested language to backend feed reads and preserves localized rows", async () => {
+    mocks.providerMode = "backend_postgres_primary";
+    const backendRows = Array.from({ length: 6 }, (_, index) => ({
+      ...snapshotArticle(index + 1),
+      title: `Titre backend ${index + 1}`,
+      ai_summary: `Resume backend ${index + 1}.`,
+      language_code: "fr",
+      requested_language_code: "fr",
+      translation_available: true,
+    }));
+    mocks.callBackendDatabaseOperation.mockResolvedValueOnce(backendRows);
+
+    const { getPublishedArticles } = await import("@/lib/articles");
+    const result = await getPublishedArticles(0, "community", "fr");
+
+    expect(mocks.callBackendDatabaseOperation).toHaveBeenCalledWith(
+      "load-public-feed-snapshot",
+      {
+        category: "community",
+        limit: 6,
+        offset: 0,
+        requestedLanguageCode: "fr",
+      },
+    );
+    expect(result.articles).toHaveLength(5);
+    expect(result.articles[0]).toMatchObject({
+      title: "Titre backend 1",
+      ai_summary: "Resume backend 1.",
+      language_code: "fr",
+      requested_language_code: "fr",
+      translation_available: true,
+    });
+    expect(result.nextPage).toBe(1);
+    expect(mocks.validateTranslatedSummary).not.toHaveBeenCalled();
+  });
+
+  it("marks older backend feed rows as English fallbacks when localized metadata is absent", async () => {
+    mocks.providerMode = "backend_postgres_primary";
+    mocks.callBackendDatabaseOperation.mockResolvedValueOnce(
+      Array.from({ length: 6 }, (_, index) => snapshotArticle(index + 1)),
+    );
+
+    const { getPublishedArticles } = await import("@/lib/articles");
+    const result = await getPublishedArticles(0, null, "fr");
+
+    expect(mocks.callBackendDatabaseOperation).toHaveBeenCalledWith(
+      "load-public-feed-snapshot",
+      {
+        category: null,
+        limit: 6,
+        offset: 0,
+        requestedLanguageCode: "fr",
+      },
+    );
+    expect(result.articles[0]).toMatchObject({
+      title: "English title 1",
+      ai_summary: "English summary 1.",
+      language_code: "en",
+      requested_language_code: "fr",
+      translation_available: false,
+    });
+  });
+
+  it("passes requested language to backend detail reads and preserves localized detail rows", async () => {
+    mocks.providerMode = "backend_postgres_primary";
+    mocks.callBackendDatabaseOperation.mockResolvedValueOnce({
+      ...snapshotArticle(7),
+      id: "detail-backend-fr",
+      title: "Titre detail backend",
+      ai_summary: "Resume detail backend.",
+      language_code: "fr",
+      requested_language_code: "fr",
+      translation_available: true,
+    });
+
+    const { getArticleById } = await import("@/lib/articles");
+    const article = await getArticleById("detail-backend-fr", "fr");
+
+    expect(mocks.callBackendDatabaseOperation).toHaveBeenCalledWith(
+      "load-article-detail",
+      {
+        id: "detail-backend-fr",
+        requestedLanguageCode: "fr",
+      },
+    );
+    expect(article).toMatchObject({
+      title: "Titre detail backend",
+      ai_summary: "Resume detail backend.",
+      language_code: "fr",
+      requested_language_code: "fr",
+      translation_available: true,
+    });
+  });
+
+  it("marks older backend detail rows as English fallbacks when localized metadata is absent", async () => {
+    mocks.providerMode = "backend_postgres_primary";
+    mocks.callBackendDatabaseOperation.mockResolvedValueOnce({
+      ...snapshotArticle(8),
+      id: "detail-backend-old",
+    });
+
+    const { getArticleById } = await import("@/lib/articles");
+    const article = await getArticleById("detail-backend-old", "ja");
+
+    expect(mocks.callBackendDatabaseOperation).toHaveBeenCalledWith(
+      "load-article-detail",
+      {
+        id: "detail-backend-old",
+        requestedLanguageCode: "ja",
+      },
+    );
+    expect(article).toMatchObject({
+      title: "English title 8",
+      ai_summary: "English summary 8.",
+      language_code: "en",
+      requested_language_code: "ja",
+      translation_available: false,
+    });
   });
 });
