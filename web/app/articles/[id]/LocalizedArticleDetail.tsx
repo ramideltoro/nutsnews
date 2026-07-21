@@ -18,9 +18,94 @@ type LocalizedArticleDetailProps = {
   initialArticle: Article;
 };
 
-function formatDate(dateValue: string | null, languageCode: LanguageCode) {
+export const articleDetailCopyByLanguage: Record<
+  LanguageCode,
+  {
+    publishedRecently: string;
+    fallbackCategory: string;
+    backToHome: string;
+    summaryNote: string;
+    readFullStory: string;
+    readFullStoryAtPrefix: string;
+    readFullStoryAtSuffix: string;
+    aboutNutsNews: string;
+  }
+> = {
+  en: {
+    publishedRecently: "Published recently",
+    fallbackCategory: "Uplifting",
+    backToHome: "Back to NutsNews",
+    summaryNote:
+      "NutsNews provides a short original summary and sends readers back to the original publisher for the complete story.",
+    readFullStory: "Read full story",
+    readFullStoryAtPrefix: "Read full story at ",
+    readFullStoryAtSuffix: "",
+    aboutNutsNews: "About NutsNews",
+  },
+  fr: {
+    publishedRecently: "Publié récemment",
+    fallbackCategory: "Positif",
+    backToHome: "Retour à NutsNews",
+    summaryNote:
+      "NutsNews propose un court résumé original et renvoie les lecteurs vers l’éditeur d’origine pour l’article complet.",
+    readFullStory: "Lire l’article complet",
+    readFullStoryAtPrefix: "Lire l’article complet chez ",
+    readFullStoryAtSuffix: "",
+    aboutNutsNews: "À propos de NutsNews",
+  },
+  ja: {
+    publishedRecently: "最近公開",
+    fallbackCategory: "前向き",
+    backToHome: "NutsNewsに戻る",
+    summaryNote:
+      "NutsNewsは短い独自の要約を提供し、記事全体は元の配信元で読めるよう読者を案内します。",
+    readFullStory: "元記事を読む",
+    readFullStoryAtPrefix: "元記事を",
+    readFullStoryAtSuffix: "で読む",
+    aboutNutsNews: "NutsNewsについて",
+  },
+  "de-CH": {
+    publishedRecently: "Kürzlich veröffentlicht",
+    fallbackCategory: "Aufmunternd",
+    backToHome: "Zurück zu NutsNews",
+    summaryNote:
+      "NutsNews bietet eine kurze eigene Zusammenfassung und leitet Leserinnen und Leser für die vollständige Geschichte zum ursprünglichen Verlag zurück.",
+    readFullStory: "Vollständige Geschichte lesen",
+    readFullStoryAtPrefix: "Vollständige Geschichte bei ",
+    readFullStoryAtSuffix: " lesen",
+    aboutNutsNews: "Über NutsNews",
+  },
+  de: {
+    publishedRecently: "Kürzlich veröffentlicht",
+    fallbackCategory: "Aufmunternd",
+    backToHome: "Zurück zu NutsNews",
+    summaryNote:
+      "NutsNews bietet eine kurze eigene Zusammenfassung und leitet Leserinnen und Leser für die vollständige Geschichte zum ursprünglichen Verlag zurück.",
+    readFullStory: "Vollständige Geschichte lesen",
+    readFullStoryAtPrefix: "Vollständige Geschichte bei ",
+    readFullStoryAtSuffix: " lesen",
+    aboutNutsNews: "Über NutsNews",
+  },
+  el: {
+    publishedRecently: "Δημοσιεύτηκε πρόσφατα",
+    fallbackCategory: "Αισιόδοξο",
+    backToHome: "Επιστροφή στο NutsNews",
+    summaryNote:
+      "Το NutsNews προσφέρει μια σύντομη πρωτότυπη σύνοψη και στέλνει τους αναγνώστες στον αρχικό εκδότη για την πλήρη ιστορία.",
+    readFullStory: "Διαβάστε την πλήρη ιστορία",
+    readFullStoryAtPrefix: "Διαβάστε την πλήρη ιστορία στο ",
+    readFullStoryAtSuffix: "",
+    aboutNutsNews: "Σχετικά με το NutsNews",
+  },
+};
+
+function formatDate(
+  dateValue: string | null,
+  languageCode: LanguageCode,
+  copy: (typeof articleDetailCopyByLanguage)[LanguageCode],
+) {
   if (!dateValue) {
-    return "Published recently";
+    return copy.publishedRecently;
   }
 
   const localeByLanguage: Record<LanguageCode, string> = {
@@ -79,6 +164,9 @@ export function LocalizedArticleDetail({
     ? localizedArticle
     : initialArticle;
   const visibleLanguageCode = visibleArticle.language_code ?? DEFAULT_LANGUAGE_CODE;
+  const copy =
+    articleDetailCopyByLanguage[visibleLanguageCode] ??
+    articleDetailCopyByLanguage.en;
   const publisherAttribution = useMemo(
     () =>
       getPublisherAttribution(
@@ -90,7 +178,14 @@ export function LocalizedArticleDetail({
   const siteDate = formatDate(
     visibleArticle.published_on_site_at,
     visibleLanguageCode,
+    copy,
   );
+  const categoryLabel = visibleArticle.category ?? copy.fallbackCategory;
+  const readFullStoryLabel = [
+    copy.readFullStoryAtPrefix,
+    publisherAttribution.publisherName,
+    copy.readFullStoryAtSuffix,
+  ].join("");
 
   useEffect(() => {
     if (selectedLanguage === DEFAULT_LANGUAGE_CODE) {
@@ -145,7 +240,7 @@ export function LocalizedArticleDetail({
             href="/"
             className="inline-flex rounded-full border border-amber-400/20 bg-neutral-900 px-4 py-2 text-sm font-bold text-amber-300 transition hover:bg-amber-400 hover:text-neutral-950"
           >
-            &larr; Back to NutsNews
+            &larr; {copy.backToHome}
           </Link>
         </nav>
 
@@ -166,10 +261,10 @@ export function LocalizedArticleDetail({
             <div className="p-6">
               <p
                 className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-amber-400"
-                aria-label={`${visibleArticle.category ?? "Uplifting"} | ${visibleArticle.source} | ${siteDate}`}
+                aria-label={`${categoryLabel} | ${visibleArticle.source} | ${siteDate}`}
               >
-                {visibleArticle.category ?? "Uplifting"} &middot;{" "}
-                {visibleArticle.source} &middot; {siteDate}
+                {categoryLabel} &middot; {visibleArticle.source} &middot;{" "}
+                {siteDate}
               </p>
 
               <h1 className="text-4xl font-black leading-tight text-white">
@@ -184,8 +279,7 @@ export function LocalizedArticleDetail({
             </p>
 
             <div className="mt-6 rounded-2xl border border-amber-500/20 bg-amber-400/10 p-4 text-sm leading-6 text-neutral-300">
-              NutsNews provides a short original summary and sends readers back
-              to the original publisher for the complete story.
+              {copy.summaryNote}
             </div>
 
             <div className="mt-6 flex flex-wrap gap-3">
@@ -194,17 +288,17 @@ export function LocalizedArticleDetail({
                 target="_blank"
                 rel="noopener noreferrer"
                 className="rounded-full bg-amber-400 px-5 py-3 text-sm font-bold text-neutral-950 transition hover:bg-amber-300"
-                aria-label={`${publisherAttribution.readFullStoryLabel}: ${visibleArticle.title}`}
-                title={publisherAttribution.policySummary}
+                aria-label={`${readFullStoryLabel}: ${visibleArticle.title}`}
+                title={copy.summaryNote}
               >
-                Read full story
+                {copy.readFullStory}
               </a>
 
               <Link
                 href="/about"
                 className="rounded-full border border-amber-400/30 bg-black/20 px-5 py-3 text-sm font-semibold text-amber-300 transition hover:bg-amber-400/10"
               >
-                About NutsNews
+                {copy.aboutNutsNews}
               </Link>
             </div>
           </section>

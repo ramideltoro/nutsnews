@@ -296,8 +296,18 @@ describe("LocalizedArticleDetail", () => {
       ),
     ).toBeInTheDocument();
     expect(
+      screen.getByRole("link", { name: /Retour à NutsNews/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Lire l’article complet")).toBeInTheDocument();
+    expect(screen.getByText("À propos de NutsNews")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "NutsNews propose un court résumé original et renvoie les lecteurs vers l’éditeur d’origine pour l’article complet.",
+      ),
+    ).toBeInTheDocument();
+    expect(
       screen.getByRole("link", {
-        name: "Read full story at Happy Times: Titre detail francais",
+        name: "Lire l’article complet chez Happy Times: Titre detail francais",
       }),
     ).toBeInTheDocument();
   });
@@ -369,6 +379,11 @@ describe("LocalizedArticleDetail", () => {
       screen.queryByRole("heading", { name: "API English fallback title" }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("main")).toHaveAttribute("lang", "en");
+    expect(
+      screen.getByRole("link", { name: /Back to NutsNews/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Read full story")).toBeInTheDocument();
+    expect(screen.getByText("About NutsNews")).toBeInTheDocument();
     expect(
       screen.getByLabelText(
         "community | Google News - Happy Times | July 2, 2026",

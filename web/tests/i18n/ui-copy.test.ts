@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import { aboutCopyByLanguage } from "@/app/about/LocalizedAboutPage";
 import { appsCopyByLanguage } from "@/app/apps/LocalizedAppsPage";
+import { articleDetailCopyByLanguage } from "@/app/articles/[id]/LocalizedArticleDetail";
 import { copyByLanguage as articleFeedCopyByLanguage, dateLocaleByLanguage } from "@/app/components/ArticleFeed";
 import { heroTaglineCopyByLanguage } from "@/app/components/HeroTagline";
 import { homeHeaderCopyByLanguage } from "@/app/components/HomeSiteHeader";
@@ -30,6 +31,7 @@ const supportedCodes = SUPPORTED_LANGUAGES.map((language) => language.code);
 const copyMaps: { name: string; value: CopyMap }[] = [
   { name: "about", value: aboutCopyByLanguage },
   { name: "apps", value: appsCopyByLanguage },
+  { name: "articleDetail", value: articleDetailCopyByLanguage },
   { name: "articleFeed", value: articleFeedCopyByLanguage },
   { name: "contactForm", value: formCopyByLanguage },
   { name: "contactPage", value: contactCopyByLanguage },
@@ -45,6 +47,10 @@ const copyMaps: { name: string; value: CopyMap }[] = [
 const criticalTranslatedPaths = [
   { map: "about", path: ["heroTitle"] },
   { map: "apps", path: ["roadmapTitle"] },
+  { map: "articleDetail", path: ["backToHome"] },
+  { map: "articleDetail", path: ["summaryNote"] },
+  { map: "articleDetail", path: ["readFullStory"] },
+  { map: "articleDetail", path: ["aboutNutsNews"] },
   { map: "articleFeed", path: ["topStories"] },
   { map: "articleFeed", path: ["emptyFeed"] },
   { map: "articleFeed", path: ["categoryLabels", "community"] },
@@ -75,7 +81,12 @@ const expectedDateLabels: Record<LanguageCode, string> = {
   el: "2 Ιουλ 2026",
 };
 
-const optionalEmptyStrings = new Set(["contactForm.en$.turnstileHelp"]);
+const optionalEmptyStrings = new Set([
+  "articleDetail.en$.readFullStoryAtSuffix",
+  "articleDetail.fr$.readFullStoryAtSuffix",
+  "articleDetail.el$.readFullStoryAtSuffix",
+  "contactForm.en$.turnstileHelp",
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
