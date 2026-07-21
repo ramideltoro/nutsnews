@@ -82,6 +82,76 @@ requireText(
 );
 requireText(
   candidateJob,
+  "node scripts/workflow_check_inventory_regression.mjs",
+  "Release candidate must validate the workflow check inventory contract.",
+);
+requireText(
+  candidateJob,
+  "node scripts/trusted_pr_deployment_eligibility_regression.mjs",
+  "Release candidate must validate the trusted PR deployment eligibility contract.",
+);
+requireText(
+  candidateJob,
+  "node scripts/pr_release_artifact_regression.mjs",
+  "Release candidate must validate the immutable PR release artifact contract.",
+);
+requireText(
+  candidateJob,
+  "node scripts/deployed_ui_smoke_regression.mjs",
+  "Release candidate must validate the target-agnostic deployed UI smoke contract.",
+);
+requireText(
+  candidateJob,
+  "node scripts/pre_merge_deployment_workflow_order_regression.mjs",
+  "Release candidate must validate pre-merge deployment stage order and post-main trigger guardrails.",
+);
+requireText(
+  candidateJob,
+  "node scripts/environments_secrets_recovery_doc_regression.mjs",
+  "Release candidate must validate the deployment environments, secrets, and recovery runbook.",
+);
+requireText(
+  candidateJob,
+  "node --test tests/protected-target-headers.test.mjs",
+  "Release candidate must validate protected-target UI smoke headers.",
+);
+requireText(
+  candidateJob,
+  "node --test tests/deployed-ui-smoke-evidence.test.mjs",
+  "Release candidate must validate deployed UI smoke evidence shape.",
+);
+requireText(
+  candidateJob,
+  "node --test tests/deployment-hardening.test.mjs",
+  "Release candidate must validate deploy wait, retry, concurrency, and idempotency helpers.",
+);
+requireText(
+  candidateJob,
+  "node --test tests/pre-merge-deployment-gate.test.mjs",
+  "Release candidate must validate the final pre-merge deployment gate evidence contract.",
+);
+requireText(
+  candidateJob,
+  "node --test tests/pr-vps-staging-deploy.test.mjs",
+  "Release candidate must validate PR VPS staging deployment evidence and idempotency.",
+);
+requireText(
+  candidateJob,
+  "node --test tests/pr-vercel-staging-deploy.test.mjs",
+  "Release candidate must validate PR Vercel staging deployment evidence and production-alias guards.",
+);
+requireText(
+  candidateJob,
+  "node --test tests/pr-vercel-production-deploy.test.mjs",
+  "Release candidate must validate PR Vercel production deployment evidence and alias verification.",
+);
+requireText(
+  candidateJob,
+  "node --test tests/pr-vps-production-deploy.test.mjs",
+  "Release candidate must validate PR VPS production deployment evidence and idempotency.",
+);
+requireText(
+  candidateJob,
   "npm run test:translation-release-gate",
   "Release candidate must prove the translation audit fails missing, critical, and below-threshold fixtures.",
 );

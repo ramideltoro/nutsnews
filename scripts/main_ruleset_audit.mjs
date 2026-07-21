@@ -6,6 +6,7 @@ const repository = process.env.GITHUB_REPOSITORY || "ramideltoro/nutsnews";
 const token = process.env.NUTSNEWS_RULESET_AUDIT_TOKEN || "";
 const fixtureIndex = process.argv.indexOf("--rulesets-file");
 const fixturePath = fixtureIndex === -1 ? "" : process.argv[fixtureIndex + 1] || "";
+const requiredStatusCheckContexts = ["Pre-merge deployment gate", "Release candidate"];
 
 function rule(ruleset, type) {
   return (ruleset.rules || []).find((candidate) => candidate.type === type);
@@ -21,7 +22,7 @@ function validate(rulesets) {
 
   assert.equal(mainRulesets.length, 1, "Expected exactly one ruleset targeting refs/heads/main.");
   const main = mainRulesets[0];
-  assert.equal(main.name, "Require PRs and Release candidate on main", "Main ruleset name is inaccurate.");
+  assert.equal(main.name, "Require PRs and pre-merge gates on main", "Main ruleset name is inaccurate.");
   assert.equal(main.enforcement, "active", "Main ruleset must be actively enforced for administrators.");
   assert.deepEqual(main.bypass_actors || [], [], "Main ruleset must not allow bypass actors.");
   assert.ok(rule(main, "deletion"), "Main ruleset must prevent branch deletion.");
@@ -43,13 +44,15 @@ function validate(rulesets) {
     "Main ruleset must require an up-to-date branch before merge.",
   );
   const required = statusChecks.parameters?.required_status_checks || [];
-  const candidate = required.filter((check) => check.context === "Release candidate");
-  assert.equal(candidate.length, 1, "Main ruleset must require exactly the Release candidate context.");
-  assert.equal(
-    typeof candidate[0].integration_id,
-    "number",
-    "Release candidate must be pinned to its GitHub Actions integration.",
-  );
+  for (const context of requiredStatusCheckContexts) {
+    const matches = required.filter((check) => check.context === context);
+    assert.equal(matches.length, 1, `Main ruleset must require exactly one ${context} context.`);
+    assert.equal(
+      typeof matches[0].integration_id,
+      "number",
+      `${context} must be pinned to its GitHub Actions integration.`,
+    );
+  }
 
   return main;
 }

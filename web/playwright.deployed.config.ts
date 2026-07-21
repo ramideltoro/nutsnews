@@ -1,16 +1,16 @@
 import { defineConfig, devices } from '@playwright/test';
 import { buildProtectedTargetHeaders } from './protectedTargetHeaders.mjs';
 
-const PORT = Number(process.env.PLAYWRIGHT_PORT ?? 3100);
-const configuredBaseURL = process.env.PLAYWRIGHT_BASE_URL?.trim();
-const baseURL = configuredBaseURL || `http://127.0.0.1:${PORT}`;
-const shouldStartLocalWebServer = !configuredBaseURL;
+const baseURL = process.env.PLAYWRIGHT_BASE_URL?.trim();
+if (!baseURL) throw new Error('PLAYWRIGHT_BASE_URL is required for deployed UI smoke tests');
+
 const protectedTarget = buildProtectedTargetHeaders(process.env, {
   defaultVercelSetBypassCookie: true,
 });
 
 export default defineConfig({
   testDir: './tests',
+  testMatch: /deployed-ui-smoke\.spec\.ts/,
   timeout: 60_000,
   expect: {
     timeout: 10_000,
@@ -19,7 +19,10 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   workers: 1,
-  reporter: process.env.CI ? [['line'], ['html', { open: 'never' }]] : [['list'], ['html', { open: 'never' }]],
+  reporter: process.env.CI
+    ? [['line'], ['html', { open: 'never' }], ['junit', { outputFile: 'test-results/deployed-ui-smoke/results.junit.xml' }]]
+    : [['list'], ['html', { open: 'never' }], ['junit', { outputFile: 'test-results/deployed-ui-smoke/results.junit.xml' }]],
+  outputDir: 'test-results/deployed-ui-smoke',
   use: {
     baseURL,
     trace: protectedTarget.hasProtectedTargetHeaders ? 'off' : 'retain-on-failure',
@@ -32,14 +35,4 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  ...(shouldStartLocalWebServer
-    ? {
-        webServer: {
-          command: `npm run start -- -p ${PORT}`,
-          url: baseURL,
-          reuseExistingServer: !process.env.CI,
-          timeout: 120_000,
-        },
-      }
-    : {}),
 });

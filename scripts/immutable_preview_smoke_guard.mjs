@@ -10,7 +10,8 @@ const protectedFiles = [
   'scripts/cloudflare_purge_cache.mjs',
   'scripts/cloudflare_production_cache_purge_regression.mjs',
   'scripts/web_offline_e2e_regression.mjs',
-  'web/tests/vercel-preview-smoke.spec.ts',
+  'web/playwright.deployed.config.ts',
+  'web/tests/deployed-ui-smoke.spec.ts',
 ];
 
 const baseRef = process.env.BASE_REF || 'main';

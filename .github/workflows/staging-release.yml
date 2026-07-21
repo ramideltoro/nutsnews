@@ -1,217 +1,114 @@
-name: Request Verified Staging Release
+name: Manual VPS Staging Recovery Dispatch
+run-name: Manual VPS staging recovery ${{ github.event.inputs.source_commit }}
 
 on:
-  workflow_run:
-    workflows: ["Container Image"]
-    types: [completed]
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type request-vps-staging-recovery to dispatch a manual VPS staging recovery.
+        required: true
+        type: string
+      source_commit:
+        description: Full app source commit SHA to recover on VPS staging.
+        required: true
+        type: string
+      image_digest:
+        description: Immutable ghcr.io/ramideltoro/nutsnews image digest.
+        required: true
+        type: string
+      build_id:
+        description: Build ID in run-attempt form.
+        required: true
+        type: string
+      schema_version:
+        description: Rollback-compatible application schema marker.
+        required: true
+        type: string
+      migration_head:
+        description: Repository migration head for the recovery candidate.
+        required: true
+        type: string
+      supabase_project_ref:
+        description: Production Supabase project ref used by the app runtime.
+        required: true
+        type: string
 
 permissions:
-  actions: read
   contents: read
 
 concurrency:
-  group: nutsnews-staging-release
+  group: nutsnews-manual-vps-staging-recovery
   cancel-in-progress: false
 
 jobs:
   request-staging:
-    name: Request VPS staging candidate
-    if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == 'main' &&
-      github.event.workflow_run.head_repository.full_name == github.repository
+    name: Request manual VPS staging recovery
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     steps:
-      - name: Download immutable staging metadata with retries
-        env:
-          ARTIFACT_DIR: ${{ runner.temp }}/nutsnews-staging-release
-          ARTIFACT_NAME: nutsnews-staging-release
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SOURCE_WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
+      - name: Mask staging recovery token
         run: |
-          set -euo pipefail
-
-          mkdir -p "$ARTIFACT_DIR"
-          artifact_zip="${RUNNER_TEMP}/${ARTIFACT_NAME}.zip"
-          artifacts_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_WORKFLOW_RUN_ID}/artifacts?per_page=100"
-          archive_url=""
-
-          for attempt in 1 2 3 4 5; do
-            if artifacts_json="$(curl -fsSL \
-              -H "Accept: application/vnd.github+json" \
-              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
-              "$artifacts_url")"; then
-              artifact_count="$(jq --arg name "$ARTIFACT_NAME" '[.artifacts[] | select(.name == $name and (.expired | not))] | length' <<<"$artifacts_json")"
-              if [[ "$artifact_count" == "1" ]]; then
-                archive_url="$(jq -r --arg name "$ARTIFACT_NAME" '.artifacts[] | select(.name == $name and (.expired | not)) | .archive_download_url' <<<"$artifacts_json")"
-                break
-              fi
-              if [[ "$artifact_count" != "0" || "$attempt" == "5" ]]; then
-                echo "Expected exactly one unexpired ${ARTIFACT_NAME} artifact for run ${SOURCE_WORKFLOW_RUN_ID}; found ${artifact_count}." >&2
-                exit 1
-              fi
-            fi
-            delay_seconds="$((attempt * 10))"
-            echo "Staging artifact lookup failed or was not visible on attempt ${attempt}/5; retrying in ${delay_seconds}s." >&2
-            sleep "$delay_seconds"
-          done
-
-          if [[ -z "$archive_url" ]]; then
-            echo "Could not resolve ${ARTIFACT_NAME} artifact archive URL for run ${SOURCE_WORKFLOW_RUN_ID}." >&2
-            exit 1
+          if [ -n "${NUTSNEWS_INFRA_STAGING_TOKEN:-}" ]; then
+            echo "::add-mask::$NUTSNEWS_INFRA_STAGING_TOKEN"
           fi
+        env:
+          NUTSNEWS_INFRA_STAGING_TOKEN: ${{ secrets.NUTSNEWS_INFRA_STAGING_TOKEN }}
 
-          for attempt in 1 2 3 4 5; do
-            if curl -fsSL \
-              -H "Accept: application/vnd.github+json" \
-              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
-              "$archive_url" \
-              -o "$artifact_zip"; then
-              unzip -q "$artifact_zip" -d "$ARTIFACT_DIR"
-              test -s "$ARTIFACT_DIR/metadata.json"
-              exit 0
-            fi
-            delay_seconds="$((attempt * 10))"
-            echo "Staging artifact download failed on attempt ${attempt}/5; retrying in ${delay_seconds}s." >&2
-            sleep "$delay_seconds"
-          done
-
-          echo "Could not download ${ARTIFACT_NAME} artifact for run ${SOURCE_WORKFLOW_RUN_ID} after retries." >&2
-          exit 1
-
-      - name: Validate staging metadata belongs to the completed main build
+      - name: Validate and dispatch manual staging recovery
         id: candidate
         env:
-          METADATA_PATH: ${{ runner.temp }}/nutsnews-staging-release/metadata.json
-          SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha }}
-          SOURCE_WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
+          NUTSNEWS_INFRA_STAGING_TOKEN: ${{ secrets.NUTSNEWS_INFRA_STAGING_TOKEN }}
+          CONFIRMATION: ${{ github.event.inputs.confirmation }}
+          SOURCE_COMMIT: ${{ github.event.inputs.source_commit }}
+          IMAGE_DIGEST: ${{ github.event.inputs.image_digest }}
+          BUILD_ID: ${{ github.event.inputs.build_id }}
+          SCHEMA_VERSION: ${{ github.event.inputs.schema_version }}
+          MIGRATION_HEAD: ${{ github.event.inputs.migration_head }}
+          SUPABASE_PROJECT_REF: ${{ github.event.inputs.supabase_project_ref }}
         run: |
           set -euo pipefail
 
           node --input-type=module <<'NODE'
-          import { readFileSync, appendFileSync } from "node:fs";
+          import { appendFileSync } from "node:fs";
           import crypto from "node:crypto";
 
+          const token = process.env.NUTSNEWS_INFRA_STAGING_TOKEN ?? "";
+          const confirmation = process.env.CONFIRMATION ?? "";
           const sourceCommit = process.env.SOURCE_COMMIT ?? "";
-          const sourceWorkflowRunId = process.env.SOURCE_WORKFLOW_RUN_ID ?? "";
-          const metadataPath = process.env.METADATA_PATH ?? "";
-          const release = JSON.parse(readFileSync(metadataPath, "utf8"));
-          const imageRepository = "ghcr.io/ramideltoro/nutsnews";
+          const imageDigest = process.env.IMAGE_DIGEST ?? "";
+          const buildId = process.env.BUILD_ID ?? "";
+          const schemaVersion = process.env.SCHEMA_VERSION ?? "";
+          const migrationHead = process.env.MIGRATION_HEAD ?? "";
+          const supabaseProjectRef = process.env.SUPABASE_PROJECT_REF ?? "";
 
-          if (!/^[0-9a-f]{40}$/.test(sourceCommit)) {
-            throw new Error("The completed workflow run did not provide a full main commit SHA.");
+          if (confirmation !== "request-vps-staging-recovery") {
+            throw new Error("Manual VPS staging recovery requires typed confirmation request-vps-staging-recovery.");
           }
-          if (!/^[1-9][0-9]{0,19}$/.test(sourceWorkflowRunId)) {
-            throw new Error("The completed workflow run did not provide a trusted run ID.");
-          }
-          if (release.source_commit !== sourceCommit || release.source_workflow_run_id !== sourceWorkflowRunId) {
-            throw new Error("Staging metadata does not match the completed Container Image run.");
-          }
-          if (release.source_repository !== "ramideltoro/nutsnews") {
-            throw new Error("Staging metadata must be emitted by ramideltoro/nutsnews.");
-          }
-          if (release.image_repository !== imageRepository || release.image_tag !== sourceCommit) {
-            throw new Error("Staging metadata must use the expected repository and full-commit image tag.");
-          }
-          if (!/^sha256:[0-9a-f]{64}$/.test(release.image_digest ?? "")) {
-            throw new Error("Staging metadata must contain an immutable sha256 image digest.");
-          }
-          if (release.image !== `${imageRepository}@${release.image_digest}`) {
-            throw new Error("Staging metadata image reference must match its immutable digest.");
-          }
-          if (!/^\d+-\d+$/.test(release.build_id ?? "") || release.deployment_target !== "vps") {
-            throw new Error("Staging metadata has an invalid build identity or deployment target.");
-          }
-          if (release.build_id.split("-", 1)[0] !== sourceWorkflowRunId) {
-            throw new Error("Staging metadata build ID must belong to the source workflow run.");
-          }
-          if (!/^[0-9]{14}$/.test(release.schema_version ?? "")) {
-            throw new Error("Staging metadata must contain the rollback-compatible schema marker.");
-          }
-          if (!/^[0-9]{14}$/.test(release.migration_head ?? "")) {
-            throw new Error("Staging metadata must contain the repository migration head.");
-          }
-          if (!/^[a-z0-9]{20}$/.test(release.supabase_project_ref ?? "")) {
-            throw new Error("Staging metadata must contain the production Supabase project reference.");
-          }
+          if (!token) throw new Error("NUTSNEWS_INFRA_STAGING_TOKEN is required for manual VPS staging recovery.");
+          if (!/^[0-9a-f]{40}$/.test(sourceCommit)) throw new Error("source_commit must be a full lowercase SHA.");
+          if (!/^sha256:[0-9a-f]{64}$/.test(imageDigest)) throw new Error("image_digest must be an immutable sha256 digest.");
+          if (!/^[1-9][0-9]{0,19}-[1-9][0-9]{0,5}$/.test(buildId)) throw new Error("build_id must be run-attempt.");
+          if (!/^[0-9]{14}$/.test(schemaVersion)) throw new Error("schema_version must be a 14-digit schema marker.");
+          if (!/^[0-9]{14}$/.test(migrationHead)) throw new Error("migration_head must be a 14-digit migration head.");
+          if (!/^[a-z0-9]{20}$/.test(supabaseProjectRef)) throw new Error("supabase_project_ref must be a 20-character Supabase project ref.");
 
           const candidate = {
-            schema_version: release.schema_version,
-            migration_head: release.migration_head,
-            supabase_project_ref: release.supabase_project_ref,
-            source_repository: release.source_repository,
-            source_commit: release.source_commit,
-            image_repository: release.image_repository,
-            image_digest: release.image_digest,
-            build_id: release.build_id,
-            source_workflow_run_id: release.source_workflow_run_id,
+            schema_version: schemaVersion,
+            migration_head: migrationHead,
+            supabase_project_ref: supabaseProjectRef,
+            source_repository: "ramideltoro/nutsnews",
+            source_commit: sourceCommit,
+            image_repository: "ghcr.io/ramideltoro/nutsnews",
+            image_digest: imageDigest,
+            build_id: buildId,
+            source_workflow_run_id: buildId.split("-", 1)[0],
           };
           const deploymentId = `stg-${crypto
             .createHash("sha256")
             .update(JSON.stringify(candidate, Object.keys(candidate).sort()))
             .digest("hex")
             .slice(0, 24)}`;
-          const lines = [
-            `candidate_json=${JSON.stringify(candidate)}`,
-            `deployment_id=${deploymentId}`,
-            `source_commit=${candidate.source_commit}`,
-            `image_repository=${candidate.image_repository}`,
-            `image_digest=${candidate.image_digest}`,
-            `build_id=${candidate.build_id}`,
-            `schema_version=${candidate.schema_version}`,
-            `migration_head=${candidate.migration_head}`,
-            `supabase_project_ref=${candidate.supabase_project_ref}`,
-          ];
-          appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join("\n")}\n`, "utf8");
-          NODE
-
-      - name: Request GitOps VPS staging candidate
-        env:
-          NUTSNEWS_INFRA_STAGING_TOKEN: ${{ secrets.NUTSNEWS_INFRA_STAGING_TOKEN }}
-          CANDIDATE_JSON: ${{ steps.candidate.outputs.candidate_json }}
-        run: |
-          set -euo pipefail
-
-          node --input-type=module <<'NODE'
-          const token = process.env.NUTSNEWS_INFRA_STAGING_TOKEN ?? "";
-          const candidate = JSON.parse(process.env.CANDIDATE_JSON ?? "{}");
-          const expectedKeys = [
-            "schema_version",
-            "migration_head",
-            "supabase_project_ref",
-            "source_repository",
-            "source_commit",
-            "image_repository",
-            "image_digest",
-            "build_id",
-            "source_workflow_run_id",
-          ];
-
-          if (!token) {
-            throw new Error("NUTSNEWS_INFRA_STAGING_TOKEN is required to request a GitOps VPS staging candidate.");
-          }
-          if (Object.keys(candidate).sort().join("\n") !== expectedKeys.sort().join("\n")) {
-            throw new Error("Refusing to dispatch a staging candidate with unexpected fields.");
-          }
-          if (
-            candidate.source_repository !== "ramideltoro/nutsnews" ||
-            candidate.image_repository !== "ghcr.io/ramideltoro/nutsnews" ||
-            !/^[0-9a-f]{40}$/.test(candidate.source_commit ?? "") ||
-            !/^sha256:[0-9a-f]{64}$/.test(candidate.image_digest ?? "") ||
-            !/^\d+-\d+$/.test(candidate.build_id ?? "") ||
-            !/^[1-9][0-9]{0,19}$/.test(candidate.source_workflow_run_id ?? "") ||
-            candidate.build_id.split("-", 1)[0] !== candidate.source_workflow_run_id ||
-            !/^[0-9]{14}$/.test(candidate.schema_version ?? "") ||
-            !/^[0-9]{14}$/.test(candidate.migration_head ?? "") ||
-            !/^[a-z0-9]{20}$/.test(candidate.supabase_project_ref ?? "")
-          ) {
-            throw new Error("Refusing to dispatch an incomplete or incompatible VPS staging candidate.");
-          }
 
           const response = await fetch("https://api.github.com/repos/ramideltoro/nutsnews-infra/dispatches", {
             method: "POST",
@@ -219,21 +116,34 @@ jobs:
               Accept: "application/vnd.github+json",
               Authorization: `Bearer ${token}`,
               "Content-Type": "application/json",
-              "X-GitHub-Api-Version": "2026-03-10",
+              "X-GitHub-Api-Version": "2022-11-28",
             },
             body: JSON.stringify({
               event_type: "nutsnews-staging-release",
               client_payload: candidate,
             }),
           });
-
           if (response.status !== 204) {
-            throw new Error(`VPS staging dispatch returned ${response.status}.`);
+            throw new Error(`Manual VPS staging recovery dispatch returned HTTP ${response.status}.`);
           }
-          console.log(`Requested GitOps VPS staging candidate for ${candidate.source_commit}.`);
+
+          appendFileSync(
+            process.env.GITHUB_OUTPUT,
+            [
+              `deployment_id=${deploymentId}`,
+              `source_commit=${sourceCommit}`,
+              `image_digest=${imageDigest}`,
+              `build_id=${buildId}`,
+              `schema_version=${schemaVersion}`,
+              `migration_head=${migrationHead}`,
+              `supabase_project_ref=${supabaseProjectRef}`,
+              "",
+            ].join("\n"),
+            "utf8",
+          );
           NODE
 
-      - name: Summarize verified staging handoff
+      - name: Summarize manual staging recovery dispatch
         env:
           SOURCE_COMMIT: ${{ steps.candidate.outputs.source_commit }}
           IMAGE_DIGEST: ${{ steps.candidate.outputs.image_digest }}
@@ -244,7 +154,9 @@ jobs:
           DEPLOYMENT_ID: ${{ steps.candidate.outputs.deployment_id }}
         run: |
           {
-            echo "## Verified NutsNews staging handoff"
+            echo "## Manual VPS staging recovery dispatch"
+            echo
+            echo "This workflow is an operator recovery path only. Normal releases deploy and test the PR candidate before merge through \`Pre-merge deployment gate\`."
             echo
             echo "- Source commit: \`${SOURCE_COMMIT}\`"
             echo "- Staging deployment ID: \`${DEPLOYMENT_ID}\`"
@@ -254,10 +166,4 @@ jobs:
             echo "- Rollback-compatible schema: \`${SCHEMA_VERSION}\`"
             echo "- Production Supabase project ref: \`${SUPABASE_PROJECT_REF}\`"
             echo "- GitOps VPS staging request: accepted"
-            echo "- Staging deploy workflow: https://github.com/ramideltoro/nutsnews-infra/actions/workflows/nutsnews-staging-deploy.yml"
-            echo "- Staging qualifier workflow: https://github.com/ramideltoro/nutsnews-infra/actions/workflows/nutsnews-staging-qualification.yml"
-            echo "- Production gate workflow: https://github.com/ramideltoro/nutsnews-infra/actions/workflows/protected-ansible-apply.yml"
-            echo "- Rollback workflow: https://github.com/ramideltoro/nutsnews-infra/actions/workflows/protected-nutsnews-rollback.yml"
-            echo
-            echo "Vercel Production is disabled for app main and deploys only after the protected VPS release workflow dispatches the exact same source commit."
           } >> "$GITHUB_STEP_SUMMARY"

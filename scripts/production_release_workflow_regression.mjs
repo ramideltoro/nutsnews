@@ -7,16 +7,35 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const containerWorkflow = await readFile(resolve(root, ".github/workflows/container-image.yml"), "utf8");
 const releaseWorkflow = await readFile(resolve(root, ".github/workflows/staging-release.yml"), "utf8");
 const regressionWorkflow = await readFile(resolve(root, ".github/workflows/staging-release-regression.yml"), "utf8");
+const preMergeDeploymentContract = await readFile(
+  resolve(root, ".github/deployment/pre-merge-deployment-gate-contract.md"),
+  "utf8",
+);
 const translationCoverageWorkflow = await readFile(resolve(root, ".github/workflows/translation-coverage.yml"), "utf8");
 const vercelBackendTokenSyncWorkflow = await readFile(resolve(root, ".github/workflows/vercel-backend-token-sync.yml"), "utf8");
 const vercelProductionWorkflow = await readFile(resolve(root, ".github/workflows/vercel-production-release.yml"), "utf8");
 const dualTargetSmoke = await readFile(resolve(root, "scripts/dual_target_web_smoke.mjs"), "utf8");
+const deploymentHardening = await readFile(resolve(root, "scripts/deployment_hardening.mjs"), "utf8");
+const deploymentHardeningTest = await readFile(resolve(root, "tests/deployment-hardening.test.mjs"), "utf8");
+const prVpsStagingDeploy = await readFile(resolve(root, "scripts/pr_vps_staging_deploy.mjs"), "utf8");
+const prVpsStagingDeployTest = await readFile(resolve(root, "tests/pr-vps-staging-deploy.test.mjs"), "utf8");
+const prVpsStagingQualification = await readFile(resolve(root, "scripts/pr_vps_staging_qualification.mjs"), "utf8");
+const prVpsStagingQualificationTest = await readFile(resolve(root, "tests/pr-vps-staging-qualification.test.mjs"), "utf8");
 const vercelConfig = JSON.parse(await readFile(resolve(root, "web/vercel.json"), "utf8"));
 const packageJson = JSON.parse(await readFile(resolve(root, "web/package.json"), "utf8"));
 const workflowNames = await readdir(resolve(root, ".github/workflows"));
 
 function requireText(text, fragment, message) {
   assert.ok(text.includes(fragment), message);
+}
+
+function requireOrderedText(text, fragments, message) {
+  let cursor = -1;
+  for (const fragment of fragments) {
+    const index = text.indexOf(fragment, cursor + 1);
+    assert.ok(index > cursor, `${message}: missing or out of order fragment ${JSON.stringify(fragment)}.`);
+    cursor = index;
+  }
 }
 
 function escapeRegExp(value) {
@@ -39,9 +58,30 @@ function workflowStep(text, name) {
   return text.slice(start, next === -1 ? text.length : next);
 }
 
+function workflowJob(text, name) {
+  const marker = `  ${name}:\n`;
+  const start = text.indexOf(marker);
+  assert.notEqual(start, -1, `Workflow job not found: ${name}`);
+  const rest = text.slice(start + marker.length);
+  const next = rest.search(/\n  [A-Za-z0-9_-]+:\n/);
+  return text.slice(start, next === -1 ? text.length : start + marker.length + next);
+}
+
+const prVpsStagingJob = workflowJob(containerWorkflow, "deploy-vps-staging");
+const vpsStagingUiSmokeJob = workflowJob(containerWorkflow, "ui-smoke-vps-staging");
+const vercelStagingDeployJob = workflowJob(containerWorkflow, "deploy-vercel-staging");
+const vercelStagingUiSmokeJob = workflowJob(containerWorkflow, "ui-smoke-vercel-staging");
+const vercelProductionDeployJob = workflowJob(containerWorkflow, "deploy-vercel-production");
+const vercelProductionUiSmokeJob = workflowJob(containerWorkflow, "ui-smoke-vercel-production");
+const vpsProductionDeployJob = workflowJob(containerWorkflow, "deploy-vps-production");
+const vpsProductionUiSmokeJob = workflowJob(containerWorkflow, "ui-smoke-vps-production");
+const preMergeDeploymentGateJob = workflowJob(containerWorkflow, "pre-merge-deployment-gate");
+
 assert.doesNotMatch(containerWorkflow, /^\s+paths:\s*$/m, "Container Image must run for every main merge, not a path subset.");
-requireText(containerWorkflow, "cancel-in-progress: false", "Container Image must not skip a merged release.");
-requireText(containerWorkflow, "name: nutsnews-staging-release", "Container Image must publish staging metadata.");
+requireText(containerWorkflow, "cancel-in-progress: ${{ github.event_name == 'pull_request' }}", "Container Image must cancel stale PR attempts without skipping merged releases.");
+requireText(containerWorkflow, "format('container-image-pr-{0}', github.event.pull_request.number)", "Container Image PR concurrency must be scoped to the PR number.");
+assert.ok(!containerWorkflow.includes("name: nutsnews-staging-release"), "Container Image must not publish post-main staging release metadata.");
+requireText(containerWorkflow, "Deployment role: archive only", "Main image publish summary must state it is not a deployment trigger.");
 requireText(containerWorkflow, "image_digest", "Release metadata must include the immutable image digest.");
 requireText(containerWorkflow, "image_tag: sourceCommit", "Release metadata must use the full commit tag.");
 requireText(containerWorkflow, "migration_head: migrationContract.head", "Release metadata must include the repository migration head.");
@@ -58,6 +98,206 @@ requireText(containerWorkflow, "TRANSLATION_QUALITY_MIN_COVERAGE=100", "Release 
 requirePinnedWorkflowUse(containerWorkflow, "actions/upload-artifact", "v6", "Release metadata must be retained as an artifact.");
 requireText(containerWorkflow, "NUTSNEWS_DEPLOYMENT_TARGET=vps", "OCI provenance must keep the infra-approved VPS build target.");
 
+requireOrderedText(
+  preMergeDeploymentContract,
+  [
+    "VPS staging",
+    "UI tests",
+    "Vercel staging",
+    "UI tests",
+    "Vercel production",
+    "UI tests",
+    "VPS production",
+    "UI tests",
+  ],
+  "Pre-merge deployment contract must preserve the required stage order",
+);
+for (const field of [
+  "source_commit",
+  "build_id",
+  "image_digest",
+  "deployment_id",
+  "target_url",
+  "runtime_env",
+  "deployment_target",
+  "workflow_run_id",
+  "test_artifact_links",
+]) {
+  requireText(preMergeDeploymentContract, field, `Pre-merge deployment contract must name ${field}.`);
+}
+for (const fragment of [
+  "Merge to `main` is a handoff after all deployment gates have passed.",
+  "A merge to `main` must not trigger deployment work.",
+  "All deployment stages complete before merge into `main`.",
+  "Reusable UI test evidence",
+  "Target-specific deploy evidence",
+  "bounded exponential backoff",
+  "nutsnews-premerge-deploy-pr-<pr_number>",
+  "pr-<pr_number>-<source_commit>-<target_type>",
+  "deploy-vps-staging",
+  "ui-smoke-vps-staging",
+  "deploy-vercel-staging",
+  "ui-smoke-vercel-staging",
+  "deploy-vercel-production",
+  "ui-smoke-vercel-production",
+  "deploy-vps-production",
+  "ui-smoke-vps-production",
+  "pre-merge-deployment-gate",
+  "nutsnews-staging-release",
+  "runtime env `staging`, deployment target `vps-staging`",
+  "infra staging qualification",
+  "deployment target `vercel-staging`",
+  "deployment target `vercel-production`",
+  "deployment target `production-vps`",
+  "NUTSNEWS_PRODUCTION_SAFE_SURFACES=true",
+  "nutsnews-production-vps-release",
+  "node ../scripts/run_deployed_ui_smoke_with_evidence.mjs",
+  "node scripts/pr_vps_staging_qualification.mjs",
+  "nutsnews-ui-smoke-vps-staging",
+  "nutsnews-ui-smoke-production-vps",
+  "pre_merge_deployment_workflow_order_regression.mjs",
+  "stage order, target URLs, deployment IDs, result, and GitHub artifact links",
+  "Pre-merge deployment gate",
+]) {
+  requireText(preMergeDeploymentContract, fragment, `Pre-merge deployment contract must define: ${fragment}`);
+}
+requireText(containerWorkflow, "node --test tests/deployment-hardening.test.mjs", "Release candidate must run deployment hardening helper tests.");
+for (const fragment of [
+  "withBoundedExponentialBackoff",
+  "fetchJsonWithRetry",
+  "pollGitHubWorkflowRun",
+  "pollInfraGitHubDeployment",
+  "pollVercelDeployment",
+  "preMergeDeploymentConcurrencyGroup",
+  "deploymentStageIdempotencyKey",
+  "safeDeploymentDebugSummary",
+]) {
+  requireText(deploymentHardening, fragment, `Deployment hardening helper must export ${fragment}.`);
+  requireText(deploymentHardeningTest, fragment, `Deployment hardening regression must cover ${fragment}.`);
+}
+requireText(prVpsStagingJob, "name: Deploy PR candidate to VPS staging", "PR pipeline must include the VPS staging deploy stage.");
+requireText(prVpsStagingJob, "needs: [pr-release-artifact, trusted-pr-deployment-eligibility]", "VPS staging deploy must consume the immutable PR artifact after eligibility.");
+requireText(prVpsStagingJob, "timeout-minutes: 30", "VPS staging deploy must have an explicit timeout.");
+requireText(prVpsStagingJob, "group: nutsnews-premerge-deploy-pr-${{ github.event.pull_request.number }}", "VPS staging deploy must serialize by PR number.");
+requireText(prVpsStagingJob, "cancel-in-progress: true", "VPS staging deploy reruns must supersede older active attempts.");
+requireText(prVpsStagingJob, "PR_RELEASE_METADATA_JSON: ${{ needs.pr-release-artifact.outputs.metadata_json }}", "VPS staging deploy must consume PR artifact metadata.");
+requireText(prVpsStagingJob, "NUTSNEWS_INFRA_STAGING_TOKEN", "VPS staging deploy must use the staging infra dispatch token.");
+requireText(prVpsStagingJob, "node scripts/pr_vps_staging_deploy.mjs", "VPS staging deploy must use the tested deploy helper.");
+requireText(prVpsStagingJob, "Upload VPS staging deploy evidence", "VPS staging deploy must retain deploy evidence.");
+requireText(containerWorkflow, "node --test tests/pr-vps-staging-deploy.test.mjs", "Release candidate must run PR VPS staging deployment tests.");
+requireText(containerWorkflow, "node --test tests/pr-vps-staging-qualification.test.mjs", "Release candidate must run delegated PR VPS staging qualification tests.");
+for (const fragment of [
+  "parsePrReleaseMetadata",
+  "buildVpsStagingCandidate",
+  "computeVpsStagingDeploymentId",
+  "pollInfraGitHubDeployment",
+  "verifyVpsStagingRuntime",
+  "verifiedVpsStagingRuntimeIdentity",
+  "deploymentStageIdempotencyKey",
+  "buildVpsStagingEvidence",
+]) {
+  requireText(prVpsStagingDeploy, fragment, `PR VPS staging deploy helper must implement ${fragment}.`);
+  requireText(prVpsStagingDeployTest, fragment, `PR VPS staging deploy regression must cover ${fragment}.`);
+}
+requireText(vpsStagingUiSmokeJob, "name: UI smoke VPS staging", "PR pipeline must include the VPS staging UI smoke stage.");
+requireText(vpsStagingUiSmokeJob, "needs: [deploy-vps-staging, pr-release-artifact, trusted-pr-deployment-eligibility]", "VPS staging UI smoke must run after the VPS staging deploy.");
+requireText(vpsStagingUiSmokeJob, "timeout-minutes: 20", "VPS staging UI smoke must have an explicit timeout.");
+requireText(vpsStagingUiSmokeJob, "group: nutsnews-premerge-deploy-pr-${{ github.event.pull_request.number }}", "VPS staging UI smoke must serialize by PR number.");
+requireText(vpsStagingUiSmokeJob, "Wait for infra staging qualification and write UI smoke evidence", "VPS staging UI smoke must wait for the protected infra qualification.");
+requireText(vpsStagingUiSmokeJob, "run: node scripts/pr_vps_staging_qualification.mjs", "VPS staging UI smoke must use the delegated qualification evidence helper.");
+requireText(vpsStagingUiSmokeJob, "NUTSNEWS_INFRA_STAGING_TOKEN", "VPS staging UI smoke must read infra qualification evidence through the staging token.");
+requireText(vpsStagingUiSmokeJob, "NUTSNEWS_VPS_STAGING_INFRA_RUN_ID: ${{ needs.deploy-vps-staging.outputs.infra_run_id }}", "VPS staging UI smoke must bind qualification evidence to the VPS staging infra run.");
+requireText(vpsStagingUiSmokeJob, "NUTSNEWS_UI_SMOKE_TARGET_TYPE: vps-staging", "VPS staging UI smoke evidence must use the vps-staging target type.");
+requireText(vpsStagingUiSmokeJob, "NUTSNEWS_UI_SMOKE_SOURCE_COMMIT: ${{ needs.pr-release-artifact.outputs.source_commit }}", "VPS staging UI smoke must bind source commit evidence to the PR artifact.");
+requireText(vpsStagingUiSmokeJob, "NUTSNEWS_UI_SMOKE_BUILD_ID: ${{ needs.pr-release-artifact.outputs.build_id }}", "VPS staging UI smoke must bind build evidence to the PR artifact.");
+requireText(vpsStagingUiSmokeJob, "NUTSNEWS_UI_SMOKE_DEPLOYMENT_ID: ${{ needs.deploy-vps-staging.outputs.deployment_id }}", "VPS staging UI smoke must bind evidence to the VPS staging deployment ID.");
+requireText(vpsStagingUiSmokeJob, "web/test-results/deployed-ui-smoke", "VPS staging UI smoke must upload standardized evidence output.");
+for (const fragment of [
+  "findInfraStagingQualification",
+  "writeDelegatedVpsStagingSmokeEvidence",
+  "staging-qualification-${deploymentId}-",
+  "writeUiSmokeEvidence",
+]) {
+  requireText(prVpsStagingQualification, fragment, `Delegated VPS staging qualification helper must implement ${fragment}.`);
+}
+for (const fragment of ["findInfraStagingQualification", "concluded failure", "staging-qualification-${deploymentId}-"]) {
+  requireText(prVpsStagingQualificationTest, fragment, `Delegated VPS staging qualification regression must cover ${fragment}.`);
+}
+requireText(vercelStagingDeployJob, "name: Deploy PR candidate to Vercel staging", "PR pipeline must include the Vercel staging deploy stage.");
+requireText(vercelStagingDeployJob, "needs: [ui-smoke-vps-staging, deploy-vps-staging, pr-release-artifact, trusted-pr-deployment-eligibility]", "Vercel staging deploy must wait for VPS staging UI smoke.");
+requireText(vercelStagingDeployJob, "timeout-minutes: 30", "Vercel staging deploy must have an explicit timeout.");
+requireText(vercelStagingDeployJob, "ref: ${{ needs.pr-release-artifact.outputs.source_commit }}", "Vercel staging deploy must checkout the exact PR artifact source commit.");
+requireText(vercelStagingDeployJob, "vercel@latest deploy", "Vercel staging deploy must use the Vercel CLI deploy path.");
+requireText(vercelStagingDeployJob, "--target \"$VERCEL_STAGING_TARGET\"", "Vercel staging deploy must target the configured staging environment.");
+requireText(vercelStagingDeployJob, "NUTSNEWS_DEPLOYMENT_TARGET=vercel-staging", "Vercel staging deploy must stamp the staging runtime target.");
+requireText(vercelStagingDeployJob, "node scripts/pr_vercel_staging_deploy.mjs", "Vercel staging deploy must use the tested validation and evidence helper.");
+requireText(vercelStagingDeployJob, "Upload Vercel staging deploy evidence", "Vercel staging deploy must retain deploy evidence.");
+requireText(containerWorkflow, "node --test tests/pr-vercel-staging-deploy.test.mjs", "Release candidate must run PR Vercel staging deployment tests.");
+requireText(vercelStagingUiSmokeJob, "name: UI smoke Vercel staging", "PR pipeline must include the Vercel staging UI smoke stage.");
+requireText(vercelStagingUiSmokeJob, "needs: [deploy-vercel-staging, ui-smoke-vps-staging, pr-release-artifact, trusted-pr-deployment-eligibility]", "Vercel staging UI smoke must run after the Vercel staging deploy.");
+requireText(vercelStagingUiSmokeJob, "timeout-minutes: 20", "Vercel staging UI smoke must have an explicit timeout.");
+requireText(vercelStagingUiSmokeJob, "Verify Vercel staging identity before browser tests", "Vercel staging UI smoke must preflight runtime identity.");
+requireText(vercelStagingUiSmokeJob, "verifyVercelStagingRuntime", "Vercel staging UI smoke must verify source, build, and target identity before browser tests.");
+requireText(vercelStagingUiSmokeJob, "PLAYWRIGHT_BASE_URL: ${{ needs.deploy-vercel-staging.outputs.target_url }}", "Vercel staging UI smoke must target the deploy job URL.");
+requireText(vercelStagingUiSmokeJob, "NUTSNEWS_UI_SMOKE_TARGET_TYPE: vercel-staging", "Vercel staging UI smoke evidence must use the vercel-staging target type.");
+requireText(vercelStagingUiSmokeJob, "VERCEL_AUTOMATION_BYPASS_SECRET", "Vercel staging UI smoke must support deployment protection bypass.");
+requireText(vercelStagingUiSmokeJob, "run: node ../scripts/run_deployed_ui_smoke_with_evidence.mjs", "Vercel staging UI smoke must use the standardized evidence runner.");
+requireText(vercelStagingUiSmokeJob, "web/test-results/deployed-ui-smoke", "Vercel staging UI smoke must upload standardized evidence output.");
+requireText(vercelProductionDeployJob, "name: Deploy PR candidate to Vercel production", "PR pipeline must include the Vercel production deploy stage.");
+requireText(vercelProductionDeployJob, "needs: [ui-smoke-vercel-staging, deploy-vercel-staging, pr-release-artifact, trusted-pr-deployment-eligibility]", "Vercel production deploy must wait for Vercel staging UI smoke.");
+requireText(vercelProductionDeployJob, "environment: Production", "Vercel production deploy must use the protected Production environment.");
+requireText(vercelProductionDeployJob, "timeout-minutes: 35", "Vercel production deploy must have an explicit timeout.");
+requireText(vercelProductionDeployJob, "ref: ${{ needs.pr-release-artifact.outputs.source_commit }}", "Vercel production deploy must checkout the exact PR artifact source commit.");
+requireText(vercelProductionDeployJob, "vercel@latest deploy", "Vercel production deploy must use the Vercel CLI deploy path.");
+requireText(vercelProductionDeployJob, "--prod", "Vercel production deploy must create a production deployment.");
+requireText(vercelProductionDeployJob, "--skip-domain", "Vercel production deploy must stage before promotion.");
+requireText(vercelProductionDeployJob, "vercel@latest promote \"$VERCEL_DEPLOYMENT_ID\"", "Vercel production deploy must promote the validated deployment.");
+requireText(vercelProductionDeployJob, "NUTSNEWS_DEPLOYMENT_TARGET=vercel-production", "Vercel production deploy must stamp the production runtime target.");
+requireText(vercelProductionDeployJob, "node scripts/pr_vercel_production_deploy.mjs", "Vercel production deploy must use the tested validation and evidence helper.");
+requireText(vercelProductionDeployJob, "Upload Vercel production deploy evidence", "Vercel production deploy must retain deploy evidence.");
+requireText(containerWorkflow, "node --test tests/pr-vercel-production-deploy.test.mjs", "Release candidate must run PR Vercel production deployment tests.");
+requireText(vercelProductionUiSmokeJob, "name: UI smoke Vercel production", "PR pipeline must include the Vercel production UI smoke stage.");
+requireText(vercelProductionUiSmokeJob, "needs: [deploy-vercel-production, ui-smoke-vercel-staging, pr-release-artifact, trusted-pr-deployment-eligibility]", "Vercel production UI smoke must run after the Vercel production deploy.");
+requireText(vercelProductionUiSmokeJob, "environment: Production", "Vercel production UI smoke must use the protected Production environment.");
+requireText(vercelProductionUiSmokeJob, "timeout-minutes: 20", "Vercel production UI smoke must have an explicit timeout.");
+requireText(vercelProductionUiSmokeJob, "Verify Vercel production identity before browser tests", "Vercel production UI smoke must preflight runtime identity.");
+requireText(vercelProductionUiSmokeJob, "verifyVercelProductionRuntime", "Vercel production UI smoke must verify source, build, and target identity before browser tests.");
+requireText(vercelProductionUiSmokeJob, "PLAYWRIGHT_BASE_URL: ${{ needs.deploy-vercel-production.outputs.target_url }}", "Vercel production UI smoke must target the production deploy URL.");
+requireText(vercelProductionUiSmokeJob, "NUTSNEWS_UI_SMOKE_TARGET_TYPE: vercel-production", "Vercel production UI smoke evidence must use the vercel-production target type.");
+requireText(vercelProductionUiSmokeJob, 'NUTSNEWS_PRODUCTION_SAFE_SURFACES: "true"', "Vercel production UI smoke must use the safe production smoke profile.");
+requireText(vercelProductionUiSmokeJob, "run: node ../scripts/run_deployed_ui_smoke_with_evidence.mjs", "Vercel production UI smoke must use the standardized evidence runner.");
+requireText(vercelProductionUiSmokeJob, "web/test-results/deployed-ui-smoke", "Vercel production UI smoke must upload standardized evidence output.");
+requireText(vpsProductionDeployJob, "name: Deploy PR candidate to VPS production", "PR pipeline must include the VPS production deploy stage.");
+requireText(vpsProductionDeployJob, "needs: [ui-smoke-vercel-production, deploy-vercel-production, pr-release-artifact, trusted-pr-deployment-eligibility]", "VPS production deploy must wait for Vercel production UI smoke.");
+requireText(vpsProductionDeployJob, "environment: Production", "VPS production deploy must use the protected Production environment.");
+requireText(vpsProductionDeployJob, "timeout-minutes: 35", "VPS production deploy must have an explicit timeout.");
+requireText(vpsProductionDeployJob, "NUTSNEWS_INFRA_PRODUCTION_TOKEN", "VPS production deploy must use the production infra token.");
+requireText(vpsProductionDeployJob, "node scripts/pr_vps_production_deploy.mjs", "VPS production deploy must use the tested validation and evidence helper.");
+requireText(vpsProductionDeployJob, "Upload VPS production deploy evidence", "VPS production deploy must retain deploy evidence.");
+requireText(containerWorkflow, "node --test tests/pr-vps-production-deploy.test.mjs", "Release candidate must run PR VPS production deployment tests.");
+requireText(vpsProductionUiSmokeJob, "name: UI smoke VPS production", "PR pipeline must include the VPS production UI smoke stage.");
+requireText(vpsProductionUiSmokeJob, "needs: [deploy-vps-production, ui-smoke-vercel-production, pr-release-artifact, trusted-pr-deployment-eligibility]", "VPS production UI smoke must run after the VPS production deploy.");
+requireText(vpsProductionUiSmokeJob, "environment: Production", "VPS production UI smoke must use the protected Production environment.");
+requireText(vpsProductionUiSmokeJob, "timeout-minutes: 20", "VPS production UI smoke must have an explicit timeout.");
+requireText(vpsProductionUiSmokeJob, "Verify VPS production identity before browser tests", "VPS production UI smoke must preflight runtime identity.");
+requireText(vpsProductionUiSmokeJob, "verifyVpsProductionRuntime", "VPS production UI smoke must verify source, build, image, and target identity before browser tests.");
+requireText(vpsProductionUiSmokeJob, "PLAYWRIGHT_BASE_URL: ${{ needs.deploy-vps-production.outputs.target_url }}", "VPS production UI smoke must target the VPS production deploy URL.");
+requireText(vpsProductionUiSmokeJob, "NUTSNEWS_UI_SMOKE_TARGET_TYPE: production-vps", "VPS production UI smoke evidence must use the production-vps target type.");
+requireText(vpsProductionUiSmokeJob, "NUTSNEWS_UI_SMOKE_DEPLOYMENT_ID: ${{ needs.deploy-vps-production.outputs.deployment_id }}", "VPS production UI smoke must bind evidence to the VPS production deployment ID.");
+requireText(vpsProductionUiSmokeJob, 'NUTSNEWS_PRODUCTION_SAFE_SURFACES: "true"', "VPS production UI smoke must use the safe production smoke profile.");
+requireText(vpsProductionUiSmokeJob, "CF_ACCESS_CLIENT_ID", "VPS production UI smoke must support protected VPS auth headers.");
+requireText(vpsProductionUiSmokeJob, "run: node ../scripts/run_deployed_ui_smoke_with_evidence.mjs", "VPS production UI smoke must use the standardized evidence runner.");
+requireText(vpsProductionUiSmokeJob, "web/test-results/deployed-ui-smoke", "VPS production UI smoke must upload standardized evidence output.");
+requireText(preMergeDeploymentGateJob, "name: Pre-merge deployment gate", "PR pipeline must expose the final pre-merge deployment gate check.");
+requireText(preMergeDeploymentGateJob, "if: always() && github.event_name == 'pull_request'", "Final pre-merge gate must run even when upstream deployment stages fail.");
+requireText(preMergeDeploymentGateJob, "needs: [trusted-pr-deployment-eligibility, pr-release-artifact, deploy-vps-staging, ui-smoke-vps-staging, deploy-vercel-staging, ui-smoke-vercel-staging, deploy-vercel-production, ui-smoke-vercel-production, deploy-vps-production, ui-smoke-vps-production]", "Final pre-merge gate must depend on all deploy and UI smoke stages.");
+requireText(preMergeDeploymentGateJob, "actions: read", "Final pre-merge gate must be able to read retained workflow artifacts.");
+requireText(preMergeDeploymentGateJob, "Summarize intentionally ineligible PR", "Final pre-merge gate must pass intentionally ineligible PRs without deployment evidence.");
+requireText(preMergeDeploymentGateJob, "PRE_MERGE_DEPLOYMENT_GATE_STAGES_JSON", "Final pre-merge gate must receive ordered stage result and artifact inputs.");
+requireText(preMergeDeploymentGateJob, "node scripts/pre_merge_deployment_gate.mjs", "Final pre-merge gate must use the tested evidence validator.");
+requireText(preMergeDeploymentGateJob, "Upload pre-merge deployment gate evidence", "Final pre-merge gate must retain its aggregate evidence.");
+requireText(containerWorkflow, "node --test tests/pre-merge-deployment-gate.test.mjs", "Release candidate must run final pre-merge deployment gate tests.");
+
 assert.equal(
   packageJson.scripts?.["test:translation-release-gate"],
   "node ../scripts/translation_release_gate_regression.mjs",
@@ -71,37 +311,21 @@ requireText(translationCoverageWorkflow, 'TRANSLATION_QUALITY_FAIL_ON_MISSING: "
 requireText(translationCoverageWorkflow, 'TRANSLATION_QUALITY_MIN_COVERAGE: "0"', "Scheduled translation workflow must not enforce the release-gate coverage threshold.");
 requireText(translationCoverageWorkflow, "Upload translation report", "Scheduled translation workflow must upload the operations report.");
 
-requireText(releaseWorkflow, "workflow_run:", "Staging handoff must wait for Container Image completion.");
-requireText(releaseWorkflow, 'workflows: ["Container Image"]', "Staging handoff must trust only the image workflow.");
-requireText(releaseWorkflow, "github.event.workflow_run.conclusion == 'success'", "Staging handoff must require a successful image workflow.");
-requireText(releaseWorkflow, "github.event.workflow_run.event == 'push'", "Staging handoff must reject pull-request workflow runs.");
-requireText(releaseWorkflow, "github.event.workflow_run.head_branch == 'main'", "Staging handoff must require main.");
-requireText(
-  releaseWorkflow,
-  "github.event.workflow_run.head_repository.full_name == github.repository",
-  "Staging handoff must reject untrusted fork workflow runs.",
-);
-requireText(releaseWorkflow, "Download immutable staging metadata with retries", "Staging handoff must retry transient artifact failures.");
-requireText(releaseWorkflow, "ARTIFACT_DIR: ${{ runner.temp }}/nutsnews-staging-release", "Release metadata must be downloaded outside the workspace.");
-requireText(releaseWorkflow, "SOURCE_WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}", "Release metadata must come from the triggering run.");
-requireText(releaseWorkflow, "archive_download_url", "Staging handoff must resolve the exact artifact archive URL.");
-requireText(releaseWorkflow, "for attempt in 1 2 3 4 5", "Staging handoff must use bounded artifact retries.");
-requireText(releaseWorkflow, "unzip -q \"$artifact_zip\" -d \"$ARTIFACT_DIR\"", "Staging handoff must unpack the immutable metadata artifact.");
-requireText(releaseWorkflow, "NUTSNEWS_INFRA_STAGING_TOKEN", "Cross-repository staging handoff must use the staging-only token.");
-requireText(releaseWorkflow, "nutsnews-staging-release", "The dispatch event must request staging only.");
-requireText(releaseWorkflow, "https://api.github.com/repos/ramideltoro/nutsnews-infra/dispatches", "Staging handoff must target only nutsnews-infra.");
-requireText(releaseWorkflow, "client_payload: candidate", "Staging dispatch payload must be the exact candidate object.");
-requireText(releaseWorkflow, "schema_version", "Staging candidate must include schema version.");
-requireText(releaseWorkflow, "source_repository", "Staging candidate must include source repository.");
-requireText(releaseWorkflow, "source_workflow_run_id", "Staging candidate must include source workflow run.");
-requireText(releaseWorkflow, "image_digest", "Staging candidate must include the immutable image digest.");
-requireText(releaseWorkflow, "migration_head", "Staging candidate must include migration head.");
-requireText(releaseWorkflow, "supabase_project_ref", "Staging candidate must include production Supabase project ref.");
-requireText(
-  releaseWorkflow,
-  "Vercel Production is disabled for app main and deploys only after the protected VPS release workflow dispatches the exact same source commit.",
-  "Staging handoff summary must document that Vercel Production is part of the protected release chain.",
-);
+requireText(releaseWorkflow, "name: Manual VPS Staging Recovery Dispatch", "Staging workflow must be clearly named as manual recovery.");
+requireText(releaseWorkflow, "workflow_dispatch:", "Staging recovery must require explicit operator dispatch.");
+assert.ok(!releaseWorkflow.includes("workflow_run:"), "Staging recovery must not run after Container Image completes on main.");
+assert.ok(!releaseWorkflow.includes("github.event.workflow_run"), "Staging recovery must not read post-main workflow_run payloads.");
+requireText(releaseWorkflow, "request-vps-staging-recovery", "Staging recovery must require typed confirmation.");
+requireText(releaseWorkflow, "NUTSNEWS_INFRA_STAGING_TOKEN", "Manual staging recovery must use the staging-only token.");
+requireText(releaseWorkflow, "nutsnews-staging-release", "Manual staging recovery dispatch must request staging only.");
+requireText(releaseWorkflow, "https://api.github.com/repos/ramideltoro/nutsnews-infra/dispatches", "Manual staging recovery must target only nutsnews-infra.");
+requireText(releaseWorkflow, 'event_type: "nutsnews-staging-release"', "Manual staging recovery must use the staging dispatch event.");
+requireText(releaseWorkflow, "source_commit", "Manual staging recovery candidate must include source commit.");
+requireText(releaseWorkflow, "source_workflow_run_id: buildId.split", "Manual staging recovery candidate must derive the source workflow run from the build ID.");
+requireText(releaseWorkflow, "image_digest", "Manual staging recovery candidate must include the immutable image digest.");
+requireText(releaseWorkflow, "migration_head", "Manual staging recovery candidate must include migration head.");
+requireText(releaseWorkflow, "supabase_project_ref", "Manual staging recovery candidate must include production Supabase project ref.");
+requireText(releaseWorkflow, "operator recovery path only", "Staging recovery summary must say it is not the normal release path.");
 requireText(regressionWorkflow, ".github/workflows/staging-release.yml", "Regression workflow must watch the staging handoff workflow.");
 requireText(regressionWorkflow, ".github/workflows/vercel-backend-token-sync.yml", "Regression workflow must watch the Vercel backend token sync workflow.");
 
@@ -114,6 +338,8 @@ requireText(vercelProductionWorkflow, "repository_dispatch:", "Vercel production
 requireText(vercelProductionWorkflow, "nutsnews-vercel-production-release", "Vercel production workflow must use the infra release event.");
 requireText(vercelProductionWorkflow, "on:\n  repository_dispatch:", "Vercel production must be driven by repository dispatch, not manual workflow dispatch.");
 assert.ok(!vercelProductionWorkflow.includes("workflow_dispatch:"), "Vercel production must not allow manual workflow_dispatch.");
+requireText(vercelProductionWorkflow, "Dispatch-only Vercel Production Recovery", "Vercel production workflow name must describe dispatch-only recovery.");
+requireText(vercelProductionWorkflow, "not triggered by pushes to main", "Vercel production summary must document that main merges do not trigger it.");
 requirePinnedWorkflowUse(vercelProductionWorkflow, "actions/checkout", "v5", "Vercel production must checkout the exact source commit.");
 requireText(vercelProductionWorkflow, "ref: ${{ env.SOURCE_COMMIT }}", "Vercel production must deploy the dispatch source commit.");
 requireText(vercelProductionWorkflow, "environment: Production", "Vercel production must use the protected app Production environment.");
@@ -261,7 +487,7 @@ assert.doesNotMatch(
 
 assert.ok(!workflowNames.includes("production-release.yml"), "Direct production release workflow file must not exist.");
 assert.ok(!workflowNames.includes("production-release-regression.yml"), "Old production release regression workflow file must not exist.");
-assert.ok(workflowNames.includes("vercel-production-release.yml"), "Vercel production must be an explicit post-VPS workflow.");
+assert.ok(workflowNames.includes("vercel-production-release.yml"), "Vercel production must be an explicit dispatch-only recovery workflow.");
 assert.ok(workflowNames.includes("vercel-backend-token-sync.yml"), "Backend token sync must be an explicit protected workflow.");
 for (const [label, text] of [
   ["Container Image", containerWorkflow],

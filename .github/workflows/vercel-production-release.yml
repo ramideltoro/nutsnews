@@ -1,5 +1,5 @@
-name: Deploy Vercel Production Release
-run-name: Deploy Vercel production ${{ github.event.client_payload.source_commit }}
+name: Dispatch-only Vercel Production Recovery
+run-name: Dispatch-only Vercel production ${{ github.event.client_payload.source_commit }}
 
 on:
   repository_dispatch:
@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy exact release to Vercel production
+    name: Deploy dispatch-only Vercel production recovery
     runs-on: ubuntu-latest
     timeout-minutes: 35
     environment: Production
@@ -389,7 +389,9 @@ jobs:
           PROMOTION_RESULT: ${{ steps.promote.outputs.result }}
         run: |
           {
-            echo "## Vercel production release"
+            echo "## Dispatch-only Vercel production recovery"
+            echo
+            echo "This workflow only accepts repository_dispatch requests from the protected infra release/recovery chain. It is not triggered by pushes to main; normal PR releases deploy and test Vercel production before merge through \`Pre-merge deployment gate\`."
             echo
             echo "- Source commit: \`${SOURCE_COMMIT}\`"
             echo "- Release kind: \`${RELEASE_KIND}\`"

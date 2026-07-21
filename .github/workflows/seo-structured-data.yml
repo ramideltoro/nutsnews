@@ -1,9 +1,6 @@
 name: SEO Structured Data Audit
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       base_url:

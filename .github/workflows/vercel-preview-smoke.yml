@@ -36,7 +36,15 @@ jobs:
         working-directory: web
 
     env:
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
       PLAYWRIGHT_BASE_URL: ${{ github.event.inputs.preview_url || github.event.deployment_status.target_url }}
+      NUTSNEWS_UI_SMOKE_TARGET_URL: ${{ github.event.inputs.preview_url || github.event.deployment_status.target_url }}
+      NUTSNEWS_UI_SMOKE_TARGET_TYPE: vercel-preview
+      NUTSNEWS_UI_SMOKE_SOURCE_COMMIT: ${{ github.event.deployment.sha || github.sha }}
+      NUTSNEWS_UI_SMOKE_BUILD_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+      NUTSNEWS_UI_SMOKE_DEPLOYMENT_ID: ${{ github.event.deployment.id || github.run_id }}
+      NUTSNEWS_UI_SMOKE_PR_NUMBER: ${{ github.event.deployment.payload.pull_request_number || '' }}
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
     steps:
@@ -50,9 +58,17 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: Mask Vercel automation bypass secret
-        if: env.VERCEL_AUTOMATION_BYPASS_SECRET != ''
-        run: echo "::add-mask::${VERCEL_AUTOMATION_BYPASS_SECRET}"
+      - name: Mask protected-target smoke secrets
+        run: |
+          set -euo pipefail
+          for value in \
+            "${CF_ACCESS_CLIENT_ID:-}" \
+            "${CF_ACCESS_CLIENT_SECRET:-}" \
+            "${VERCEL_AUTOMATION_BYPASS_SECRET:-}"; do
+            if [ -n "$value" ]; then
+              echo "::add-mask::$value"
+            fi
+          done
 
       - name: Install dependencies
         run: npm ci
@@ -60,8 +76,9 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run Vercel preview smoke test
-        run: npm run test:e2e:preview
+      - name: Run deployed UI smoke test
+        id: smoke
+        run: node ../scripts/run_deployed_ui_smoke_with_evidence.mjs
 
       - name: Summarize preview URL
         if: always()
@@ -70,6 +87,11 @@ jobs:
             echo "## Vercel Preview Smoke Test"
             echo ""
             echo "Preview URL: ${PLAYWRIGHT_BASE_URL}"
+            if [ -n "${CF_ACCESS_CLIENT_ID:-}" ] && [ -n "${CF_ACCESS_CLIENT_SECRET:-}" ]; then
+              echo "Cloudflare Access service token: configured"
+            else
+              echo "Cloudflare Access service token: not configured"
+            fi
             if [ -n "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
               echo "Vercel deployment protection bypass: configured"
             else
@@ -81,8 +103,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6
         with:
-          name: vercel-preview-smoke-playwright-report
+          name: ${{ steps.smoke.outputs.artifact_name || format('nutsnews-ui-smoke-vercel-preview-run-{0}-attempt-{1}', github.run_id, github.run_attempt) }}
           path: |
             web/playwright-report
-            web/test-results
+            web/test-results/deployed-ui-smoke
           if-no-files-found: ignore
