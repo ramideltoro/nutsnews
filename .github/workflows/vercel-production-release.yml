@@ -325,6 +325,9 @@ jobs:
         shell: bash
         env:
           DEPLOYMENT_URL: ${{ steps.stage.outputs.staged_deployment_url }}
+          NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS: ${{ vars.NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS || '' }}
+          NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES: ${{ vars.NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES || 'false' }}
+          NUTSNEWS_VERCEL_FAILOVER_PRODUCTION_ALIASES: ${{ vars.NUTSNEWS_VERCEL_FAILOVER_PRODUCTION_ALIASES || '' }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           set -euo pipefail
@@ -332,16 +335,54 @@ jobs:
           const expectedCommit = process.env.SOURCE_COMMIT ?? "";
           const expectedBuildId = process.env.BUILD_ID ?? "";
           const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET ?? "";
+          const canonicalHosts = new Set(["www.nutsnews.com", "nutsnews.com"]);
           const headers = bypass
             ? {
                 "x-vercel-protection-bypass": bypass,
               }
             : {};
-          const targets = [
-            new URL("/healthz", process.env.DEPLOYMENT_URL).toString(),
-            "https://www.nutsnews.com/healthz",
-            "https://nutsnews.com/healthz",
-          ];
+          function parseBoolean(value) {
+            const normalized = String(value || "").trim().toLowerCase();
+            if (!normalized) return false;
+            if (["1", "true", "yes"].includes(normalized)) return true;
+            if (["0", "false", "no"].includes(normalized)) return false;
+            throw new Error("NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES must be true or false.");
+          }
+          function parseUrlList(value, label) {
+            return String(value || "")
+              .split(",")
+              .map((item) => item.trim())
+              .filter(Boolean)
+              .map((item) => {
+                const url = new URL(item);
+                if (url.protocol !== "https:") {
+                  throw new Error(`${label} must contain only HTTPS URLs.`);
+                }
+                return url.toString();
+              });
+          }
+          function unique(values) {
+            return [...new Set(values)];
+          }
+          function assertNoCanonicalProductionUrls(urls, label) {
+            const canonical = urls.filter((url) => canonicalHosts.has(new URL(url).hostname.toLowerCase()));
+            if (canonical.length > 0) {
+              throw new Error(`${label} must not include VPS-primary production domains unless failover alias verification is enabled: ${canonical.join(", ")}`);
+            }
+          }
+          const configuredSecondaryTargets = parseUrlList(process.env.NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS, "NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS");
+          const secondaryTargets = configuredSecondaryTargets.length > 0 ? unique(configuredSecondaryTargets) : [new URL(process.env.DEPLOYMENT_URL).toString()];
+          assertNoCanonicalProductionUrls(secondaryTargets, "Vercel secondary production targets");
+          const verifyFailoverAliases = parseBoolean(process.env.NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES);
+          const failoverAliases = verifyFailoverAliases
+            ? unique(
+                parseUrlList(
+                  process.env.NUTSNEWS_VERCEL_FAILOVER_PRODUCTION_ALIASES || "https://www.nutsnews.com/,https://nutsnews.com/",
+                  "NUTSNEWS_VERCEL_FAILOVER_PRODUCTION_ALIASES",
+                ),
+              )
+            : [];
+          const targets = unique([...secondaryTargets, ...failoverAliases]).map((target) => new URL("/healthz", target).toString());
           const deadline = Date.now() + 10 * 60 * 1000;
           async function readHealth(url) {
             const response = await fetch(url, { headers });
@@ -378,6 +419,8 @@ jobs:
               throw lastError;
             }
           }
+          console.log(`Verified Vercel secondary targets: ${secondaryTargets.join(", ")}`);
+          console.log(`Verified Vercel failover aliases: ${failoverAliases.length > 0 ? failoverAliases.join(", ") : "not requested"}`);
           NODE
 
       - name: Summarize Vercel production deployment
@@ -387,6 +430,9 @@ jobs:
           VERCEL_DEPLOYMENT_ID: ${{ steps.stage.outputs.vercel_deployment_id }}
           STAGED_SMOKE_RESULT: ${{ steps.staged_smoke.outputs.result }}
           PROMOTION_RESULT: ${{ steps.promote.outputs.result }}
+          NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS: ${{ vars.NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS || '' }}
+          NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES: ${{ vars.NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES || 'false' }}
+          NUTSNEWS_VERCEL_FAILOVER_PRODUCTION_ALIASES: ${{ vars.NUTSNEWS_VERCEL_FAILOVER_PRODUCTION_ALIASES || '' }}
         run: |
           {
             echo "## Dispatch-only Vercel production recovery"
@@ -404,7 +450,11 @@ jobs:
             echo "- Vercel deployment ID: \`${VERCEL_DEPLOYMENT_ID}\`"
             echo "- Vercel staged smoke result: \`${STAGED_SMOKE_RESULT}\`"
             echo "- Vercel promotion result: \`${PROMOTION_RESULT}\`"
-            echo "- Production aliases verified: \`www.nutsnews.com\`, \`nutsnews.com\`"
+            echo "- Vercel secondary targets: \`${NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS:-$STAGED_DEPLOYMENT_URL}\`"
+            echo "- Controlled failover aliases verified: \`${NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES}\`"
+            if [[ "$NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES" == "true" ]]; then
+              echo "- Vercel failover aliases: \`${NUTSNEWS_VERCEL_FAILOVER_PRODUCTION_ALIASES:-https://www.nutsnews.com/,https://nutsnews.com/}\`"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Write sanitized Vercel release evidence
@@ -417,6 +467,9 @@ jobs:
           VERCEL_SOURCE_SHA: ${{ steps.stage.outputs.vercel_source_sha }}
           STAGED_SMOKE_RESULT: ${{ steps.staged_smoke.outputs.result }}
           PROMOTION_RESULT: ${{ steps.promote.outputs.result }}
+          NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS: ${{ vars.NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS || '' }}
+          NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES: ${{ vars.NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES || 'false' }}
+          NUTSNEWS_VERCEL_FAILOVER_PRODUCTION_ALIASES: ${{ vars.NUTSNEWS_VERCEL_FAILOVER_PRODUCTION_ALIASES || '' }}
         run: |
           set -euo pipefail
           node --input-type=module <<'NODE'
@@ -435,6 +488,9 @@ jobs:
             vercel_deployment_url: process.env.STAGED_DEPLOYMENT_URL || "",
             vercel_source_sha: process.env.VERCEL_SOURCE_SHA || "",
             vercel_config_generation: process.env.VERCEL_CONFIG_GENERATION || "",
+            vercel_secondary_targets: process.env.NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS || process.env.STAGED_DEPLOYMENT_URL || "",
+            vercel_failover_alias_verification: process.env.NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES || "false",
+            vercel_failover_aliases: process.env.NUTSNEWS_VERCEL_FAILOVER_PRODUCTION_ALIASES || "",
             staged_smoke_result: process.env.STAGED_SMOKE_RESULT || "",
             promotion_result: process.env.PROMOTION_RESULT || "",
             workflow_run_id: process.env.GITHUB_RUN_ID || "",

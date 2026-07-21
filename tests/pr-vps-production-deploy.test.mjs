@@ -105,10 +105,10 @@ test("PR VPS production deploy dispatches, waits, verifies runtime identity, and
         html_url: "https://github.com/ramideltoro/nutsnews-infra/actions/runs/888",
       });
     }
-    if (parsed.hostname === "vps.nutsnews.com" && parsed.pathname === "/healthz") {
+    if (parsed.hostname === "www.nutsnews.com" && parsed.pathname === "/healthz") {
       return json({ ok: true, sourceCommit, buildId: "123-1" }, 200, { "x-nutsnews-source-commit": sourceCommit, "x-nutsnews-build-id": "123-1" });
     }
-    if (parsed.hostname === "vps.nutsnews.com" && parsed.pathname === "/readyz") {
+    if (parsed.hostname === "www.nutsnews.com" && parsed.pathname === "/readyz") {
       return json({ ok: true, runtimeEnv: "production" }, 200, { "x-nutsnews-runtime-environment": "production", "x-nutsnews-deployment-target": "production-vps", "x-nutsnews-source-commit": sourceCommit, "x-nutsnews-build-id": "123-1", "x-nutsnews-expected-image-digest": imageDigest });
     }
     throw new Error(`Unexpected fetch ${parsed}`);
@@ -120,6 +120,7 @@ test("PR VPS production deploy dispatches, waits, verifies runtime identity, and
   assert.equal(dispatches[0].client_payload.deployment.id, deploymentId);
   assert.equal(evidence.result, "success");
   assert.equal(evidence.target_type, "production-vps");
+  assert.equal(evidence.target_url, "https://www.nutsnews.com/");
   assert.equal(evidence.deployment_id, deploymentId);
   assert.equal(evidence.infra_run_id, "888");
   assert.equal(evidence.runtime_env, "production");
@@ -157,6 +158,10 @@ test("findInfraPremergeProductionRun waits for the matching repository dispatch 
   });
   assert.equal(result.run_id, "999");
   assert.deepEqual(clock.sleeps, [2000]);
+});
+
+test("VPS production runtime target defaults to the canonical primary hostname", () => {
+  assert.equal(selectVpsProductionRuntimeTargetUrl(), "https://www.nutsnews.com/");
 });
 
 test("VPS production runtime target prefers environment_url over GitHub status target_url", () => {

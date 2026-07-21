@@ -15,11 +15,15 @@ import {
   withBoundedExponentialBackoff,
 } from "./deployment_hardening.mjs";
 import { parsePrReleaseMetadata } from "./pr_vps_staging_deploy.mjs";
+import {
+  configuredVpsPrimaryProductionTarget,
+  defaultVpsPrimaryProductionUrl,
+} from "./production_topology.mjs";
 
 const infraRepository = "ramideltoro/nutsnews-infra";
 const premergeProductionWorkflow = "nutsnews-premerge-production-vps-deploy.yml";
 const payloadSchemaVersion = "nutsnews.premerge.production_vps.v1";
-const defaultTargetUrl = "https://vps.nutsnews.com/";
+const defaultTargetUrl = defaultVpsPrimaryProductionUrl;
 
 function clean(value) {
   return String(value ?? "").trim();
@@ -306,7 +310,7 @@ export async function runPrVpsProductionDeploy(env = process.env, adapters = {})
     now: adapters.now,
   });
   const targetUrl = selectVpsProductionRuntimeTargetUrl({
-    configuredTargetUrl: clean(env.NUTSNEWS_VPS_PRODUCTION_URL),
+    configuredTargetUrl: configuredVpsPrimaryProductionTarget(env),
   });
   const runtimeIdentity = await verifyVpsProductionRuntime({
     fetchImpl: adapters.fetchImpl,

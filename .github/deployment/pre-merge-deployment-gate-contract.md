@@ -139,11 +139,11 @@ The stage uses the same `node ../scripts/run_deployed_ui_smoke_with_evidence.mjs
 
 The `deploy-vercel-production` PR job starts only after `ui-smoke-vercel-staging` succeeds. It stages the exact PR source commit with `vercel deploy --prod --skip-domain`, promotes that deployment after validation, and must not deploy a mutable branch ref or a different build ID.
 
-The stage must verify Vercel deployment ID, Vercel source SHA, staged deployment URL, and production aliases `www.nutsnews.com` and `nutsnews.com` before succeeding. Production alias verification is runtime-based after promotion, because Vercel deployment metadata may temporarily list only the generated project alias while the custom domains already serve the promoted deployment. Its deploy evidence must include source commit, build ID, image digest, deployment ID, deployment URL, production aliases, runtime env `production`, deployment target `vercel-production`, workflow run ID, and run attempt.
+The stage must verify Vercel deployment ID, Vercel source SHA, staged deployment URL, and the configured Vercel secondary production target before succeeding. Normal validation must not assume `www.nutsnews.com` or `nutsnews.com` belong to Vercel, because those hostnames are VPS-primary after cutover. Apex and `www` may be verified as Vercel failover aliases only when `NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES=true` during a controlled DNS failover test. Its deploy evidence must include source commit, build ID, image digest, deployment ID, deployment URL, `vercel_secondary_targets`, any `vercel_failover_aliases`, runtime env `production`, deployment target `vercel-production`, workflow run ID, and run attempt.
 
 ## Vercel Production UI Smoke
 
-The `ui-smoke-vercel-production` PR job starts only after `deploy-vercel-production` succeeds. The base URL is the production alias selected by the deploy evidence, and the identity preflight must confirm the expected PR source commit, build ID, runtime env `production`, and deployment target `vercel-production` before browser tests start.
+The `ui-smoke-vercel-production` PR job starts only after `deploy-vercel-production` succeeds. The base URL is the Vercel secondary target selected by the deploy evidence, and the identity preflight must confirm the expected PR source commit, build ID, runtime env `production`, and deployment target `vercel-production` before browser tests start.
 
 The stage uses the shared `node ../scripts/run_deployed_ui_smoke_with_evidence.mjs` wrapper and sets `NUTSNEWS_PRODUCTION_SAFE_SURFACES=true` for the smoke profile. Production UI smoke must avoid destructive writes and retain the standardized `nutsnews-ui-smoke-vercel-production-...` evidence artifact.
 
@@ -151,7 +151,7 @@ The stage uses the shared `node ../scripts/run_deployed_ui_smoke_with_evidence.m
 
 The `deploy-vps-production` PR job starts only after `ui-smoke-vercel-production` succeeds. It dispatches `nutsnews-production-vps-release` to `ramideltoro/nutsnews-infra` with a compact versioned payload containing the same immutable PR artifact identity, the Vercel production deployment ID that already passed UI smoke, deterministic `prod-<sha24>` deployment ID, and idempotency key `pr-<pr_number>-<source_commit>-production-vps`.
 
-The stage waits for the protected infra pre-merge VPS production workflow to complete, records infra run ID, target URL, source commit, build ID, image digest, workflow run ID, and run attempt, and verifies `/readyz` reports runtime env `production` and deployment target `production-vps` before succeeding. The default VPS production target URL is `https://vps.nutsnews.com/`.
+The stage waits for the protected infra pre-merge VPS production workflow to complete, records infra run ID, target URL, source commit, build ID, image digest, workflow run ID, and run attempt, and verifies `/readyz` reports runtime env `production` and deployment target `production-vps` before succeeding. The default VPS production target URL is `https://www.nutsnews.com/`; `https://vps.nutsnews.com/` remains the direct-origin URL for pre-cutover or origin-only checks.
 
 ## VPS Production UI Smoke
 

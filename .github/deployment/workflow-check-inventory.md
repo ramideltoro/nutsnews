@@ -30,7 +30,7 @@ Manual recovery and dispatch-only release workflows are outside this budget beca
 | `api-contracts.yml` | PR-required | Verifies API, route, sitemap, robots, and runtime compatibility before merge. | No deployment. |
 | `app-store-docs-check.yml` | PR-required | Blocks regressions to public support/privacy docs only when App Store documentation inputs change. | No deployment. |
 | `cloudflare-cache-config.yml` | PR-required | Runs deterministic cache observability config and public cache policy regressions for cache-related changes before merge. | No deployment. |
-| `cloudflare-cache-observability.yml` | scheduled/operational | Runs scheduled or manually requested live Cloudflare/Vercel cache policy probes and uploads observability artifacts. | No deployment. |
+| `cloudflare-cache-observability.yml` | scheduled/operational | Runs scheduled or manually requested live Cloudflare/VPS-primary cache policy probes and uploads observability artifacts. | No deployment. |
 | `cloudflare-production-cache-purge-regression.yml` | PR-required | Guards the production cache purge workflow contract before purge automation changes merge. | No deployment. |
 | `cloudflare-production-cache-purge.yml` | manual recovery | Typed operator workflow for manual production cache purge recovery; it no longer reacts to deployment statuses after merge. | Mutates production cache only on manual dispatch. |
 | `codeql.yml` | PR-required | Runs CodeQL for source, script, workflow, and security-config PRs while keeping default-branch and scheduled security reporting. | No deployment. |
