@@ -3,7 +3,10 @@
 import type { LanguageCode } from "@/lib/languages";
 import { useSelectedLanguage } from "./useSelectedLanguage";
 
-const taglineCopy: Record<LanguageCode, { soft: string; accent: string; ariaLabel: string }> = {
+export const heroTaglineCopyByLanguage: Record<
+  LanguageCode,
+  { soft: string; accent: string; ariaLabel: string }
+> = {
   en: {
     soft: "Positive News,",
     accent: "Simplified",
@@ -36,9 +39,21 @@ const taglineCopy: Record<LanguageCode, { soft: string; accent: string; ariaLabe
   },
 };
 
-export function HeroTagline() {
+type HeroTaglineProps = {
+  variant?: "hero" | "masthead";
+};
+
+export function HeroTagline({ variant = "hero" }: HeroTaglineProps) {
   const languageCode = useSelectedLanguage();
-  const copy = taglineCopy[languageCode] ?? taglineCopy.en;
+  const copy = heroTaglineCopyByLanguage[languageCode] ?? heroTaglineCopyByLanguage.en;
+
+  if (variant === "masthead") {
+    return (
+      <p className="newspaper-tagline" aria-label={copy.ariaLabel}>
+        {copy.ariaLabel}
+      </p>
+    );
+  }
 
   return (
     <p className="hero-tagline mx-auto max-w-max" aria-label={copy.ariaLabel}>
