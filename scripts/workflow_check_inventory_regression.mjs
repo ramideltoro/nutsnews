@@ -216,6 +216,22 @@ for (const [triggerName, triggerBlock] of [
 }
 assert.ok(hasTrigger(fluidCpuWorkflow, "workflow_dispatch"), "Fluid Active CPU Regression must remain manually runnable.");
 
+const immutableTestsWorkflow = await readFile(resolve(workflowDir, "immutable-tests-guard.yml"), "utf8");
+const immutableTestsPullRequest = workflowTriggerBlock(immutableTestsWorkflow, "pull_request");
+assert.ok(immutableTestsPullRequest.includes("paths:"), "Immutable Test Guard pull_request trigger must be path-filtered.");
+for (const requiredImmutableTestPath of [
+  ".github/workflows/immutable-tests-guard.yml",
+  ".github/workflows/vercel-preview-smoke.yml",
+  "scripts/immutable_preview_smoke_guard.mjs",
+  "web/tests/deployed-ui-smoke.spec.ts",
+]) {
+  assert.ok(
+    immutableTestsPullRequest.includes(requiredImmutableTestPath),
+    `Immutable Test Guard pull_request trigger must cover ${requiredImmutableTestPath}.`,
+  );
+}
+assert.ok(hasTrigger(immutableTestsWorkflow, "workflow_dispatch"), "Immutable Test Guard must remain manually runnable.");
+
 for (const workflow of workflowFiles) {
   const row = rows.get(workflow);
   assert.ok(row, `Inventory is missing ${workflow}.`);
