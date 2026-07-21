@@ -134,6 +134,78 @@ test("PR Vercel staging deploy waits, verifies runtime identity, and writes evid
   assert.equal(evidence.idempotency_key, `pr-42-${sourceCommit}-vercel-staging`);
 });
 
+test("Vercel staging runtime validation falls back to protected bypass query parameter", async () => {
+  const calls = [];
+  const runtime = await verifyVercelStagingRuntime({
+    env: { VERCEL_AUTOMATION_BYPASS_SECRET: "vercel-secret" },
+    metadata,
+    targetUrl: "https://nutsnews-git-pr-42.vercel.app/",
+    timeoutMs: 10_000,
+    ...fakeClock(),
+    fetchImpl: async (url, init = {}) => {
+      const parsed = new URL(url);
+      calls.push({
+        pathname: parsed.pathname,
+        bypassQuery: parsed.searchParams.get("x-vercel-protection-bypass"),
+        bypassHeader: init.headers?.["x-vercel-protection-bypass"],
+        bypassCookieHeader: init.headers?.["x-vercel-set-bypass-cookie"],
+      });
+
+      if (!parsed.searchParams.has("x-vercel-protection-bypass")) {
+        return new Response(null, { status: 302, headers: { location: "https://vercel.com/sso-api" } });
+      }
+      assert.equal(parsed.searchParams.get("x-vercel-protection-bypass"), "vercel-secret");
+      assert.equal(init.headers?.["x-vercel-protection-bypass"], undefined);
+      assert.equal(init.headers?.["x-vercel-set-bypass-cookie"], undefined);
+
+      if (parsed.pathname === "/healthz") {
+        return json({ ok: true, sourceCommit, buildId: "123-1" }, 200, {
+          "x-nutsnews-source-commit": sourceCommit,
+          "x-nutsnews-build-id": "123-1",
+        });
+      }
+      if (parsed.pathname === "/readyz") {
+        return json({ ok: true, runtimeEnv: "staging" }, 200, {
+          "x-nutsnews-runtime-environment": "staging",
+          "x-nutsnews-deployment-target": "vercel-staging",
+          "x-nutsnews-source-commit": sourceCommit,
+          "x-nutsnews-build-id": "123-1",
+        });
+      }
+      throw new Error(`Unexpected fetch ${parsed.pathname}`);
+    },
+  });
+
+  assert.deepEqual(runtime, { runtime_env: "staging", deployment_target: "vercel-staging" });
+  assert.ok(calls.some((call) => call.bypassHeader === "vercel-secret"));
+  assert.ok(calls.some((call) => call.bypassQuery === "vercel-secret"));
+  assert.ok(calls.every((call) => call.bypassCookieHeader === undefined));
+});
+
+test("Vercel staging runtime validation reports redacted endpoint fetch failures", async () => {
+  let failure;
+  try {
+    await verifyVercelStagingRuntime({
+      env: { VERCEL_AUTOMATION_BYPASS_SECRET: "vercel-secret" },
+      metadata,
+      targetUrl: "https://nutsnews-git-pr-42.vercel.app/",
+      timeoutMs: 6_000,
+      ...fakeClock(),
+      fetchImpl: async () => {
+        const error = new TypeError("fetch failed with vercel-secret");
+        error.cause = { code: "UND_ERR_CONNECT_TIMEOUT", message: "timeout with vercel-secret" };
+        throw error;
+      },
+    });
+  } catch (error) {
+    failure = error;
+  }
+
+  assert.ok(failure);
+  assert.match(failure.message, /Vercel staging (health|readiness) fetch failed: UND_ERR_CONNECT_TIMEOUT/);
+  assert.doesNotMatch(failure.message, /vercel-secret/);
+});
+
 test("Vercel staging runtime validation catches source drift", async () => {
   await assert.rejects(
     () =>

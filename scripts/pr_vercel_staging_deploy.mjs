@@ -20,12 +20,15 @@ function clean(value) {
   return String(value ?? "").trim();
 }
 
+function vercelBypassSecret(env) {
+  return clean(env.VERCEL_AUTOMATION_BYPASS_SECRET || env.VERCEL_PROTECTION_BYPASS_SECRET);
+}
+
 function protectedHeaders(env) {
-  const bypassSecret = clean(env.VERCEL_AUTOMATION_BYPASS_SECRET || env.VERCEL_PROTECTION_BYPASS_SECRET);
+  const bypassSecret = vercelBypassSecret(env);
   if (!bypassSecret) return {};
   return {
     "x-vercel-protection-bypass": bypassSecret,
-    "x-vercel-set-bypass-cookie": "true",
   };
 }
 
@@ -39,7 +42,33 @@ function requireUrl(value, label) {
   }
 }
 
-async function responseJson(response, label) {
+function isProtectionRedirectOrDenial(status) {
+  return [301, 302, 303, 307, 308, 401, 403].includes(Number(status));
+}
+
+function withVercelBypassQuery(url, env) {
+  const bypassSecret = vercelBypassSecret(env);
+  if (!bypassSecret) return null;
+  const nextUrl = new URL(url);
+  nextUrl.searchParams.set("x-vercel-protection-bypass", bypassSecret);
+  return nextUrl;
+}
+
+function redactRuntimeMessage(value, env) {
+  const bypassSecret = vercelBypassSecret(env);
+  let text = clean(value);
+  if (bypassSecret) text = text.split(bypassSecret).join("[REDACTED]");
+  return text.replace(/(x-vercel-protection-bypass=)[^&\s)]+/gi, "$1[REDACTED]").slice(0, 500);
+}
+
+function fetchFailureMessage(error, env) {
+  const parts = [error?.cause?.code, error?.cause?.message, error?.message]
+    .map((part) => redactRuntimeMessage(part, env))
+    .filter(Boolean);
+  return parts[0] || redactRuntimeMessage(error, env) || "unknown request failure";
+}
+
+async function responseJson(response, label, env) {
   if (!response.ok) {
     if (isTransientHttpStatus(response.status)) throw new DeploymentTransientError(`${label} returned transient HTTP ${response.status}.`);
     throw new DeploymentValidationError(`${label} returned HTTP ${response.status}.`);
@@ -47,8 +76,56 @@ async function responseJson(response, label) {
   try {
     return await response.json();
   } catch (error) {
-    throw new DeploymentValidationError(`${label} did not return JSON: ${error instanceof Error ? error.message : String(error)}`);
+    throw new DeploymentValidationError(`${label} did not return JSON: ${fetchFailureMessage(error, env)}`);
   }
+}
+
+async function fetchRuntimeJson({ fetchImpl, url, headers, env, label }) {
+  const attempts = [{ url, headers, mode: "header" }];
+  const queryUrl = withVercelBypassQuery(url, env);
+  if (queryUrl) {
+    attempts.push({
+      url: queryUrl,
+      headers: Object.fromEntries(Object.entries(headers).filter(([name]) => name.toLowerCase() !== "x-vercel-protection-bypass")),
+      mode: "query",
+    });
+  }
+
+  let lastProtectionFailure = "";
+  for (const attempt of attempts) {
+    let response;
+    try {
+      response = await fetchImpl(attempt.url, {
+        headers: attempt.headers,
+        redirect: "manual",
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch (error) {
+      lastProtectionFailure = `${attempt.mode} request failed: ${fetchFailureMessage(error, env)}`;
+      if (attempt !== attempts.at(-1)) continue;
+      throw new DeploymentTransientError(`${label} fetch failed: ${fetchFailureMessage(error, env)}.`);
+    }
+
+    if (!response.ok && attempt !== attempts.at(-1) && isProtectionRedirectOrDenial(response.status)) {
+      lastProtectionFailure = `${attempt.mode} request returned HTTP ${response.status}`;
+      continue;
+    }
+
+    try {
+      return { response, body: await responseJson(response, label, env) };
+    } catch (error) {
+      if (attempt !== attempts.at(-1) && error instanceof DeploymentValidationError) {
+        lastProtectionFailure = `${attempt.mode} request ${fetchFailureMessage(error, env)}`;
+        continue;
+      }
+      if (lastProtectionFailure && error instanceof DeploymentValidationError) {
+        error.message = `${error.message} Previous Vercel bypass attempt: ${lastProtectionFailure}.`;
+      }
+      throw error;
+    }
+  }
+
+  throw new DeploymentTransientError(`${label} did not return a usable protected response.`);
 }
 
 function assertEqual(actual, expected, label) {
@@ -90,15 +167,22 @@ export async function verifyVercelStagingRuntime({ fetchImpl = fetch, env, metad
 
   return withBoundedExponentialBackoff(
     async () => {
-      const [healthResponse, readyResponse] = await Promise.all([
-        fetchImpl(new URL("healthz", baseUrl), { headers, signal: AbortSignal.timeout(15_000) }),
-        fetchImpl(new URL(`readyz?cache-bust=${encodeURIComponent(metadata.build_id)}`, baseUrl), {
+      const [{ response: healthResponse, body: health }, { response: readyResponse, body: ready }] = await Promise.all([
+        fetchRuntimeJson({
+          fetchImpl,
+          url: new URL("healthz", baseUrl),
+          headers,
+          env,
+          label: "Vercel staging health",
+        }),
+        fetchRuntimeJson({
+          fetchImpl,
+          url: new URL(`readyz?cache-bust=${encodeURIComponent(metadata.build_id)}`, baseUrl),
           headers: { ...headers, "Cache-Control": "no-store" },
-          signal: AbortSignal.timeout(15_000),
+          env,
+          label: "Vercel staging readiness",
         }),
       ]);
-      const health = await responseJson(healthResponse, "Vercel staging health");
-      const ready = await responseJson(readyResponse, "Vercel staging readiness");
 
       assertEqual(health.sourceCommit, metadata.source_commit, "Health source commit");
       assertEqual(health.buildId, metadata.build_id, "Health build ID");
