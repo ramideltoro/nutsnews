@@ -139,7 +139,7 @@ The stage uses the same `node ../scripts/run_deployed_ui_smoke_with_evidence.mjs
 
 The `deploy-vercel-production` PR job starts only after `ui-smoke-vercel-staging` succeeds. It stages the exact PR source commit with `vercel deploy --prod --skip-domain`, promotes that deployment after validation, and must not deploy a mutable branch ref or a different build ID.
 
-The stage must verify Vercel deployment ID, Vercel source SHA, staged deployment URL, and production aliases `www.nutsnews.com` and `nutsnews.com` before succeeding. Its deploy evidence must include source commit, build ID, image digest, deployment ID, deployment URL, production aliases, runtime env `production`, deployment target `vercel-production`, workflow run ID, and run attempt.
+The stage must verify Vercel deployment ID, Vercel source SHA, staged deployment URL, and production aliases `www.nutsnews.com` and `nutsnews.com` before succeeding. Production alias verification is runtime-based after promotion, because Vercel deployment metadata may temporarily list only the generated project alias while the custom domains already serve the promoted deployment. Its deploy evidence must include source commit, build ID, image digest, deployment ID, deployment URL, production aliases, runtime env `production`, deployment target `vercel-production`, workflow run ID, and run attempt.
 
 ## Vercel Production UI Smoke
 

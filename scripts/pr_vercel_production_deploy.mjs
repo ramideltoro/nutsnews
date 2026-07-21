@@ -65,11 +65,16 @@ function deploymentAliases(deployment) {
     .map((item) => item.replace(/^https?:\/\//, "").replace(/\/$/, "").toLowerCase());
 }
 
-export function assertVercelProductionAliases({ deployment, aliases }) {
+export function assertVercelProductionTarget({ deployment }) {
   const target = clean(deployment?.target).toLowerCase();
   if (target && target !== "production") {
     throw new DeploymentValidationError(`Vercel production deployment target mismatch: ${target}.`);
   }
+  return true;
+}
+
+export function assertVercelProductionAliases({ deployment, aliases }) {
+  assertVercelProductionTarget({ deployment });
   const attached = new Set(deploymentAliases(deployment));
   for (const alias of aliases) {
     const host = new URL(alias).hostname.toLowerCase();
@@ -171,7 +176,7 @@ export async function runPrVercelProductionDeploy(env = process.env, adapters = 
     sleep: adapters.sleep,
     now: adapters.now,
   });
-  assertVercelProductionAliases({ deployment, aliases });
+  assertVercelProductionTarget({ deployment });
   const runtimeIdentity = await verifyVercelProductionRuntime({
     fetchImpl: adapters.fetchImpl,
     env,

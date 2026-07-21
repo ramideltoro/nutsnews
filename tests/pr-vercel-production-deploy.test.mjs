@@ -116,6 +116,41 @@ test("PR Vercel production deploy validates aliases and writes evidence shape", 
   assert.equal(evidence.idempotency_key, `pr-42-${sourceCommit}-vercel-production`);
 });
 
+test("PR Vercel production deploy accepts runtime-verified aliases when Vercel metadata lists only generated alias", async () => {
+  const fetchImpl = async (url) => {
+    const parsed = new URL(url);
+    if (parsed.hostname === "api.vercel.com") {
+      return json({
+        id: "dpl_prod123",
+        readyState: "READY",
+        target: "production",
+        alias: ["nutsnews-nutsnews.vercel.app"],
+        meta: { githubCommitSha: sourceCommit },
+      });
+    }
+    if (["www.nutsnews.com", "nutsnews.com"].includes(parsed.hostname) && parsed.pathname === "/healthz") {
+      return json({ ok: true, sourceCommit, buildId: "123-1" }, 200, {
+        "x-nutsnews-source-commit": sourceCommit,
+        "x-nutsnews-build-id": "123-1",
+      });
+    }
+    if (["www.nutsnews.com", "nutsnews.com"].includes(parsed.hostname) && parsed.pathname === "/readyz") {
+      return json({ ok: true, runtimeEnv: "production" }, 200, {
+        "x-nutsnews-runtime-environment": "production",
+        "x-nutsnews-deployment-target": "vercel-production",
+        "x-nutsnews-source-commit": sourceCommit,
+        "x-nutsnews-build-id": "123-1",
+      });
+    }
+    throw new Error(`Unexpected fetch ${parsed}`);
+  };
+
+  const evidence = await runPrVercelProductionDeploy(env(), { fetchImpl, ...fakeClock() });
+  assert.equal(evidence.result, "success");
+  assert.equal(evidence.deployment_id, "dpl_prod123");
+  assert.deepEqual(evidence.production_aliases, ["https://www.nutsnews.com/", "https://nutsnews.com/"]);
+});
+
 test("Vercel production runtime validation catches target drift", async () => {
   await assert.rejects(
     () =>
