@@ -918,6 +918,148 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
+  deploy-vercel-staging:
+    name: Deploy PR candidate to Vercel staging
+    if: >-
+      github.event_name == 'pull_request' &&
+      needs.trusted-pr-deployment-eligibility.outputs.eligible == 'true'
+    needs: [ui-smoke-vps-staging, deploy-vps-staging, pr-release-artifact, trusted-pr-deployment-eligibility]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: nutsnews-premerge-deploy-pr-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      deployment_id: ${{ steps.validate.outputs.deployment_id }}
+      target_url: ${{ steps.validate.outputs.target_url }}
+      vercel_source_sha: ${{ steps.validate.outputs.vercel_source_sha }}
+      evidence_path: ${{ steps.validate.outputs.evidence_path }}
+
+    steps:
+      - name: Checkout exact PR release source
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
+        with:
+          ref: ${{ needs.pr-release-artifact.outputs.source_commit }}
+          persist-credentials: false
+
+      - name: Use Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Mask Vercel staging secrets
+        run: |
+          set -euo pipefail
+          for value in \
+            "${VERCEL_TOKEN:-}" \
+            "${VERCEL_AUTOMATION_BYPASS_SECRET:-}"; do
+            if [ -n "$value" ]; then
+              echo "::add-mask::$value"
+            fi
+          done
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+
+      - name: Stage Vercel staging deployment
+        id: stage
+        env:
+          BUILD_ID: ${{ needs.pr-release-artifact.outputs.build_id }}
+          DATABASE_PROVIDER_MODE: supabase_primary
+          IMAGE_DIGEST: ${{ needs.pr-release-artifact.outputs.image_digest }}
+          SOURCE_COMMIT: ${{ needs.pr-release-artifact.outputs.source_commit }}
+          VERCEL_CONFIG_GENERATION: vercel-staging-${{ needs.pr-release-artifact.outputs.source_commit }}-${{ github.run_id }}-${{ github.run_attempt }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_STAGING_ENVIRONMENT: ${{ vars.VERCEL_STAGING_ENVIRONMENT || 'preview' }}
+          VERCEL_STAGING_TARGET: ${{ vars.VERCEL_STAGING_TARGET || 'staging' }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          npx --yes vercel@latest pull --yes --environment="$VERCEL_STAGING_ENVIRONMENT" --token "$VERCEL_TOKEN"
+          node --input-type=module <<'NODE'
+          import { readFile, writeFile } from "node:fs/promises";
+
+          const envPaths = [
+            `.vercel/.env.${process.env.VERCEL_STAGING_ENVIRONMENT}.local`,
+            ".vercel/.env.local",
+          ];
+          const shellSensitiveEnvNames = new Set(["HOME", "PATH", "Path", "SHELL"]);
+          for (const envPath of envPaths) {
+            try {
+              const input = await readFile(envPath, "utf8");
+              const lines = input.split(/\r?\n/);
+              const safeLines = lines.filter((line) => {
+                const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)=/);
+                return !match || !shellSensitiveEnvNames.has(match[1]);
+              });
+              await writeFile(envPath, `${safeLines.join("\n").replace(/\n*$/, "")}\n`);
+            } catch (error) {
+              if (error?.code !== "ENOENT") throw error;
+            }
+          }
+          NODE
+          vercel_identity_flags=(
+            --build-env "NUTSNEWS_BUILD_ID=$BUILD_ID"
+            --build-env "NUTSNEWS_CONFIG_GENERATION=$VERCEL_CONFIG_GENERATION"
+            --build-env "NUTSNEWS_DATABASE_PROVIDER_MODE=$DATABASE_PROVIDER_MODE"
+            --build-env "NUTSNEWS_DEPLOYMENT_TARGET=vercel-staging"
+            --build-env "NUTSNEWS_EXPECTED_IMAGE_DIGEST=$IMAGE_DIGEST"
+            --build-env "NUTSNEWS_RUNTIME_ENV=staging"
+            --build-env "NUTSNEWS_SIDE_EFFECTS_MODE=disabled"
+            --build-env "NUTSNEWS_SOURCE_COMMIT=$SOURCE_COMMIT"
+            --build-env "NEXT_PUBLIC_NUTSNEWS_BUILD_ID=$BUILD_ID"
+            --build-env "NEXT_PUBLIC_NUTSNEWS_SOURCE_COMMIT=$SOURCE_COMMIT"
+            --env "NUTSNEWS_BUILD_ID=$BUILD_ID"
+            --env "NUTSNEWS_CONFIG_GENERATION=$VERCEL_CONFIG_GENERATION"
+            --env "NUTSNEWS_DATABASE_PROVIDER_MODE=$DATABASE_PROVIDER_MODE"
+            --env "NUTSNEWS_DEPLOYMENT_TARGET=vercel-staging"
+            --env "NUTSNEWS_EXPECTED_IMAGE_DIGEST=$IMAGE_DIGEST"
+            --env "NUTSNEWS_RUNTIME_ENV=staging"
+            --env "NUTSNEWS_SIDE_EFFECTS_MODE=disabled"
+            --env "NUTSNEWS_SOURCE_COMMIT=$SOURCE_COMMIT"
+            --env "NEXT_PUBLIC_NUTSNEWS_BUILD_ID=$BUILD_ID"
+            --env "NEXT_PUBLIC_NUTSNEWS_SOURCE_COMMIT=$SOURCE_COMMIT"
+          )
+          deploy_output="$RUNNER_TEMP/vercel-staging-deploy.txt"
+          npx --yes vercel@latest deploy \
+            --target "$VERCEL_STAGING_TARGET" \
+            --force \
+            --archive=tgz \
+            --token "$VERCEL_TOKEN" \
+            "${vercel_identity_flags[@]}" > "$deploy_output"
+          deployment_url="$(grep -Eo 'https://[^[:space:]]+' "$deploy_output" | tail -n 1)"
+          if [[ -z "$deployment_url" ]]; then
+            echo "Vercel CLI did not return a staging deployment URL." >&2
+            exit 1
+          fi
+          echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
+
+      - name: Validate Vercel staging deployment
+        id: validate
+        env:
+          PR_RELEASE_METADATA_JSON: ${{ needs.pr-release-artifact.outputs.metadata_json }}
+          VERCEL_STAGING_DEPLOYMENT_URL: ${{ steps.stage.outputs.deployment_url }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          NUTSNEWS_VERCEL_STAGING_EVIDENCE_PATH: ${{ runner.temp }}/vercel-staging-deploy/evidence.json
+        run: node scripts/pr_vercel_staging_deploy.mjs
+
+      - name: Upload Vercel staging deploy evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6
+        with:
+          name: nutsnews-vercel-staging-deploy-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/vercel-staging-deploy/evidence.json
+          if-no-files-found: ignore
+          retention-days: 30
+
   release-candidate:
     name: Release candidate
     if: always() && github.event_name == 'pull_request'
@@ -986,6 +1128,7 @@ jobs:
           node --test tests/deployed-ui-smoke-evidence.test.mjs
           node --test tests/deployment-hardening.test.mjs
           node --test tests/pr-vps-staging-deploy.test.mjs
+          node --test tests/pr-vercel-staging-deploy.test.mjs
           node scripts/immutable_all_tests_guard_regression.mjs
           node scripts/immutable_all_tests_guard.mjs
           node scripts/verify_github_actions_pinned.mjs

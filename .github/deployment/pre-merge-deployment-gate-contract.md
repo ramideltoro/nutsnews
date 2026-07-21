@@ -121,6 +121,12 @@ The `ui-smoke-vps-staging` PR job starts only after `deploy-vps-staging` succeed
 
 The stage must call `node ../scripts/run_deployed_ui_smoke_with_evidence.mjs` from `web/`, which delegates to the shared `npm run test:e2e:deployed` command. It must upload the standardized `nutsnews-ui-smoke-vps-staging-...` artifact containing JUnit, HTML report, trace-on-failure output when safe, and `web/test-results/deployed-ui-smoke/evidence.json`.
 
+## Vercel Staging Deploy
+
+The `deploy-vercel-staging` PR job starts only after `ui-smoke-vps-staging` succeeds. It deploys the exact PR source commit from `needs.pr-release-artifact.outputs.source_commit` to the configured Vercel staging target and must not rebuild from any mutable branch ref.
+
+The stage must record Vercel deployment URL, Vercel deployment ID, Vercel source SHA, source commit, build ID, image digest, runtime env `staging`, and deployment target `vercel-staging`. It must verify the deployment target is not `production` and that no production host alias such as `nutsnews.com` or `www.nutsnews.com` is attached before later stages may start.
+
 ## Merge And Main Behavior
 
 All deployment stages complete before merge into `main`.
