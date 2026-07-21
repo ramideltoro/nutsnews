@@ -69,6 +69,10 @@ The shared deployed UI smoke command is `npm run test:e2e:deployed` from `web/`.
 
 Target-specific expectations must be supplied through environment variables, not copied spec files. Deployment jobs must call this same command for every release target so the retained UI evidence is comparable across providers.
 
+Protected target authentication is configured through environment variables. `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET` provide Cloudflare Access service-token headers and must be supplied together. `VERCEL_AUTOMATION_BYPASS_SECRET` or `VERCEL_PROTECTION_BYPASS_SECRET` provides Vercel Deployment Protection bypass headers. Public production targets may omit all protected-target header variables.
+
+Retained UI artifacts must not include protected-target secrets. Playwright traces are disabled when protected-target headers are configured, and workflows must mask the Cloudflare and Vercel header values before running the shared command.
+
 The Vercel preview workflow remains separate for non-release previews, but it delegates to `npm run test:e2e:deployed` so preview behavior uses the shared deployed-target smoke coverage.
 
 ## Trusted PR Eligibility

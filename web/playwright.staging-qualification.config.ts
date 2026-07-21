@@ -1,11 +1,12 @@
 import { defineConfig, devices } from '@playwright/test';
+import { buildProtectedTargetHeaders } from './protectedTargetHeaders.mjs';
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL?.trim();
 if (!baseURL) throw new Error('PLAYWRIGHT_BASE_URL is required');
 
-const clientId = process.env.CF_ACCESS_CLIENT_ID?.trim();
-const clientSecret = process.env.CF_ACCESS_CLIENT_SECRET?.trim();
-if (!clientId || !clientSecret) throw new Error('Cloudflare Access service-token inputs are required');
+const protectedTarget = buildProtectedTargetHeaders(process.env, {
+  requireCloudflareAccess: true,
+});
 
 export default defineConfig({
   testDir: './tests',
@@ -23,11 +24,8 @@ export default defineConfig({
   outputDir: 'test-results/staging-qualification-playwright/artifacts',
   use: {
     baseURL,
-    extraHTTPHeaders: {
-      'CF-Access-Client-Id': clientId,
-      'CF-Access-Client-Secret': clientSecret,
-    },
-    trace: 'retain-on-failure',
+    extraHTTPHeaders: protectedTarget.extraHTTPHeaders,
+    trace: protectedTarget.hasProtectedTargetHeaders ? 'off' : 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'off',
     navigationTimeout: 15_000,

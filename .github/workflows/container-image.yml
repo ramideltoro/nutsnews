@@ -791,6 +791,7 @@ jobs:
           node scripts/trusted_pr_deployment_eligibility_regression.mjs
           node scripts/pr_release_artifact_regression.mjs
           node scripts/deployed_ui_smoke_regression.mjs
+          node --test tests/protected-target-headers.test.mjs
           node scripts/immutable_all_tests_guard_regression.mjs
           node scripts/immutable_all_tests_guard.mjs
           node scripts/verify_github_actions_pinned.mjs

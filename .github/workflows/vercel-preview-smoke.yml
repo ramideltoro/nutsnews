@@ -36,6 +36,8 @@ jobs:
         working-directory: web
 
     env:
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
       PLAYWRIGHT_BASE_URL: ${{ github.event.inputs.preview_url || github.event.deployment_status.target_url }}
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
@@ -50,9 +52,17 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: Mask Vercel automation bypass secret
-        if: env.VERCEL_AUTOMATION_BYPASS_SECRET != ''
-        run: echo "::add-mask::${VERCEL_AUTOMATION_BYPASS_SECRET}"
+      - name: Mask protected-target smoke secrets
+        run: |
+          set -euo pipefail
+          for value in \
+            "${CF_ACCESS_CLIENT_ID:-}" \
+            "${CF_ACCESS_CLIENT_SECRET:-}" \
+            "${VERCEL_AUTOMATION_BYPASS_SECRET:-}"; do
+            if [ -n "$value" ]; then
+              echo "::add-mask::$value"
+            fi
+          done
 
       - name: Install dependencies
         run: npm ci
@@ -70,6 +80,11 @@ jobs:
             echo "## Vercel Preview Smoke Test"
             echo ""
             echo "Preview URL: ${PLAYWRIGHT_BASE_URL}"
+            if [ -n "${CF_ACCESS_CLIENT_ID:-}" ] && [ -n "${CF_ACCESS_CLIENT_SECRET:-}" ]; then
+              echo "Cloudflare Access service token: configured"
+            else
+              echo "Cloudflare Access service token: not configured"
+            fi
             if [ -n "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
               echo "Vercel deployment protection bypass: configured"
             else

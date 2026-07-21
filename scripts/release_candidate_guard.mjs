@@ -102,6 +102,11 @@ requireText(
 );
 requireText(
   candidateJob,
+  "node --test tests/protected-target-headers.test.mjs",
+  "Release candidate must validate protected-target UI smoke headers.",
+);
+requireText(
+  candidateJob,
   "npm run test:translation-release-gate",
   "Release candidate must prove the translation audit fails missing, critical, and below-threshold fixtures.",
 );

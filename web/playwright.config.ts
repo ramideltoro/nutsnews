@@ -1,19 +1,13 @@
 import { defineConfig, devices } from '@playwright/test';
+import { buildProtectedTargetHeaders } from './protectedTargetHeaders.mjs';
 
 const PORT = Number(process.env.PLAYWRIGHT_PORT ?? 3100);
 const configuredBaseURL = process.env.PLAYWRIGHT_BASE_URL?.trim();
 const baseURL = configuredBaseURL || `http://127.0.0.1:${PORT}`;
 const shouldStartLocalWebServer = !configuredBaseURL;
-const vercelAutomationBypassSecret =
-  process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim() ||
-  process.env.VERCEL_PROTECTION_BYPASS_SECRET?.trim() ||
-  '';
-const extraHTTPHeaders = vercelAutomationBypassSecret
-  ? {
-      'x-vercel-protection-bypass': vercelAutomationBypassSecret,
-      'x-vercel-set-bypass-cookie': 'true',
-    }
-  : undefined;
+const protectedTarget = buildProtectedTargetHeaders(process.env, {
+  defaultVercelSetBypassCookie: true,
+});
 
 export default defineConfig({
   testDir: './tests',
@@ -28,9 +22,9 @@ export default defineConfig({
   reporter: process.env.CI ? [['line'], ['html', { open: 'never' }]] : [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL,
-    trace: vercelAutomationBypassSecret ? 'off' : 'retain-on-failure',
+    trace: protectedTarget.hasProtectedTargetHeaders ? 'off' : 'retain-on-failure',
     screenshot: 'only-on-failure',
-    ...(extraHTTPHeaders ? { extraHTTPHeaders } : {}),
+    ...(protectedTarget.extraHTTPHeaders ? { extraHTTPHeaders: protectedTarget.extraHTTPHeaders } : {}),
   },
   projects: [
     {
