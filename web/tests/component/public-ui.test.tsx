@@ -5,6 +5,7 @@ import { describe, expect, test, vi } from "vitest";
 import { ArticleFeed } from "@/app/components/ArticleFeed";
 import { SiteFooter } from "@/app/components/SiteFooter";
 import { ThemeSwitcher } from "@/app/components/ThemeSwitcher";
+import { LocalizedArticleDetail } from "@/app/articles/[id]/LocalizedArticleDetail";
 import { ContactForm } from "@/app/contact/ContactForm";
 import { SavedStoriesPage } from "@/app/saved/SavedStoriesPage";
 import type { Article } from "@/lib/articles";
@@ -234,6 +235,99 @@ describe("ArticleFeed", () => {
       JSON.parse(window.localStorage.getItem(SAVED_STORIES_STORAGE_KEY) ?? "{}")
         .stories,
     ).toHaveLength(0);
+  });
+});
+
+describe("LocalizedArticleDetail", () => {
+  test("hydrates visible article copy from the selected language detail API", async () => {
+    const englishArticle = article({
+      id: "detail-localized",
+      source: "Google News - Happy Times",
+      title: "English detail title",
+      ai_summary: "English detail summary.",
+      published_on_site_at: "2026-07-02T12:00:00Z",
+    });
+    const frenchArticle = {
+      ...englishArticle,
+      title: "Titre detail francais",
+      ai_summary: "Resume detail francais.",
+      language_code: "fr",
+      requested_language_code: "fr",
+      translation_available: true,
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => frenchArticle,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<LocalizedArticleDetail initialArticle={englishArticle} />);
+
+    expect(
+      screen.getByRole("heading", { name: "English detail title" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("main")).toHaveAttribute("lang", "en");
+
+    window.dispatchEvent(
+      new CustomEvent(LANGUAGE_CHANGE_EVENT, {
+        detail: { languageCode: "fr" },
+      }),
+    );
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/articles/detail-localized?lang=fr",
+        expect.objectContaining({
+          cache: "default",
+          headers: { Accept: "application/json" },
+          signal: expect.any(AbortSignal),
+        }),
+      ),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Titre detail francais" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Resume detail francais.")).toBeInTheDocument();
+    expect(screen.getByRole("main")).toHaveAttribute("lang", "fr");
+    expect(
+      screen.getByLabelText(
+        "community | Google News - Happy Times | 2 juillet 2026",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", {
+        name: "Read full story at Happy Times: Titre detail francais",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  test("keeps the server-rendered article when localized detail fetch fails", async () => {
+    const englishArticle = article({
+      id: "detail-fallback",
+      title: "English fallback title",
+      ai_summary: "English fallback summary.",
+    });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({ error: "Article not found" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<LocalizedArticleDetail initialArticle={englishArticle} />);
+
+    window.dispatchEvent(
+      new CustomEvent(LANGUAGE_CHANGE_EVENT, {
+        detail: { languageCode: "fr" },
+      }),
+    );
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(
+      screen.getByRole("heading", { name: "English fallback title" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("English fallback summary.")).toBeInTheDocument();
+    expect(screen.getByRole("main")).toHaveAttribute("lang", "en");
   });
 });
 

@@ -1,13 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { SiteFooter } from "@/app/components/SiteFooter";
 import { getArticleById, getRecentArticleSitemapItems, SITE_URL } from "@/lib/articles";
-import { OptimizedArticleImage } from "@/app/components/OptimizedArticleImage";
-import { ARTICLE_DETAIL_IMAGE_SIZES } from "@/lib/imageDelivery";
-import { type LanguageCode } from "@/lib/languages";
 import { getPublisherAttribution } from "@/lib/publisherAttribution";
+import { LocalizedArticleDetail } from "./LocalizedArticleDetail";
 
 export const revalidate = 3600;
 
@@ -20,27 +16,6 @@ type ArticlePageProps = {
 export async function generateStaticParams() {
   const articles = await getRecentArticleSitemapItems(100);
   return articles.map((article) => ({ id: article.id }));
-}
-
-function formatDate(dateValue: string | null, languageCode: LanguageCode) {
-  if (!dateValue) {
-    return "Published recently";
-  }
-
-  const localeByLanguage: Record<LanguageCode, string> = {
-    en: "en-US",
-    fr: "fr-FR",
-    ja: "ja-JP",
-    "de-CH": "de-CH",
-    de: "de-DE",
-    el: "el-GR",
-  };
-
-  return new Intl.DateTimeFormat(localeByLanguage[languageCode], {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(dateValue));
 }
 
 export async function generateMetadata({
@@ -120,7 +95,6 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
     notFound();
   }
 
-  const articleLanguageCode = article.language_code ?? "en";
   const articleUrl = `${SITE_URL}/articles/${article.id}`;
   const publisherAttribution = getPublisherAttribution(
     article.source,
@@ -156,84 +130,13 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   };
 
   return (
-      <main
-        lang={articleLanguageCode}
-        className="min-h-screen overflow-hidden bg-neutral-950 px-4 pb-28 pt-6 text-neutral-100"
-      >
+      <>
         <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
         />
 
-        <section className="mx-auto w-full max-w-md">
-          <nav className="mb-5">
-            <Link
-                href="/"
-                className="inline-flex rounded-full border border-amber-400/20 bg-neutral-900 px-4 py-2 text-sm font-bold text-amber-300 transition hover:bg-amber-400 hover:text-neutral-950"
-            >
-              ← Back to NutsNews
-            </Link>
-          </nav>
-
-          <article>
-            <header className="overflow-hidden rounded-[2rem] border border-amber-500/20 bg-neutral-900 shadow-2xl shadow-black/40">
-              <div className="relative h-64 overflow-hidden bg-neutral-800">
-                <OptimizedArticleImage
-                  src={article.image_url}
-                  category={article.category}
-                  eager
-                  sizes={ARTICLE_DETAIL_IMAGE_SIZES}
-                />
-
-                <div className="absolute inset-0 bg-gradient-to-t from-neutral-950/85 via-neutral-950/20 to-transparent" />
-              </div>
-
-              <div className="p-6">
-                <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-amber-400">
-                  {article.category ?? "Uplifting"} · {article.source} ·{" "}
-                  {formatDate(article.published_on_site_at, articleLanguageCode)}
-                </p>
-
-                <h1 className="text-4xl font-black leading-tight text-white">
-                  {article.title}
-                </h1>
-              </div>
-            </header>
-
-            <section className="mt-5 rounded-[2rem] border border-white/10 bg-neutral-900 p-6 shadow-xl shadow-black/20">
-              <p className="text-lg leading-8 text-neutral-200">
-                {article.ai_summary}
-              </p>
-
-              <div className="mt-6 rounded-2xl border border-amber-500/20 bg-amber-400/10 p-4 text-sm leading-6 text-neutral-300">
-                NutsNews provides a short original summary and sends readers back
-                to the original publisher for the complete story.
-              </div>
-
-              <div className="mt-6 flex flex-wrap gap-3">
-                <a
-                    href={article.original_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-full bg-amber-400 px-5 py-3 text-sm font-bold text-neutral-950 transition hover:bg-amber-300"
-                    aria-label={`${publisherAttribution.readFullStoryLabel}: ${article.title}`}
-                    title={publisherAttribution.policySummary}
-                >
-                  Read full story
-                </a>
-
-                <Link
-                    href="/about"
-                    className="rounded-full border border-amber-400/30 bg-black/20 px-5 py-3 text-sm font-semibold text-amber-300 transition hover:bg-amber-400/10"
-                >
-                  About NutsNews
-                </Link>
-              </div>
-            </section>
-          </article>
-        </section>
-
-        <SiteFooter />
-      </main>
+        <LocalizedArticleDetail initialArticle={article} />
+      </>
   );
 }
