@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    paths:
+      - "web/package.json"
+      - "web/package-lock.json"
+      - ".github/workflows/snyk.yml"
   schedule:
     # Weekly dependency/security scan on Wednesdays at 11:22 UTC.
     - cron: "22 11 * * 3"

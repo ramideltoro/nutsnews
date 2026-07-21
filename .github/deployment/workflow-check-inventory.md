@@ -51,7 +51,7 @@ No deployment work is hidden inside a workflow classified as an existing check. 
 | `release-notes.yml` | scheduled/operational | Creates GitHub releases for tags or operator requests; it is release documentation, not a merge blocker. | No deployment. |
 | `seo-structured-data.yml` | scheduled/operational | Audits currently live production structured data on schedule or operator request; local route coverage is already PR-gated by API contracts. | No deployment. |
 | `sitemap-robots-check.yml` | PR-required | Runs local sitemap/robots contract coverage before merge and keeps live URL probing scheduled/manual. | No deployment. |
-| `snyk.yml` | PR-required | Runs Snyk dependency tests before merge while keeping default-branch project monitoring. | No deployment. |
+| `snyk.yml` | PR-required | Runs Snyk dependency tests for dependency-risk PRs while keeping default-branch project monitoring main-only. | No deployment. |
 | `staging-release-regression.yml` | PR-required | Guards staging and release workflow contracts before release workflow changes merge. | No deployment. |
 | `staging-release.yml` | manual recovery | Typed operator workflow for manual VPS staging recovery dispatch; normal PR releases use the pre-merge VPS staging deploy job. | Dispatches staging only on manual recovery. |
 | `staging-supabase-migration-regression.yml` | PR-required | Guards staging migration workflow behavior before migration automation changes merge. | No deployment. |

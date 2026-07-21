@@ -146,6 +146,17 @@ assert.ok(
   "Cloudflare Cache Observability must keep the live cache probe.",
 );
 
+const snykWorkflow = await readFile(resolve(workflowDir, "snyk.yml"), "utf8");
+const snykPullRequest = workflowTriggerBlock(snykWorkflow, "pull_request");
+assert.ok(snykPullRequest.includes("paths:"), "Snyk pull_request trigger must be path-filtered.");
+for (const requiredSnykPath of ["web/package.json", "web/package-lock.json", ".github/workflows/snyk.yml"]) {
+  assert.ok(snykPullRequest.includes(requiredSnykPath), `Snyk pull_request trigger must cover ${requiredSnykPath}.`);
+}
+assert.ok(
+  snykWorkflow.includes("if: github.event_name == 'push' && github.ref == 'refs/heads/main'"),
+  "Snyk monitor upload must remain main-push only.",
+);
+
 for (const workflow of workflowFiles) {
   const row = rows.get(workflow);
   assert.ok(row, `Inventory is missing ${workflow}.`);
