@@ -60,8 +60,8 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run Vercel preview smoke test
-        run: npm run test:e2e:preview
+      - name: Run deployed UI smoke test
+        run: npm run test:e2e:deployed
 
       - name: Summarize preview URL
         if: always()

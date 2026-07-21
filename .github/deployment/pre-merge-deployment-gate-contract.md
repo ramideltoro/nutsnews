@@ -63,6 +63,14 @@ Target-specific deploy evidence comes from the platform workflow that changed an
 
 UI test evidence must not replace deploy evidence. Deploy evidence must not replace UI test evidence. The final gate needs both for every target.
 
+## Deployed UI Smoke Command
+
+The shared deployed UI smoke command is `npm run test:e2e:deployed` from `web/`. The command runs the same Playwright spec against `PLAYWRIGHT_BASE_URL` for VPS staging, Vercel staging, Vercel production, and VPS production.
+
+Target-specific expectations must be supplied through environment variables, not copied spec files. Deployment jobs must call this same command for every release target so the retained UI evidence is comparable across providers.
+
+The Vercel preview workflow remains separate for non-release previews, but it delegates to `npm run test:e2e:deployed` so preview behavior uses the shared deployed-target smoke coverage.
+
 ## Trusted PR Eligibility
 
 The pre-merge deployment pipeline is deployment-eligible only for same-repository PR branches in `ramideltoro/nutsnews`. Fork PRs and other untrusted PR sources are not deployment-eligible.

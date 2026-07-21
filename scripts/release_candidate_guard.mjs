@@ -97,6 +97,11 @@ requireText(
 );
 requireText(
   candidateJob,
+  "node scripts/deployed_ui_smoke_regression.mjs",
+  "Release candidate must validate the target-agnostic deployed UI smoke contract.",
+);
+requireText(
+  candidateJob,
   "npm run test:translation-release-gate",
   "Release candidate must prove the translation audit fails missing, critical, and below-threshold fixtures.",
 );

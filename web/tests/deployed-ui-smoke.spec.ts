@@ -55,7 +55,7 @@ test.beforeEach(async ({ context }) => {
   );
 });
 
-async function assertNotVercelProtectionPage(page: Page) {
+async function assertNotDeploymentProtectionPage(page: Page) {
   const pageUrl = page.url();
   const pageText = await page.locator('body').innerText({ timeout: 5_000 }).catch(() => '');
   const title = await page.title().catch(() => '');
@@ -67,7 +67,7 @@ async function assertNotVercelProtectionPage(page: Page) {
 
   expect(
     looksProtected,
-    'The Vercel preview is protected by Vercel Authentication/Deployment Protection. Add the GitHub repository secret VERCEL_AUTOMATION_BYPASS_SECRET from Vercel Project Settings > Deployment Protection > Protection Bypass for Automation, or disable protection for preview deployments.',
+    'The deployed target is behind deployment protection. Configure the target-specific automation bypass credentials before running deployed UI smoke tests.',
   ).toBeFalsy();
 }
 
@@ -77,11 +77,11 @@ async function openHomeWithCards(page: Page) {
 
   await expect
     .poll(async () => page.getByTestId('nutsnews-article-feed').count(), {
-      message: 'Expected the NutsNews article feed to render. If this stays at 0, check whether the preview is behind Vercel Deployment Protection.',
+      message: 'Expected the NutsNews article feed to render. If this stays at 0, check whether the target is behind deployment protection.',
       timeout: 30_000,
     })
     .toBeGreaterThan(0);
-  await assertNotVercelProtectionPage(page);
+  await assertNotDeploymentProtectionPage(page);
   await expect(page.getByTestId('nutsnews-article-feed')).toBeVisible({ timeout: 30_000 });
   await expect
     .poll(async () => page.getByTestId('nutsnews-article-card').count(), {
@@ -172,7 +172,7 @@ function expectedFirstArticleLanguage(payload: ArticleLanguageResponse, requeste
   );
 }
 
-test.describe('Vercel Preview smoke regression', () => {
+test.describe('Deployed UI smoke regression', () => {
   test('homepage populates article cards', async ({ page }) => {
     await openHomeWithCards(page);
   });
@@ -189,7 +189,7 @@ test.describe('Vercel Preview smoke regression', () => {
       const response = await page.goto(route.path, { waitUntil: 'domcontentloaded' });
       expect(
         response?.ok(),
-        `Expected ${route.path} to load from the preview deployment, got ${response?.status() ?? 'no response'}.`,
+        `Expected ${route.path} to load from the deployed target, got ${response?.status() ?? 'no response'}.`,
       ).toBeTruthy();
       await expect(page.locator('main')).toContainText(route.expectedText, { timeout: 20_000 });
     }
@@ -244,7 +244,7 @@ test.describe('Vercel Preview smoke regression', () => {
     expect(searchResponse.ok(), `Expected /api/search?q=${searchQuery} to succeed, got ${searchResponse.status()}.`).toBeTruthy();
 
     const payload = (await searchResponse.json()) as SearchResponse;
-    expect(payload.error, 'Expected the staging search API to return a successful response.').toBeUndefined();
+    expect(payload.error, 'Expected the deployed search API to return a successful response.').toBeUndefined();
     expect(payload.query, 'Expected the search response to preserve the submitted query.').toBe(searchQuery);
 
     if ((payload.articles?.length ?? 0) > 0) {
