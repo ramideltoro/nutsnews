@@ -51,13 +51,13 @@ assert.ok(
 assert.equal(rows.size, workflowFiles.length, "Inventory must contain exactly one row for every workflow.");
 assert.match(
   rows.get("container-image.yml")?.reason ?? "",
-  /immutable PR artifact.*VPS staging deploy.*VPS staging UI smoke.*Vercel staging deploy.*Vercel staging UI smoke/,
-  "Container Image inventory row must explicitly mention the trusted PR VPS and Vercel staging deploy/UI smoke stages.",
+  /immutable PR artifact.*VPS staging deploy.*VPS staging UI smoke.*Vercel staging deploy.*Vercel staging UI smoke.*Vercel production deploy/,
+  "Container Image inventory row must explicitly mention the trusted PR VPS staging, Vercel staging, and Vercel production stages.",
 );
 assert.match(
   rows.get("container-image.yml")?.deploymentNote ?? "",
-  /trusted PR candidate to VPS staging and Vercel staging.*shared UI smoke evidence after each staging deployment/,
-  "Container Image inventory row must identify both staging deployment targets and UI smoke evidence.",
+  /trusted PR candidate to VPS staging, Vercel staging, and Vercel production/,
+  "Container Image inventory row must identify staging and Vercel production deployment targets.",
 );
 
 for (const workflow of workflowFiles) {
@@ -80,11 +80,15 @@ for (const workflow of workflowFiles) {
     assert.ok(!deploymentStatus, `${workflow} is PR-required but listens to deployment_status.`);
     assert.ok(!repositoryDispatch, `${workflow} is PR-required but listens to repository_dispatch.`);
     assert.ok(!workflowRun, `${workflow} is PR-required but listens to workflow_run.`);
-    assert.doesNotMatch(
-      text,
-      /environment:\\s*(Production|production-supabase|staging-supabase)/,
-      `${workflow} is PR-required but uses a protected deployment environment.`,
-    );
+    const protectedDeploymentEnvironment = /environment:\s*(Production|production-supabase|staging-supabase)/.test(text);
+    if (workflow === "container-image.yml") {
+      assert.ok(
+        protectedDeploymentEnvironment,
+        "Container Image must explicitly use the protected Production environment for the pre-merge Vercel production deploy stage.",
+      );
+    } else {
+      assert.equal(protectedDeploymentEnvironment, false, `${workflow} is PR-required but uses a protected deployment environment.`);
+    }
   }
 
   if (row.classification === "optional PR") {

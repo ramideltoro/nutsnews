@@ -127,6 +127,11 @@ requireText(
 );
 requireText(
   candidateJob,
+  "node --test tests/pr-vercel-production-deploy.test.mjs",
+  "Release candidate must validate PR Vercel production deployment evidence and alias verification.",
+);
+requireText(
+  candidateJob,
   "npm run test:translation-release-gate",
   "Release candidate must prove the translation audit fails missing, critical, and below-threshold fixtures.",
 );

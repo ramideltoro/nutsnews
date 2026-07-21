@@ -133,6 +133,12 @@ The `ui-smoke-vercel-staging` PR job starts only after `deploy-vercel-staging` s
 
 The stage uses the same `node ../scripts/run_deployed_ui_smoke_with_evidence.mjs` wrapper as VPS staging. When `VERCEL_AUTOMATION_BYPASS_SECRET` is configured, the Vercel Deployment Protection bypass header is masked and traces are disabled by the shared protected-target header helper before artifacts are uploaded.
 
+## Vercel Production Deploy
+
+The `deploy-vercel-production` PR job starts only after `ui-smoke-vercel-staging` succeeds. It stages the exact PR source commit with `vercel deploy --prod --skip-domain`, promotes that deployment after validation, and must not deploy a mutable branch ref or a different build ID.
+
+The stage must verify Vercel deployment ID, Vercel source SHA, staged deployment URL, and production aliases `www.nutsnews.com` and `nutsnews.com` before succeeding. Its deploy evidence must include source commit, build ID, image digest, deployment ID, deployment URL, production aliases, runtime env `production`, deployment target `vercel-production`, workflow run ID, and run attempt.
+
 ## Merge And Main Behavior
 
 All deployment stages complete before merge into `main`.
