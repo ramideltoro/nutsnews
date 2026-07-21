@@ -112,6 +112,11 @@ requireText(
 );
 requireText(
   candidateJob,
+  "node --test tests/deployment-hardening.test.mjs",
+  "Release candidate must validate deploy wait, retry, concurrency, and idempotency helpers.",
+);
+requireText(
+  candidateJob,
   "npm run test:translation-release-gate",
   "Release candidate must prove the translation audit fails missing, critical, and below-threshold fixtures.",
 );

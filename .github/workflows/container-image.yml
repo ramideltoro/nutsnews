@@ -7,8 +7,8 @@ on:
     branches: [main]
 
 concurrency:
-  group: container-image-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'pull_request' && format('container-image-pr-{0}', github.event.pull_request.number) || format('container-image-{0}-{1}', github.workflow, github.ref) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build-test:
@@ -793,6 +793,7 @@ jobs:
           node scripts/deployed_ui_smoke_regression.mjs
           node --test tests/protected-target-headers.test.mjs
           node --test tests/deployed-ui-smoke-evidence.test.mjs
+          node --test tests/deployment-hardening.test.mjs
           node scripts/immutable_all_tests_guard_regression.mjs
           node scripts/immutable_all_tests_guard.mjs
           node scripts/verify_github_actions_pinned.mjs

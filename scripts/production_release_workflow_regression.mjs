@@ -15,6 +15,8 @@ const translationCoverageWorkflow = await readFile(resolve(root, ".github/workfl
 const vercelBackendTokenSyncWorkflow = await readFile(resolve(root, ".github/workflows/vercel-backend-token-sync.yml"), "utf8");
 const vercelProductionWorkflow = await readFile(resolve(root, ".github/workflows/vercel-production-release.yml"), "utf8");
 const dualTargetSmoke = await readFile(resolve(root, "scripts/dual_target_web_smoke.mjs"), "utf8");
+const deploymentHardening = await readFile(resolve(root, "scripts/deployment_hardening.mjs"), "utf8");
+const deploymentHardeningTest = await readFile(resolve(root, "tests/deployment-hardening.test.mjs"), "utf8");
 const vercelConfig = JSON.parse(await readFile(resolve(root, "web/vercel.json"), "utf8"));
 const packageJson = JSON.parse(await readFile(resolve(root, "web/package.json"), "utf8"));
 const workflowNames = await readdir(resolve(root, ".github/workflows"));
@@ -53,7 +55,8 @@ function workflowStep(text, name) {
 }
 
 assert.doesNotMatch(containerWorkflow, /^\s+paths:\s*$/m, "Container Image must run for every main merge, not a path subset.");
-requireText(containerWorkflow, "cancel-in-progress: false", "Container Image must not skip a merged release.");
+requireText(containerWorkflow, "cancel-in-progress: ${{ github.event_name == 'pull_request' }}", "Container Image must cancel stale PR attempts without skipping merged releases.");
+requireText(containerWorkflow, "format('container-image-pr-{0}', github.event.pull_request.number)", "Container Image PR concurrency must be scoped to the PR number.");
 requireText(containerWorkflow, "name: nutsnews-staging-release", "Container Image must publish staging metadata.");
 requireText(containerWorkflow, "image_digest", "Release metadata must include the immutable image digest.");
 requireText(containerWorkflow, "image_tag: sourceCommit", "Release metadata must use the full commit tag.");
@@ -104,9 +107,26 @@ for (const fragment of [
   "All deployment stages complete before merge into `main`.",
   "Reusable UI test evidence",
   "Target-specific deploy evidence",
+  "bounded exponential backoff",
+  "nutsnews-premerge-deploy-pr-<pr_number>",
+  "pr-<pr_number>-<source_commit>-<target_type>",
   "Pre-merge deployment gate",
 ]) {
   requireText(preMergeDeploymentContract, fragment, `Pre-merge deployment contract must define: ${fragment}`);
+}
+requireText(containerWorkflow, "node --test tests/deployment-hardening.test.mjs", "Release candidate must run deployment hardening helper tests.");
+for (const fragment of [
+  "withBoundedExponentialBackoff",
+  "fetchJsonWithRetry",
+  "pollGitHubWorkflowRun",
+  "pollInfraGitHubDeployment",
+  "pollVercelDeployment",
+  "preMergeDeploymentConcurrencyGroup",
+  "deploymentStageIdempotencyKey",
+  "safeDeploymentDebugSummary",
+]) {
+  requireText(deploymentHardening, fragment, `Deployment hardening helper must export ${fragment}.`);
+  requireText(deploymentHardeningTest, fragment, `Deployment hardening regression must cover ${fragment}.`);
 }
 
 assert.equal(

@@ -79,6 +79,16 @@ Retained UI artifacts must not include protected-target secrets. Playwright trac
 
 The Vercel preview workflow remains separate for non-release previews, but it delegates to `npm run test:e2e:deployed` so preview behavior uses the shared deployed-target smoke coverage.
 
+## Deployment Hardening
+
+Deployment and UI smoke jobs must use `scripts/deployment_hardening.mjs` helpers for bounded exponential backoff, transient network/API retries, and terminal deployment polling. The helper owns the common behavior for GitHub workflow polling, GitHub infra deployment status polling, and Vercel deployment polling.
+
+Transient network failures and HTTP `408`, `425`, `429`, `500`, `502`, `503`, and `504` responses are retried until the bounded timeout. Validation failures such as stale PR heads, source commit mismatches, build ID mismatches, deployment target mismatches, malformed evidence, and provider terminal failure states fail fast.
+
+Pre-merge deploy pipelines must use the concurrency group `nutsnews-premerge-deploy-pr-<pr_number>` with `cancel-in-progress: true` so a newer run supersedes older active work for the same PR. Each deploy stage must use the stable idempotency key `pr-<pr_number>-<source_commit>-<target_type>`; rerunning the same PR head either reuses the same provider deployment identity or explicitly supersedes the previous attempt for that idempotency key.
+
+Every deploy and UI test stage must set an explicit GitHub Actions `timeout-minutes` value and pass a bounded helper timeout for any provider polling loop. Logs and summaries must include PR number, target type, source commit, build ID, deployment ID, workflow run ID, and run attempt when available, but must never print tokens, protected auth headers, cookies, or raw provider secret values.
+
 ## Trusted PR Eligibility
 
 The pre-merge deployment pipeline is deployment-eligible only for same-repository PR branches in `ramideltoro/nutsnews`. Fork PRs and other untrusted PR sources are not deployment-eligible.
