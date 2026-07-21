@@ -115,12 +115,12 @@ test("fixture database target must exactly match the verified staging runtime", 
   }
 });
 
-test("deployment smoke keeps image health target separate from staging readiness target", () => {
+test("deployment smoke expects staging health and readiness targets", () => {
   const smokeEnv = deploymentSmokeEnvironment(input("unused"), { EXISTING_VALUE: "preserved" });
 
   assert.equal(smokeEnv.EXISTING_VALUE, "preserved");
   assert.equal(smokeEnv.NUTSNEWS_EXPECTED_DEPLOYMENT_TARGET, "vps-staging");
-  assert.equal(smokeEnv.NUTSNEWS_EXPECTED_HEALTH_DEPLOYMENT_TARGET, "vps");
+  assert.equal(smokeEnv.NUTSNEWS_EXPECTED_HEALTH_DEPLOYMENT_TARGET, "vps-staging");
 });
 
 test("anonymous auth session must be null", async () => {
