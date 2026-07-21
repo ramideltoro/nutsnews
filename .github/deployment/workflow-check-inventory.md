@@ -35,7 +35,7 @@ No deployment work is hidden inside a workflow classified as an existing check. 
 | `gitleaks.yml` | PR-required | Scans for committed secrets before merge while keeping default-branch and scheduled coverage. | No deployment. |
 | `homepage-performance-budget.yml` | PR-required | Builds the app and enforces homepage bundle/performance budget review before merge. | No deployment. |
 | `image-coverage-report.yml` | scheduled/operational | Reports live article image coverage from production data on a schedule or operator request. | No deployment. |
-| `immutable-all-tests-guard.yml` | PR-required | Ensures required all-test guard configuration cannot be weakened before merge. | No deployment. |
+| `immutable-all-tests-guard.yml` | PR-required | Reports established test-like, guard, workflow, and test inventory changes only when those inputs change. | No deployment. |
 | `immutable-tests-guard.yml` | PR-required | Reports locked preview smoke, guard script, and related workflow changes only when those protected inputs change. | No deployment. |
 | `lighthouse-ci.yml` | scheduled/operational | Runs scheduled or manually requested Lighthouse audits; lighter merge-critical performance coverage remains in `homepage-performance-budget.yml`. | No deployment. |
 | `link-check.yml` | PR-required | Checks Markdown links for documentation changes before merge; scheduled runs catch remote link rot. | No deployment. |

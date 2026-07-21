@@ -232,6 +232,28 @@ for (const requiredImmutableTestPath of [
 }
 assert.ok(hasTrigger(immutableTestsWorkflow, "workflow_dispatch"), "Immutable Test Guard must remain manually runnable.");
 
+const immutableAllTestsWorkflow = await readFile(resolve(workflowDir, "immutable-all-tests-guard.yml"), "utf8");
+const immutableAllTestsPullRequest = workflowTriggerBlock(immutableAllTestsWorkflow, "pull_request");
+assert.ok(
+  immutableAllTestsPullRequest.includes("paths:"),
+  "Immutable All Tests Guard pull_request trigger must be path-filtered.",
+);
+for (const requiredImmutableAllTestsPath of [
+  ".github/workflows/**",
+  "scripts/*guard*.mjs",
+  "scripts/*regression*.mjs",
+  "web/tests/**",
+  "web/playwright*.config.ts",
+  "web/vitest*.config.ts",
+  "web/package.json",
+]) {
+  assert.ok(
+    immutableAllTestsPullRequest.includes(requiredImmutableAllTestsPath),
+    `Immutable All Tests Guard pull_request trigger must cover ${requiredImmutableAllTestsPath}.`,
+  );
+}
+assert.ok(hasTrigger(immutableAllTestsWorkflow, "workflow_dispatch"), "Immutable All Tests Guard must remain manually runnable.");
+
 for (const workflow of workflowFiles) {
   const row = rows.get(workflow);
   assert.ok(row, `Inventory is missing ${workflow}.`);
