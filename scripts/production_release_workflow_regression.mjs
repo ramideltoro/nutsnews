@@ -70,6 +70,7 @@ const vpsStagingUiSmokeJob = workflowJob(containerWorkflow, "ui-smoke-vps-stagin
 const vercelStagingDeployJob = workflowJob(containerWorkflow, "deploy-vercel-staging");
 const vercelStagingUiSmokeJob = workflowJob(containerWorkflow, "ui-smoke-vercel-staging");
 const vercelProductionDeployJob = workflowJob(containerWorkflow, "deploy-vercel-production");
+const vercelProductionUiSmokeJob = workflowJob(containerWorkflow, "ui-smoke-vercel-production");
 
 assert.doesNotMatch(containerWorkflow, /^\s+paths:\s*$/m, "Container Image must run for every main merge, not a path subset.");
 requireText(containerWorkflow, "cancel-in-progress: ${{ github.event_name == 'pull_request' }}", "Container Image must cancel stale PR attempts without skipping merged releases.");
@@ -132,10 +133,12 @@ for (const fragment of [
   "deploy-vercel-staging",
   "ui-smoke-vercel-staging",
   "deploy-vercel-production",
+  "ui-smoke-vercel-production",
   "nutsnews-staging-release",
   "runtime env `staging`, deployment target `vps-staging`",
   "deployment target `vercel-staging`",
   "deployment target `vercel-production`",
+  "NUTSNEWS_PRODUCTION_SAFE_SURFACES=true",
   "node ../scripts/run_deployed_ui_smoke_with_evidence.mjs",
   "nutsnews-ui-smoke-vps-staging",
   "Pre-merge deployment gate",
@@ -223,6 +226,17 @@ requireText(vercelProductionDeployJob, "NUTSNEWS_DEPLOYMENT_TARGET=vercel-produc
 requireText(vercelProductionDeployJob, "node scripts/pr_vercel_production_deploy.mjs", "Vercel production deploy must use the tested validation and evidence helper.");
 requireText(vercelProductionDeployJob, "Upload Vercel production deploy evidence", "Vercel production deploy must retain deploy evidence.");
 requireText(containerWorkflow, "node --test tests/pr-vercel-production-deploy.test.mjs", "Release candidate must run PR Vercel production deployment tests.");
+requireText(vercelProductionUiSmokeJob, "name: UI smoke Vercel production", "PR pipeline must include the Vercel production UI smoke stage.");
+requireText(vercelProductionUiSmokeJob, "needs: [deploy-vercel-production, ui-smoke-vercel-staging, pr-release-artifact, trusted-pr-deployment-eligibility]", "Vercel production UI smoke must run after the Vercel production deploy.");
+requireText(vercelProductionUiSmokeJob, "environment: Production", "Vercel production UI smoke must use the protected Production environment.");
+requireText(vercelProductionUiSmokeJob, "timeout-minutes: 20", "Vercel production UI smoke must have an explicit timeout.");
+requireText(vercelProductionUiSmokeJob, "Verify Vercel production identity before browser tests", "Vercel production UI smoke must preflight runtime identity.");
+requireText(vercelProductionUiSmokeJob, "verifyVercelProductionRuntime", "Vercel production UI smoke must verify source, build, and target identity before browser tests.");
+requireText(vercelProductionUiSmokeJob, "PLAYWRIGHT_BASE_URL: ${{ needs.deploy-vercel-production.outputs.target_url }}", "Vercel production UI smoke must target the production deploy URL.");
+requireText(vercelProductionUiSmokeJob, "NUTSNEWS_UI_SMOKE_TARGET_TYPE: vercel-production", "Vercel production UI smoke evidence must use the vercel-production target type.");
+requireText(vercelProductionUiSmokeJob, 'NUTSNEWS_PRODUCTION_SAFE_SURFACES: "true"', "Vercel production UI smoke must use the safe production smoke profile.");
+requireText(vercelProductionUiSmokeJob, "run: node ../scripts/run_deployed_ui_smoke_with_evidence.mjs", "Vercel production UI smoke must use the standardized evidence runner.");
+requireText(vercelProductionUiSmokeJob, "web/test-results/deployed-ui-smoke", "Vercel production UI smoke must upload standardized evidence output.");
 
 assert.equal(
   packageJson.scripts?.["test:translation-release-gate"],

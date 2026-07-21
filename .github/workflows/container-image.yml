@@ -1324,6 +1324,105 @@ jobs:
           if-no-files-found: ignore
           retention-days: 90
 
+  ui-smoke-vercel-production:
+    name: UI smoke Vercel production
+    if: >-
+      github.event_name == 'pull_request' &&
+      needs.trusted-pr-deployment-eligibility.outputs.eligible == 'true'
+    needs: [deploy-vercel-production, ui-smoke-vercel-staging, pr-release-artifact, trusted-pr-deployment-eligibility]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: Production
+    concurrency:
+      group: nutsnews-premerge-deploy-pr-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      evidence_path: ${{ steps.smoke.outputs.evidence_path }}
+      artifact_name: ${{ steps.smoke.outputs.artifact_name }}
+
+    steps:
+      - name: Checkout exact PR release source
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
+        with:
+          ref: ${{ needs.pr-release-artifact.outputs.source_commit }}
+          persist-credentials: false
+
+      - name: Use Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Mask Vercel production UI smoke secrets
+        run: |
+          set -euo pipefail
+          for value in \
+            "${VERCEL_AUTOMATION_BYPASS_SECRET:-}"; do
+            if [ -n "$value" ]; then
+              echo "::add-mask::$value"
+            fi
+          done
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Verify Vercel production identity before browser tests
+        env:
+          PR_RELEASE_METADATA_JSON: ${{ needs.pr-release-artifact.outputs.metadata_json }}
+          NUTSNEWS_VERCEL_PRODUCTION_ALIASES: ${{ needs.deploy-vercel-production.outputs.target_url }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { parsePrReleaseMetadata } from "./scripts/pr_vps_staging_deploy.mjs";
+          import { verifyVercelProductionRuntime } from "./scripts/pr_vercel_production_deploy.mjs";
+
+          const metadata = parsePrReleaseMetadata(process.env.PR_RELEASE_METADATA_JSON);
+          await verifyVercelProductionRuntime({
+            env: process.env,
+            metadata,
+            aliases: [process.env.NUTSNEWS_VERCEL_PRODUCTION_ALIASES],
+            timeoutMs: 180_000,
+          });
+          NODE
+
+      - name: Install Playwright Chromium
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run shared UI smoke against Vercel production
+        id: smoke
+        working-directory: web
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ needs.deploy-vercel-production.outputs.target_url }}
+          NUTSNEWS_UI_SMOKE_TARGET_URL: ${{ needs.deploy-vercel-production.outputs.target_url }}
+          NUTSNEWS_UI_SMOKE_TARGET_TYPE: vercel-production
+          NUTSNEWS_UI_SMOKE_SOURCE_COMMIT: ${{ needs.pr-release-artifact.outputs.source_commit }}
+          NUTSNEWS_UI_SMOKE_BUILD_ID: ${{ needs.pr-release-artifact.outputs.build_id }}
+          NUTSNEWS_UI_SMOKE_DEPLOYMENT_ID: ${{ needs.deploy-vercel-production.outputs.deployment_id }}
+          NUTSNEWS_UI_SMOKE_PR_NUMBER: ${{ github.event.pull_request.number }}
+          NUTSNEWS_PRODUCTION_SAFE_SURFACES: "true"
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: node ../scripts/run_deployed_ui_smoke_with_evidence.mjs
+
+      - name: Upload Vercel production UI smoke evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6
+        with:
+          name: ${{ steps.smoke.outputs.artifact_name || format('nutsnews-ui-smoke-vercel-production-pr-{0}-attempt-{1}', github.event.pull_request.number, github.run_attempt) }}
+          path: |
+            web/playwright-report
+            web/test-results/deployed-ui-smoke
+          if-no-files-found: ignore
+          retention-days: 90
+
   release-candidate:
     name: Release candidate
     if: always() && github.event_name == 'pull_request'

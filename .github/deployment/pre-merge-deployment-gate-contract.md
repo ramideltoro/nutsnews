@@ -139,6 +139,12 @@ The `deploy-vercel-production` PR job starts only after `ui-smoke-vercel-staging
 
 The stage must verify Vercel deployment ID, Vercel source SHA, staged deployment URL, and production aliases `www.nutsnews.com` and `nutsnews.com` before succeeding. Its deploy evidence must include source commit, build ID, image digest, deployment ID, deployment URL, production aliases, runtime env `production`, deployment target `vercel-production`, workflow run ID, and run attempt.
 
+## Vercel Production UI Smoke
+
+The `ui-smoke-vercel-production` PR job starts only after `deploy-vercel-production` succeeds. The base URL is the production alias selected by the deploy evidence, and the identity preflight must confirm the expected PR source commit, build ID, runtime env `production`, and deployment target `vercel-production` before browser tests start.
+
+The stage uses the shared `node ../scripts/run_deployed_ui_smoke_with_evidence.mjs` wrapper and sets `NUTSNEWS_PRODUCTION_SAFE_SURFACES=true` for the smoke profile. Production UI smoke must avoid destructive writes and retain the standardized `nutsnews-ui-smoke-vercel-production-...` evidence artifact.
+
 ## Merge And Main Behavior
 
 All deployment stages complete before merge into `main`.
