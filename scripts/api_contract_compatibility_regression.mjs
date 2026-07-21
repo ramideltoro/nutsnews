@@ -498,7 +498,7 @@ function testInventoryCompleteness() {
   const inventory = readJson("api-contracts/inventory.json");
   assert.equal(inventory.schemaVersion, 1, "API inventory schema version must be explicit");
   assert(Array.isArray(inventory.endpoints), "API inventory endpoints must be an array");
-  assert.equal(inventory.endpoints.length, 17, "API inventory must include every supported custom response endpoint");
+  assert.equal(inventory.endpoints.length, 18, "API inventory must include every supported custom response endpoint");
 
   const inventoryFiles = inventory.endpoints.map((endpoint) => endpoint.routeFile).sort();
   assert.equal(new Set(inventoryFiles).size, inventoryFiles.length, "API inventory route files must be unique");

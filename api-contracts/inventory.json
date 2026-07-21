@@ -108,6 +108,53 @@
       "testFile": "scripts/api_contract_compatibility_regression.mjs"
     },
     {
+      "id": "article-detail",
+      "method": ["GET"],
+      "path": "/api/articles/[id]",
+      "routeFile": "web/app/api/articles/[id]/route.ts",
+      "request": {
+        "body": "none",
+        "path": {
+          "id": "required published article id"
+        },
+        "query": {
+          "lang": "optional enum en|fr|ja|de-CH|de|el; invalid values normalize to en"
+        }
+      },
+      "auth": "public; no authentication or authorization is required",
+      "successStatus": [200],
+      "successResponseShape": {
+        "contentType": "application/json",
+        "requiredKeys": [
+          "id",
+          "source",
+          "title",
+          "original_url",
+          "language_code",
+          "requested_language_code",
+          "translation_available"
+        ],
+        "article": "top-level public Article shape matching /api/articles article items",
+        "nullable": {
+          "image_url": "string|null",
+          "published_at": "string|null",
+          "published_on_site_at": "string|null",
+          "ai_summary": "string|null",
+          "category": "string|null",
+          "positivity_score": "number|null"
+        }
+      },
+      "errorStatuses": [404, 500],
+      "errorShape": {
+        "requiredKeys": ["error"],
+        "error": "string"
+      },
+      "pagination": "none",
+      "cache": "public JSON cache for 200 responses; no-store for missing/unpublished IDs and unexpected failures",
+      "iosCallSites": [],
+      "testFile": "scripts/api_contract_compatibility_regression.mjs"
+    },
+    {
       "id": "home-feed",
       "method": ["GET"],
       "path": "/api/home-feed",
