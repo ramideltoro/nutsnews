@@ -51,13 +51,13 @@ assert.ok(
 assert.equal(rows.size, workflowFiles.length, "Inventory must contain exactly one row for every workflow.");
 assert.match(
   rows.get("container-image.yml")?.reason ?? "",
-  /immutable PR artifact.*VPS staging deploy.*VPS staging UI smoke.*Vercel staging deploy/,
-  "Container Image inventory row must explicitly mention the trusted PR VPS staging, UI smoke, and Vercel staging stages.",
+  /immutable PR artifact.*VPS staging deploy.*VPS staging UI smoke.*Vercel staging deploy.*Vercel staging UI smoke/,
+  "Container Image inventory row must explicitly mention the trusted PR VPS and Vercel staging deploy/UI smoke stages.",
 );
 assert.match(
   rows.get("container-image.yml")?.deploymentNote ?? "",
-  /trusted PR candidate to VPS staging and Vercel staging.*shared UI smoke evidence/,
-  "Container Image inventory row must identify the VPS and Vercel staging deployment targets.",
+  /trusted PR candidate to VPS staging and Vercel staging.*shared UI smoke evidence after each staging deployment/,
+  "Container Image inventory row must identify both staging deployment targets and UI smoke evidence.",
 );
 
 for (const workflow of workflowFiles) {

@@ -68,6 +68,7 @@ function workflowJob(text, name) {
 const prVpsStagingJob = workflowJob(containerWorkflow, "deploy-vps-staging");
 const vpsStagingUiSmokeJob = workflowJob(containerWorkflow, "ui-smoke-vps-staging");
 const vercelStagingDeployJob = workflowJob(containerWorkflow, "deploy-vercel-staging");
+const vercelStagingUiSmokeJob = workflowJob(containerWorkflow, "ui-smoke-vercel-staging");
 
 assert.doesNotMatch(containerWorkflow, /^\s+paths:\s*$/m, "Container Image must run for every main merge, not a path subset.");
 requireText(containerWorkflow, "cancel-in-progress: ${{ github.event_name == 'pull_request' }}", "Container Image must cancel stale PR attempts without skipping merged releases.");
@@ -128,6 +129,7 @@ for (const fragment of [
   "deploy-vps-staging",
   "ui-smoke-vps-staging",
   "deploy-vercel-staging",
+  "ui-smoke-vercel-staging",
   "nutsnews-staging-release",
   "runtime env `staging`, deployment target `vps-staging`",
   "deployment target `vercel-staging`",
@@ -195,6 +197,16 @@ requireText(vercelStagingDeployJob, "NUTSNEWS_DEPLOYMENT_TARGET=vercel-staging",
 requireText(vercelStagingDeployJob, "node scripts/pr_vercel_staging_deploy.mjs", "Vercel staging deploy must use the tested validation and evidence helper.");
 requireText(vercelStagingDeployJob, "Upload Vercel staging deploy evidence", "Vercel staging deploy must retain deploy evidence.");
 requireText(containerWorkflow, "node --test tests/pr-vercel-staging-deploy.test.mjs", "Release candidate must run PR Vercel staging deployment tests.");
+requireText(vercelStagingUiSmokeJob, "name: UI smoke Vercel staging", "PR pipeline must include the Vercel staging UI smoke stage.");
+requireText(vercelStagingUiSmokeJob, "needs: [deploy-vercel-staging, ui-smoke-vps-staging, pr-release-artifact, trusted-pr-deployment-eligibility]", "Vercel staging UI smoke must run after the Vercel staging deploy.");
+requireText(vercelStagingUiSmokeJob, "timeout-minutes: 20", "Vercel staging UI smoke must have an explicit timeout.");
+requireText(vercelStagingUiSmokeJob, "Verify Vercel staging identity before browser tests", "Vercel staging UI smoke must preflight runtime identity.");
+requireText(vercelStagingUiSmokeJob, "verifyVercelStagingRuntime", "Vercel staging UI smoke must verify source, build, and target identity before browser tests.");
+requireText(vercelStagingUiSmokeJob, "PLAYWRIGHT_BASE_URL: ${{ needs.deploy-vercel-staging.outputs.target_url }}", "Vercel staging UI smoke must target the deploy job URL.");
+requireText(vercelStagingUiSmokeJob, "NUTSNEWS_UI_SMOKE_TARGET_TYPE: vercel-staging", "Vercel staging UI smoke evidence must use the vercel-staging target type.");
+requireText(vercelStagingUiSmokeJob, "VERCEL_AUTOMATION_BYPASS_SECRET", "Vercel staging UI smoke must support deployment protection bypass.");
+requireText(vercelStagingUiSmokeJob, "run: node ../scripts/run_deployed_ui_smoke_with_evidence.mjs", "Vercel staging UI smoke must use the standardized evidence runner.");
+requireText(vercelStagingUiSmokeJob, "web/test-results/deployed-ui-smoke", "Vercel staging UI smoke must upload standardized evidence output.");
 
 assert.equal(
   packageJson.scripts?.["test:translation-release-gate"],
