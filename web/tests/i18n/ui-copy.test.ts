@@ -10,8 +10,10 @@ import { formCopyByLanguage } from "@/app/contact/ContactForm";
 import { contactCopyByLanguage } from "@/app/contact/LocalizedContactPage";
 import { privacyCopyByLanguage } from "@/app/privacy/LocalizedPrivacyPolicyPage";
 import { savedStoriesCopyByLanguage } from "@/app/saved/SavedStoriesPage";
+import { themeInitScript } from "@/lib/themeBootstrap";
 import {
   DEFAULT_LANGUAGE_CODE,
+  LANGUAGE_STORAGE_KEY,
   SUPPORTED_LANGUAGES,
   getLanguageLabel,
   isSupportedLanguageCode,
@@ -121,6 +123,64 @@ function readPath(value: unknown, path: readonly string[]) {
   }, value);
 }
 
+type BootstrapElement = {
+  attributes: Record<string, string>;
+  style: Record<string, string>;
+  setAttribute: (name: string, value: string) => void;
+};
+
+function createBootstrapElement(): BootstrapElement {
+  const element: BootstrapElement = {
+    attributes: {},
+    style: {},
+    setAttribute(name, value) {
+      element.attributes[name] = String(value);
+    },
+  };
+
+  return element;
+}
+
+function runThemeBootstrap(storedLanguage: string | null) {
+  const root = createBootstrapElement();
+
+  const window = {
+    localStorage: {
+      getItem(key: string) {
+        if (key === LANGUAGE_STORAGE_KEY) {
+          return storedLanguage;
+        }
+
+        if (key === "nutsnews.web.theme") {
+          return "amber";
+        }
+
+        return null;
+      },
+    },
+  };
+  const document = {
+    documentElement: root,
+    head: {
+      appendChild() {},
+    },
+    querySelector() {
+      return null;
+    },
+    createElement() {
+      return createBootstrapElement();
+    },
+  };
+
+  new Function("window", "document", themeInitScript)(window, document);
+
+  return {
+    lang: root.attributes.lang,
+    theme: root.attributes["data-nutsnews-theme"],
+    colorScheme: root.style.colorScheme,
+  };
+}
+
 describe("i18n copy inventory", () => {
   test("every public UI copy map covers the centralized supported locale inventory", () => {
     for (const { name, value } of copyMaps) {
@@ -185,6 +245,39 @@ describe("i18n copy inventory", () => {
 });
 
 describe("i18n fallback and formatting", () => {
+  test("pre-hydration bootstrap honors the centralized supported language inventory", () => {
+    for (const languageCode of supportedCodes) {
+      expect(
+        runThemeBootstrap(languageCode).lang,
+        `bootstrap script must preserve stored ${languageCode}`,
+      ).toBe(languageCode);
+    }
+  });
+
+  test("pre-hydration bootstrap normalization matches shared language utilities", () => {
+    for (const storedLanguage of [
+      null,
+      "",
+      "zz",
+      " de_ch ",
+      "ch",
+      "DE",
+      "EL",
+      "fr",
+    ]) {
+      expect(runThemeBootstrap(storedLanguage).lang).toBe(
+        normalizeLanguageCode(storedLanguage),
+      );
+    }
+  });
+
+  test("pre-hydration bootstrap keeps existing theme initialization behavior", () => {
+    expect(runThemeBootstrap("fr")).toMatchObject({
+      colorScheme: "dark",
+      theme: "amber",
+    });
+  });
+
   test("unsupported language inputs normalize to English instead of leaking raw codes", () => {
     expect(isSupportedLanguageCode("zz")).toBe(false);
     expect(normalizeLanguageCode("zz")).toBe(DEFAULT_LANGUAGE_CODE);

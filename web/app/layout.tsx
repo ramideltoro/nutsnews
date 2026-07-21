@@ -3,59 +3,9 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AppVersionGuard } from "./components/AppVersionGuard";
 import { RuntimeAnalytics } from "./components/RuntimeAnalytics";
+import { themeInitScript } from "@/lib/themeBootstrap";
 
 const siteUrl = "https://www.nutsnews.com";
-
-const themeInitScript = `
-(function () {
-  var browserThemeColors = {
-    amber: "#0a0a0a",
-    "modern-saas": "#121212",
-    "creative-premium": "#0f172a",
-    "moody-cyberpunk": "#1a211b"
-  };
-
-  function updateBrowserThemeColor(theme) {
-    var color = browserThemeColors[theme] || browserThemeColors.amber;
-    var themeColorMeta = document.querySelector('meta[name="theme-color"]');
-
-    if (!themeColorMeta) {
-      themeColorMeta = document.createElement("meta");
-      themeColorMeta.setAttribute("name", "theme-color");
-      document.head.appendChild(themeColorMeta);
-    }
-
-    themeColorMeta.setAttribute("content", color);
-  }
-
-  try {
-    var storageKey = "nutsnews.web.theme";
-    var allowedThemes = {
-      amber: true,
-      "modern-saas": true,
-      "creative-premium": true,
-      "moody-cyberpunk": true
-    };
-    var storedTheme = window.localStorage.getItem(storageKey);
-    var theme = allowedThemes[storedTheme] ? storedTheme : "amber";
-    var root = document.documentElement;
-    root.setAttribute("data-nutsnews-theme", theme);
-    root.style.colorScheme = "dark";
-    updateBrowserThemeColor(theme);
-
-    var languageStorageKey = "nutsnews.web.language";
-    var allowedLanguages = { en: true, fr: true, ja: true };
-    var storedLanguage = window.localStorage.getItem(languageStorageKey);
-    var language = allowedLanguages[storedLanguage] ? storedLanguage : "en";
-    root.setAttribute("lang", language);
-  } catch (_) {
-    document.documentElement.setAttribute("data-nutsnews-theme", "amber");
-    document.documentElement.style.colorScheme = "dark";
-    document.documentElement.setAttribute("lang", "en");
-    updateBrowserThemeColor("amber");
-  }
-})();
-`;
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
