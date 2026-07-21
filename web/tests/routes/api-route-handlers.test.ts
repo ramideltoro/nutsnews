@@ -296,6 +296,9 @@ describe("public article route handlers", () => {
     });
     expect(response.headers.get("cache-control")).toContain("s-maxage=300");
     expect(response.headers.get("x-nutsnews-cache-policy")).toBe("public-home-feed-cache-3600s");
+    expect(response.headers.get("x-nutsnews-article-language")).toBe("fr");
+    expect(response.headers.get("x-nutsnews-article-data-source")).toBe("public_feed_snapshot");
+    expect(response.headers.get("x-nutsnews-feed-snapshot")).toBe("hit");
     expect(mocks.getHomeFeedDataWithEdgeFallback).toHaveBeenCalledWith("fr");
   });
 

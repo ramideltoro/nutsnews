@@ -8,21 +8,49 @@ import {
   createMaintenanceHomeFeedPayload,
   getHomeFeedDataWithEdgeFallback,
 } from "@/lib/edgeFeedSnapshot";
-import type { FeedDegradationStatus } from "@/lib/articles";
+import type { FeedDegradationStatus, HomeFeedPayload } from "@/lib/articles";
 import { normalizeLanguageCode } from "@/lib/languages";
 import { logError, logInfoSampled, logWarn } from "@/lib/logger";
 
 export const revalidate = 900;
 
-function buildHomeFeedHeaders(degradation?: FeedDegradationStatus | null) {
+function buildHomeFeedHeaders(result: HomeFeedPayload, languageCode: string) {
+  const feedSnapshotStatus =
+    result.dataSource === "public_feed_snapshot"
+      ? "hit"
+      : result.dataSource === "edge_feed_snapshot"
+        ? "edge-fallback"
+        : "fallback";
+
   const headers: Record<string, string> = {
     ...ARTICLE_API_CACHE_HEADERS,
     "X-NutsNews-Cache-Policy": `public-home-feed-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`,
+    "X-NutsNews-Article-Language": languageCode,
+    "X-NutsNews-Article-Data-Source": result.dataSource,
+    "X-NutsNews-Feed-Snapshot": feedSnapshotStatus,
+    "X-NutsNews-Edge-Snapshot": result.edgeSnapshot?.status ?? "not-used",
   };
+  const degradation: FeedDegradationStatus | null | undefined = result.degradation;
 
   if (degradation) {
     headers["X-NutsNews-Degradation-Mode"] = degradation.mode;
     headers["X-NutsNews-Degradation-Reason"] = degradation.reason;
+  }
+
+  if (result.edgeSnapshot?.updatedAt) {
+    headers["X-NutsNews-Edge-Snapshot-Updated-At"] = result.edgeSnapshot.updatedAt;
+  }
+
+  if (typeof result.edgeSnapshot?.ageSeconds === "number") {
+    headers["X-NutsNews-Edge-Snapshot-Age-Seconds"] = String(result.edgeSnapshot.ageSeconds);
+  }
+
+  if (typeof result.edgeSnapshot?.articleCount === "number") {
+    headers["X-NutsNews-Edge-Snapshot-Article-Count"] = String(result.edgeSnapshot.articleCount);
+  }
+
+  if (typeof result.edgeSnapshot?.version === "number") {
+    headers["X-NutsNews-Edge-Snapshot-Version"] = String(result.edgeSnapshot.version);
   }
 
   return headers;
@@ -48,7 +76,7 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json(result, {
-      headers: buildHomeFeedHeaders(result.degradation),
+      headers: buildHomeFeedHeaders(result, languageCode),
     });
   } catch (error) {
     await logError("api.home_feed.request_failed", "Home feed API request failed", error, {
@@ -79,7 +107,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(result, {
       status: 200,
-      headers: buildHomeFeedHeaders(result.degradation),
+      headers: buildHomeFeedHeaders(result, languageCode),
     });
   }
 }

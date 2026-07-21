@@ -120,6 +120,19 @@ function hasUsableEdgeTranslation(article: Article, requestedLanguageCode: Langu
   );
 }
 
+function resultHasUsableEdgeTranslations(
+  result: PublishedArticlesResult | null,
+  requestedLanguageCode: LanguageCode,
+): result is PublishedArticlesResult {
+  if (requestedLanguageCode === DEFAULT_LANGUAGE_CODE || !result) {
+    return false;
+  }
+
+  return result.articles.some((article) =>
+    hasUsableEdgeTranslation(article, requestedLanguageCode),
+  );
+}
+
 function normalizeEdgeArticles(articles: Article[], requestedLanguageCode: LanguageCode) {
   return dedupeArticlesByIdentity(articles).map((article) => {
     if (hasUsableEdgeTranslation(article, requestedLanguageCode)) {
@@ -299,100 +312,37 @@ function shouldUseEdgeFallback(result: PublishedArticlesResult) {
   return result.dataSource === "articles_fallback" && result.articles.length === 0;
 }
 
-export async function getPublishedArticlesWithEdgeFallback(
+async function getPreferredLocalizedEdgeFeedSnapshotPage({
   page = 0,
-  category?: string | null,
-  requestedLanguageCode?: string | null,
-): Promise<PublishedArticlesResult> {
-  let result: PublishedArticlesResult | null = null;
-
-  try {
-    result = await getPublishedArticles(page, category, requestedLanguageCode);
-
-    if (!shouldUseEdgeFallback(result)) {
-      return result;
-    }
-  } catch (error) {
-    console.error("Published article read threw before edge snapshot fallback:", error);
+  category,
+  pageSize = PAGE_SIZE,
+  requestedLanguageCode,
+}: {
+  page?: number;
+  category?: string | null;
+  pageSize?: number;
+  requestedLanguageCode: LanguageCode;
+}) {
+  if (requestedLanguageCode === DEFAULT_LANGUAGE_CODE) {
+    return null;
   }
 
   const edgeResult = await getEdgeFeedSnapshotPage({
     page,
     category,
+    pageSize,
     requestedLanguageCode,
   });
 
-  if (edgeResult) {
-    return edgeResult;
-  }
-
-  if (result) {
-    return result;
-  }
-
-  const languageCode = normalizeLanguageCode(requestedLanguageCode);
-
-  return {
-    articles: [],
-    nextPage: null,
-    nextCursor: null,
-    dataSource: "articles_fallback",
-    languageCode,
-  };
+  return resultHasUsableEdgeTranslations(edgeResult, requestedLanguageCode)
+    ? edgeResult
+    : null;
 }
 
-export async function getHomeFeedDataWithEdgeFallback(
-  requestedLanguageCode?: string | null,
-): Promise<HomeFeedPayload> {
-  let snapshotResult: HomeFeedPayload | null = null;
-
-  try {
-    snapshotResult = await getHomeFeedFromSnapshot(requestedLanguageCode);
-  } catch (error) {
-    await logHomeFeedDegradation(
-      "web.home_feed.snapshot_read_failed",
-      "Homepage public feed snapshot read failed before fallback.",
-      {
-        languageCode: normalizeLanguageCode(requestedLanguageCode),
-        errorMessage: error instanceof Error ? error.message : String(error),
-      },
-    );
-  }
-
-  if (snapshotResult) {
-    return snapshotResult;
-  }
-
-  let mainResult: PublishedArticlesResult;
-  let sections: HomeFeedPayload["sections"];
-
-  try {
-    [mainResult, sections] = await Promise.all([
-      getPublishedArticlesWithEdgeFallback(0, null, requestedLanguageCode),
-      Promise.all(
-        HOME_FEED_SECTIONS.map(async (section) => ({
-          id: section.id,
-          articles: await getPublishedArticlesForSectionWithEdgeFallback(
-            section.query,
-            requestedLanguageCode,
-          ),
-        })),
-      ),
-    ]);
-  } catch (error) {
-    await logHomeFeedDegradation(
-      "web.home_feed.fallback_read_failed",
-      "Homepage fallback reads failed; returning maintenance payload.",
-      {
-        languageCode: normalizeLanguageCode(requestedLanguageCode),
-        errorMessage: error instanceof Error ? error.message : String(error),
-      },
-    );
-
-    return createMaintenanceHomeFeedPayload(requestedLanguageCode, {
-      reason: "home_feed_exception",
-    });
-  }
+function buildHomeFeedPayload(
+  mainResult: PublishedArticlesResult,
+  sections: HomeFeedPayload["sections"],
+): HomeFeedPayload {
   const seenArticleKeys = new Set(
     mainResult.articles
       .map((article) => getArticleIdentityKey(article))
@@ -421,11 +371,177 @@ export async function getHomeFeedDataWithEdgeFallback(
     };
   });
 
-  const payload: HomeFeedPayload = {
+  return {
     ...mainResult,
     nextPage: mainResult.nextCursor ? null : mainResult.nextPage,
     sections: uniqueSections,
   };
+}
+
+async function getPreferredLocalizedEdgeHomeFeed(
+  languageCode: LanguageCode,
+): Promise<HomeFeedPayload | null> {
+  const mainResult = await getPreferredLocalizedEdgeFeedSnapshotPage({
+    page: 0,
+    requestedLanguageCode: languageCode,
+  });
+
+  if (!mainResult) {
+    return null;
+  }
+
+  const sections = await Promise.all(
+    HOME_FEED_SECTIONS.map(async (section) => ({
+      id: section.id,
+      articles: await getPublishedArticlesForSectionWithEdgeFallback(
+        section.query,
+        languageCode,
+      ),
+    })),
+  );
+
+  return buildHomeFeedPayload(mainResult, sections);
+}
+
+export async function getPublishedArticlesWithEdgeFallback(
+  page = 0,
+  category?: string | null,
+  requestedLanguageCode?: string | null,
+): Promise<PublishedArticlesResult> {
+  const languageCode = normalizeLanguageCode(requestedLanguageCode);
+  let edgeResult: PublishedArticlesResult | null = null;
+  let result: PublishedArticlesResult | null = null;
+
+  if (languageCode !== DEFAULT_LANGUAGE_CODE) {
+    edgeResult = await getEdgeFeedSnapshotPage({
+      page,
+      category,
+      requestedLanguageCode: languageCode,
+    });
+
+    if (resultHasUsableEdgeTranslations(edgeResult, languageCode)) {
+      return edgeResult;
+    }
+  }
+
+  try {
+    result = await getPublishedArticles(page, category, languageCode);
+
+    if (!shouldUseEdgeFallback(result)) {
+      return result;
+    }
+  } catch (error) {
+    console.error("Published article read threw before edge snapshot fallback:", error);
+  }
+
+  if (!edgeResult) {
+    edgeResult = await getEdgeFeedSnapshotPage({
+      page,
+      category,
+      requestedLanguageCode: languageCode,
+    });
+  }
+
+  if (edgeResult) {
+    return edgeResult;
+  }
+
+  if (result) {
+    return result;
+  }
+
+  return {
+    articles: [],
+    nextPage: null,
+    nextCursor: null,
+    dataSource: "articles_fallback",
+    languageCode,
+  };
+}
+
+export async function getHomeFeedDataWithEdgeFallback(
+  requestedLanguageCode?: string | null,
+): Promise<HomeFeedPayload> {
+  const languageCode = normalizeLanguageCode(requestedLanguageCode);
+  const preferredLocalizedEdgeResult = await getPreferredLocalizedEdgeHomeFeed(languageCode);
+
+  if (preferredLocalizedEdgeResult) {
+    await logHomeFeedDegradation(
+      "web.home_feed.localized_edge_snapshot_preferred",
+      "Homepage feed preferred a localized Cloudflare edge snapshot over the local public feed snapshot.",
+      {
+        languageCode,
+        articleCount: preferredLocalizedEdgeResult.articles.length,
+        edgeSnapshotAgeSeconds: preferredLocalizedEdgeResult.edgeSnapshot?.ageSeconds ?? null,
+      },
+    );
+
+    return {
+      ...preferredLocalizedEdgeResult,
+      degradation: buildHomeFeedDegradationStatus({
+        mode: "degraded",
+        reason: "localized_edge_snapshot_preferred",
+        message:
+          "NutsNews is serving localized public feed data from the edge snapshot while the local snapshot catches up.",
+        supabase: "degraded",
+        edgeSnapshot: "available",
+        worker: "unknown",
+        localAi: "unknown",
+        translations: "available",
+      }),
+    };
+  }
+
+  let snapshotResult: HomeFeedPayload | null = null;
+
+  try {
+    snapshotResult = await getHomeFeedFromSnapshot(languageCode);
+  } catch (error) {
+    await logHomeFeedDegradation(
+      "web.home_feed.snapshot_read_failed",
+      "Homepage public feed snapshot read failed before fallback.",
+      {
+        languageCode,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      },
+    );
+  }
+
+  if (snapshotResult) {
+    return snapshotResult;
+  }
+
+  let mainResult: PublishedArticlesResult;
+  let sections: HomeFeedPayload["sections"];
+
+  try {
+    [mainResult, sections] = await Promise.all([
+      getPublishedArticlesWithEdgeFallback(0, null, languageCode),
+      Promise.all(
+        HOME_FEED_SECTIONS.map(async (section) => ({
+          id: section.id,
+          articles: await getPublishedArticlesForSectionWithEdgeFallback(
+            section.query,
+            languageCode,
+          ),
+        })),
+      ),
+    ]);
+  } catch (error) {
+    await logHomeFeedDegradation(
+      "web.home_feed.fallback_read_failed",
+      "Homepage fallback reads failed; returning maintenance payload.",
+      {
+        languageCode,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      },
+    );
+
+    return createMaintenanceHomeFeedPayload(languageCode, {
+      reason: "home_feed_exception",
+    });
+  }
+  const payload = buildHomeFeedPayload(mainResult, sections);
   const hasAnyArticles =
     payload.articles.length > 0 ||
     payload.sections.some((section) => section.articles.length > 0);
@@ -491,8 +607,24 @@ export async function getPublishedArticlesForSectionWithEdgeFallback(
   requestedLanguageCode?: string | null,
   limit = CATEGORY_SECTION_SIZE,
 ): Promise<Article[]> {
+  const languageCode = normalizeLanguageCode(requestedLanguageCode);
+  let edgeResult: PublishedArticlesResult | null = null;
+
+  if (languageCode !== DEFAULT_LANGUAGE_CODE) {
+    edgeResult = await getEdgeFeedSnapshotPage({
+      page: 0,
+      category,
+      pageSize: limit,
+      requestedLanguageCode: languageCode,
+    });
+
+    if (resultHasUsableEdgeTranslations(edgeResult, languageCode)) {
+      return edgeResult.articles;
+    }
+  }
+
   try {
-    const articles = await getPublishedArticlesForSection(category, requestedLanguageCode, limit);
+    const articles = await getPublishedArticlesForSection(category, languageCode, limit);
 
     if (articles.length > 0) {
       return articles;
@@ -501,12 +633,14 @@ export async function getPublishedArticlesForSectionWithEdgeFallback(
     console.error("Published section read threw before edge snapshot fallback:", error);
   }
 
-  const edgeResult = await getEdgeFeedSnapshotPage({
-    page: 0,
-    category,
-    pageSize: limit,
-    requestedLanguageCode,
-  });
+  if (!edgeResult) {
+    edgeResult = await getEdgeFeedSnapshotPage({
+      page: 0,
+      category,
+      pageSize: limit,
+      requestedLanguageCode: languageCode,
+    });
+  }
 
   return edgeResult?.articles ?? [];
 }
