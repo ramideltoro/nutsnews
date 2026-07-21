@@ -107,6 +107,11 @@ requireText(
 );
 requireText(
   candidateJob,
+  "node --test tests/deployed-ui-smoke-evidence.test.mjs",
+  "Release candidate must validate deployed UI smoke evidence shape.",
+);
+requireText(
+  candidateJob,
   "npm run test:translation-release-gate",
   "Release candidate must prove the translation audit fails missing, critical, and below-threshold fixtures.",
 );

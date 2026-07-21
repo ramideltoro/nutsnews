@@ -39,6 +39,12 @@ jobs:
       CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
       CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
       PLAYWRIGHT_BASE_URL: ${{ github.event.inputs.preview_url || github.event.deployment_status.target_url }}
+      NUTSNEWS_UI_SMOKE_TARGET_URL: ${{ github.event.inputs.preview_url || github.event.deployment_status.target_url }}
+      NUTSNEWS_UI_SMOKE_TARGET_TYPE: vercel-preview
+      NUTSNEWS_UI_SMOKE_SOURCE_COMMIT: ${{ github.event.deployment.sha || github.sha }}
+      NUTSNEWS_UI_SMOKE_BUILD_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+      NUTSNEWS_UI_SMOKE_DEPLOYMENT_ID: ${{ github.event.deployment.id || github.run_id }}
+      NUTSNEWS_UI_SMOKE_PR_NUMBER: ${{ github.event.deployment.payload.pull_request_number || '' }}
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
     steps:
@@ -71,7 +77,8 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run deployed UI smoke test
-        run: npm run test:e2e:deployed
+        id: smoke
+        run: node ../scripts/run_deployed_ui_smoke_with_evidence.mjs
 
       - name: Summarize preview URL
         if: always()
@@ -96,8 +103,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6
         with:
-          name: vercel-preview-smoke-playwright-report
+          name: ${{ steps.smoke.outputs.artifact_name || format('nutsnews-ui-smoke-vercel-preview-run-{0}-attempt-{1}', github.run_id, github.run_attempt) }}
           path: |
             web/playwright-report
-            web/test-results
+            web/test-results/deployed-ui-smoke
           if-no-files-found: ignore

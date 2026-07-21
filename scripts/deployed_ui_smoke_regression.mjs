@@ -11,6 +11,7 @@ const deployedSpec = await readFile(resolve(root, "web/tests/deployed-ui-smoke.s
 const previewWorkflow = await readFile(resolve(root, ".github/workflows/vercel-preview-smoke.yml"), "utf8");
 const immutablePreviewGuard = await readFile(resolve(root, "scripts/immutable_preview_smoke_guard.mjs"), "utf8");
 const contract = await readFile(resolve(root, ".github/deployment/pre-merge-deployment-gate-contract.md"), "utf8");
+const evidenceRunner = await readFile(resolve(root, "scripts/run_deployed_ui_smoke_with_evidence.mjs"), "utf8");
 
 function requireText(text, fragment, message) {
   assert.ok(text.includes(fragment), message);
@@ -28,10 +29,21 @@ assert.equal(
 );
 requireText(deployedConfig, "PLAYWRIGHT_BASE_URL is required", "Deployed smoke config must require PLAYWRIGHT_BASE_URL.");
 requireText(deployedConfig, "testMatch: /deployed-ui-smoke\\.spec\\.ts/", "Deployed smoke config must select the shared spec.");
+requireText(deployedConfig, "results.junit.xml", "Deployed smoke config must write JUnit evidence.");
 assert.doesNotMatch(deployedConfig, /webServer:/, "Deployed smoke config must not start a local web server.");
 requireText(deployedSpec, "Deployed UI smoke regression", "Shared deployed smoke spec must use target-neutral naming.");
 assert.doesNotMatch(deployedSpec, /Vercel Preview smoke regression|preview deployment|staging search API/, "Shared deployed smoke spec must avoid Vercel-only or staging-only naming.");
-requireText(previewWorkflow, "run: npm run test:e2e:deployed", "Preview workflow must call the shared deployed UI smoke command.");
+requireText(
+  previewWorkflow,
+  "node ../scripts/run_deployed_ui_smoke_with_evidence.mjs",
+  "Preview workflow must use the deployed UI smoke evidence runner.",
+);
+requireText(previewWorkflow, "steps.smoke.outputs.artifact_name", "Preview workflow must use the standardized UI smoke artifact name.");
+requireText(evidenceRunner, '"test:e2e:deployed"', "Evidence runner must call the shared deployed UI smoke command.");
+requireText(evidenceRunner, "sanitizeUploadedArtifacts", "Evidence runner must sanitize protected auth material before retention.");
+requireText(evidenceRunner, "artifact_paths", "Evidence runner must write artifact paths for final-gate validation.");
+requireText(evidenceRunner, "evidence.json", "Evidence runner must write JSON evidence.");
+requireText(evidenceRunner, "NUTSNEWS_UI_SMOKE_TARGET_TYPE", "Evidence runner must require a target type.");
 requireText(
   immutablePreviewGuard,
   "web/tests/deployed-ui-smoke.spec.ts",
@@ -46,6 +58,7 @@ for (const fragment of [
   "`npm run test:e2e:deployed`",
   "VPS staging, Vercel staging, Vercel production, and VPS production",
   "Target-specific expectations must be supplied through environment variables",
+  "`target_url`, `target_type`, `source_commit`, `build_id`, `deployment_id`, `result`, and artifact paths",
   "The Vercel preview workflow remains separate for non-release previews",
 ]) {
   requireText(contract, fragment, `Pre-merge deployment contract must document deployed UI smoke behavior: ${fragment}`);
