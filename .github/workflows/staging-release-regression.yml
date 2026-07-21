@@ -1,4 +1,4 @@
-name: Staging Release Workflow Regression
+name: Pre-Merge Release Workflow Regression
 
 on:
   pull_request:
@@ -29,7 +29,7 @@ permissions:
 
 jobs:
   regression:
-    name: Verify staging release automation
+    name: Verify pre-merge release automation
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -42,5 +42,5 @@ jobs:
         with:
           node-version: 22
 
-      - name: Run staging release workflow regression
+      - name: Run pre-merge release workflow regression
         run: node scripts/production_release_workflow_regression.mjs

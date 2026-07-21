@@ -14,6 +14,7 @@ const allowedClassifications = new Set([
   "optional PR",
   "scheduled/operational",
   "manual recovery",
+  "dispatch-only recovery",
   "deprecated post-main work",
 ]);
 
@@ -50,6 +51,11 @@ assert.ok(
   "Inventory must state that deployment work is not hidden inside existing checks.",
 );
 assert.equal(rows.size, workflowFiles.length, "Inventory must contain exactly one row for every workflow.");
+assert.equal(
+  [...rows.values()].filter((row) => row.classification === "deprecated post-main work").length,
+  0,
+  "Post-main deployment workflows must be removed or rewired behind recovery paths.",
+);
 assert.match(
   rows.get("container-image.yml")?.reason ?? "",
   /immutable PR artifact.*Pre-merge deployment gate.*VPS staging deploy.*VPS staging UI smoke.*Vercel staging deploy.*Vercel staging UI smoke.*Vercel production deploy.*Vercel production UI smoke.*VPS production deploy.*VPS production UI smoke/,
@@ -111,6 +117,14 @@ for (const workflow of workflowFiles) {
     assert.ok(!mainPush, `${workflow} is manual recovery but runs after main pushes.`);
   }
 
+  if (row.classification === "dispatch-only recovery") {
+    assert.ok(repositoryDispatch, `${workflow} is dispatch-only recovery but has no repository_dispatch trigger.`);
+    assert.ok(!workflowDispatch, `${workflow} is dispatch-only recovery but exposes workflow_dispatch.`);
+    assert.ok(!pullRequest, `${workflow} is dispatch-only recovery but runs on pull_request.`);
+    assert.ok(!mainPush, `${workflow} is dispatch-only recovery but runs after main pushes.`);
+    assert.ok(!workflowRun, `${workflow} is dispatch-only recovery but listens to workflow_run.`);
+  }
+
   if (row.classification === "deprecated post-main work") {
     assert.ok(!pullRequest, `${workflow} is deprecated post-main work but runs on pull_request.`);
     assert.ok(
@@ -121,7 +135,7 @@ for (const workflow of workflowFiles) {
 
   assert.ok(
     !mainPush || pullRequest,
-    `${workflow} runs after main pushes without a PR trigger; classify it as deprecated post-main work or remove the main push trigger.`,
+    `${workflow} runs after main pushes without a PR trigger; remove the main push trigger or make it a non-deployment PR workflow.`,
   );
 }
 

@@ -78,7 +78,8 @@ const preMergeDeploymentGateJob = workflowJob(containerWorkflow, "pre-merge-depl
 assert.doesNotMatch(containerWorkflow, /^\s+paths:\s*$/m, "Container Image must run for every main merge, not a path subset.");
 requireText(containerWorkflow, "cancel-in-progress: ${{ github.event_name == 'pull_request' }}", "Container Image must cancel stale PR attempts without skipping merged releases.");
 requireText(containerWorkflow, "format('container-image-pr-{0}', github.event.pull_request.number)", "Container Image PR concurrency must be scoped to the PR number.");
-requireText(containerWorkflow, "name: nutsnews-staging-release", "Container Image must publish staging metadata.");
+assert.ok(!containerWorkflow.includes("name: nutsnews-staging-release"), "Container Image must not publish post-main staging release metadata.");
+requireText(containerWorkflow, "Deployment role: archive only", "Main image publish summary must state it is not a deployment trigger.");
 requireText(containerWorkflow, "image_digest", "Release metadata must include the immutable image digest.");
 requireText(containerWorkflow, "image_tag: sourceCommit", "Release metadata must use the full commit tag.");
 requireText(containerWorkflow, "migration_head: migrationContract.head", "Release metadata must include the repository migration head.");
@@ -292,37 +293,21 @@ requireText(translationCoverageWorkflow, 'TRANSLATION_QUALITY_FAIL_ON_MISSING: "
 requireText(translationCoverageWorkflow, 'TRANSLATION_QUALITY_MIN_COVERAGE: "0"', "Scheduled translation workflow must not enforce the release-gate coverage threshold.");
 requireText(translationCoverageWorkflow, "Upload translation report", "Scheduled translation workflow must upload the operations report.");
 
-requireText(releaseWorkflow, "workflow_run:", "Staging handoff must wait for Container Image completion.");
-requireText(releaseWorkflow, 'workflows: ["Container Image"]', "Staging handoff must trust only the image workflow.");
-requireText(releaseWorkflow, "github.event.workflow_run.conclusion == 'success'", "Staging handoff must require a successful image workflow.");
-requireText(releaseWorkflow, "github.event.workflow_run.event == 'push'", "Staging handoff must reject pull-request workflow runs.");
-requireText(releaseWorkflow, "github.event.workflow_run.head_branch == 'main'", "Staging handoff must require main.");
-requireText(
-  releaseWorkflow,
-  "github.event.workflow_run.head_repository.full_name == github.repository",
-  "Staging handoff must reject untrusted fork workflow runs.",
-);
-requireText(releaseWorkflow, "Download immutable staging metadata with retries", "Staging handoff must retry transient artifact failures.");
-requireText(releaseWorkflow, "ARTIFACT_DIR: ${{ runner.temp }}/nutsnews-staging-release", "Release metadata must be downloaded outside the workspace.");
-requireText(releaseWorkflow, "SOURCE_WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}", "Release metadata must come from the triggering run.");
-requireText(releaseWorkflow, "archive_download_url", "Staging handoff must resolve the exact artifact archive URL.");
-requireText(releaseWorkflow, "for attempt in 1 2 3 4 5", "Staging handoff must use bounded artifact retries.");
-requireText(releaseWorkflow, "unzip -q \"$artifact_zip\" -d \"$ARTIFACT_DIR\"", "Staging handoff must unpack the immutable metadata artifact.");
-requireText(releaseWorkflow, "NUTSNEWS_INFRA_STAGING_TOKEN", "Cross-repository staging handoff must use the staging-only token.");
-requireText(releaseWorkflow, "nutsnews-staging-release", "The dispatch event must request staging only.");
-requireText(releaseWorkflow, "https://api.github.com/repos/ramideltoro/nutsnews-infra/dispatches", "Staging handoff must target only nutsnews-infra.");
-requireText(releaseWorkflow, "client_payload: candidate", "Staging dispatch payload must be the exact candidate object.");
-requireText(releaseWorkflow, "schema_version", "Staging candidate must include schema version.");
-requireText(releaseWorkflow, "source_repository", "Staging candidate must include source repository.");
-requireText(releaseWorkflow, "source_workflow_run_id", "Staging candidate must include source workflow run.");
-requireText(releaseWorkflow, "image_digest", "Staging candidate must include the immutable image digest.");
-requireText(releaseWorkflow, "migration_head", "Staging candidate must include migration head.");
-requireText(releaseWorkflow, "supabase_project_ref", "Staging candidate must include production Supabase project ref.");
-requireText(
-  releaseWorkflow,
-  "Vercel Production is disabled for app main and deploys only after the protected VPS release workflow dispatches the exact same source commit.",
-  "Staging handoff summary must document that Vercel Production is part of the protected release chain.",
-);
+requireText(releaseWorkflow, "name: Manual VPS Staging Recovery Dispatch", "Staging workflow must be clearly named as manual recovery.");
+requireText(releaseWorkflow, "workflow_dispatch:", "Staging recovery must require explicit operator dispatch.");
+assert.ok(!releaseWorkflow.includes("workflow_run:"), "Staging recovery must not run after Container Image completes on main.");
+assert.ok(!releaseWorkflow.includes("github.event.workflow_run"), "Staging recovery must not read post-main workflow_run payloads.");
+requireText(releaseWorkflow, "request-vps-staging-recovery", "Staging recovery must require typed confirmation.");
+requireText(releaseWorkflow, "NUTSNEWS_INFRA_STAGING_TOKEN", "Manual staging recovery must use the staging-only token.");
+requireText(releaseWorkflow, "nutsnews-staging-release", "Manual staging recovery dispatch must request staging only.");
+requireText(releaseWorkflow, "https://api.github.com/repos/ramideltoro/nutsnews-infra/dispatches", "Manual staging recovery must target only nutsnews-infra.");
+requireText(releaseWorkflow, 'event_type: "nutsnews-staging-release"', "Manual staging recovery must use the staging dispatch event.");
+requireText(releaseWorkflow, "source_commit", "Manual staging recovery candidate must include source commit.");
+requireText(releaseWorkflow, "source_workflow_run_id: buildId.split", "Manual staging recovery candidate must derive the source workflow run from the build ID.");
+requireText(releaseWorkflow, "image_digest", "Manual staging recovery candidate must include the immutable image digest.");
+requireText(releaseWorkflow, "migration_head", "Manual staging recovery candidate must include migration head.");
+requireText(releaseWorkflow, "supabase_project_ref", "Manual staging recovery candidate must include production Supabase project ref.");
+requireText(releaseWorkflow, "operator recovery path only", "Staging recovery summary must say it is not the normal release path.");
 requireText(regressionWorkflow, ".github/workflows/staging-release.yml", "Regression workflow must watch the staging handoff workflow.");
 requireText(regressionWorkflow, ".github/workflows/vercel-backend-token-sync.yml", "Regression workflow must watch the Vercel backend token sync workflow.");
 
@@ -335,6 +320,8 @@ requireText(vercelProductionWorkflow, "repository_dispatch:", "Vercel production
 requireText(vercelProductionWorkflow, "nutsnews-vercel-production-release", "Vercel production workflow must use the infra release event.");
 requireText(vercelProductionWorkflow, "on:\n  repository_dispatch:", "Vercel production must be driven by repository dispatch, not manual workflow dispatch.");
 assert.ok(!vercelProductionWorkflow.includes("workflow_dispatch:"), "Vercel production must not allow manual workflow_dispatch.");
+requireText(vercelProductionWorkflow, "Dispatch-only Vercel Production Recovery", "Vercel production workflow name must describe dispatch-only recovery.");
+requireText(vercelProductionWorkflow, "not triggered by pushes to main", "Vercel production summary must document that main merges do not trigger it.");
 requirePinnedWorkflowUse(vercelProductionWorkflow, "actions/checkout", "v5", "Vercel production must checkout the exact source commit.");
 requireText(vercelProductionWorkflow, "ref: ${{ env.SOURCE_COMMIT }}", "Vercel production must deploy the dispatch source commit.");
 requireText(vercelProductionWorkflow, "environment: Production", "Vercel production must use the protected app Production environment.");
@@ -482,7 +469,7 @@ assert.doesNotMatch(
 
 assert.ok(!workflowNames.includes("production-release.yml"), "Direct production release workflow file must not exist.");
 assert.ok(!workflowNames.includes("production-release-regression.yml"), "Old production release regression workflow file must not exist.");
-assert.ok(workflowNames.includes("vercel-production-release.yml"), "Vercel production must be an explicit post-VPS workflow.");
+assert.ok(workflowNames.includes("vercel-production-release.yml"), "Vercel production must be an explicit dispatch-only recovery workflow.");
 assert.ok(workflowNames.includes("vercel-backend-token-sync.yml"), "Backend token sync must be an explicit protected workflow.");
 for (const [label, text] of [
   ["Container Image", containerWorkflow],

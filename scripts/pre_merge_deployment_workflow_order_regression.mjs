@@ -43,12 +43,6 @@ const requiredNeeds = new Map([
   ],
 ]);
 
-const deprecatedPostMainDeploymentWorkflows = new Set([
-  "cloudflare-production-cache-purge.yml",
-  "staging-release.yml",
-  "vercel-production-release.yml",
-]);
-
 function requireText(text, fragment, message) {
   assert.ok(text.includes(fragment), message);
 }
@@ -83,8 +77,7 @@ function hasAutomaticPostMainDeploymentTrigger(workflowName, workflowText) {
   const workflowRunFromMain = /workflow_run:/.test(triggers) && /head_branch\s*==\s*'main'/.test(workflowText);
   const deploymentStatusTrigger = /deployment_status:/.test(triggers);
   const mainPushTrigger = /push:[\s\S]*?branches:\s*(?:\[(?:"main"|main)\]|\n\s*-\s*main\b)/.test(triggers);
-  const repositoryDispatchRelease = /repository_dispatch:[\s\S]*?nutsnews-(?:vercel-production|staging|production-vps)-release/.test(triggers);
-  return workflowRunFromMain || deploymentStatusTrigger || mainPushTrigger || repositoryDispatchRelease;
+  return workflowRunFromMain || deploymentStatusTrigger || mainPushTrigger;
 }
 
 let previousStart = -1;
@@ -133,14 +126,13 @@ for (const workflowName of workflowNames) {
   }
   if (!hasAutomaticPostMainDeploymentTrigger(workflowName, workflowText)) continue;
   const classification = inventoryClassification(workflowName);
-  if (deprecatedPostMainDeploymentWorkflows.has(workflowName) && classification === "deprecated post-main work") continue;
   unexpectedPostMainDeploymentTriggers.push(`${workflowName} (${classification || "unclassified"})`);
 }
 assert.deepEqual(customMainMergeWorkflows, [], "Merge handoff must use maintainer merge or GitHub native auto-merge, not a custom workflow that pushes or merges to main.");
 assert.deepEqual(
   unexpectedPostMainDeploymentTriggers,
   [],
-  "Automatic post-main deployment triggers must not exist outside explicitly deprecated workflows pending issue #312.",
+  "Automatic post-main deployment triggers must be absent after pre-merge deployment gating.",
 );
 
 console.log("Pre-merge deployment workflow order regression passed.");

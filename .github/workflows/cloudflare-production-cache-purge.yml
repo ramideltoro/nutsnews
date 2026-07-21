@@ -1,12 +1,15 @@
-name: Purge Cloudflare Cache After Production Deploy
+name: Manual Cloudflare Production Cache Purge
 
 on:
-  deployment_status:
   workflow_dispatch:
     inputs:
+      confirmation:
+        description: Type purge-production-cache to manually purge the production Cloudflare cache.
+        required: true
+        type: string
       reason:
         description: Why are you manually purging the production Cloudflare cache?
-        required: false
+        required: true
         type: string
       dry_run:
         description: Validate configuration without calling Cloudflare
@@ -24,22 +27,20 @@ concurrency:
 
 jobs:
   purge-cloudflare-production-cache:
-    name: Purge Cloudflare production cache
+    name: Manual purge Cloudflare production cache
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (
-        github.event.deployment_status.state == 'success' &&
-        (
-          github.event.deployment.environment == 'Production' ||
-          github.event.deployment.environment == 'production' ||
-          github.event.deployment_status.environment == 'Production' ||
-          github.event.deployment_status.environment == 'production'
-        )
-      )
 
     steps:
+      - name: Validate manual purge confirmation
+        env:
+          CONFIRMATION: ${{ github.event.inputs.confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != "purge-production-cache" ]; then
+            echo "Manual Cloudflare production cache purge requires typed confirmation purge-production-cache." >&2
+            exit 1
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
 
@@ -61,8 +62,19 @@ jobs:
           CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
           CLOUDFLARE_PURGE_EVERYTHING: 'true'
           CLOUDFLARE_PURGE_DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
-          DEPLOYMENT_ENVIRONMENT: ${{ github.event.deployment.environment || github.event.deployment_status.environment || 'manual' }}
-          DEPLOYMENT_STATE: ${{ github.event.deployment_status.state || 'manual' }}
-          DEPLOYMENT_URL: ${{ github.event.deployment_status.environment_url || github.event.deployment_status.target_url || '' }}
-          MANUAL_PURGE_REASON: ${{ github.event.inputs.reason || '' }}
+          DEPLOYMENT_ENVIRONMENT: manual
+          DEPLOYMENT_STATE: manual
+          DEPLOYMENT_URL: ''
+          MANUAL_PURGE_REASON: ${{ github.event.inputs.reason }}
         run: node scripts/cloudflare_purge_cache.mjs
+
+      - name: Summarize manual purge path
+        run: |
+          {
+            echo "## Manual Cloudflare production cache purge"
+            echo
+            echo "This workflow is an operator recovery path only. Normal PR deployments are validated before merge by \`Pre-merge deployment gate\` and do not trigger this workflow automatically."
+            echo
+            echo "- Dry run: \`${{ github.event.inputs.dry_run || 'false' }}\`"
+            echo "- Reason: ${{ github.event.inputs.reason }}"
+          } >> "$GITHUB_STEP_SUMMARY"

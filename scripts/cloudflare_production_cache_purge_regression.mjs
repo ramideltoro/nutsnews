@@ -34,16 +34,17 @@ try {
   for (const file of requiredFiles) read(file);
 
   const purgeWorkflow = read('.github/workflows/cloudflare-production-cache-purge.yml');
-  assertIncludes(purgeWorkflow, 'deployment_status:', 'cloudflare-production-cache-purge.yml');
+  assertIncludes(purgeWorkflow, 'name: Manual Cloudflare Production Cache Purge', 'cloudflare-production-cache-purge.yml');
   assertIncludes(purgeWorkflow, 'workflow_dispatch:', 'cloudflare-production-cache-purge.yml');
-  assertIncludes(purgeWorkflow, "github.event.deployment_status.state == 'success'", 'cloudflare-production-cache-purge.yml');
-  assertIncludes(purgeWorkflow, "github.event.deployment.environment == 'Production'", 'cloudflare-production-cache-purge.yml');
-  assertIncludes(purgeWorkflow, "github.event.deployment.environment == 'production'", 'cloudflare-production-cache-purge.yml');
+  assertIncludes(purgeWorkflow, 'confirmation:', 'cloudflare-production-cache-purge.yml');
+  assertIncludes(purgeWorkflow, 'purge-production-cache', 'cloudflare-production-cache-purge.yml');
+  assertIncludes(purgeWorkflow, 'Validate manual purge confirmation', 'cloudflare-production-cache-purge.yml');
   assertIncludes(purgeWorkflow, 'CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}', 'cloudflare-production-cache-purge.yml');
   assertIncludes(purgeWorkflow, 'CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}', 'cloudflare-production-cache-purge.yml');
   assertIncludes(purgeWorkflow, 'CLOUDFLARE_PURGE_EVERYTHING: \'true\'', 'cloudflare-production-cache-purge.yml');
   assertIncludes(purgeWorkflow, 'node scripts/cloudflare_purge_cache.mjs', 'cloudflare-production-cache-purge.yml');
-  assert(!/^\s+push:/m.test(purgeWorkflow), 'Production purge workflow must not run directly on push; it must wait for a successful production deployment_status event.');
+  assert(!/deployment_status:/m.test(purgeWorkflow), 'Production purge workflow must not run automatically from deployment_status events.');
+  assert(!/^\s+push:/m.test(purgeWorkflow), 'Production purge workflow must not run directly on push.');
   assert(!/^\s+pull_request:/m.test(purgeWorkflow), 'Production purge workflow must not run on pull requests.');
   assert(!/api_token\s*[:=]\s*[A-Za-z0-9_-]{20,}/i.test(purgeWorkflow), 'Workflow must not hard-code Cloudflare API tokens.');
   assert(!/zone_id\s*[:=]\s*[a-f0-9]{32}/i.test(purgeWorkflow), 'Workflow must not hard-code Cloudflare zone ids.');
