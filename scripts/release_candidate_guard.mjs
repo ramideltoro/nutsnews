@@ -102,6 +102,11 @@ requireText(
 );
 requireText(
   candidateJob,
+  "node scripts/pre_merge_deployment_workflow_order_regression.mjs",
+  "Release candidate must validate pre-merge deployment stage order and post-main trigger guardrails.",
+);
+requireText(
+  candidateJob,
   "node --test tests/protected-target-headers.test.mjs",
   "Release candidate must validate protected-target UI smoke headers.",
 );

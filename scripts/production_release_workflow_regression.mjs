@@ -150,6 +150,7 @@ for (const fragment of [
   "node ../scripts/run_deployed_ui_smoke_with_evidence.mjs",
   "nutsnews-ui-smoke-vps-staging",
   "nutsnews-ui-smoke-production-vps",
+  "pre_merge_deployment_workflow_order_regression.mjs",
   "stage order, target URLs, deployment IDs, result, and GitHub artifact links",
   "Pre-merge deployment gate",
 ]) {

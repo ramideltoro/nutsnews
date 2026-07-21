@@ -180,3 +180,5 @@ The `pre-merge-deployment-gate` job depends on the trusted eligibility gate, the
 Every evidence file must reference the current live PR head SHA, build ID, workflow run ID, and run attempt. The gate re-reads the current PR head from the GitHub API before validating evidence. If the trusted eligibility gate marked the PR intentionally ineligible, the final check may pass with a skipped deployment summary and no target evidence.
 
 The check summary must list the stage order, target URLs, deployment IDs, result, and GitHub artifact links for every retained deploy and UI smoke evidence artifact.
+
+The release-candidate validation path runs `scripts/pre_merge_deployment_workflow_order_regression.mjs` so changes to job order, `needs` relationships, shared UI smoke commands, production-stage prerequisites, final-gate evidence inputs, or post-main deployment trigger inventory fail before merge.
