@@ -111,6 +111,41 @@ assert.ok(
   "Public Reader Smoke push trigger must cover its smoke harness.",
 );
 
+assert.equal(
+  rows.get("cloudflare-cache-config.yml")?.classification,
+  "PR-required",
+  "Cloudflare Cache Config must be the PR-required deterministic cache check.",
+);
+assert.equal(
+  rows.get("cloudflare-cache-observability.yml")?.classification,
+  "scheduled/operational",
+  "Cloudflare Cache Observability live probes must stay out of PR-required checks.",
+);
+const cloudflareCacheConfigWorkflow = await readFile(resolve(workflowDir, "cloudflare-cache-config.yml"), "utf8");
+assert.ok(hasTrigger(cloudflareCacheConfigWorkflow, "pull_request"), "Cloudflare Cache Config must run on pull_request.");
+assert.ok(
+  cloudflareCacheConfigWorkflow.includes("npm run audit:cache:config"),
+  "Cloudflare Cache Config must run deterministic config validation.",
+);
+assert.ok(
+  cloudflareCacheConfigWorkflow.includes("npm run test:public-cache"),
+  "Cloudflare Cache Config must run deterministic public cache policy regression.",
+);
+assert.ok(
+  !cloudflareCacheConfigWorkflow.includes('npm run audit:cache -- --url "$NUTSNEWS_CACHE_OBSERVABILITY_URL"'),
+  "Cloudflare Cache Config must not call live production URLs.",
+);
+const cloudflareCacheObservabilityWorkflow = await readFile(resolve(workflowDir, "cloudflare-cache-observability.yml"), "utf8");
+assert.ok(
+  !hasTrigger(cloudflareCacheObservabilityWorkflow, "pull_request"),
+  "Cloudflare Cache Observability live probes must not run on pull_request.",
+);
+assert.ok(hasTrigger(cloudflareCacheObservabilityWorkflow, "schedule"), "Cloudflare Cache Observability must remain scheduled.");
+assert.ok(
+  cloudflareCacheObservabilityWorkflow.includes('npm run audit:cache -- --url "$NUTSNEWS_CACHE_OBSERVABILITY_URL"'),
+  "Cloudflare Cache Observability must keep the live cache probe.",
+);
+
 for (const workflow of workflowFiles) {
   const row = rows.get(workflow);
   assert.ok(row, `Inventory is missing ${workflow}.`);
