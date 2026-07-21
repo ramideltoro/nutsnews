@@ -248,7 +248,7 @@ describe("localized article detail API with article_summaries", () => {
     ];
     mocks.validateTranslatedSummary.mockReturnValueOnce({
       usable: false,
-      warnings: [{ code: "missing_title" }],
+      warnings: [],
     });
 
     const { GET } = await import("@/app/api/articles/[id]/route");
