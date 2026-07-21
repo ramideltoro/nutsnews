@@ -83,6 +83,25 @@ assert.ok(
   "Accessibility CI must not run for dependency-only package changes by default.",
 );
 
+const visualRegressionWorkflow = await readFile(resolve(workflowDir, "visual-regression.yml"), "utf8");
+const visualRegressionPush = workflowTriggerBlock(visualRegressionWorkflow, "push");
+const visualRegressionPullRequest = workflowTriggerBlock(visualRegressionWorkflow, "pull_request");
+for (const [triggerName, triggerBlock] of [
+  ["push", visualRegressionPush],
+  ["pull_request", visualRegressionPullRequest],
+]) {
+  assert.ok(triggerBlock.includes("paths:"), `Visual Regression ${triggerName} trigger must be path-filtered.`);
+  assert.ok(
+    !triggerBlock.includes('"web/**"') && !triggerBlock.includes("'web/**'"),
+    `Visual Regression ${triggerName} trigger must not run for every web change.`,
+  );
+  assert.ok(triggerBlock.includes("web/public/**"), `Visual Regression ${triggerName} trigger must cover public assets.`);
+  assert.ok(
+    triggerBlock.includes("web/tests/visual-regression.spec.ts"),
+    `Visual Regression ${triggerName} trigger must cover visual test changes.`,
+  );
+}
+
 for (const workflow of workflowFiles) {
   const row = rows.get(workflow);
   assert.ok(row, `Inventory is missing ${workflow}.`);

@@ -4,11 +4,34 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "web/app/*.tsx"
+      - "web/app/**/*.tsx"
+      - "web/app/*.css"
+      - "web/app/**/*.css"
+      - "web/app/components/**"
+      - "web/components/**"
+      - "web/public/**"
+      - "web/tests/visual-regression.spec.ts"
+      - "web/tests/visual-regression.spec.ts-snapshots/**"
+      - "web/playwright.visual.config.ts"
+      - "scripts/web_public_reader_smoke.mjs"
+      - "scripts/web_visual_regression.mjs"
+      - ".github/workflows/visual-regression.yml"
   pull_request:
     branches:
       - main
     paths:
-      - "web/**"
+      - "web/app/*.tsx"
+      - "web/app/**/*.tsx"
+      - "web/app/*.css"
+      - "web/app/**/*.css"
+      - "web/app/components/**"
+      - "web/components/**"
+      - "web/public/**"
+      - "web/tests/visual-regression.spec.ts"
+      - "web/tests/visual-regression.spec.ts-snapshots/**"
+      - "web/playwright.visual.config.ts"
       - "scripts/web_public_reader_smoke.mjs"
       - "scripts/web_visual_regression.mjs"
       - ".github/workflows/visual-regression.yml"

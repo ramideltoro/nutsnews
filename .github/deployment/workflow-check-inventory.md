@@ -61,7 +61,7 @@ No deployment work is hidden inside a workflow classified as an existing check. 
 | `vercel-backend-token-sync.yml` | manual recovery | Protected operator workflow that syncs backend API token material into Vercel production. | Mutates protected provider configuration. |
 | `vercel-preview-smoke.yml` | optional PR | Runs against Vercel preview deployment statuses or manual preview URLs; shared target-agnostic UI smoke evidence replaces it for required deployment gates. | No production deployment. |
 | `vercel-production-release.yml` | dispatch-only recovery | Dispatch-only Vercel production recovery path accepted from the protected infra chain; normal PR releases use the pre-merge Vercel production deploy job. | Deploys Vercel production only from protected repository dispatch. |
-| `visual-regression.yml` | PR-required | Runs Playwright visual regression before web changes merge. | No deployment. |
+| `visual-regression.yml` | PR-required | Runs Playwright visual regression only for high-risk UI, CSS, public asset, or visual snapshot changes before merge. | No deployment. |
 | `web-ci.yml` | default-branch/manual | Keeps the Web CI command set available for default-branch and operator-triggered validation after PR coverage moved to `Merge Gate`. | No deployment. |
 | `web-offline-e2e.yml` | PR-required | Runs offline end-to-end coverage before web changes merge. | No deployment. |
 
