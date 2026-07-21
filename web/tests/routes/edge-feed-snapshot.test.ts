@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   getPublishedArticlesForSection: vi.fn(),
   logWarn: vi.fn(),
 }));
+const ORIGINAL_RUNTIME_ENV = process.env.NUTSNEWS_RUNTIME_ENV;
+const ORIGINAL_SIDE_EFFECTS_MODE = process.env.NUTSNEWS_SIDE_EFFECTS_MODE;
 
 vi.mock("@/lib/articles", () => ({
   CATEGORY_SECTION_SIZE: 8,
@@ -57,6 +59,14 @@ function publishedResult(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function restoreOptionalEnv(name: string, value: string | undefined) {
+  if (typeof value === "string") {
+    process.env[name] = value;
+  } else {
+    delete process.env[name];
+  }
+}
+
 beforeEach(() => {
   vi.resetModules();
   mocks.fetch.mockReset();
@@ -71,6 +81,8 @@ beforeEach(() => {
 afterEach(() => {
   delete process.env.NUTSNEWS_EDGE_FEED_SNAPSHOT_URL;
   delete process.env.NUTSNEWS_EDGE_SNAPSHOT_URL;
+  restoreOptionalEnv("NUTSNEWS_RUNTIME_ENV", ORIGINAL_RUNTIME_ENV);
+  restoreOptionalEnv("NUTSNEWS_SIDE_EFFECTS_MODE", ORIGINAL_SIDE_EFFECTS_MODE);
   vi.restoreAllMocks();
 });
 
@@ -154,6 +166,51 @@ describe("getEdgeFeedSnapshotPage", () => {
         translation_available: false,
       }),
     ]);
+  });
+
+  it("uses the production edge snapshot endpoint when no override is configured", async () => {
+    delete process.env.NUTSNEWS_EDGE_FEED_SNAPSHOT_URL;
+    process.env.NUTSNEWS_RUNTIME_ENV = "production";
+    process.env.NUTSNEWS_SIDE_EFFECTS_MODE = "live";
+
+    const localizedArticle = {
+      ...edgeArticle,
+      title: "Titre francais de production",
+      ai_summary: "Resume francais de production.",
+      language_code: "fr",
+      requested_language_code: "fr",
+      translation_available: true,
+    };
+
+    mocks.fetch.mockResolvedValueOnce(
+      edgeResponse({
+        articles: [localizedArticle],
+        nextPage: null,
+        dataSource: "edge_feed_snapshot",
+        languageCode: "fr",
+      }),
+    );
+
+    const { getEdgeFeedSnapshotPage } = await import("@/lib/edgeFeedSnapshot");
+    const result = await getEdgeFeedSnapshotPage({
+      page: 0,
+      requestedLanguageCode: "fr",
+    });
+
+    expect(result?.dataSource).toBe("edge_feed_snapshot");
+    expect(result?.articles).toEqual([
+      expect.objectContaining({
+        title: "Titre francais de production",
+        language_code: "fr",
+        requested_language_code: "fr",
+        translation_available: true,
+      }),
+    ]);
+
+    const requestedUrl = new URL(String(mocks.fetch.mock.calls[0]?.[0]));
+    expect(requestedUrl.origin).toBe("https://nutsnews-worker-0.nutsnews.workers.dev");
+    expect(requestedUrl.pathname).toBe("/public-feed-snapshot");
+    expect(requestedUrl.searchParams.get("lang")).toBe("fr");
   });
 });
 
