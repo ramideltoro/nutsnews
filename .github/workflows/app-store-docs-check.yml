@@ -6,10 +6,17 @@ on:
     paths:
       - "web/app/privacy/**"
       - "web/app/contact/**"
+      - "web/app/layout.tsx"
       - "scripts/app_store_docs_check.mjs"
       - ".github/workflows/app-store-docs-check.yml"
   pull_request:
     branches: [main]
+    paths:
+      - "web/app/privacy/**"
+      - "web/app/contact/**"
+      - "web/app/layout.tsx"
+      - "scripts/app_store_docs_check.mjs"
+      - ".github/workflows/app-store-docs-check.yml"
   workflow_dispatch:
 
 permissions:

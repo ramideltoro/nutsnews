@@ -20,7 +20,7 @@ No deployment work is hidden inside a workflow classified as an existing check. 
 | `actionlint.yml` | PR-required | Lints GitHub Actions changes before workflow changes merge. | No deployment. |
 | `admin-access-denied-contract.yml` | PR-required | Verifies the protected admin access-denied contract before merge. | No deployment. |
 | `api-contracts.yml` | PR-required | Verifies API, route, sitemap, robots, and runtime compatibility before merge. | No deployment. |
-| `app-store-docs-check.yml` | PR-required | Blocks regressions to public support/privacy docs needed by the iOS/PWA release surface. | No deployment. |
+| `app-store-docs-check.yml` | PR-required | Blocks regressions to public support/privacy docs only when App Store documentation inputs change. | No deployment. |
 | `cloudflare-cache-config.yml` | PR-required | Runs deterministic cache observability config and public cache policy regressions for cache-related changes before merge. | No deployment. |
 | `cloudflare-cache-observability.yml` | scheduled/operational | Runs scheduled or manually requested live Cloudflare/Vercel cache policy probes and uploads observability artifacts. | No deployment. |
 | `cloudflare-production-cache-purge-regression.yml` | PR-required | Guards the production cache purge workflow contract before purge automation changes merge. | No deployment. |

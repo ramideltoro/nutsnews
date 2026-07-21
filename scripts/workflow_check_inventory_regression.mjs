@@ -174,6 +174,22 @@ for (const requiredCodeqlPath of ["web/**", "scripts/**", ".github/workflows/**"
 }
 assert.ok(hasTrigger(codeqlWorkflow, "schedule"), "CodeQL must keep scheduled full scans.");
 
+const appStoreDocsWorkflow = await readFile(resolve(workflowDir, "app-store-docs-check.yml"), "utf8");
+const appStoreDocsPullRequest = workflowTriggerBlock(appStoreDocsWorkflow, "pull_request");
+assert.ok(appStoreDocsPullRequest.includes("paths:"), "App Store Docs Check pull_request trigger must be path-filtered.");
+for (const requiredAppStoreDocsPath of [
+  "web/app/privacy/**",
+  "web/app/contact/**",
+  "web/app/layout.tsx",
+  "scripts/app_store_docs_check.mjs",
+]) {
+  assert.ok(
+    appStoreDocsPullRequest.includes(requiredAppStoreDocsPath),
+    `App Store Docs Check pull_request trigger must cover ${requiredAppStoreDocsPath}.`,
+  );
+}
+assert.ok(hasTrigger(appStoreDocsWorkflow, "workflow_dispatch"), "App Store Docs Check must remain manually runnable.");
+
 for (const workflow of workflowFiles) {
   const row = rows.get(workflow);
   assert.ok(row, `Inventory is missing ${workflow}.`);
