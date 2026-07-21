@@ -31,7 +31,7 @@ No deployment work is hidden inside a workflow classified as an existing check. 
 | `db-size-warning.yml` | scheduled/operational | Reports production database growth from protected production credentials on a schedule or operator request. | No deployment. |
 | `dependency-review.yml` | PR-required | Blocks vulnerable dependency changes before merge. | No deployment. |
 | `feed-health-report.yml` | scheduled/operational | Reports live feed and worker health from production data on a schedule or operator request. | No deployment. |
-| `fluid-active-cpu-regression.yml` | PR-required | Verifies Vercel CPU safeguards before changes merge. | No deployment. |
+| `fluid-active-cpu-regression.yml` | PR-required | Verifies Vercel CPU safeguards only when runtime, cache, public API, cost guardrail, or regression inputs change. | No deployment. |
 | `gitleaks.yml` | PR-required | Scans for committed secrets before merge while keeping default-branch and scheduled coverage. | No deployment. |
 | `homepage-performance-budget.yml` | PR-required | Builds the app and enforces homepage bundle/performance budget review before merge. | No deployment. |
 | `image-coverage-report.yml` | scheduled/operational | Reports live article image coverage from production data on a schedule or operator request. | No deployment. |

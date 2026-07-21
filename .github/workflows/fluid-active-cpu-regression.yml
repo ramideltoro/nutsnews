@@ -3,8 +3,46 @@ name: Fluid Active CPU Regression
 on:
   pull_request:
     branches: [main]
+    paths:
+      - "web/app/components/ArticleFeed.tsx"
+      - "web/app/page.tsx"
+      - "web/lib/articles.ts"
+      - "web/app/api/articles/route.ts"
+      - "web/app/articles/[id]/page.tsx"
+      - "web/app/articles/[id]/opengraph-image.tsx"
+      - "web/app/opengraph-image.tsx"
+      - "web/app/api/home-feed/route.ts"
+      - "web/app/healthz/route.ts"
+      - "web/app/api/search/route.ts"
+      - "web/lib/cacheHeaders.ts"
+      - "web/lib/logger.ts"
+      - "web/lib/adminCostGuardrails.ts"
+      - "web/middleware.ts"
+      - "web/next.config.ts"
+      - "web/vercel.json"
+      - "scripts/fluid_active_cpu_regression.mjs"
+      - ".github/workflows/fluid-active-cpu-regression.yml"
   push:
     branches: [main]
+    paths:
+      - "web/app/components/ArticleFeed.tsx"
+      - "web/app/page.tsx"
+      - "web/lib/articles.ts"
+      - "web/app/api/articles/route.ts"
+      - "web/app/articles/[id]/page.tsx"
+      - "web/app/articles/[id]/opengraph-image.tsx"
+      - "web/app/opengraph-image.tsx"
+      - "web/app/api/home-feed/route.ts"
+      - "web/app/healthz/route.ts"
+      - "web/app/api/search/route.ts"
+      - "web/lib/cacheHeaders.ts"
+      - "web/lib/logger.ts"
+      - "web/lib/adminCostGuardrails.ts"
+      - "web/middleware.ts"
+      - "web/next.config.ts"
+      - "web/vercel.json"
+      - "scripts/fluid_active_cpu_regression.mjs"
+      - ".github/workflows/fluid-active-cpu-regression.yml"
   workflow_dispatch:
 
 permissions:

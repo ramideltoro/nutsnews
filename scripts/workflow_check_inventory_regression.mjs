@@ -190,6 +190,32 @@ for (const requiredAppStoreDocsPath of [
 }
 assert.ok(hasTrigger(appStoreDocsWorkflow, "workflow_dispatch"), "App Store Docs Check must remain manually runnable.");
 
+const fluidCpuWorkflow = await readFile(resolve(workflowDir, "fluid-active-cpu-regression.yml"), "utf8");
+const requiredFluidCpuPaths = [
+  "web/app/components/ArticleFeed.tsx",
+  "web/app/api/articles/route.ts",
+  "web/app/api/home-feed/route.ts",
+  "web/lib/articles.ts",
+  "web/lib/cacheHeaders.ts",
+  "web/lib/adminCostGuardrails.ts",
+  "web/next.config.ts",
+  "web/vercel.json",
+  "scripts/fluid_active_cpu_regression.mjs",
+];
+for (const [triggerName, triggerBlock] of [
+  ["push", workflowTriggerBlock(fluidCpuWorkflow, "push")],
+  ["pull_request", workflowTriggerBlock(fluidCpuWorkflow, "pull_request")],
+]) {
+  assert.ok(triggerBlock.includes("paths:"), `Fluid Active CPU ${triggerName} trigger must be path-filtered.`);
+  for (const requiredFluidCpuPath of requiredFluidCpuPaths) {
+    assert.ok(
+      triggerBlock.includes(requiredFluidCpuPath),
+      `Fluid Active CPU ${triggerName} trigger must cover ${requiredFluidCpuPath}.`,
+    );
+  }
+}
+assert.ok(hasTrigger(fluidCpuWorkflow, "workflow_dispatch"), "Fluid Active CPU Regression must remain manually runnable.");
+
 for (const workflow of workflowFiles) {
   const row = rows.get(workflow);
   assert.ok(row, `Inventory is missing ${workflow}.`);
