@@ -87,6 +87,11 @@ requireText(
 );
 requireText(
   candidateJob,
+  "node scripts/trusted_pr_deployment_eligibility_regression.mjs",
+  "Release candidate must validate the trusted PR deployment eligibility contract.",
+);
+requireText(
+  candidateJob,
   "npm run test:translation-release-gate",
   "Release candidate must prove the translation audit fails missing, critical, and below-threshold fixtures.",
 );

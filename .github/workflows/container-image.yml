@@ -388,6 +388,116 @@ jobs:
         if: always()
         run: supabase stop --no-backup
 
+  trusted-pr-deployment-eligibility:
+    name: Trusted PR deployment eligibility
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      eligible: ${{ steps.evaluate.outputs.eligible }}
+      reason: ${{ steps.evaluate.outputs.reason }}
+      trusted_pr_head_sha: ${{ steps.evaluate.outputs.trusted_pr_head_sha }}
+      current_pr_head_sha: ${{ steps.evaluate.outputs.current_pr_head_sha }}
+
+    steps:
+      - name: Evaluate trusted PR deployment source
+        id: evaluate
+        env:
+          EVENT_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from "node:fs";
+
+          const repository = process.env.REPOSITORY ?? "";
+          const prNumber = process.env.PR_NUMBER ?? "";
+          const eventHeadRepository = process.env.EVENT_HEAD_REPOSITORY ?? "";
+          const eventHeadSha = process.env.EVENT_HEAD_SHA ?? "";
+          const token = process.env.GITHUB_TOKEN ?? "";
+
+          if (!/^[-_.A-Za-z0-9]+\/[-_.A-Za-z0-9]+$/.test(repository)) {
+            throw new Error("Repository identity is missing or invalid.");
+          }
+          if (!/^[1-9][0-9]{0,19}$/.test(prNumber)) {
+            throw new Error("Pull request number is missing or invalid.");
+          }
+          if (!/^[0-9a-f]{40}$/.test(eventHeadSha)) {
+            throw new Error("Pull request event head SHA must be a full lowercase commit SHA.");
+          }
+          if (!token) {
+            throw new Error("GITHUB_TOKEN is required to validate the current pull request head.");
+          }
+
+          const response = await fetch(`https://api.github.com/repos/${repository}/pulls/${prNumber}`, {
+            headers: {
+              Accept: "application/vnd.github+json",
+              Authorization: `Bearer ${token}`,
+              "X-GitHub-Api-Version": "2022-11-28",
+            },
+          });
+          if (!response.ok) {
+            throw new Error(`Pull request lookup returned HTTP ${response.status}.`);
+          }
+
+          const pullRequest = await response.json();
+          const currentHeadRepository = String(pullRequest?.head?.repo?.full_name ?? "");
+          const currentHeadSha = String(pullRequest?.head?.sha ?? "");
+          let eligible = false;
+          let reason = "eligible";
+
+          if (eventHeadRepository !== repository) {
+            reason = "untrusted_pr_source";
+          } else if (currentHeadRepository !== repository) {
+            reason = "current_pr_source_untrusted";
+          } else if (currentHeadSha !== eventHeadSha) {
+            reason = "stale_pr_head";
+          } else {
+            eligible = true;
+          }
+
+          appendFileSync(
+            process.env.GITHUB_OUTPUT,
+            [
+              `eligible=${eligible ? "true" : "false"}`,
+              `reason=${reason}`,
+              `trusted_pr_head_sha=${eligible ? eventHeadSha : ""}`,
+              `current_pr_head_sha=${currentHeadSha}`,
+              "",
+            ].join("\n"),
+            "utf8",
+          );
+
+          const summary = eligible
+            ? [
+                "## Trusted PR deployment eligibility",
+                "",
+                "Deployment eligibility: eligible",
+                "",
+                `- Trusted source: \`${eventHeadRepository}\``,
+                `- Trusted PR head SHA: \`${eventHeadSha}\``,
+              ]
+            : [
+                "## Trusted PR deployment eligibility",
+                "",
+                "Deployment eligibility: skipped",
+                "",
+                `- Reason: \`${reason}\``,
+                `- Event source: \`${eventHeadRepository || "unknown"}\``,
+                `- Current source: \`${currentHeadRepository || "unknown"}\``,
+                `- Event head SHA: \`${eventHeadSha}\``,
+                `- Current head SHA: \`${currentHeadSha || "unknown"}\``,
+              ];
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary.join("\n")}\n`, "utf8");
+          NODE
+
   release-candidate:
     name: Release candidate
     if: always() && github.event_name == 'pull_request'
@@ -449,6 +559,7 @@ jobs:
           node scripts/release_candidate_guard.mjs
           node scripts/main_ruleset_audit_regression.mjs
           node scripts/workflow_check_inventory_regression.mjs
+          node scripts/trusted_pr_deployment_eligibility_regression.mjs
           node scripts/immutable_all_tests_guard_regression.mjs
           node scripts/immutable_all_tests_guard.mjs
           node scripts/verify_github_actions_pinned.mjs

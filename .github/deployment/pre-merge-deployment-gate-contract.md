@@ -63,6 +63,14 @@ Target-specific deploy evidence comes from the platform workflow that changed an
 
 UI test evidence must not replace deploy evidence. Deploy evidence must not replace UI test evidence. The final gate needs both for every target.
 
+## Trusted PR Eligibility
+
+The pre-merge deployment pipeline is deployment-eligible only for same-repository PR branches in `ramideltoro/nutsnews`. Fork PRs and other untrusted PR sources are not deployment-eligible.
+
+The eligibility gate must compare the event PR head SHA with the current PR head SHA from the GitHub API before any deployment stage can run. If the PR head changed after the workflow started, deployment stages must skip or fail closed and must write a clear check summary explaining that the candidate is stale.
+
+Every protected deployment stage must re-check that the live PR head SHA still matches the trusted PR head SHA before reading protected environment secrets or changing a target. Deployment workflows must not use `pull_request_target` or an equivalent pattern that checks out untrusted PR code with production secrets.
+
 ## Merge And Main Behavior
 
 All deployment stages complete before merge into `main`.
