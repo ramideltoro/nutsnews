@@ -87,6 +87,58 @@ export type HomeServerDashboardData = {
 const DEFAULT_HOME_SERVER_STATS_URL = "https://ai.nutsnews.com/stats";
 const REQUEST_TIMEOUT_MS = 10000;
 
+function payloadErrorDetail(payload: unknown) {
+  if (typeof payload !== "object" || payload === null) {
+    return null;
+  }
+
+  const data = payload as Record<string, unknown>;
+  for (const key of ["error", "message"]) {
+    const value = data[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return null;
+}
+
+function statsEndpointDisplay(statsUrl: string) {
+  try {
+    const url = new URL(statsUrl);
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return statsUrl;
+  }
+}
+
+function homeServerHttpErrorMessage(status: number, payload: unknown, statsUrl: string) {
+  const endpoint = statsEndpointDisplay(statsUrl);
+  const detail = payloadErrorDetail(payload);
+
+  if (status === 401 || status === 403) {
+    return `Home server stats endpoint rejected HOME_SERVER_STATS_API_KEY. Verify the VPS Production HOME_SERVER_STATS_API_KEY matches the x-nutsnews-ai-key expected by ${DEFAULT_HOME_SERVER_STATS_URL}.`;
+  }
+
+  if (status === 404) {
+    return `Home server stats endpoint returned 404 from ${endpoint}. Set HOME_SERVER_STATS_URL to ${DEFAULT_HOME_SERVER_STATS_URL}; /api/stats, /healthz, and /readyz are not stats endpoints.`;
+  }
+
+  if (status === 503) {
+    return `Home server stats endpoint returned HTTP 503 from ${endpoint}. Check the home-server local AI service, Ollama, and Cloudflare Tunnel before treating the dashboard as healthy.`;
+  }
+
+  return `Home server stats request failed with HTTP ${status}${detail ? `: ${detail}` : ""}. Check HOME_SERVER_STATS_URL, HOME_SERVER_STATS_API_KEY, and the Cloudflare Tunnel route.`;
+}
+
+function homeServerFetchErrorMessage(error: unknown, statsUrl: string) {
+  if (error instanceof Error && error.name === "AbortError") {
+    return `Home server stats request timed out after ${Math.round(REQUEST_TIMEOUT_MS / 1000)}s. Check ${DEFAULT_HOME_SERVER_STATS_URL}, Cloudflare Tunnel, and the home-server local AI service.`;
+  }
+
+  return `Unable to load home server stats from ${statsEndpointDisplay(statsUrl)}. Check HOME_SERVER_STATS_URL, HOME_SERVER_STATS_API_KEY, Cloudflare Tunnel routing, and the home-server local AI service.`;
+}
+
 function toNumber(value: unknown, fallback = 0) {
   const numberValue = Number(value);
   return Number.isFinite(numberValue) ? numberValue : fallback;
@@ -205,14 +257,14 @@ function normalizeStats(payload: unknown): HomeServerStats {
 }
 
 export async function getAdminHomeServerDashboardData(): Promise<HomeServerDashboardData> {
-  const statsUrl = process.env.HOME_SERVER_STATS_URL || DEFAULT_HOME_SERVER_STATS_URL;
-  const statsApiKey = process.env.HOME_SERVER_STATS_API_KEY || process.env.LOCAL_AI_API_KEY || "";
+  const statsUrl = process.env.HOME_SERVER_STATS_URL?.trim() || DEFAULT_HOME_SERVER_STATS_URL;
+  const statsApiKey = (process.env.HOME_SERVER_STATS_API_KEY || process.env.LOCAL_AI_API_KEY || "").trim();
 
   if (!statsApiKey) {
     return {
       isConfigured: false,
       errorMessage:
-        "Missing HOME_SERVER_STATS_API_KEY. Add it to Vercel as a server-side environment variable using the same value as the local AI service key.",
+        "Missing HOME_SERVER_STATS_API_KEY. Add it to Vercel Production or the protected VPS runtime sync as a server-side value matching the home-server x-nutsnews-ai-key.",
       generatedAt: new Date().toISOString(),
       stats: null,
     };
@@ -235,10 +287,7 @@ export async function getAdminHomeServerDashboardData(): Promise<HomeServerDashb
     if (!response.ok) {
       return {
         isConfigured: true,
-        errorMessage:
-          typeof payload === "object" && payload !== null && "error" in payload
-            ? String((payload as { error?: unknown }).error)
-            : `Home server stats request failed with HTTP ${response.status}.`,
+        errorMessage: homeServerHttpErrorMessage(response.status, payload, statsUrl),
         generatedAt: new Date().toISOString(),
         stats: null,
       };
@@ -253,10 +302,7 @@ export async function getAdminHomeServerDashboardData(): Promise<HomeServerDashb
   } catch (error) {
     return {
       isConfigured: true,
-      errorMessage:
-        error instanceof Error
-          ? error.message
-          : "Unable to load home server stats from the local AI service.",
+      errorMessage: homeServerFetchErrorMessage(error, statsUrl),
       generatedAt: new Date().toISOString(),
       stats: null,
     };
