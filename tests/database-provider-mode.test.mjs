@@ -371,3 +371,18 @@ test("Backend primary admin guardrails uses provider-neutral admin database oper
   assert.doesNotMatch(guardrailsSource, /getServerSupabase\(/);
   assert.match(guardrailsSource, /AdminDatabaseAccessError/);
 });
+
+test("Backend primary admin worker shards uses provider-neutral admin database operation", async () => {
+  const workerShardsSource = await readFile(
+    resolve(import.meta.dirname, "../web/lib/adminShardHealth.ts"),
+    "utf8",
+  );
+
+  assert.match(
+    workerShardsSource,
+    /readAdminDatabase\(\s*"load-admin-worker-shards"/,
+  );
+  assert.doesNotMatch(workerShardsSource, /from "@\/lib\/supabase"/);
+  assert.doesNotMatch(workerShardsSource, /getServerSupabase\(/);
+  assert.match(workerShardsSource, /AdminDatabaseAccessError/);
+});
