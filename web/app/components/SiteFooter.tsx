@@ -42,6 +42,8 @@ export const footerCopyByLanguage: Record<
     shortcuts: string;
     homeAria: string;
     searchAria: string;
+    openMenu: string;
+    closeMenu: string;
     closeSearch: string;
     searchTitle: string;
     searchPlaceholder: string;
@@ -68,6 +70,8 @@ export const footerCopyByLanguage: Record<
     shortcuts: "Site shortcuts",
     homeAria: "Go to NutsNews home",
     searchAria: "Open search",
+    openMenu: "Open site menu",
+    closeMenu: "Close site menu",
     closeSearch: "Close search",
     searchTitle: "Search",
     searchPlaceholder: "Animals, science, community, wellness...",
@@ -95,6 +99,8 @@ export const footerCopyByLanguage: Record<
     shortcuts: "Raccourcis du site",
     homeAria: "Aller à l’accueil de NutsNews",
     searchAria: "Ouvrir la recherche",
+    openMenu: "Ouvrir le menu du site",
+    closeMenu: "Fermer le menu du site",
     closeSearch: "Fermer la recherche",
     searchTitle: "Recherche",
     searchPlaceholder: "Animaux, science, communauté, bien-être...",
@@ -122,6 +128,8 @@ export const footerCopyByLanguage: Record<
     shortcuts: "サイトのショートカット",
     homeAria: "NutsNewsのホームへ移動",
     searchAria: "検索を開く",
+    openMenu: "サイトメニューを開く",
+    closeMenu: "サイトメニューを閉じる",
     closeSearch: "検索を閉じる",
     searchTitle: "検索",
     searchPlaceholder: "動物、科学、コミュニティ、健康...",
@@ -149,6 +157,8 @@ export const footerCopyByLanguage: Record<
     shortcuts: "Website-Abkürzungen",
     homeAria: "Zur NutsNews-Startseite",
     searchAria: "Suche öffnen",
+    openMenu: "Website-Menü öffnen",
+    closeMenu: "Website-Menü schliessen",
     closeSearch: "Suche schliessen",
     searchTitle: "Suche",
     searchPlaceholder: "Tiere, Wissenschaft, Gemeinschaft, Wohlbefinden...",
@@ -176,6 +186,8 @@ export const footerCopyByLanguage: Record<
     shortcuts: "Website-Kurzbefehle",
     homeAria: "Zur NutsNews-Startseite",
     searchAria: "Suche öffnen",
+    openMenu: "Website-Menü öffnen",
+    closeMenu: "Website-Menü schließen",
     closeSearch: "Suche schließen",
     searchTitle: "Suche",
     searchPlaceholder: "Tiere, Wissenschaft, Gemeinschaft, Wohlbefinden...",
@@ -203,6 +215,8 @@ export const footerCopyByLanguage: Record<
     shortcuts: "Συντομεύσεις ιστότοπου",
     homeAria: "Μετάβαση στην αρχική σελίδα του NutsNews",
     searchAria: "Άνοιγμα αναζήτησης",
+    openMenu: "Άνοιγμα μενού ιστότοπου",
+    closeMenu: "Κλείσιμο μενού ιστότοπου",
     closeSearch: "Κλείσιμο αναζήτησης",
     searchTitle: "Αναζήτηση",
     searchPlaceholder: "Ζώα, επιστήμη, κοινότητα, ευεξία...",
@@ -311,6 +325,27 @@ function SearchIcon({ className = "" }: { className?: string }) {
       <circle cx="11" cy="11" r="7" />
       <path d="m20 20-3.5-3.5" />
     </svg>
+  );
+}
+
+function MenuIcon({
+  className = "",
+  isOpen,
+}: {
+  className?: string;
+  isOpen: boolean;
+}) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`${className} footer-menu-icon ${
+        isOpen ? "footer-menu-icon--open" : ""
+      }`}
+    >
+      <span className="footer-menu-icon__line" />
+      <span className="footer-menu-icon__line" />
+      <span className="footer-menu-icon__line" />
+    </span>
   );
 }
 
@@ -710,8 +745,34 @@ export function SiteFooter() {
   const pathname = usePathname();
   const router = useRouter();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSearchButtonAnimating, setIsSearchButtonAnimating] = useState(false);
   const [isHomeButtonAnimating, setIsHomeButtonAnimating] = useState(false);
+  const footerNavLinks = [
+    { href: "/apps", label: copy.apps },
+    { href: "/saved", label: copy.saved },
+    { href: "/about", label: copy.about },
+    { href: "/contact", label: copy.contact },
+    { href: "/privacy", label: copy.privacy },
+  ];
+
+  useEffect(() => {
+    if (!isMenuOpen) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsMenuOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMenuOpen]);
 
   function pulseHomeButton() {
     setIsHomeButtonAnimating(false);
@@ -779,25 +840,57 @@ export function SiteFooter() {
               <SearchIcon className="footer-icon-button__icon" />
             </button>
 
+            <div className="site-footer-modern__mobile-menu">
+              <button
+                type="button"
+                data-testid="nutsnews-footer-menu"
+                className="footer-icon-button footer-icon-button--menu"
+                aria-label={isMenuOpen ? copy.closeMenu : copy.openMenu}
+                aria-expanded={isMenuOpen}
+                aria-controls="nutsnews-footer-menu-panel"
+                onClick={() => setIsMenuOpen((current) => !current)}
+              >
+                <span className="footer-icon-button__halo" />
+                <MenuIcon
+                  className="footer-icon-button__icon"
+                  isOpen={isMenuOpen}
+                />
+              </button>
+
+              {isMenuOpen ? (
+                <nav
+                  id="nutsnews-footer-menu-panel"
+                  data-testid="nutsnews-footer-menu-panel"
+                  aria-label={copy.footerNav}
+                  className="site-footer-modern__mobile-panel"
+                >
+                  {footerNavLinks.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className="site-footer-modern__mobile-link"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </nav>
+              ) : null}
+            </div>
+
             <ThemeSwitcher />
           </div>
 
           <nav aria-label={copy.footerNav} className="site-footer-modern__nav">
-            <Link href="/apps" className="site-footer-modern__link">
-              {copy.apps}
-            </Link>
-            <Link href="/saved" className="site-footer-modern__link">
-              {copy.saved}
-            </Link>
-            <Link href="/about" className="site-footer-modern__link">
-              {copy.about}
-            </Link>
-            <Link href="/contact" className="site-footer-modern__link">
-              {copy.contact}
-            </Link>
-            <Link href="/privacy" className="site-footer-modern__link">
-              {copy.privacy}
-            </Link>
+            {footerNavLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="site-footer-modern__link"
+              >
+                {link.label}
+              </Link>
+            ))}
           </nav>
         </div>
 

@@ -5,6 +5,13 @@ const THEME_STORAGE_KEY = 'nutsnews.web.theme';
 const FIRST_ARTICLE_ID = 'public-smoke-article-01';
 const FIRST_ARTICLE_TITLE = 'Public smoke readers celebrate neighborhood gardens';
 const FIRST_ARTICLE_FRENCH_TITLE = 'Jardins de quartier pour le test public';
+const mobileFooterRoutes = [
+  { name: 'Apps', path: '/apps' },
+  { name: 'Saved', path: '/saved' },
+  { name: 'About', path: '/about' },
+  { name: 'Contact', path: '/contact' },
+  { name: 'Privacy', path: '/privacy' },
+];
 
 type ArticlesResponse = {
   articles?: Array<{
@@ -100,7 +107,57 @@ async function openSettingsPanel(page: Page) {
   return panel;
 }
 
+async function openFooterMenu(page: Page) {
+  const toggle = page.getByTestId('nutsnews-footer-menu');
+  const panel = page.getByTestId('nutsnews-footer-menu-panel');
+
+  await expect(toggle).toBeVisible({ timeout: 15_000 });
+  await toggle.scrollIntoViewIfNeeded();
+
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    if (await panel.isVisible().catch(() => false)) {
+      return panel;
+    }
+
+    await toggle.click({ force: true });
+
+    try {
+      await expect(toggle).toHaveAttribute('aria-expanded', 'true', { timeout: 3_000 });
+      await expect(panel).toBeVisible({ timeout: 3_000 });
+      return panel;
+    } catch {
+      if (attempt === 4) {
+        break;
+      }
+
+      await page.waitForTimeout(500);
+    }
+  }
+
+  await expect(panel).toBeVisible({ timeout: 15_000 });
+  return panel;
+}
+
 test.describe('Public reader smoke flows', () => {
+  test('mobile footer routes move into the hamburger menu', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openHomeWithArticles(page);
+
+    const footer = page.locator('footer');
+    await expect(footer.locator('.site-footer-modern__nav')).toBeHidden();
+
+    const menuToggle = page.getByTestId('nutsnews-footer-menu');
+    await expect(menuToggle).toBeVisible();
+    await expect(menuToggle).toHaveAttribute('aria-expanded', 'false');
+
+    const menuPanel = await openFooterMenu(page);
+    await expect(menuToggle).toHaveAttribute('aria-expanded', 'true');
+
+    for (const route of mobileFooterRoutes) {
+      await expect(menuPanel.getByRole('link', { name: route.name, exact: true })).toHaveAttribute('href', route.path);
+    }
+  });
+
   test('home page loads articles and infinite scroll can fetch more', async ({ page }) => {
     const paginationResponses: import('@playwright/test').Response[] = [];
     page.on('response', (response) => {

@@ -486,6 +486,32 @@ describe("HeroTagline", () => {
 });
 
 describe("SiteFooter", () => {
+  test("opens the mobile menu with the footer navigation routes", async () => {
+    const user = userEvent.setup();
+
+    render(<SiteFooter />);
+
+    const menuToggle = screen.getByTestId("nutsnews-footer-menu");
+    expect(menuToggle).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(menuToggle);
+
+    expect(menuToggle).toHaveAttribute("aria-expanded", "true");
+    const menuPanel = screen.getByTestId("nutsnews-footer-menu-panel");
+
+    expect(within(menuPanel).getByRole("link", { name: "Apps" })).toHaveAttribute("href", "/apps");
+    expect(within(menuPanel).getByRole("link", { name: "Saved" })).toHaveAttribute("href", "/saved");
+    expect(within(menuPanel).getByRole("link", { name: "About" })).toHaveAttribute("href", "/about");
+    expect(within(menuPanel).getByRole("link", { name: "Contact" })).toHaveAttribute("href", "/contact");
+    expect(within(menuPanel).getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "/privacy");
+
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("nutsnews-footer-menu-panel")).not.toBeInTheDocument();
+    });
+  });
+
   test("opens archive search and renders result cards from mocked public data", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn().mockResolvedValue({
