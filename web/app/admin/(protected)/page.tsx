@@ -1,5 +1,10 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { auth, signOut } from "@/auth";
+import { RuntimeIdentityBanner } from "./RuntimeIdentityBanner";
+import { buildAdminRuntimeIdentityViewModel } from "@/lib/adminRuntimeIdentity";
+import { getRuntimePublicConfig } from "@/lib/runtimePublicConfig";
+import { getSafeReadiness } from "@/lib/runtimeSafety";
 
 export const metadata = {
   title: "Admin | NutsNews",
@@ -94,6 +99,13 @@ function SectionHeader({
 
 export default async function AdminPage() {
   const session = await auth();
+  const requestHeaders = await headers();
+  const identity = buildAdminRuntimeIdentityViewModel({
+    requestHost:
+      requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host"),
+    runtimeConfig: getRuntimePublicConfig(),
+    readiness: getSafeReadiness(),
+  });
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#0a0a0a] px-4 py-6 text-amber-50 sm:px-6 lg:px-8">
@@ -150,6 +162,8 @@ export default async function AdminPage() {
             </div>
           </div>
         </header>
+
+        <RuntimeIdentityBanner identity={identity} />
 
         <section className="mb-5 rounded-[2rem] border border-amber-300/20 bg-black/25 p-5 shadow-xl shadow-amber-950/10 sm:p-6">
           <SectionHeader
