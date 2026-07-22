@@ -269,3 +269,21 @@ test("Backend primary public article reads use backend compatibility operations"
     );
   }
 });
+
+test("Backend primary admin production readiness uses provider-neutral admin database operation", async () => {
+  const readinessSource = await readFile(
+    resolve(import.meta.dirname, "../web/lib/adminProductionReadiness.ts"),
+    "utf8",
+  );
+
+  assert.match(
+    readinessSource,
+    /readAdminDatabase\(\s*"load-admin-production-readiness"/,
+  );
+  assert.doesNotMatch(readinessSource, /from "@\/lib\/supabase"/);
+  assert.doesNotMatch(readinessSource, /getServerSupabase\(/);
+  assert.match(
+    readinessSource,
+    /NUTSNEWS_BACKEND_API_URL and NUTSNEWS_BACKEND_API_TOKEN/,
+  );
+});
