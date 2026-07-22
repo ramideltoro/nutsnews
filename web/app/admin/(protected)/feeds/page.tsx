@@ -548,7 +548,7 @@ export default async function FeedManagementPage({ searchParams }: FeedManagemen
                 {formatFeedManagementDateTime(data.generatedAt)}
               </p>
               <p className="mt-2 text-xs leading-5 text-amber-100/55">
-                Quality scores and tier recommendations come from Supabase `feed_quality_scores`; admin tier changes are written to the audit log.
+                Quality scores and tier recommendations come from the primary database `feed_quality_scores`; admin tier changes are written to the audit log.
               </p>
             </div>
           </div>
@@ -579,7 +579,7 @@ export default async function FeedManagementPage({ searchParams }: FeedManagemen
             <FeedList feeds={data.bestQualityFeeds} emptyMessage="No scored feeds yet. Run the Worker after applying the quality score migration." />
           </Section>
 
-          <Section id="manage-feeds" eyebrow="Source Controls" title="Manage All RSS Feeds" description="Enable or disable feeds safely from Supabase-backed admin controls. Disabled feeds are skipped by Worker shards without changing code.">
+          <Section id="manage-feeds" eyebrow="Source Controls" title="Manage All RSS Feeds" description="Enable or disable feeds safely from protected admin controls. Disabled feeds are skipped by Worker shards without changing code.">
             <FeedList feeds={data.feeds} emptyMessage="No RSS feeds found." />
           </Section>
 
@@ -587,11 +587,11 @@ export default async function FeedManagementPage({ searchParams }: FeedManagemen
             <FeedList feeds={data.recommendedDisableFeeds} emptyMessage="No active weak feeds are currently recommended for disabling." />
           </Section>
 
-          <Section id="inactive-feeds" eyebrow="Inactive Sources" title="Currently Disabled Feeds" description="Feeds listed here are inactive in Supabase and will not be used by Worker shards unless re-enabled.">
+          <Section id="inactive-feeds" eyebrow="Inactive Sources" title="Currently Disabled Feeds" description="Feeds listed here are inactive in the primary database and will not be used by Worker shards unless re-enabled.">
             <FeedList feeds={data.inactiveFeeds} emptyMessage="No feeds are currently disabled." />
           </Section>
 
-          <Section id="quality-sql" eyebrow="Supabase Query" title="Rank Feeds by Quality" description="Use this query in Supabase SQL Editor to rank sources by quality score and quickly find the best or weakest feeds.">
+          <Section id="quality-sql" eyebrow="Database Query" title="Rank Feeds by Quality" description="Use this query against the primary database to rank sources by quality score and quickly find the best or weakest feeds.">
             <pre className="overflow-x-auto rounded-[1.5rem] border border-amber-300/15 bg-black/45 p-4 text-xs leading-6 text-amber-100/75">
               <code>{data.rankingSql}</code>
             </pre>

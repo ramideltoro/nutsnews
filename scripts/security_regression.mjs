@@ -153,14 +153,37 @@ async function testExternalUrlSafety() {
 
 async function testAdminFeedMutationUrlBoundary() {
   class RuntimeSafetyError extends Error {}
+  class AdminDatabaseAccessError extends Error {}
   const externalUrlSafety = loadTsModule("web/lib/externalUrlSafety.ts");
   let fetchCalls = 0;
   const originalFetch = globalThis.fetch;
 
   try {
-    globalThis.fetch = async () => {
+    globalThis.fetch = async (url) => {
       fetchCalls += 1;
-      return new Response(null, { status: 204 });
+      const requestUrl = String(url);
+
+      if (requestUrl.includes("/rest/v1/rpc/set_rss_feed_active_with_audit")) {
+        return Response.json([
+          {
+            audit_event_id: "audit-feed-active",
+            feed_id: 1,
+          },
+        ]);
+      }
+
+      if (requestUrl.includes("/rest/v1/rpc/set_rss_feed_trust_tier_with_audit")) {
+        return Response.json([
+          {
+            audit_event_id: "audit-feed-trust-tier",
+            feed_id: 1,
+            next_source_trust_tier: "watchlist",
+            next_publisher_allowlist_status: "candidate",
+          },
+        ]);
+      }
+
+      return new Response("Unexpected feed management mutation request.", { status: 404 });
     };
 
     const { setAdminRssFeedActiveStatus, setAdminRssFeedTrustTier } = loadTsModule("web/lib/adminFeedManagement.ts", {
@@ -174,12 +197,23 @@ async function testAdminFeedMutationUrlBoundary() {
         RuntimeSafetyError,
         assertDataMutation() {},
       },
-      "@/lib/supabase": {
-        getServerSupabaseConfig() {
-          return {
-            url: "https://staging-fixture.supabase.co",
-            serviceRoleKey: "test-service-role-key",
-          };
+      "@/lib/adminDatabase": {
+        AdminDatabaseAccessError,
+        async readAdminDatabase() {
+          throw new Error("Feed management URL boundary regression should not read dashboard data.");
+        },
+        async mutateAdminDatabase(_operation, _payload, supabaseHandler) {
+          return supabaseHandler({
+            getConfig() {
+              return {
+                url: "https://staging-fixture.supabase.co",
+                serviceRoleKey: "test-service-role-key",
+              };
+            },
+            getClient() {
+              throw new Error("Feed management URL boundary regression should not use Supabase client reads.");
+            },
+          });
         },
       },
     });
