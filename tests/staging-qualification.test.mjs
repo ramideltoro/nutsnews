@@ -47,7 +47,7 @@ function mockFetch() {
     const protectedRequest = new Headers(init.headers).has("cf-access-client-secret");
     if (!protectedRequest && url.pathname === "/") return new Response("", { status: 302, headers: { location: "https://example.cloudflareaccess.com/cdn-cgi/access/login" } });
     const security = { "content-security-policy": "default-src 'self'", "referrer-policy": "same-origin", "x-content-type-options": "nosniff", "x-frame-options": "DENY", "x-robots-tag": "noindex, nofollow" };
-    if (url.pathname === "/healthz") return json({ ok: true }, { headers: { ...security, "x-nutsnews-source-commit": commit, "x-nutsnews-build-id": "123456789-1", "x-nutsnews-deployment-target": "vps" } });
+    if (url.pathname === "/healthz") return json({ ok: true }, { headers: { ...security, "x-nutsnews-source-commit": commit, "x-nutsnews-build-id": "123456789-1", "x-nutsnews-deployment-target": "vps-staging" } });
     if (url.pathname === "/readyz") return json({ ok: true, code: "ready" }, { headers: { ...security, "cache-control": "no-store", "x-nutsnews-source-commit": commit, "x-nutsnews-build-id": "123456789-1", "x-nutsnews-deployment-target": "vps-staging", "x-nutsnews-runtime-environment": "staging", "x-nutsnews-config-generation": configGeneration, "x-nutsnews-expected-image-digest": digest } });
     if (url.pathname === "/api/runtime-config") return json({ sourceCommit: commit, buildId: "123456789-1", expectedImageDigest: digest, runtimeEnv: "staging", deploymentTarget: "vps-staging", configGeneration, sideEffectsMode: "disabled", telemetryEnabled: false, supabaseUrl: "https://staging-fixture.supabase.co" }, { headers: { "cache-control": "no-store" } });
     if (url.pathname === "/") return new Response('<html><body>NutsNews<footer><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a></footer><script src="/_next/static/test.js"></script></body></html>', { status: 200, headers: { "content-type": "text/html", ...security } });
@@ -120,7 +120,7 @@ test("deployment smoke expects staging health and readiness targets", () => {
 
   assert.equal(smokeEnv.EXISTING_VALUE, "preserved");
   assert.equal(smokeEnv.NUTSNEWS_EXPECTED_DEPLOYMENT_TARGET, "vps-staging");
-  assert.equal(smokeEnv.NUTSNEWS_EXPECTED_HEALTH_DEPLOYMENT_TARGET, "vps");
+  assert.equal(smokeEnv.NUTSNEWS_EXPECTED_HEALTH_DEPLOYMENT_TARGET, "vps-staging");
 });
 
 test("anonymous auth session must be null", async () => {
