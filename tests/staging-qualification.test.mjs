@@ -37,7 +37,7 @@ function json(payload, init = {}) {
   return new Response(JSON.stringify(payload), { status: init.status ?? 200, headers: headers(init.headers) });
 }
 
-function mockFetch() {
+function mockFetch({ adminBypass = false } = {}) {
   return async (value, init = {}) => {
     const url = new URL(value);
     if (url.hostname === "api.github.com" && url.pathname.endsWith("/deployments")) {
@@ -54,7 +54,11 @@ function mockFetch() {
     if (url.pathname === "/_next/static/test.js") return new Response("ok", { status: 200 });
     if (url.pathname === "/api/articles") return json({ articles: [{ id: "synthetic-article", source: "nutsnews-test-deterministic-177" }], nextPage: null }, { headers: { "cache-control": "public, s-maxage=60" } });
     if (url.pathname === "/search") return new Response("not found", { status: 404, headers: security });
-    if (url.pathname === "/admin") return new Response("", { status: 307, headers: { location: "/admin/login" } });
+    if (url.pathname === "/admin") {
+      return adminBypass
+        ? new Response('<html><body><main>Admin</main></body></html>', { status: 200, headers: { "content-type": "text/html", ...security } })
+        : new Response("", { status: 307, headers: { location: "/admin/login" } });
+    }
     if (url.pathname === "/api/contact" && init.method === "POST") return json({ error: "disabled" }, { status: 503, headers: { "cache-control": "no-store" } });
     if (url.pathname === "/api/auth/session") return json(null, { headers: { "cache-control": "no-store" } });
     if (["/api/home-feed", "/api/search", "/api/auth/providers", "/api/auth/csrf"].includes(url.pathname)) return json({ ok: true }, { headers: { "cache-control": url.pathname.includes("auth/") ? "no-store" : "public, s-maxage=60" } });
@@ -85,6 +89,21 @@ test("deterministic local fixture qualification passes and retains JSON/JUnit", 
     assert.deepEqual(run.events, ["seed:nutsnews-test-deterministic-177", "cleanup:nutsnews-test-deterministic-177"]);
     assert.match(await readFile(path.join(run.artifactDir, "staging-qualification.json"), "utf8"), /"suiteRevision"/);
     assert.match(await readFile(path.join(run.artifactDir, "staging-qualification.junit.xml"), "utf8"), /testsuite/);
+  } finally { await rm(run.artifactDir, { recursive: true, force: true }); }
+});
+
+test("deterministic local fixture qualification accepts expected admin bypass", async () => {
+  const run = await fixtureRun({
+    env: {
+      CF_ACCESS_CLIENT_ID: "client-id-secret",
+      CF_ACCESS_CLIENT_SECRET: "client-secret-value",
+      NUTSNEWS_ADMIN_TEST_AUTH_BYPASS_EXPECTED: "true",
+    },
+    fetchImpl: mockFetch({ adminBypass: true }),
+  });
+  try {
+    assert.equal(run.report.result, "pass");
+    assert.deepEqual(run.events, ["seed:nutsnews-test-deterministic-177", "cleanup:nutsnews-test-deterministic-177"]);
   } finally { await rm(run.artifactDir, { recursive: true, force: true }); }
 });
 
