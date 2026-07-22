@@ -14,9 +14,11 @@ const runId = `web-offline-e2e-${Date.now()}-${Math.random().toString(16).slice(
 const supabasePort = Number(process.env.WEB_E2E_SUPABASE_PORT || 8895);
 const mockExternalPort = Number(process.env.WEB_E2E_EXTERNAL_PORT || 8896);
 const webPort = Number(process.env.WEB_E2E_WEB_PORT || 3011);
+const backendWebPort = Number(process.env.WEB_E2E_BACKEND_WEB_PORT || webPort + 1);
 const supabaseUrl = `http://127.0.0.1:${supabasePort}`;
 const mockExternalUrl = `http://127.0.0.1:${mockExternalPort}`;
 const webUrl = `http://127.0.0.1:${webPort}`;
+const backendWebUrl = `http://127.0.0.1:${backendWebPort}`;
 
 const articleUrlOne = `https://mock.nutsnews.test/story/cotton-candy-planets-${runId}`;
 const articleUrlTwo = `https://mock.nutsnews.test/story/therapy-dogs-${runId}`;
@@ -141,8 +143,49 @@ const articleSummaries = [
   },
 ];
 
+const protectedAdminRoutes = [
+  { path: "/admin", label: "Admin landing" },
+  { path: "/admin/readiness", label: "Production Readiness" },
+  { path: "/admin/articles", label: "Article Reviews" },
+  { path: "/admin/engagement", label: "Article Engagement" },
+  { path: "/admin/ai-usage", label: "AI Usage" },
+  { path: "/admin/translations", label: "Translation Quality" },
+  { path: "/admin/guardrails", label: "Guardrails" },
+  { path: "/admin/cache", label: "Cache Observability" },
+  { path: "/admin/feature-flags", label: "Runtime Feature Flags" },
+  { path: "/admin/edge-snapshot", label: "Edge Snapshot" },
+  { path: "/admin/local-ai", label: "Local AI" },
+  { path: "/admin/home-server", label: "Home Server" },
+  { path: "/admin/failover", label: "DNS Failover" },
+  { path: "/admin/shards", label: "Worker Shards" },
+  { path: "/admin/feed-health", label: "RSS Feed Health" },
+  { path: "/admin/feeds", label: "Feed Management" },
+  { path: "/admin/audit", label: "Audit Log" },
+];
+
+const backendPrimaryAdminOperations = [
+  "load-admin-production-readiness",
+  "load-admin-article-reviews",
+  "load-admin-article-engagement",
+  "load-admin-ai-usage",
+  "load-admin-translation-quality",
+  "load-admin-guardrails",
+  "load-admin-local-ai",
+  "load-admin-worker-shards",
+  "load-admin-rss-feed-health",
+  "load-admin-feed-management",
+  "load-admin-audit-log",
+];
+
+const forbiddenAdminDashboardPatterns = [
+  { label: "framework 404", pattern: /This page could not be found|NEXT_HTTP_ERROR_FALLBACK;404|404: This page could not be found/i },
+  { label: "generic client exception", pattern: /Application error|Unhandled Runtime Error|Minified React error|Hydration failed because/i },
+  { label: "backend-primary Supabase access error", pattern: /supabase_access_disabled_for_backend_primary|Server-side Supabase access is not configured|Missing SUPABASE_URL|Missing runtime public Supabase/i },
+];
+
 const emailDeliveries = [];
 const quotaEvents = [];
+const backendDatabaseRequests = [];
 let nextQuotaEventId = 1;
 let supabaseOutageMode = false;
 
@@ -182,7 +225,7 @@ function options(response) {
   response.writeHead(204, {
     "access-control-allow-origin": "*",
     "access-control-allow-methods": "GET,POST,PATCH,DELETE,OPTIONS",
-    "access-control-allow-headers": "authorization,apikey,content-type,prefer,range,x-client-info",
+    "access-control-allow-headers": "authorization,apikey,content-type,prefer,range,x-client-info,x-nutsnews-db-client",
   });
   response.end();
 }
@@ -227,6 +270,143 @@ function localizeEdgeSnapshotArticle(article, requestedLanguageCode) {
     requested_language_code: requestedLanguageCode,
     translation_available: requestedLanguageCode === "en",
   };
+}
+
+function backendArticlesForRequest(body = {}) {
+  const page = Number(body.page ?? 0);
+  const pageSize = Number(body.pageSize ?? body.limit ?? articles.length);
+  const offset = Number(body.offset ?? Math.max(0, page) * Math.max(1, pageSize));
+  const requestedLanguageCode = normalizeMockLanguageCode(body.requestedLanguageCode);
+  const category = String(body.category ?? "").toLowerCase();
+  const query = String(body.query ?? "").toLowerCase();
+  const rows = articles
+    .filter((article) => !category || article.category.toLowerCase().includes(category))
+    .filter((article) =>
+      !query ||
+      [article.title, article.ai_summary, article.source, article.category]
+        .join(" ")
+        .toLowerCase()
+        .includes(query),
+    )
+    .sort((a, b) => a.snapshot_rank - b.snapshot_rank)
+    .slice(Math.max(0, offset), Math.max(0, offset) + Math.max(1, pageSize))
+    .map((article) => localizeEdgeSnapshotArticle(article, requestedLanguageCode));
+
+  return rows;
+}
+
+function backendSitemapArticles() {
+  return articles.map((article) => ({
+    id: article.id,
+    published_on_site_at: article.published_on_site_at,
+    published_at: article.published_at,
+  }));
+}
+
+function backendRowsSnapshot(row) {
+  return {
+    rows: [row],
+    rowCount: 1,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+function backendAdminReadResult(operation) {
+  switch (operation) {
+    case "load-admin-production-readiness":
+      return backendRowsSnapshot({
+        articleCount: articles.length,
+        publicFeedSnapshotCount: articles.length,
+        recentArticles: articles.map(stripColumns),
+        workerRun: null,
+        articlesLast24Hours: articles.length,
+        articlesLast7Days: articles.length,
+        translationSummaries: articleSummaries.map(({ original_url, language_code }) => ({
+          original_url,
+          language_code,
+        })),
+        translationExpectedCount: articles.length * 5,
+      });
+    case "load-admin-article-reviews":
+      return backendRowsSnapshot({
+        sourceOptions: [],
+        categoryOptions: [],
+        recentPublishedArticleRows: [],
+        recentPublishedReviewRows: [],
+        versionReportRows: [],
+        versionReportError: null,
+        reviewRows: [],
+        publishedArticlesForReviews: [],
+        totalMatchingReviews: 0,
+        reviewError: null,
+      });
+    case "load-admin-article-engagement":
+      return backendRowsSnapshot({
+        sourceCategoryRows: [],
+        sourceCategoryError: null,
+        articleRows: [],
+        articleError: null,
+      });
+    case "load-admin-ai-usage":
+      return backendRowsSnapshot({ usageRunRows: [] });
+    case "load-admin-local-ai":
+      return backendRowsSnapshot({ usageRunRows: [], recentReviewRows: [] });
+    case "load-admin-translation-quality":
+      return backendRowsSnapshot({ articleRows: [], summaryRows: [] });
+    case "load-admin-guardrails":
+      return backendRowsSnapshot({
+        aiUsageRunRows: [],
+        workerRunRows: [],
+        quotaUsageEventRows: [],
+        articleCount: articles.length,
+        summaryCount: articleSummaries.length,
+        feedCount: 0,
+        partialErrors: [],
+      });
+    case "load-admin-worker-shards":
+      return backendRowsSnapshot({ workerRunRows: [] });
+    case "load-admin-rss-feed-health":
+      return backendRowsSnapshot({ rssFeedRows: [], feedHealthRows: [] });
+    case "load-admin-feed-management":
+      return backendRowsSnapshot({ feedQualityRows: [] });
+    case "load-admin-audit-log":
+      return backendRowsSnapshot({ auditEventRows: [] });
+    default:
+      return null;
+  }
+}
+
+function backendDatabaseOperationResult(operation, body = {}) {
+  const adminResult = backendAdminReadResult(operation);
+  if (adminResult) {
+    return adminResult;
+  }
+
+  switch (operation) {
+    case "load-public-feed-snapshot":
+    case "load-published-articles":
+    case "load-home-feed-snapshot":
+      return backendArticlesForRequest(body);
+    case "search-published-articles":
+      return backendArticlesForRequest({ ...body, query: body.query ?? body.searchQuery });
+    case "load-published-categories":
+      return articles.map(({ category }) => ({ category }));
+    case "load-article-detail": {
+      const requestedLanguageCode = normalizeMockLanguageCode(body.requestedLanguageCode);
+      const article = articles.find((row) => row.id === body.id) ?? null;
+      return article ? localizeEdgeSnapshotArticle(article, requestedLanguageCode) : null;
+    }
+    case "load-recent-article-sitemap-items":
+    case "load-article-sitemap-items-page":
+      return backendSitemapArticles();
+    case "load-published-article-sitemap-count":
+      return { articleCount: articles.length };
+    case "record-quota-usage-event":
+    case "record-article-engagement-event":
+      return { ok: true };
+    default:
+      return null;
+  }
 }
 
 function applyRange(request, rows) {
@@ -401,6 +581,26 @@ function createExternalMockServer() {
 
       const url = new URL(request.url ?? "/", mockExternalUrl);
 
+      if (url.pathname.startsWith("/api/app/db/") && request.method === "POST") {
+        if (request.headers.authorization !== "Bearer offline-e2e-backend-token") {
+          json(response, 401, { error: "Mock backend database token rejected" });
+          return;
+        }
+
+        const operation = decodeURIComponent(url.pathname.slice("/api/app/db/".length));
+        const body = JSON.parse((await readBody(request)) || "{}");
+        const payload = backendDatabaseOperationResult(operation, body);
+        backendDatabaseRequests.push({ operation, body });
+
+        if (payload === null) {
+          json(response, 404, { error: `Unhandled mock backend database operation ${operation}` });
+          return;
+        }
+
+        json(response, 200, payload);
+        return;
+      }
+
       if (url.pathname === "/public-feed-snapshot/status" && request.method === "GET") {
         json(
           response,
@@ -553,9 +753,14 @@ async function waitForUrl(url, timeoutMs = 60000, child) {
   fail(`Timed out waiting for ${url}.${output}`);
 }
 
-function startNextDev() {
-  const child = spawn(npmCommand, ["run", "dev", "--", "--hostname", "127.0.0.1", "--port", String(webPort)], {
+function startNextDev({
+  port = webPort,
+  baseUrl = webUrl,
+  envOverrides = {},
+} = {}) {
+  const child = spawn(npmCommand, ["run", "dev", "--", "--hostname", "127.0.0.1", "--port", String(port)], {
     cwd: webDir,
+    detached: process.platform !== "win32",
     stdio: ["ignore", "pipe", "pipe"],
     env: {
       ...process.env,
@@ -580,11 +785,31 @@ function startNextDev() {
       CONTACT_TO_EMAIL: "rami@example.test",
       CONTACT_FROM_EMAIL: "NutsNews Offline E2E <noreply@example.test>",
       AUTH_SECRET: "offline-e2e-auth-secret-not-for-production",
-      NEXTAUTH_URL: webUrl,
+      NEXTAUTH_URL: baseUrl,
       NEXT_PUBLIC_APP_ENV: "staging",
+      NUTSNEWS_PUBLIC_APP_ENV: "staging",
+      NUTSNEWS_PUBLIC_SIDE_EFFECTS_MODE: "sandbox",
+      NUTSNEWS_DATABASE_PROVIDER_MODE: "supabase_primary",
+      NUTSNEWS_BACKEND_POSTGRES_PRIMARY_CONFIRMATION: "",
+      NUTSNEWS_BACKEND_API_URL: "",
+      NUTSNEWS_BACKEND_API_TOKEN: "",
+      ACTIONS_READ_TOKEN: "",
+      CLOUDFLARE_API_TOKEN: "",
+      CLOUDFLARE_ACCOUNT_ID: "",
+      CLOUDFLARE_ZONE_ID: "",
+      HOME_SERVER_STATS_URL: "",
+      HOME_SERVER_STATS_API_KEY: "",
+      LOCAL_AI_API_KEY: "",
+      NUTSNEWS_FAILOVER_CONTROLLER_STATUS_URL: "",
+      NUTSNEWS_FAILOVER_CONTROLLER_ACTION_URL: "",
+      NUTSNEWS_FAILOVER_STATUS_HMAC_SECRET: "",
+      NUTSNEWS_FAILOVER_ACTION_HMAC_SECRET: "",
+      NUTSNEWS_CACHE_OBSERVABILITY_URL: baseUrl,
+      NUTSNEWS_CACHE_ARTICLE_PATH: `/articles/${articles[0].id}`,
       NUTSNEWS_EDGE_FEED_SNAPSHOT_URL: mockExternalUrl,
       NUTSNEWS_ADMIN_TEST_AUTH_BYPASS: "true",
       NUTSNEWS_TEST_USER_NAMESPACE: "nutsnews-test-offline-e2e",
+      ...envOverrides,
     },
   });
 
@@ -607,20 +832,86 @@ function startNextDev() {
   return child;
 }
 
-async function stopChild(child) {
-  if (!child || child.killed) {
+function signalProcessTree(child, signal) {
+  if (!child?.pid) {
     return;
   }
 
-  child.kill("SIGTERM");
-  await Promise.race([
-    new Promise((resolve) => child.once("exit", resolve)),
-    delay(5000).then(() => {
-      if (!child.killed) {
-        child.kill("SIGKILL");
+  try {
+    if (process.platform === "win32") {
+      child.kill(signal);
+    } else {
+      process.kill(-child.pid, signal);
+    }
+  } catch (error) {
+    if (error?.code !== "ESRCH") {
+      throw error;
+    }
+  }
+}
+
+async function stopChild(child) {
+  if (!child || child.exitCode !== null || child.signalCode !== null) {
+    return;
+  }
+
+  let exited = false;
+  const exitPromise = new Promise((resolve) => {
+    child.once("exit", () => {
+      exited = true;
+      resolve();
+    });
+  });
+
+  signalProcessTree(child, "SIGTERM");
+  await Promise.race([exitPromise, delay(5000)]);
+
+  if (!exited) {
+    signalProcessTree(child, "SIGKILL");
+    await Promise.race([exitPromise, delay(5000)]);
+  }
+}
+
+async function verifyProtectedAdminDashboardRoutes(page, { providerLabel }) {
+  const pageErrors = [];
+  const onPageError = (error) => {
+    pageErrors.push(`${error.name}: ${error.message}`);
+  };
+
+  page.on("pageerror", onPageError);
+
+  try {
+    for (const route of protectedAdminRoutes) {
+      pageErrors.length = 0;
+      const response = await page.goto(route.path, { waitUntil: "domcontentloaded" });
+      const finalPath = new URL(page.url()).pathname;
+      const status = response?.status() ?? 0;
+
+      if (finalPath !== route.path) {
+        fail(`${providerLabel} protected admin route ${route.path} redirected to ${finalPath}.`);
       }
-    }),
-  ]);
+
+      if (status === 404 || status >= 500) {
+        fail(`${providerLabel} protected admin route ${route.path} returned HTTP ${status}.`);
+      }
+
+      await expect(page.locator("main")).toBeVisible({ timeout: 20000 });
+      await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
+
+      if (pageErrors.length > 0) {
+        fail(`${providerLabel} protected admin route ${route.path} raised a client error: ${pageErrors.join("; ")}`);
+      }
+
+      const bodyText = await page.locator("body").innerText({ timeout: 10000 });
+      for (const { label, pattern } of forbiddenAdminDashboardPatterns) {
+        if (pattern.test(bodyText)) {
+          fail(`${providerLabel} protected admin route ${route.path} rendered ${label} copy.`);
+        }
+      }
+    }
+  } finally {
+    page.off("pageerror", onPageError);
+  }
 }
 
 async function runBrowserChecks() {
@@ -880,6 +1171,10 @@ async function runBrowserChecks() {
   }
   logOk("Article API recovered from localized edge fallback and explicit missing-translation fallback");
 
+  logStep("Verifying protected admin dashboards render through staging auth bypass in Supabase primary mode");
+  await verifyProtectedAdminDashboardRoutes(page, { providerLabel: "Supabase primary" });
+  logOk(`Protected admin dashboard smoke rendered ${protectedAdminRoutes.length} routes in Supabase primary mode`);
+
   logStep("Verifying admin edge snapshot dashboard reflects Worker health");
   await page.goto("/admin/edge-snapshot", { waitUntil: "networkidle" });
   await expect(page.locator("main")).toHaveAttribute("data-edge-snapshot-ready", "true");
@@ -893,6 +1188,30 @@ async function runBrowserChecks() {
   await browser.close();
 }
 
+async function runBackendPostgresPrimaryAdminSmoke(baseUrl) {
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({ baseURL: baseUrl });
+  const page = await context.newPage();
+
+  try {
+    logStep("Verifying protected admin dashboards render through staging auth bypass in backend PostgreSQL primary mode");
+    await verifyProtectedAdminDashboardRoutes(page, { providerLabel: "Backend PostgreSQL primary" });
+    logOk(`Protected admin dashboard smoke rendered ${protectedAdminRoutes.length} routes in backend PostgreSQL primary mode`);
+  } finally {
+    await browser.close();
+  }
+
+  const missingOperations = backendPrimaryAdminOperations.filter(
+    (operation) => !backendDatabaseRequests.some((request) => request.operation === operation),
+  );
+
+  if (missingOperations.length > 0) {
+    fail(`Backend PostgreSQL primary admin smoke did not call expected backend operations: ${missingOperations.join(", ")}`);
+  }
+
+  logOk(`Backend PostgreSQL primary smoke exercised ${backendPrimaryAdminOperations.length} migrated admin database operations`);
+}
+
 async function run() {
   let nextProcess;
   const supabaseServer = createSupabaseMockServer();
@@ -902,6 +1221,7 @@ async function run() {
   console.log(`Mock Supabase URL: ${supabaseUrl}`);
   console.log(`Mock external service URL: ${mockExternalUrl}`);
   console.log(`Web URL: ${webUrl}`);
+  console.log(`Backend primary Web URL: ${backendWebUrl}`);
 
   try {
     logStep("Starting mock Supabase and external service servers");
@@ -914,6 +1234,34 @@ async function run() {
     logOk("Next.js app is ready");
 
     await runBrowserChecks();
+
+    logStep("Restarting Next.js app in backend PostgreSQL primary mode for protected admin smoke");
+    await stopChild(nextProcess);
+    nextProcess = startNextDev({
+      port: backendWebPort,
+      baseUrl: backendWebUrl,
+      envOverrides: {
+        NUTSNEWS_DATABASE_PROVIDER_MODE: "backend_postgres_primary",
+        NUTSNEWS_BACKEND_POSTGRES_PRIMARY_CONFIRMATION: "enable-backend-postgres-primary",
+        NUTSNEWS_BACKEND_API_URL: `${mockExternalUrl}/api/app/db`,
+        NUTSNEWS_BACKEND_API_TOKEN: "offline-e2e-backend-token",
+        NUTSNEWS_BACKEND_API_TIMEOUT_MS: "2000",
+        NEXT_PUBLIC_SUPABASE_URL: "",
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "",
+        NUTSNEWS_PUBLIC_SUPABASE_URL: "",
+        NUTSNEWS_PUBLIC_SUPABASE_ANON_KEY: "",
+        SUPABASE_URL: "",
+        NUTSNEWS_SUPABASE_URL: "",
+        SUPABASE_SERVICE_ROLE_KEY: "",
+        NUTSNEWS_SUPABASE_CREDENTIALS_ENV: "",
+        NUTSNEWS_SUPABASE_PROJECT_REF: "",
+        NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: "",
+      },
+    });
+    await waitForUrl(backendWebUrl, 90000, nextProcess);
+    logOk("Next.js app is ready in backend PostgreSQL primary mode");
+
+    await runBackendPostgresPrimaryAdminSmoke(backendWebUrl);
 
     if (quotaEvents.filter((event) => event.event_type === "email_send").length !== 1) {
       fail("Expected one quota_usage_events email_send row after contact form submission.");

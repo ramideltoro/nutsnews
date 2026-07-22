@@ -1,6 +1,32 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
+const protectedAdminRoutes = [
+  '/admin',
+  '/admin/readiness',
+  '/admin/articles',
+  '/admin/engagement',
+  '/admin/ai-usage',
+  '/admin/translations',
+  '/admin/guardrails',
+  '/admin/cache',
+  '/admin/feature-flags',
+  '/admin/edge-snapshot',
+  '/admin/local-ai',
+  '/admin/home-server',
+  '/admin/failover',
+  '/admin/shards',
+  '/admin/feed-health',
+  '/admin/feeds',
+  '/admin/audit',
+];
+
+const forbiddenAdminDashboardPatterns = [
+  /This page could not be found|NEXT_HTTP_ERROR_FALLBACK;404|404: This page could not be found/i,
+  /Application error|Unhandled Runtime Error|Minified React error|Hydration failed because/i,
+  /supabase_access_disabled_for_backend_primary|Server-side Supabase access is not configured|Missing SUPABASE_URL|Missing runtime public Supabase/i,
+];
+
 test('bounded private-staging navigation and accessibility smoke', async ({ page }) => {
   const fixtureNamespace = process.env.NUTSNEWS_QUALIFICATION_FIXTURE_NAMESPACE?.trim();
   expect(fixtureNamespace, 'A synthetic staging fixture namespace is required').toMatch(/^nutsnews-test-/);
@@ -30,6 +56,25 @@ test('bounded private-staging navigation and accessibility smoke', async ({ page
   expect(articleId, 'The isolated staging read must return a seeded synthetic article ID').toBeTruthy();
   await page.goto(`/articles/${encodeURIComponent(articleId as string)}`, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('main')).toBeVisible();
+
+  if (process.env.NUTSNEWS_ADMIN_TEST_AUTH_BYPASS_EXPECTED === 'true') {
+    for (const route of protectedAdminRoutes) {
+      const response = await page.goto(route, { waitUntil: 'domcontentloaded' });
+      const status = response?.status() ?? 0;
+      const finalPath = new URL(page.url()).pathname;
+
+      expect(finalPath, `${route} should render without redirecting when admin bypass is expected`).toBe(route);
+      expect(status, `${route} should not return a framework 404 or server error`).not.toBe(404);
+      expect(status, `${route} should not return a server error`).toBeLessThan(500);
+      await expect(page.locator('main')).toBeVisible({ timeout: 20000 });
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+      const bodyText = await page.locator('body').innerText({ timeout: 10000 });
+      for (const pattern of forbiddenAdminDashboardPatterns) {
+        expect(bodyText, `${route} rendered blocked admin smoke text ${pattern}`).not.toMatch(pattern);
+      }
+    }
+  }
 
   const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
   const blocking = axe.violations.filter((item) => item.impact === 'critical' || item.impact === 'serious');
