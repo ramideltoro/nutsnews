@@ -341,3 +341,18 @@ test("Backend primary admin local AI uses provider-neutral admin database operat
   assert.doesNotMatch(localAiSource, /getServerSupabase\(/);
   assert.match(localAiSource, /AdminDatabaseAccessError/);
 });
+
+test("Backend primary admin translation quality uses provider-neutral admin database operation", async () => {
+  const translationQualitySource = await readFile(
+    resolve(import.meta.dirname, "../web/lib/adminTranslationQuality.ts"),
+    "utf8",
+  );
+
+  assert.match(
+    translationQualitySource,
+    /readAdminDatabase\(\s*"load-admin-translation-quality"/,
+  );
+  assert.doesNotMatch(translationQualitySource, /from "@\/lib\/supabase"/);
+  assert.doesNotMatch(translationQualitySource, /getServerSupabase\(/);
+  assert.match(translationQualitySource, /AdminDatabaseAccessError/);
+});

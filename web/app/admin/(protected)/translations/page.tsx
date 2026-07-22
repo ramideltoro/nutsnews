@@ -102,6 +102,13 @@ export default async function TranslationQualityPage() {
           </p>
         </header>
 
+        {data.errorMessage ? (
+          <section className="mb-5 rounded-[1.5rem] border border-red-300/25 bg-red-500/10 p-5 text-sm leading-6 text-red-100/85 shadow-xl shadow-red-950/20">
+            <p className="font-black">Translation Quality dashboard data is unavailable.</p>
+            <p className="mt-2">{data.errorMessage}</p>
+          </section>
+        ) : null}
+
         <section className="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard
             label="Overall"
