@@ -271,9 +271,13 @@ export default async function GuardrailsPage() {
           </div>
         </header>
 
-        {!data.isConfigured ? (
+        {data.errorMessage ? (
           <section className="mb-5 rounded-[2rem] border border-red-300/25 bg-red-400/10 p-5 text-red-100">
-            <h2 className="text-xl font-black">Guardrails are not configured</h2>
+            <h2 className="text-xl font-black">
+              {data.isConfigured
+                ? "Guardrails database telemetry is partial"
+                : "Guardrails database telemetry is not configured"}
+            </h2>
             <p className="mt-2 text-sm leading-6">{data.errorMessage}</p>
           </section>
         ) : null}

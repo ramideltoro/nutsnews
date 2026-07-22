@@ -45,7 +45,6 @@ test("every discovered mutation or live operational path has a central runtime g
 test("service-role clients are centralized behind the runtime-validated Supabase factory", async () => {
   const sources = await Promise.all(
     [
-      "web/lib/adminCostGuardrails.ts",
       "web/lib/adminFeedHealth.ts",
       "web/lib/adminFeedManagement.ts",
       "web/lib/adminShardHealth.ts",
@@ -106,6 +105,14 @@ test("service-role clients are centralized behind the runtime-validated Supabase
   assert.match(migratedTranslationQualitySource, /@\/lib\/adminDatabase/);
   assert.doesNotMatch(migratedTranslationQualitySource, /createClient\(/);
   assert.doesNotMatch(migratedTranslationQualitySource, /getServerSupabase\(/);
+
+  const migratedGuardrailsSource = await readFile(
+    resolve(root, "web/lib/adminCostGuardrails.ts"),
+    "utf8",
+  );
+  assert.match(migratedGuardrailsSource, /@\/lib\/adminDatabase/);
+  assert.doesNotMatch(migratedGuardrailsSource, /createClient\(/);
+  assert.doesNotMatch(migratedGuardrailsSource, /getServerSupabase\(/);
 });
 
 test("the web image has no ingestion schedule, startup migration, and CI fixtures remain non-production", async () => {
