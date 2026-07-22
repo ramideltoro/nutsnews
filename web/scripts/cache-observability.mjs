@@ -109,6 +109,51 @@ function getHeader(headers, name) {
   return headers[String(name).toLowerCase()] || "";
 }
 
+function normalizedHeaderName(name) {
+  return String(name).toLowerCase();
+}
+
+function configuredCdnControlHeaders(config) {
+  return (config.defaults.visibleCdnControlHeaders || [
+    "cdn-cache-control",
+    "cloudflare-cdn-cache-control",
+    "vercel-cdn-cache-control",
+  ]).map(normalizedHeaderName);
+}
+
+function hiddenAfterCdnHeaders(config) {
+  return new Set((config.defaults.hiddenAfterCdnHeaders || []).map(normalizedHeaderName));
+}
+
+function allowedCloudflareStatuses(config) {
+  return new Set((config.defaults.allowedCloudflareStatuses || []).map((status) => String(status).toUpperCase()));
+}
+
+function cacheableCloudflareStatuses(config) {
+  return new Set(
+    (config.defaults.allowedCloudflareStatuses || [])
+      .map((status) => String(status).toUpperCase())
+      .filter((status) => status !== "BYPASS" && status !== "DYNAMIC"),
+  );
+}
+
+function cloudflareFrontedHosts(config) {
+  return new Set((config.defaults.cloudflareFrontedHosts || []).map((host) => String(host).toLowerCase()));
+}
+
+function urlUsesCloudflareFrontedHost(config, url) {
+  try {
+    return cloudflareFrontedHosts(config).has(new URL(url).hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+function hasCacheableCloudflareStatus(config, statuses) {
+  const cacheableStatuses = cacheableCloudflareStatuses(config);
+  return statuses.some((status) => cacheableStatuses.has(status));
+}
+
 async function fetchWithTimeout(url, options, timeoutMs) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -239,7 +284,7 @@ function validateConfig(config) {
   return { failures, warnings };
 }
 
-function evaluateRoute({ route, samples, resolvedPath, requiredHeaders, forbiddenTokens }) {
+function evaluateRoute({ route, samples, resolvedPath, url, config, requiredHeaders, forbiddenTokens }) {
   const failures = [];
   const warnings = [];
   const lastSample = samples[samples.length - 1];
@@ -249,6 +294,7 @@ function evaluateRoute({ route, samples, resolvedPath, requiredHeaders, forbidde
   const cloudflareCdnCacheControl = getHeader(headers, "cloudflare-cdn-cache-control");
   const vercelCdnCacheControl = getHeader(headers, "vercel-cdn-cache-control");
   const policy = getHeader(headers, "x-nutsnews-cache-policy");
+  const hiddenCdnHeaders = hiddenAfterCdnHeaders(config);
 
   if (!lastSample) {
     failures.push("No response samples were collected.");
@@ -279,6 +325,7 @@ function evaluateRoute({ route, samples, resolvedPath, requiredHeaders, forbidde
   const hitCount = cfStatuses.filter((status) => status === "HIT").length;
   const cloudflareHitRate = cfStatuses.length > 0 ? hitCount / cfStatuses.length : null;
   const hasCloudflareHit = hitCount > 0;
+  const hasCacheableCloudflareObservation = hasCacheableCloudflareStatus(config, cfStatuses);
 
   for (const token of forbiddenTokens) {
     if (!includesToken(cacheControl, token)) {
@@ -308,9 +355,7 @@ function evaluateRoute({ route, samples, resolvedPath, requiredHeaders, forbidde
 
   const visibleCdnControls = [
     ["cache-control", cacheControl],
-    ["cdn-cache-control", cdnCacheControl],
-    ["cloudflare-cdn-cache-control", cloudflareCdnCacheControl],
-    ["vercel-cdn-cache-control", vercelCdnCacheControl],
+    ...configuredCdnControlHeaders(config).map((name) => [name, getHeader(headers, name)]),
   ].filter(([, value]) => value);
 
   for (const token of route.expectedCdnIncludes || []) {
@@ -318,25 +363,32 @@ function evaluateRoute({ route, samples, resolvedPath, requiredHeaders, forbidde
       .filter(([, value]) => includesToken(value, token))
       .map(([name]) => name);
 
-    if (matchingHeaders.length === 0) {
+    if (matchingHeaders.length === 0 && !hasCacheableCloudflareObservation) {
       failures.push(`no visible CDN cache-control header includes ${token}.`);
     }
   }
 
-  if (!cloudflareCdnCacheControl) {
-    warnings.push("cloudflare-cdn-cache-control was not visible in the final response. This can be normal after Cloudflare processes the origin response.");
-  }
-
-  if (!vercelCdnCacheControl) {
-    warnings.push("vercel-cdn-cache-control was not visible in the final response. This can be normal after Vercel processes the origin response.");
+  for (const [name, value] of [
+    ["cloudflare-cdn-cache-control", cloudflareCdnCacheControl],
+    ["vercel-cdn-cache-control", vercelCdnCacheControl],
+  ]) {
+    if (!value && !hiddenCdnHeaders.has(name)) {
+      warnings.push(`${name} was not visible in the final response. Verify the origin still emits the expected CDN cache policy.`);
+    }
   }
 
   if (cfStatuses.length === 0) {
-    warnings.push("cf-cache-status was not observed. This is normal on local/Vercel preview checks before Cloudflare.");
+    if (urlUsesCloudflareFrontedHost(config, url)) {
+      warnings.push("cf-cache-status was not observed for a Cloudflare-fronted host. Public edge caching is ambiguous.");
+    }
+  } else if (cfStatuses.some((status) => !allowedCloudflareStatuses(config).has(status))) {
+    warnings.push(`Unexpected Cloudflare cache status observed: ${cfStatuses.join(", ")}.`);
   } else if (route.key === "articles-api" && cfStatuses.every((status) => status === "BYPASS" || status === "DYNAMIC")) {
     failures.push(`/api/articles returned only non-cache statuses: ${cfStatuses.join(", ")}.`);
+  } else if (!hasCacheableCloudflareObservation) {
+    warnings.push(`Cloudflare returned ${cfStatuses.join(", ")}; app cache headers matched, but public edge caching was not confirmed for this route.`);
   } else if (cloudflareHitRate !== null && cloudflareHitRate === 0) {
-    warnings.push(`Cloudflare was observed but no HIT samples were seen: ${cfStatuses.join(", ")}.`);
+    warnings.push(`Cloudflare cache was observed without HIT samples: ${cfStatuses.join(", ")}.`);
   }
 
   const result = failures.length > 0 ? "fail" : warnings.length > 0 ? "warn" : "pass";
@@ -469,6 +521,8 @@ async function runLiveAudit({ config, baseUrl, articlePath }) {
           route,
           samples,
           resolvedPath,
+          url: toUrl(baseUrl, resolvedPath),
+          config,
           requiredHeaders: config.defaults.requiredHeaders,
           forbiddenTokens: config.defaults.forbiddenCacheControlTokens,
         }),

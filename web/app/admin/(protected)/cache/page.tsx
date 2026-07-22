@@ -130,7 +130,7 @@ export default async function CacheObservabilityPage() {
           <MetricCard
             label="Overall"
             value={data.summary.status.toUpperCase()}
-            helper="Pass means all required cache headers and policies matched."
+            helper="Pass means required app cache policy matched and no real edge ambiguity was observed."
             tone={summaryTone}
           />
           <MetricCard
@@ -142,7 +142,7 @@ export default async function CacheObservabilityPage() {
           <MetricCard
             label="Cloudflare HIT rate"
             value={formatPercent(data.summary.cloudflareHitRate)}
-            helper="Shown when the request path is actually behind Cloudflare."
+            helper="Shown for Cloudflare-fronted requests; direct VPS origin checks may show n/a."
             tone={data.summary.cloudflareHitRate === 0 ? "warning" : "default"}
           />
           <MetricCard
@@ -163,8 +163,10 @@ export default async function CacheObservabilityPage() {
             </h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-amber-100/60">
               Failures mean a route lost cacheability, changed its NutsNews
-              policy marker, or stopped sending the CDN headers needed by
-              Cloudflare and Vercel.
+              policy marker, or stopped exposing a required public cache
+              signal. CDN-control headers that Cloudflare or Vercel hide after
+              processing are rebaselined against the configured production
+              host and observed Cloudflare status.
             </p>
           </div>
 
