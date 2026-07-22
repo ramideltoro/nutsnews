@@ -120,7 +120,7 @@ test("deployment smoke expects staging health and readiness targets", () => {
 
   assert.equal(smokeEnv.EXISTING_VALUE, "preserved");
   assert.equal(smokeEnv.NUTSNEWS_EXPECTED_DEPLOYMENT_TARGET, "vps-staging");
-  assert.equal(smokeEnv.NUTSNEWS_EXPECTED_HEALTH_DEPLOYMENT_TARGET, "vps-staging");
+  assert.equal(smokeEnv.NUTSNEWS_EXPECTED_HEALTH_DEPLOYMENT_TARGET, "vps,vps-staging");
 });
 
 test("anonymous auth session must be null", async () => {
