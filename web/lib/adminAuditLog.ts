@@ -1,12 +1,12 @@
+import {
+  AdminDatabaseAccessError,
+  readAdminDatabase,
+  type AdminDatabaseJsonObject,
+  type AdminSupabaseDatabaseContext,
+} from "@/lib/adminDatabase";
 import { formatAdminDateTime } from "@/lib/adminTime";
-import { getServerSupabaseConfig } from "@/lib/supabase";
 
 const MAX_AUDIT_EVENTS = 50;
-
-type SupabaseConfig = {
-  url: string;
-  serviceRoleKey: string;
-};
 
 type AdminAuditEventDbRow = {
   id: string;
@@ -42,14 +42,6 @@ export type AdminAuditLogData = {
   retentionDays: number;
   events: AdminAuditEvent[];
 };
-
-function getSupabaseConfig(): SupabaseConfig | null {
-  try {
-    return getServerSupabaseConfig();
-  } catch {
-    return null;
-  }
-}
 
 function emptyAuditLogData(errorMessage: string | null = null): AdminAuditLogData {
   return {
@@ -115,18 +107,37 @@ function mapAuditEvent(row: AdminAuditEventDbRow): AdminAuditEvent {
   };
 }
 
-export async function getAdminAuditLogData(limit = MAX_AUDIT_EVENTS): Promise<AdminAuditLogData> {
-  const config = getSupabaseConfig();
+type SupabaseConfig = ReturnType<AdminSupabaseDatabaseContext["getConfig"]>;
 
-  if (!config) {
-    return emptyAuditLogData(
-      "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for the admin audit log.",
-    );
+type AuditLogDatabaseResult = {
+  rows: AdminDatabaseJsonObject[];
+  rowCount?: number;
+  generatedAt?: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeAuditLogDatabaseResult(
+  result: AuditLogDatabaseResult,
+): AdminAuditEventDbRow[] {
+  const rows = result.rows ?? [];
+  const snapshot = rows[0];
+
+  if (isRecord(snapshot) && Array.isArray(snapshot.auditEventRows)) {
+    return snapshot.auditEventRows as AdminAuditEventDbRow[];
   }
 
-  const boundedLimit = Math.max(1, Math.min(MAX_AUDIT_EVENTS, Math.round(limit)));
+  return rows as unknown as AdminAuditEventDbRow[];
+}
+
+async function fetchSupabaseAuditRows(
+  config: SupabaseConfig,
+  limit: number,
+): Promise<AdminAuditEventDbRow[]> {
   const response = await fetch(
-    `${config.url}/rest/v1/admin_audit_events?select=id,created_at,actor_email,action,target_type,target_id,target_label,before_values,after_values,metadata&order=created_at.desc&limit=${boundedLimit}`,
+    `${config.url}/rest/v1/admin_audit_events?select=id,created_at,actor_email,action,target_type,target_id,target_label,before_values,after_values,metadata&order=created_at.desc&limit=${limit}`,
     {
       method: "GET",
       cache: "no-store",
@@ -141,10 +152,60 @@ export async function getAdminAuditLogData(limit = MAX_AUDIT_EVENTS): Promise<Ad
   if (!response.ok) {
     const errorText = await response.text();
 
-    return emptyAuditLogData(errorText || `Supabase returned ${response.status}`);
+    throw new Error(errorText || `Supabase returned ${response.status}`);
   }
 
-  const rows = (await response.json()) as AdminAuditEventDbRow[];
+  return (await response.json()) as AdminAuditEventDbRow[];
+}
+
+async function loadSupabaseAuditLogRows(
+  context: AdminSupabaseDatabaseContext,
+  limit: number,
+) {
+  const rows = await fetchSupabaseAuditRows(context.getConfig(), limit);
+
+  return {
+    rows: rows as unknown as AdminDatabaseJsonObject[],
+    rowCount: rows.length,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+async function loadAuditLogDatabaseRows(limit: number) {
+  const result = await readAdminDatabase(
+    "load-admin-audit-log",
+    { limit },
+    (context) => loadSupabaseAuditLogRows(context, limit),
+    { cache: "no-store" },
+  );
+
+  return normalizeAuditLogDatabaseResult(result as AuditLogDatabaseResult);
+}
+
+function auditLogDataAccessErrorMessage(error: unknown) {
+  if (error instanceof AdminDatabaseAccessError) {
+    return error.message;
+  }
+
+  if (
+    error instanceof Error &&
+    /server-side supabase access is not configured/i.test(error.message)
+  ) {
+    return "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for the admin audit log.";
+  }
+
+  return error instanceof Error ? error.message : "Unknown admin audit log error.";
+}
+
+export async function getAdminAuditLogData(limit = MAX_AUDIT_EVENTS): Promise<AdminAuditLogData> {
+  const boundedLimit = Math.max(1, Math.min(MAX_AUDIT_EVENTS, Math.round(limit)));
+  let rows: AdminAuditEventDbRow[];
+
+  try {
+    rows = await loadAuditLogDatabaseRows(boundedLimit);
+  } catch (error) {
+    return emptyAuditLogData(auditLogDataAccessErrorMessage(error));
+  }
 
   return {
     isConfigured: true,

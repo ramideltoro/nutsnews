@@ -401,3 +401,44 @@ test("Backend primary admin RSS feed health uses provider-neutral admin database
   assert.doesNotMatch(rssFeedHealthSource, /getServerSupabase\(/);
   assert.match(rssFeedHealthSource, /AdminDatabaseAccessError/);
 });
+
+test("Backend primary admin feed management uses provider-neutral admin database operations", async () => {
+  const feedManagementSource = await readFile(
+    resolve(import.meta.dirname, "../web/lib/adminFeedManagement.ts"),
+    "utf8",
+  );
+
+  assert.match(
+    feedManagementSource,
+    /readAdminDatabase\(\s*"load-admin-feed-management"/,
+  );
+  assert.match(
+    feedManagementSource,
+    /mutateAdminDatabase\(\s*"set-admin-rss-feed-active-status"/,
+  );
+  assert.match(
+    feedManagementSource,
+    /mutateAdminDatabase\(\s*"set-admin-rss-feed-trust-tier"/,
+  );
+  assert.doesNotMatch(feedManagementSource, /from "@\/lib\/supabase"/);
+  assert.doesNotMatch(feedManagementSource, /getServerSupabaseConfig\(/);
+  assert.doesNotMatch(feedManagementSource, /getServerSupabase\(/);
+  assert.match(feedManagementSource, /AdminDatabaseAccessError/);
+  assert.match(feedManagementSource, /assertDataMutation/);
+});
+
+test("Backend primary admin audit log uses provider-neutral admin database operation", async () => {
+  const auditLogSource = await readFile(
+    resolve(import.meta.dirname, "../web/lib/adminAuditLog.ts"),
+    "utf8",
+  );
+
+  assert.match(
+    auditLogSource,
+    /readAdminDatabase\(\s*"load-admin-audit-log"/,
+  );
+  assert.doesNotMatch(auditLogSource, /from "@\/lib\/supabase"/);
+  assert.doesNotMatch(auditLogSource, /getServerSupabaseConfig\(/);
+  assert.doesNotMatch(auditLogSource, /getServerSupabase\(/);
+  assert.match(auditLogSource, /AdminDatabaseAccessError/);
+});

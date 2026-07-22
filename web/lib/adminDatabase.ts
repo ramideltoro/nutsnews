@@ -61,15 +61,16 @@ export type AdminDatabaseReadParams = {
 };
 
 export type AdminFeedActiveStatusMutation = {
-  feedId: string;
+  feedUrl: string;
   active: boolean;
   actorEmail: string;
   reason?: string;
 };
 
 export type AdminFeedTrustTierMutation = {
-  feedId: string;
-  trustTier: string;
+  feedUrl: string;
+  sourceTrustTier: string;
+  publisherAllowlistStatus: string;
   actorEmail: string;
   reason?: string;
 };
@@ -103,8 +104,11 @@ export type AdminDatabaseRowsResult<
 export type AdminMutationResult = {
   ok: boolean;
   id?: string;
+  message?: string;
   changed?: boolean;
   auditEventId?: string | null;
+  nextSourceTrustTier?: string | null;
+  nextPublisherAllowlistStatus?: string | null;
 };
 
 export type AdminDatabaseOperationResultMap = {

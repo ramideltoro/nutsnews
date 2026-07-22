@@ -45,7 +45,6 @@ test("every discovered mutation or live operational path has a central runtime g
 test("service-role clients are centralized behind the runtime-validated Supabase factory", async () => {
   const sources = await Promise.all(
     [
-      "web/lib/adminFeedManagement.ts",
       "web/lib/runtimeFeatureFlags.ts",
       "web/lib/articleEngagement.ts",
     ].map((relativePath) => readFile(resolve(root, relativePath), "utf8")),
@@ -127,6 +126,25 @@ test("service-role clients are centralized behind the runtime-validated Supabase
   assert.match(migratedRssFeedHealthSource, /@\/lib\/adminDatabase/);
   assert.doesNotMatch(migratedRssFeedHealthSource, /createClient\(/);
   assert.doesNotMatch(migratedRssFeedHealthSource, /getServerSupabase\(/);
+
+  const migratedFeedManagementSource = await readFile(
+    resolve(root, "web/lib/adminFeedManagement.ts"),
+    "utf8",
+  );
+  assert.match(migratedFeedManagementSource, /@\/lib\/adminDatabase/);
+  assert.match(migratedFeedManagementSource, /assertDataMutation/);
+  assert.doesNotMatch(migratedFeedManagementSource, /createClient\(/);
+  assert.doesNotMatch(migratedFeedManagementSource, /getServerSupabaseConfig\(/);
+  assert.doesNotMatch(migratedFeedManagementSource, /getServerSupabase\(/);
+
+  const migratedAuditLogSource = await readFile(
+    resolve(root, "web/lib/adminAuditLog.ts"),
+    "utf8",
+  );
+  assert.match(migratedAuditLogSource, /@\/lib\/adminDatabase/);
+  assert.doesNotMatch(migratedAuditLogSource, /createClient\(/);
+  assert.doesNotMatch(migratedAuditLogSource, /getServerSupabaseConfig\(/);
+  assert.doesNotMatch(migratedAuditLogSource, /getServerSupabase\(/);
 });
 
 test("the web image has no ingestion schedule, startup migration, and CI fixtures remain non-production", async () => {

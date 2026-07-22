@@ -1,6 +1,13 @@
 import { formatAdminDateTime } from "@/lib/adminTime";
+import {
+  AdminDatabaseAccessError,
+  mutateAdminDatabase,
+  readAdminDatabase,
+  type AdminDatabaseJsonObject,
+  type AdminMutationResult,
+  type AdminSupabaseDatabaseContext,
+} from "@/lib/adminDatabase";
 import { ExternalUrlSafetyError, assertPublicHttpUrl } from "@/lib/externalUrlSafety";
-import { getServerSupabaseConfig } from "@/lib/supabase";
 import { RuntimeSafetyError, assertDataMutation } from "@/lib/runtimeSafety";
 
 const FEED_QUALITY_SELECT_COLUMNS = [
@@ -43,11 +50,6 @@ const FEED_QUALITY_SELECT_COLUMNS = [
   "quality_reason",
   "updated_at",
 ].join(",");
-
-type SupabaseConfig = {
-  url: string;
-  serviceRoleKey: string;
-};
 
 type NumericValue = number | string | null;
 
@@ -241,14 +243,6 @@ type FeedTrustTierRpcRow = {
   next_is_active: boolean | string | null;
   audit_event_id: string;
 };
-
-function getSupabaseConfig(): SupabaseConfig | null {
-  try {
-    return getServerSupabaseConfig();
-  } catch {
-    return null;
-  }
-}
 
 function emptySummary(): FeedManagementSummary {
   return {
@@ -649,6 +643,31 @@ function buildSummary(feeds: ManagedFeed[]): FeedManagementSummary {
   };
 }
 
+type SupabaseConfig = ReturnType<AdminSupabaseDatabaseContext["getConfig"]>;
+
+type FeedManagementDatabaseResult = {
+  rows: AdminDatabaseJsonObject[];
+  rowCount?: number;
+  generatedAt?: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeFeedManagementDatabaseResult(
+  result: FeedManagementDatabaseResult,
+): FeedQualityDbRow[] {
+  const rows = result.rows ?? [];
+  const snapshot = rows[0];
+
+  if (isRecord(snapshot) && Array.isArray(snapshot.feedQualityRows)) {
+    return snapshot.feedQualityRows as FeedQualityDbRow[];
+  }
+
+  return rows as unknown as FeedQualityDbRow[];
+}
+
 async function fetchSupabaseRows<T>(
   config: SupabaseConfig,
   pathAndQuery: string,
@@ -678,6 +697,58 @@ async function fetchSupabaseRows<T>(
   };
 }
 
+async function loadSupabaseFeedManagementRows(
+  context: AdminSupabaseDatabaseContext,
+) {
+  const config = context.getConfig();
+  const qualityResult = await fetchSupabaseRows<FeedQualityDbRow>(
+    config,
+    `/rest/v1/feed_quality_scores?select=${FEED_QUALITY_SELECT_COLUMNS}&order=quality_score.asc,total_accepted_count.desc`,
+  );
+
+  if (qualityResult.errorMessage) {
+    throw new Error(
+      `Failed to load feed_quality_scores. Apply migration 20260615002000_create_feed_quality_scores.sql first. Supabase error: ${qualityResult.errorMessage}`,
+    );
+  }
+
+  return {
+    rows: qualityResult.data as unknown as AdminDatabaseJsonObject[],
+    rowCount: qualityResult.data.length,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+async function loadFeedManagementDatabaseRows() {
+  const result = await readAdminDatabase(
+    "load-admin-feed-management",
+    { limit: 10000 },
+    loadSupabaseFeedManagementRows,
+    { cache: "no-store" },
+  );
+
+  return normalizeFeedManagementDatabaseResult(
+    result as FeedManagementDatabaseResult,
+  );
+}
+
+function feedManagementDataAccessErrorMessage(error: unknown) {
+  if (error instanceof AdminDatabaseAccessError) {
+    return error.message;
+  }
+
+  if (
+    error instanceof Error &&
+    /server-side supabase access is not configured/i.test(error.message)
+  ) {
+    return "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for the admin feed management dashboard.";
+  }
+
+  return error instanceof Error
+    ? error.message
+    : "Unknown feed management dashboard error.";
+}
+
 function buildRankingSql() {
   return `select
   source,
@@ -702,26 +773,15 @@ order by source_trust_tier asc, quality_score desc, total_accepted_count desc, s
 }
 
 export async function getAdminFeedManagementDashboardData(): Promise<FeedManagementDashboardData> {
-  const config = getSupabaseConfig();
+  let feedRows: FeedQualityDbRow[];
 
-  if (!config) {
-    return emptyDashboardData(
-      "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for the admin feed management dashboard.",
-    );
+  try {
+    feedRows = await loadFeedManagementDatabaseRows();
+  } catch (error) {
+    return emptyDashboardData(feedManagementDataAccessErrorMessage(error));
   }
 
-  const qualityResult = await fetchSupabaseRows<FeedQualityDbRow>(
-    config,
-    `/rest/v1/feed_quality_scores?select=${FEED_QUALITY_SELECT_COLUMNS}&order=quality_score.asc,total_accepted_count.desc`,
-  );
-
-  if (qualityResult.errorMessage) {
-    return emptyDashboardData(
-      `Failed to load feed_quality_scores. Apply migration 20260615002000_create_feed_quality_scores.sql first. Supabase error: ${qualityResult.errorMessage}`,
-    );
-  }
-
-  const managedFeeds = qualityResult.data
+  const managedFeeds = feedRows
     .map((row) => buildManagedFeed(row))
     .sort((a, b) => {
       const statusWeight: Record<FeedManagementStatus, number> = {
@@ -783,6 +843,129 @@ export async function getAdminFeedManagementDashboardData(): Promise<FeedManagem
   };
 }
 
+function normalizeActorEmail(actorEmail: string | null | undefined) {
+  return actorEmail?.trim().toLowerCase() || "unknown-admin@example.invalid";
+}
+
+async function parseRpcRows<T>(response: Response): Promise<T[]> {
+  if (response.status === 204) {
+    return [];
+  }
+
+  return (await response.json()) as T[];
+}
+
+function mutationErrorMessage(error: unknown, fallbackMessage: string) {
+  if (error instanceof AdminDatabaseAccessError) {
+    return error.message;
+  }
+
+  if (
+    error instanceof Error &&
+    /server-side supabase access is not configured/i.test(error.message)
+  ) {
+    return "Missing Supabase admin configuration.";
+  }
+
+  return error instanceof Error ? error.message : fallbackMessage;
+}
+
+async function setSupabaseRssFeedActiveStatus(
+  context: AdminSupabaseDatabaseContext,
+  {
+    actorEmail,
+    feedUrl,
+    active,
+  }: {
+    actorEmail: string;
+    feedUrl: string;
+    active: boolean;
+  },
+): Promise<AdminMutationResult> {
+  const config = context.getConfig();
+  const response = await fetch(`${config.url}/rest/v1/rpc/set_rss_feed_active_with_audit`, {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      apikey: config.serviceRoleKey,
+      Authorization: `Bearer ${config.serviceRoleKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      p_actor_email: actorEmail,
+      p_feed_url: feedUrl,
+      p_is_active: active,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+
+    throw new Error(errorText || `Supabase returned ${response.status}`);
+  }
+
+  const rows = await parseRpcRows<FeedToggleRpcRow>(response);
+  const updatedFeed = rows[0];
+
+  return {
+    ok: true,
+    changed: true,
+    id: updatedFeed?.feed_id ? String(updatedFeed.feed_id) : undefined,
+    auditEventId: updatedFeed?.audit_event_id ?? null,
+  };
+}
+
+async function setSupabaseRssFeedTrustTier(
+  context: AdminSupabaseDatabaseContext,
+  {
+    actorEmail,
+    feedUrl,
+    sourceTrustTier,
+    publisherAllowlistStatus,
+  }: {
+    actorEmail: string;
+    feedUrl: string;
+    sourceTrustTier: SourceTrustTier;
+    publisherAllowlistStatus: PublisherAllowlistStatus;
+  },
+): Promise<AdminMutationResult> {
+  const config = context.getConfig();
+  const response = await fetch(`${config.url}/rest/v1/rpc/set_rss_feed_trust_tier_with_audit`, {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      apikey: config.serviceRoleKey,
+      Authorization: `Bearer ${config.serviceRoleKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      p_actor_email: actorEmail,
+      p_feed_url: feedUrl,
+      p_source_trust_tier: sourceTrustTier,
+      p_publisher_allowlist_status: publisherAllowlistStatus,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+
+    throw new Error(errorText || `Supabase returned ${response.status}`);
+  }
+
+  const rows = await parseRpcRows<FeedTrustTierRpcRow>(response);
+  const updatedFeed = rows[0];
+
+  return {
+    ok: true,
+    changed: true,
+    id: updatedFeed?.feed_id ? String(updatedFeed.feed_id) : undefined,
+    auditEventId: updatedFeed?.audit_event_id ?? null,
+    nextSourceTrustTier: updatedFeed?.next_source_trust_tier ?? sourceTrustTier,
+    nextPublisherAllowlistStatus:
+      updatedFeed?.next_publisher_allowlist_status ?? publisherAllowlistStatus,
+  };
+}
+
 export async function setAdminRssFeedActiveStatus({
   actorEmail,
   feedUrl,
@@ -818,45 +1001,40 @@ export async function setAdminRssFeedActiveStatus({
     throw error;
   }
 
-  const config = getSupabaseConfig();
+  const normalizedActorEmail = normalizeActorEmail(actorEmail);
+  let result: AdminMutationResult;
 
-  if (!config) {
+  try {
+    result = await mutateAdminDatabase(
+      "set-admin-rss-feed-active-status",
+      {
+        actorEmail: normalizedActorEmail,
+        feedUrl: safeFeedUrl,
+        active: isActive,
+      },
+      (context) =>
+        setSupabaseRssFeedActiveStatus(context, {
+          actorEmail: normalizedActorEmail,
+          feedUrl: safeFeedUrl,
+          active: isActive,
+        }),
+      { cache: "no-store" },
+    );
+  } catch (error) {
     return {
       ok: false,
-      message: "Missing Supabase admin configuration.",
+      message: mutationErrorMessage(error, "Feed status could not be updated."),
     };
   }
 
-  const normalizedActorEmail = actorEmail?.trim().toLowerCase() || "unknown-admin@example.invalid";
-
-  const response = await fetch(`${config.url}/rest/v1/rpc/set_rss_feed_active_with_audit`, {
-    method: "POST",
-    cache: "no-store",
-    headers: {
-      apikey: config.serviceRoleKey,
-      Authorization: `Bearer ${config.serviceRoleKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      p_actor_email: normalizedActorEmail,
-      p_feed_url: safeFeedUrl,
-      p_is_active: isActive,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-
+  if (!result.ok) {
     return {
       ok: false,
-      message: errorText || `Supabase returned ${response.status}`,
+      message: result.message ?? "Feed status could not be updated.",
     };
   }
 
-  const rows = response.status === 204 ? [] : ((await response.json()) as FeedToggleRpcRow[]);
-  const updatedFeed = rows[0];
-
-  if (response.status !== 204 && !updatedFeed?.audit_event_id) {
+  if (!result.auditEventId) {
     return {
       ok: false,
       message: "Feed status changed, but the audit event was not returned.",
@@ -925,46 +1103,42 @@ export async function setAdminRssFeedTrustTier({
     };
   }
 
-  const config = getSupabaseConfig();
+  const normalizedActorEmail = normalizeActorEmail(actorEmail);
+  let result: AdminMutationResult;
 
-  if (!config) {
+  try {
+    result = await mutateAdminDatabase(
+      "set-admin-rss-feed-trust-tier",
+      {
+        actorEmail: normalizedActorEmail,
+        feedUrl: safeFeedUrl,
+        sourceTrustTier: safeSourceTrustTier,
+        publisherAllowlistStatus: safePublisherAllowlistStatus,
+      },
+      (context) =>
+        setSupabaseRssFeedTrustTier(context, {
+          actorEmail: normalizedActorEmail,
+          feedUrl: safeFeedUrl,
+          sourceTrustTier: safeSourceTrustTier,
+          publisherAllowlistStatus: safePublisherAllowlistStatus,
+        }),
+      { cache: "no-store" },
+    );
+  } catch (error) {
     return {
       ok: false,
-      message: "Missing Supabase admin configuration.",
+      message: mutationErrorMessage(error, "Source tier could not be updated."),
     };
   }
 
-  const normalizedActorEmail = actorEmail?.trim().toLowerCase() || "unknown-admin@example.invalid";
-
-  const response = await fetch(`${config.url}/rest/v1/rpc/set_rss_feed_trust_tier_with_audit`, {
-    method: "POST",
-    cache: "no-store",
-    headers: {
-      apikey: config.serviceRoleKey,
-      Authorization: `Bearer ${config.serviceRoleKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      p_actor_email: normalizedActorEmail,
-      p_feed_url: safeFeedUrl,
-      p_source_trust_tier: safeSourceTrustTier,
-      p_publisher_allowlist_status: safePublisherAllowlistStatus,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-
+  if (!result.ok) {
     return {
       ok: false,
-      message: errorText || `Supabase returned ${response.status}`,
+      message: result.message ?? "Source tier could not be updated.",
     };
   }
 
-  const rows = response.status === 204 ? [] : ((await response.json()) as FeedTrustTierRpcRow[]);
-  const updatedFeed = rows[0];
-
-  if (response.status !== 204 && !updatedFeed?.audit_event_id) {
+  if (!result.auditEventId) {
     return {
       ok: false,
       message: "Source tier changed, but the audit event was not returned.",
@@ -972,7 +1146,7 @@ export async function setAdminRssFeedTrustTier({
   }
 
   const nextTier = parseSourceTrustTierInput(
-    updatedFeed?.next_source_trust_tier ?? safeSourceTrustTier,
+    result.nextSourceTrustTier ?? safeSourceTrustTier,
   ) ?? safeSourceTrustTier;
   const nextTierLabel = getSourceTrustTierLabel(nextTier);
 
