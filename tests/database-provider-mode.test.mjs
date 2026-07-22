@@ -287,3 +287,18 @@ test("Backend primary admin production readiness uses provider-neutral admin dat
     /NUTSNEWS_BACKEND_API_URL and NUTSNEWS_BACKEND_API_TOKEN/,
   );
 });
+
+test("Backend primary admin article reviews uses provider-neutral admin database operation", async () => {
+  const articleReviewsSource = await readFile(
+    resolve(import.meta.dirname, "../web/lib/adminArticleReviews.ts"),
+    "utf8",
+  );
+
+  assert.match(
+    articleReviewsSource,
+    /readAdminDatabase\(\s*"load-admin-article-reviews"/,
+  );
+  assert.doesNotMatch(articleReviewsSource, /from "@\/lib\/supabase"/);
+  assert.doesNotMatch(articleReviewsSource, /getServerSupabase\(/);
+  assert.match(articleReviewsSource, /AdminDatabaseAccessError/);
+});
