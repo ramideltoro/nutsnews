@@ -57,6 +57,7 @@
     "test:admin-guardrails": "node ../scripts/admin_guardrails_regression.mjs",
     "test:admin-guardrails-cloudflare-forecast": "node ../scripts/admin_guardrails_cloudflare_forecast_regression.mjs",
     "test:admin-production-readiness": "node ../scripts/admin_production_readiness_regression.mjs",
+    "test:admin-failover": "node ../scripts/admin_failover_dashboard_regression.mjs",
     "test:admin-readiness-actions-token": "node ../scripts/admin_readiness_actions_token_contract.mjs",
     "test:admin-access-denied": "node ../scripts/admin_access_denied_regression.mjs",
     "test:admin-audit-log": "node ../scripts/admin_audit_log_regression.mjs",
