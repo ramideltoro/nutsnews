@@ -386,3 +386,18 @@ test("Backend primary admin worker shards uses provider-neutral admin database o
   assert.doesNotMatch(workerShardsSource, /getServerSupabase\(/);
   assert.match(workerShardsSource, /AdminDatabaseAccessError/);
 });
+
+test("Backend primary admin RSS feed health uses provider-neutral admin database operation", async () => {
+  const rssFeedHealthSource = await readFile(
+    resolve(import.meta.dirname, "../web/lib/adminFeedHealth.ts"),
+    "utf8",
+  );
+
+  assert.match(
+    rssFeedHealthSource,
+    /readAdminDatabase\(\s*"load-admin-rss-feed-health"/,
+  );
+  assert.doesNotMatch(rssFeedHealthSource, /from "@\/lib\/supabase"/);
+  assert.doesNotMatch(rssFeedHealthSource, /getServerSupabase\(/);
+  assert.match(rssFeedHealthSource, /AdminDatabaseAccessError/);
+});
