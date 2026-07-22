@@ -1,6 +1,14 @@
-import { getServerSupabase } from "@/lib/supabase";
+import { type SupabaseClient } from "@supabase/supabase-js";
+
+import {
+  AdminDatabaseAccessError,
+  readAdminDatabase,
+  type AdminDatabaseJsonObject,
+  type AdminSupabaseDatabaseContext,
+} from "@/lib/adminDatabase";
 import {
   DEFAULT_LANGUAGE_CODE,
+  normalizeLanguageCodeValue,
   normalizeLanguageCode,
   SUPPORTED_LANGUAGES,
   type LanguageCode,
@@ -17,6 +25,11 @@ const TARGET_LANGUAGES = SUPPORTED_LANGUAGES.map((language) => language.code).fi
   (languageCode): languageCode is Exclude<LanguageCode, "en"> =>
     languageCode !== DEFAULT_LANGUAGE_CODE,
 );
+const TARGET_LANGUAGE_SET = new Set<string>(TARGET_LANGUAGES);
+const PUBLIC_FEED_SNAPSHOT_SELECT_COLUMNS =
+  "id,source,title,original_url,ai_summary,category,published_on_site_at,snapshot_rank";
+const TRANSLATED_SUMMARY_SELECT_COLUMNS =
+  "original_url,language_code,title,summary,updated_at,generated_by,model";
 
 type ArticleRow = {
   id: string;
@@ -37,6 +50,20 @@ type SummaryRow = {
   updated_at: string | null;
   generated_by: string | null;
   model: string | null;
+};
+
+type TranslationQualityDatabaseSnapshot = {
+  articleRows: ArticleRow[];
+  summaryRows: SummaryRow[];
+};
+
+type TranslationQualityDatabaseSnapshotRow =
+  Partial<TranslationQualityDatabaseSnapshot>;
+
+type TranslationQualityDatabaseResult = {
+  rows?: TranslationQualityDatabaseSnapshotRow[];
+  rowCount?: number;
+  generatedAt?: string;
 };
 
 export type TranslationQualityIssueRow = {
@@ -64,6 +91,8 @@ export type TranslationLanguageSummary = {
 };
 
 export type TranslationQualityDashboardData = {
+  isConfigured: boolean;
+  errorMessage: string | null;
   generatedAt: string;
   auditLimit: number;
   source: "public_feed_snapshot";
@@ -89,12 +118,43 @@ function clampNumber(value: string | undefined, fallback: number, min: number, m
   return Math.max(min, Math.min(Math.floor(parsed), max));
 }
 
-function getSupabaseConfig() {
-  return getServerSupabase();
-}
-
 function summaryKey(originalUrl: string, languageCode: string) {
   return `${languageCode}::${originalUrl}`;
+}
+
+function emptyDashboardData(
+  auditLimit: number,
+  errorMessage: string | null = null,
+): TranslationQualityDashboardData {
+  return {
+    isConfigured: !errorMessage,
+    errorMessage,
+    generatedAt: new Date().toISOString(),
+    auditLimit,
+    source: "public_feed_snapshot",
+    articleCount: 0,
+    expectedTranslationCount: 0,
+    availableTranslationCount: 0,
+    missingTranslationCount: 0,
+    qualityWarningCount: 0,
+    criticalIssueCount: errorMessage ? 1 : 0,
+    fallbackPolicy:
+      "Missing or critically invalid translations fall back to the canonical English title and summary. Public feed responses must not fail because article_summaries rows are missing or questionable.",
+    overallStatus: errorMessage ? "fail" : "pass",
+    languageSummaries: TARGET_LANGUAGES.map((languageCode) => ({
+      languageCode,
+      label:
+        SUPPORTED_LANGUAGES.find((language) => language.code === languageCode)
+          ?.nativeLabel ?? languageCode,
+      expectedCount: 0,
+      availableCount: 0,
+      missingCount: 0,
+      warningCount: 0,
+      criticalCount: 0,
+      coveragePercent: 1,
+    })),
+    issueRows: [],
+  };
 }
 
 function formatProvider(row?: SummaryRow) {
@@ -134,43 +194,175 @@ function warningToIssueRow({
   };
 }
 
-export async function getTranslationQualityDashboardData(): Promise<TranslationQualityDashboardData> {
-  const auditLimit = clampNumber(process.env.TRANSLATION_QUALITY_AUDIT_LIMIT, DEFAULT_AUDIT_LIMIT, 1, 500);
-  const supabase = getSupabaseConfig();
-
-  const { data: articleData, error: articleError } = await supabase
+async function loadSupabaseArticleRows(client: SupabaseClient, auditLimit: number) {
+  const { data, error } = await client
     .from("public_feed_snapshot")
-    .select("id,source,title,original_url,ai_summary,category,published_on_site_at,snapshot_rank")
+    .select(PUBLIC_FEED_SNAPSHOT_SELECT_COLUMNS)
     .order("snapshot_rank", { ascending: true })
     .limit(auditLimit);
 
-  if (articleError) {
-    throw new Error(`Failed to load public feed snapshot for translation quality: ${articleError.message}`);
+  if (error) {
+    throw new Error(
+      `Failed to load public feed snapshot for translation quality: ${error.message}`,
+    );
   }
 
-  const articles = (articleData ?? []) as ArticleRow[];
-  const originalUrls = articles.map((article) => article.original_url).filter(Boolean);
-  let summaries: SummaryRow[] = [];
+  return (data ?? []) as unknown as ArticleRow[];
+}
 
+async function loadSupabaseSummaryRows(
+  client: SupabaseClient,
+  originalUrls: string[],
+) {
   if (originalUrls.length > 0) {
-    const { data: summaryData, error: summaryError } = await supabase
+    const { data, error } = await client
       .from("article_summaries")
-      .select("original_url,language_code,title,summary,updated_at,generated_by,model")
+      .select(TRANSLATED_SUMMARY_SELECT_COLUMNS)
       .in("original_url", originalUrls)
-      .in("language_code", TARGET_LANGUAGES)
       .limit(SUMMARY_LOOKUP_LIMIT);
 
-    if (summaryError) {
-      throw new Error(`Failed to load translated summary rows: ${summaryError.message}`);
+    if (error) {
+      throw new Error(`Failed to load translated summary rows: ${error.message}`);
     }
 
-    summaries = (summaryData ?? []) as SummaryRow[];
+    return (data ?? []) as unknown as SummaryRow[];
   }
 
-  const summariesByKey = new Map(
-    summaries.map((summary) => [summaryKey(summary.original_url, summary.language_code), summary]),
+  return [];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function requiredArrayField<T>(row: Record<string, unknown>, field: string): T[] {
+  const value = row[field];
+
+  if (!Array.isArray(value)) {
+    throw new Error(
+      `Admin translation quality operation returned an invalid ${field} array.`,
+    );
+  }
+
+  return value as T[];
+}
+
+function normalizeTranslationQualityDatabaseResult(
+  result: TranslationQualityDatabaseResult,
+): TranslationQualityDatabaseSnapshot {
+  const row = result.rows?.[0];
+
+  if (!isRecord(row)) {
+    throw new Error(
+      "Admin translation quality operation returned no dashboard snapshot row.",
+    );
+  }
+
+  return {
+    articleRows: requiredArrayField<ArticleRow>(row, "articleRows"),
+    summaryRows: requiredArrayField<SummaryRow>(row, "summaryRows"),
+  };
+}
+
+async function loadSupabaseTranslationQualityDatabaseSnapshot(
+  context: AdminSupabaseDatabaseContext,
+  auditLimit: number,
+) {
+  context.getConfig();
+  const client = context.getClient();
+  const articleRows = await loadSupabaseArticleRows(client, auditLimit);
+  const originalUrls = articleRows
+    .map((article) => article.original_url)
+    .filter(Boolean);
+  const summaryRows = await loadSupabaseSummaryRows(client, originalUrls);
+
+  return {
+    rows: [
+      {
+        articleRows,
+        summaryRows,
+      } as unknown as AdminDatabaseJsonObject,
+    ],
+    rowCount: 1,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+async function loadTranslationQualityDatabaseSnapshot(auditLimit: number) {
+  const result = await readAdminDatabase(
+    "load-admin-translation-quality",
+    {
+      auditLimit,
+      summaryLookupLimit: SUMMARY_LOOKUP_LIMIT,
+      targetLanguageCodes: TARGET_LANGUAGES,
+    },
+    (context) =>
+      loadSupabaseTranslationQualityDatabaseSnapshot(context, auditLimit),
+    { cache: "no-store" },
   );
 
+  return normalizeTranslationQualityDatabaseResult(
+    result as TranslationQualityDatabaseResult,
+  );
+}
+
+function targetLanguageCodeForSummary(row: SummaryRow) {
+  if (TARGET_LANGUAGE_SET.has(row.language_code)) {
+    return row.language_code;
+  }
+
+  const normalizedLanguageCode = normalizeLanguageCodeValue(row.language_code);
+
+  return TARGET_LANGUAGE_SET.has(normalizedLanguageCode)
+    ? normalizedLanguageCode
+    : null;
+}
+
+function buildSummariesByKey(summaries: SummaryRow[]) {
+  const summariesByKey = new Map(
+    summaries
+      .map((summary) => {
+        const languageCode = targetLanguageCodeForSummary(summary);
+
+        if (!languageCode) {
+          return null;
+        }
+
+        return [summaryKey(summary.original_url, languageCode), summary] as const;
+      })
+      .filter((entry): entry is readonly [string, SummaryRow] => Boolean(entry)),
+  );
+
+  return summariesByKey;
+}
+
+function translationQualityDataAccessErrorMessage(error: unknown) {
+  if (error instanceof AdminDatabaseAccessError) {
+    return error.message;
+  }
+
+  if (
+    error instanceof Error &&
+    /server-side supabase access is not configured/i.test(error.message)
+  ) {
+    return "Missing SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.";
+  }
+
+  return error instanceof Error
+    ? error.message
+    : "Unable to load translation quality dashboard data.";
+}
+
+function buildTranslationQualityDashboardData({
+  articles,
+  summaries,
+  auditLimit,
+}: {
+  articles: ArticleRow[];
+  summaries: SummaryRow[];
+  auditLimit: number;
+}): TranslationQualityDashboardData {
+  const summariesByKey = buildSummariesByKey(summaries);
   const languageSummaries: TranslationLanguageSummary[] = TARGET_LANGUAGES.map((languageCode) => {
     const label = SUPPORTED_LANGUAGES.find((language) => language.code === languageCode)?.nativeLabel ?? languageCode;
     let availableCount = 0;
@@ -280,6 +472,8 @@ export async function getTranslationQualityDashboardData(): Promise<TranslationQ
   const overallStatus = criticalIssueCount > 0 ? "fail" : missingTranslationCount > 0 || qualityWarningCount > 0 ? "warn" : "pass";
 
   return {
+    isConfigured: true,
+    errorMessage: null,
     generatedAt: new Date().toISOString(),
     auditLimit,
     source: "public_feed_snapshot",
@@ -294,4 +488,28 @@ export async function getTranslationQualityDashboardData(): Promise<TranslationQ
     languageSummaries,
     issueRows: issueRows.slice(0, 80),
   };
+}
+
+export async function getTranslationQualityDashboardData(): Promise<TranslationQualityDashboardData> {
+  const auditLimit = clampNumber(
+    process.env.TRANSLATION_QUALITY_AUDIT_LIMIT,
+    DEFAULT_AUDIT_LIMIT,
+    1,
+    500,
+  );
+
+  try {
+    const snapshot = await loadTranslationQualityDatabaseSnapshot(auditLimit);
+
+    return buildTranslationQualityDashboardData({
+      articles: snapshot.articleRows,
+      summaries: snapshot.summaryRows,
+      auditLimit,
+    });
+  } catch (error) {
+    return emptyDashboardData(
+      auditLimit,
+      translationQualityDataAccessErrorMessage(error),
+    );
+  }
 }

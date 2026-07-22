@@ -49,7 +49,6 @@ test("service-role clients are centralized behind the runtime-validated Supabase
       "web/lib/adminFeedHealth.ts",
       "web/lib/adminFeedManagement.ts",
       "web/lib/adminShardHealth.ts",
-      "web/lib/adminTranslationQuality.ts",
       "web/lib/runtimeFeatureFlags.ts",
       "web/lib/articleEngagement.ts",
     ].map((relativePath) => readFile(resolve(root, relativePath), "utf8")),
@@ -99,6 +98,14 @@ test("service-role clients are centralized behind the runtime-validated Supabase
   assert.match(migratedLocalAiSource, /@\/lib\/adminDatabase/);
   assert.doesNotMatch(migratedLocalAiSource, /createClient\(/);
   assert.doesNotMatch(migratedLocalAiSource, /getServerSupabase\(/);
+
+  const migratedTranslationQualitySource = await readFile(
+    resolve(root, "web/lib/adminTranslationQuality.ts"),
+    "utf8",
+  );
+  assert.match(migratedTranslationQualitySource, /@\/lib\/adminDatabase/);
+  assert.doesNotMatch(migratedTranslationQualitySource, /createClient\(/);
+  assert.doesNotMatch(migratedTranslationQualitySource, /getServerSupabase\(/);
 });
 
 test("the web image has no ingestion schedule, startup migration, and CI fixtures remain non-production", async () => {
