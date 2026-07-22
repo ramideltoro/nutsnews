@@ -11,8 +11,10 @@ on:
       - ".github/workflows/vercel-backend-token-sync.yml"
       - ".github/workflows/vercel-production-release.yml"
       - ".github/deployment/pre-merge-deployment-gate-contract.md"
+      - ".github/deployment/staging-active-use-runbook.md"
       - "scripts/dual_target_web_smoke.mjs"
       - "scripts/production_release_workflow_regression.mjs"
+      - "scripts/staging_active_use_contract_regression.mjs"
   push:
     branches: [main]
     paths:
@@ -23,8 +25,10 @@ on:
       - ".github/workflows/vercel-backend-token-sync.yml"
       - ".github/workflows/vercel-production-release.yml"
       - ".github/deployment/pre-merge-deployment-gate-contract.md"
+      - ".github/deployment/staging-active-use-runbook.md"
       - "scripts/dual_target_web_smoke.mjs"
       - "scripts/production_release_workflow_regression.mjs"
+      - "scripts/staging_active_use_contract_regression.mjs"
 
 permissions:
   contents: read
@@ -49,4 +53,6 @@ jobs:
           node-version: 22
 
       - name: Run pre-merge release workflow regression
-        run: node scripts/production_release_workflow_regression.mjs
+        run: |
+          node scripts/production_release_workflow_regression.mjs
+          node scripts/staging_active_use_contract_regression.mjs

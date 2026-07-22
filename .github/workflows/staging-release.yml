@@ -8,6 +8,24 @@ on:
         description: Type request-vps-staging-recovery to dispatch a manual VPS staging recovery.
         required: true
         type: string
+      operator_reason:
+        description: Short reason for enabling staging during a bounded validation window.
+        required: true
+        type: string
+      validation_ttl_hours:
+        description: Requested validation window. Infra auto-idle still enforces the actual off state.
+        required: true
+        default: "1"
+        type: choice
+        options:
+          - "1"
+          - "4"
+          - "8"
+          - "24"
+      off_state_acknowledgement:
+        description: Type staging-auto-idle-required to acknowledge teardown/off-state verification.
+        required: true
+        type: string
       source_commit:
         description: Full app source commit SHA to recover on VPS staging.
         required: true
@@ -60,6 +78,9 @@ jobs:
         env:
           NUTSNEWS_INFRA_STAGING_TOKEN: ${{ secrets.NUTSNEWS_INFRA_STAGING_TOKEN }}
           CONFIRMATION: ${{ github.event.inputs.confirmation }}
+          OPERATOR_REASON: ${{ github.event.inputs.operator_reason }}
+          VALIDATION_TTL_HOURS: ${{ github.event.inputs.validation_ttl_hours }}
+          OFF_STATE_ACKNOWLEDGEMENT: ${{ github.event.inputs.off_state_acknowledgement }}
           SOURCE_COMMIT: ${{ github.event.inputs.source_commit }}
           IMAGE_DIGEST: ${{ github.event.inputs.image_digest }}
           BUILD_ID: ${{ github.event.inputs.build_id }}
@@ -75,6 +96,9 @@ jobs:
 
           const token = process.env.NUTSNEWS_INFRA_STAGING_TOKEN ?? "";
           const confirmation = process.env.CONFIRMATION ?? "";
+          const operatorReason = process.env.OPERATOR_REASON ?? "";
+          const validationTtlHours = process.env.VALIDATION_TTL_HOURS ?? "";
+          const offStateAcknowledgement = process.env.OFF_STATE_ACKNOWLEDGEMENT ?? "";
           const sourceCommit = process.env.SOURCE_COMMIT ?? "";
           const imageDigest = process.env.IMAGE_DIGEST ?? "";
           const buildId = process.env.BUILD_ID ?? "";
@@ -84,6 +108,15 @@ jobs:
 
           if (confirmation !== "request-vps-staging-recovery") {
             throw new Error("Manual VPS staging recovery requires typed confirmation request-vps-staging-recovery.");
+          }
+          if (offStateAcknowledgement !== "staging-auto-idle-required") {
+            throw new Error("Manual VPS staging recovery requires acknowledging staging-auto-idle-required.");
+          }
+          if (!["1", "4", "8", "24"].includes(validationTtlHours)) {
+            throw new Error("validation_ttl_hours must be one of 1, 4, 8, or 24.");
+          }
+          if (!/^[A-Za-z0-9][A-Za-z0-9 .,:;@#/_+=()[\]-]{7,180}$/.test(operatorReason)) {
+            throw new Error("operator_reason must be 8-180 safe printable characters and cannot contain secrets or newlines.");
           }
           if (!token) throw new Error("NUTSNEWS_INFRA_STAGING_TOKEN is required for manual VPS staging recovery.");
           if (!/^[0-9a-f]{40}$/.test(sourceCommit)) throw new Error("source_commit must be a full lowercase SHA.");
@@ -137,6 +170,9 @@ jobs:
               `schema_version=${schemaVersion}`,
               `migration_head=${migrationHead}`,
               `supabase_project_ref=${supabaseProjectRef}`,
+              `operator_reason=${operatorReason}`,
+              `validation_ttl_hours=${validationTtlHours}`,
+              `requested_disable_by=${new Date(Date.now() + Number(validationTtlHours) * 60 * 60 * 1000).toISOString()}`,
               "",
             ].join("\n"),
             "utf8",
@@ -152,12 +188,18 @@ jobs:
           MIGRATION_HEAD: ${{ steps.candidate.outputs.migration_head }}
           SUPABASE_PROJECT_REF: ${{ steps.candidate.outputs.supabase_project_ref }}
           DEPLOYMENT_ID: ${{ steps.candidate.outputs.deployment_id }}
+          OPERATOR_REASON: ${{ steps.candidate.outputs.operator_reason }}
+          VALIDATION_TTL_HOURS: ${{ steps.candidate.outputs.validation_ttl_hours }}
+          REQUESTED_DISABLE_BY: ${{ steps.candidate.outputs.requested_disable_by }}
         run: |
           {
             echo "## Manual VPS staging recovery dispatch"
             echo
-            echo "This workflow is an operator recovery path only. Normal releases deploy and test the PR candidate before merge through \`Pre-merge deployment gate\`."
+            echo "This workflow is an operator recovery path only. Normal PR merges do not deploy staging or production."
             echo
+            echo "- Operator reason: \`${OPERATOR_REASON}\`"
+            echo "- Requested validation TTL: \`${VALIDATION_TTL_HOURS}h\` (operator commitment; infra candidate payload remains strict)"
+            echo "- Requested disable-by time: \`${REQUESTED_DISABLE_BY}\`"
             echo "- Source commit: \`${SOURCE_COMMIT}\`"
             echo "- Staging deployment ID: \`${DEPLOYMENT_ID}\`"
             echo "- VPS image: \`ghcr.io/ramideltoro/nutsnews@${IMAGE_DIGEST}\`"
@@ -166,4 +208,6 @@ jobs:
             echo "- Rollback-compatible schema: \`${SCHEMA_VERSION}\`"
             echo "- Production Supabase project ref: \`${SUPABASE_PROJECT_REF}\`"
             echo "- GitOps VPS staging request: accepted"
+            echo "- Off-state enforcement: infra \`nutsnews-staging-auto-idle.timer\` must stop the staging app, stop the Access verifier, remove the staging cache volume, and record \`production_touched=false\` after the validation window or qualification expiry."
+            echo "- Teardown verification: see \`.github/deployment/staging-active-use-runbook.md\` and the Ops Portal staging auto-idle status before considering staging off."
           } >> "$GITHUB_STEP_SUMMARY"
