@@ -277,12 +277,43 @@ async function testAuthBoundaryContracts() {
   const oauthRoute = read("web/app/api/auth/[...nextauth]/route.ts");
   const authConfig = read("web/auth.ts");
   const nextConfig = read("web/next.config.ts");
+  const runtimeSafety = read("web/runtimeSafety.mjs");
+  const offlineE2e = read("scripts/web_offline_e2e_regression.mjs");
+  const stagingQualificationSpec = read("web/tests/staging-qualification.spec.ts");
 
   assertIncludes(protectedAdminLayout, "const session = await auth();", "protected admin layout");
   assertIncludes(protectedAdminLayout, 'redirect("/admin/login")', "protected admin layout unauthenticated denial");
   assertIncludes(protectedAdminLayout, 'redirect("/admin/access-denied")', "protected admin layout unauthorized denial");
   assertIncludes(protectedAdminLayout, "isAllowedAdminEmail(email)", "protected admin layout allow-list");
   assertIncludes(protectedAdminLayout, "assertSyntheticTestUser", "protected admin test bypass");
+  assertIncludes(runtimeSafety, "synthetic_test_user_production_live_rejected", "admin test bypass production-live guard");
+  assertIncludes(offlineE2e, "backend_postgres_primary", "protected admin dashboard smoke backend primary fixture");
+  assertIncludes(offlineE2e, "NUTSNEWS_BACKEND_API_URL", "protected admin dashboard smoke backend API config");
+  assertIncludes(offlineE2e, "Server-side Supabase access is not configured", "protected admin dashboard smoke forbidden Supabase error copy");
+  assertIncludes(stagingQualificationSpec, "NUTSNEWS_ADMIN_TEST_AUTH_BYPASS_EXPECTED", "staging protected admin dashboard smoke");
+
+  for (const route of [
+    "/admin",
+    "/admin/readiness",
+    "/admin/articles",
+    "/admin/engagement",
+    "/admin/ai-usage",
+    "/admin/translations",
+    "/admin/guardrails",
+    "/admin/cache",
+    "/admin/feature-flags",
+    "/admin/edge-snapshot",
+    "/admin/local-ai",
+    "/admin/home-server",
+    "/admin/failover",
+    "/admin/shards",
+    "/admin/feed-health",
+    "/admin/feeds",
+    "/admin/audit",
+  ]) {
+    assertIncludes(offlineE2e, `path: "${route}"`, "offline protected admin dashboard smoke route list");
+    assertIncludes(stagingQualificationSpec, `'${route}'`, "staging protected admin dashboard smoke route list");
+  }
 
   for (const method of ["GET", "POST"]) {
     assert.match(

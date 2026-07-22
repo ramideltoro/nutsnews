@@ -10,6 +10,7 @@ import {
   assertOAuthCallback,
   assertProductionOperation,
   assertSyntheticFixtureMutation,
+  assertSyntheticTestUser,
   getRuntimeSafetyPolicy,
   getSafeReadiness,
   isTelemetryDeliveryAllowed,
@@ -131,6 +132,7 @@ test("sandbox permits only isolated endpoints and isolated staging writes", () =
   );
   assert.doesNotThrow(() => assertIsolatedDataMutation("quota-event", environment));
   assert.doesNotThrow(() => assertSyntheticFixtureMutation("nutsnews-test-sandbox-fixture", environment));
+  assert.doesNotThrow(() => assertSyntheticTestUser("nutsnews-test-admin-smoke", environment));
 });
 
 test("staging recognizes Docker's isolated fixture hostname without allowing production access", () => {
@@ -150,6 +152,12 @@ test("only live production can perform production mutations", () => {
   assert.throws(
     () => assertSyntheticFixtureMutation("nutsnews-test-production-fixture", productionEnvironment()),
     RuntimeSafetyError,
+  );
+  assert.throws(
+    () => assertSyntheticTestUser("nutsnews-test-production-bypass", productionEnvironment()),
+    (error) =>
+      error instanceof RuntimeSafetyError &&
+      error.code === "synthetic_test_user_production_live_rejected",
   );
 });
 

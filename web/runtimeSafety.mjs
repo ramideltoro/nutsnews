@@ -542,6 +542,14 @@ export function assertSyntheticFixtureMutation(namespace, env = process.env) {
 }
 
 export function assertSyntheticTestUser(namespace, env = process.env) {
+  const policy = assertRuntimeReady(env);
+  if (policy.runtimeEnv === "production" && policy.sideEffectsMode === "live") {
+    refuse(
+      "synthetic_test_user_production_live_rejected",
+      "Admin test auth bypass is disabled in live production runtime.",
+    );
+  }
+
   return assertSyntheticFixtureMutation(namespace, env);
 }
 
