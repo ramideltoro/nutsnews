@@ -14,6 +14,30 @@ export const FAILOVER_OBSERVED_DEPLOYMENT_TARGETS = [
   "unknown",
   "unexpected",
 ] as const;
+export const FAILOVER_LIVE_ORIGIN_CLASSIFICATIONS = [
+  "vps",
+  "vercel",
+  "unknown",
+  "unreachable",
+] as const;
+export const FAILOVER_LIVE_ORIGIN_DNS_STATES = [
+  "unknown",
+  "in_sync",
+  "propagating",
+  "mismatch",
+  "partial",
+  "unreachable",
+] as const;
+export const FAILOVER_LIVE_ORIGIN_CACHE_STATES = [
+  "unknown",
+  "fresh",
+  "stale",
+] as const;
+export const FAILOVER_LIVE_ORIGIN_ERROR_CODES = [
+  "timeout",
+  "network_error",
+  "http_status_unreachable",
+] as const;
 export const FAILOVER_HEALTH_RESULTS = [
   "unknown",
   "reachable",
@@ -67,6 +91,10 @@ export const FAILOVER_CONTROLLER_STALE_AFTER_SECONDS = 60 as const;
 export type FailoverDnsTarget = (typeof FAILOVER_DNS_TARGETS)[number];
 export type FailoverDnsTargetClassification = (typeof FAILOVER_DNS_TARGET_CLASSIFICATIONS)[number];
 export type FailoverObservedDeploymentTarget = (typeof FAILOVER_OBSERVED_DEPLOYMENT_TARGETS)[number];
+export type FailoverLiveOriginClassification = (typeof FAILOVER_LIVE_ORIGIN_CLASSIFICATIONS)[number];
+export type FailoverLiveOriginDnsState = (typeof FAILOVER_LIVE_ORIGIN_DNS_STATES)[number];
+export type FailoverLiveOriginCacheState = (typeof FAILOVER_LIVE_ORIGIN_CACHE_STATES)[number];
+export type FailoverLiveOriginErrorCode = (typeof FAILOVER_LIVE_ORIGIN_ERROR_CODES)[number];
 export type FailoverHealthResult = (typeof FAILOVER_HEALTH_RESULTS)[number];
 export type FailoverVpsStatusCode = (typeof FAILOVER_VPS_STATUS_CODES)[number];
 export type FailoverDnsAction = (typeof FAILOVER_DNS_ACTIONS)[number];
@@ -74,6 +102,30 @@ export type FailoverControllerState = (typeof FAILOVER_CONTROLLER_STATES)[number
 export type FailoverStaleReason = (typeof FAILOVER_STALE_REASONS)[number];
 export type FailoverIsoDateTime = string;
 export type FailoverVpsStatus = number | FailoverVpsStatusCode | null;
+export type FailoverLiveOriginHostReadiness = {
+  checkedAt: FailoverIsoDateTime;
+  hostname: string;
+  ok: boolean;
+  origin: FailoverLiveOriginClassification;
+  status: number | null;
+  latencyMs: number | null;
+  deploymentTarget: string;
+  sourceCommit: string;
+  buildId: string;
+  readinessCode: string;
+  runtimeEnv: string;
+  sideEffectsMode: string;
+  databaseProviderMode: string;
+  productionWritesPaused: boolean | null;
+  cacheState: FailoverLiveOriginCacheState;
+  error: FailoverLiveOriginErrorCode | null;
+};
+export type FailoverLiveOriginReadiness = {
+  checkedAt: FailoverIsoDateTime;
+  dnsState: FailoverLiveOriginDnsState;
+  apex: FailoverLiveOriginHostReadiness;
+  www: FailoverLiveOriginHostReadiness;
+};
 
 export type FailoverStatus = {
   schemaVersion: typeof FAILOVER_STATUS_SCHEMA_VERSION;
@@ -84,6 +136,7 @@ export type FailoverStatus = {
   actualApexDnsTarget: FailoverDnsTargetClassification;
   actualWwwDnsTarget: FailoverDnsTargetClassification;
   observedDeploymentTarget: FailoverObservedDeploymentTarget;
+  liveOriginReadiness: FailoverLiveOriginReadiness;
   lastHealthResult: FailoverHealthResult;
   lastVpsCheckAt: FailoverIsoDateTime | null;
   lastVpsReachable: boolean;
@@ -110,6 +163,7 @@ export const FAILOVER_STATUS_REQUIRED_FIELDS = [
   "actualApexDnsTarget",
   "actualWwwDnsTarget",
   "observedDeploymentTarget",
+  "liveOriginReadiness",
   "lastHealthResult",
   "lastVpsCheckAt",
   "lastVpsReachable",
@@ -131,6 +185,55 @@ const nullableDateTimeSchema = {
   oneOf: [{ type: "string", format: "date-time" }, { type: "null" }],
 } as const;
 
+const liveOriginHostReadinessSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "checkedAt",
+    "hostname",
+    "ok",
+    "origin",
+    "status",
+    "latencyMs",
+    "deploymentTarget",
+    "sourceCommit",
+    "buildId",
+    "readinessCode",
+    "runtimeEnv",
+    "sideEffectsMode",
+    "databaseProviderMode",
+    "productionWritesPaused",
+    "cacheState",
+    "error",
+  ],
+  properties: {
+    checkedAt: { type: "string", format: "date-time" },
+    hostname: { type: "string" },
+    ok: { type: "boolean" },
+    origin: { enum: FAILOVER_LIVE_ORIGIN_CLASSIFICATIONS },
+    status: {
+      oneOf: [{ type: "integer", minimum: 100, maximum: 599 }, { type: "null" }],
+    },
+    latencyMs: {
+      oneOf: [{ type: "integer", minimum: 0 }, { type: "null" }],
+    },
+    deploymentTarget: { type: "string" },
+    sourceCommit: { type: "string" },
+    buildId: { type: "string" },
+    readinessCode: { type: "string" },
+    runtimeEnv: { type: "string" },
+    sideEffectsMode: { type: "string" },
+    databaseProviderMode: { type: "string" },
+    productionWritesPaused: {
+      oneOf: [{ type: "boolean" }, { type: "null" }],
+    },
+    cacheState: { enum: FAILOVER_LIVE_ORIGIN_CACHE_STATES },
+    error: {
+      oneOf: [{ enum: FAILOVER_LIVE_ORIGIN_ERROR_CODES }, { type: "null" }],
+    },
+  },
+} as const;
+
 export const failoverStatusJsonSchema = {
   $schema: "https://json-schema.org/draft/2020-12/schema",
   $id: "https://nutsnews.com/schemas/failover-status.v1.json",
@@ -147,6 +250,17 @@ export const failoverStatusJsonSchema = {
     actualApexDnsTarget: { enum: FAILOVER_DNS_TARGET_CLASSIFICATIONS },
     actualWwwDnsTarget: { enum: FAILOVER_DNS_TARGET_CLASSIFICATIONS },
     observedDeploymentTarget: { enum: FAILOVER_OBSERVED_DEPLOYMENT_TARGETS },
+    liveOriginReadiness: {
+      type: "object",
+      additionalProperties: false,
+      required: ["checkedAt", "dnsState", "apex", "www"],
+      properties: {
+        checkedAt: { type: "string", format: "date-time" },
+        dnsState: { enum: FAILOVER_LIVE_ORIGIN_DNS_STATES },
+        apex: liveOriginHostReadinessSchema,
+        www: liveOriginHostReadinessSchema,
+      },
+    },
     lastHealthResult: { enum: FAILOVER_HEALTH_RESULTS },
     lastVpsCheckAt: nullableDateTimeSchema,
     lastVpsReachable: { type: "boolean" },
@@ -226,6 +340,7 @@ export const failoverStatusFieldVisibility = {
   actualApexDnsTarget: "public",
   actualWwwDnsTarget: "public",
   observedDeploymentTarget: "public",
+  liveOriginReadiness: "public",
   lastHealthResult: "public",
   lastVpsCheckAt: "public",
   lastVpsReachable: "public",
@@ -264,6 +379,46 @@ const baseExample = {
   stale: false,
   staleReason: null,
   controllerVersion: "contract-v1",
+  liveOriginReadiness: {
+    checkedAt: "2026-07-22T03:30:00.000Z",
+    dnsState: "in_sync",
+    apex: {
+      checkedAt: "2026-07-22T03:30:00.000Z",
+      hostname: "nutsnews.com",
+      ok: true,
+      origin: "vps",
+      status: 200,
+      latencyMs: 86,
+      deploymentTarget: "production-vps",
+      sourceCommit: "contract-v1",
+      buildId: "contract-v1",
+      readinessCode: "ok",
+      runtimeEnv: "production",
+      sideEffectsMode: "enabled",
+      databaseProviderMode: "supabase_primary",
+      productionWritesPaused: false,
+      cacheState: "fresh",
+      error: null,
+    },
+    www: {
+      checkedAt: "2026-07-22T03:30:00.000Z",
+      hostname: "www.nutsnews.com",
+      ok: true,
+      origin: "vps",
+      status: 200,
+      latencyMs: 91,
+      deploymentTarget: "production-vps",
+      sourceCommit: "contract-v1",
+      buildId: "contract-v1",
+      readinessCode: "ok",
+      runtimeEnv: "production",
+      sideEffectsMode: "enabled",
+      databaseProviderMode: "supabase_primary",
+      productionWritesPaused: false,
+      cacheState: "fresh",
+      error: null,
+    },
+  },
 } as const;
 
 export const failoverStatusExamples = {

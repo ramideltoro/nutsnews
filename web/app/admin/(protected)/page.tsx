@@ -248,6 +248,14 @@ export default async function AdminPage() {
             />
 
             <DashboardCard
+              eyebrow="Failover"
+              title="DNS Failover"
+              description="See whether NutsNews is serving from VPS or Vercel, compare desired and actual Cloudflare DNS targets, and inspect latest VPS readiness."
+              href="/admin/failover"
+              status="Live"
+            />
+
+            <DashboardCard
               eyebrow="Worker Health"
               title="Worker Shards"
               description="Monitor Worker refreshes, failed shard executions, latest error messages, consecutive failures, stale shards, feed counts, fetch volume, image hydration, and duration by shard."
