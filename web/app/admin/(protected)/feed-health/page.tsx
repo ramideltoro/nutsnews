@@ -262,7 +262,7 @@ export default async function FeedHealthPage() {
                                 RSS Feed Health
                             </h1>
                             <p className="mt-3 max-w-3xl text-sm leading-6 text-amber-100/70">
-                                Track which RSS feeds fetch successfully, produce thumbnails, generate accepted articles, repeatedly fail, or should be disabled directly from Supabase without code changes.
+                                Track which RSS feeds fetch successfully, produce thumbnails, generate accepted articles, repeatedly fail, or should be disabled in the primary database without code changes.
                             </p>
                         </div>
 
@@ -290,7 +290,7 @@ export default async function FeedHealthPage() {
                 </section>
 
                 <div className="grid gap-5">
-                    <Section id="weak-feeds" eyebrow="Feed Quality" title="Weak Feeds to Review" description="Feeds listed here are repeatedly failing, stale, untracked, low image quality, or not producing accepted stories. Disable the worst ones in Supabase by setting rss_feeds.is_active=false.">
+                    <Section id="weak-feeds" eyebrow="Feed Quality" title="Weak Feeds to Review" description="Feeds listed here are repeatedly failing, stale, untracked, low image quality, or not producing accepted stories. Disable the worst ones by setting rss_feeds.is_active=false through a protected admin action or primary database console.">
                         <FeedList feeds={data.weakFeeds} emptyMessage="No weak feeds detected right now." />
                     </Section>
 
@@ -334,7 +334,7 @@ export default async function FeedHealthPage() {
                         </div>
                     </Section>
 
-                    <Section id="disable-sql" eyebrow="Supabase Action" title="Disable Weak Feeds Without Code Changes" description="Copy this SQL into Supabase SQL Editor to deactivate weak active feeds. The Worker already filters rss_feeds where is_active=true, so no deploy is required after this update.">
+                    <Section id="disable-sql" eyebrow="Database Action" title="Disable Weak Feeds Without Code Changes" description="Run this SQL against the primary database to deactivate weak active feeds. The Worker already filters rss_feeds where is_active=true, so no deploy is required after this update.">
                         <pre className="overflow-x-auto rounded-[1.5rem] border border-amber-300/15 bg-black/45 p-4 text-xs leading-6 text-amber-100/75">
                             <code>{data.disableWeakFeedsSql}</code>
                         </pre>

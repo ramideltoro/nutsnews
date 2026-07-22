@@ -1,5 +1,12 @@
+import { type SupabaseClient } from "@supabase/supabase-js";
+
+import {
+    AdminDatabaseAccessError,
+    readAdminDatabase,
+    type AdminDatabaseJsonObject,
+    type AdminSupabaseDatabaseContext,
+} from "@/lib/adminDatabase";
 import { formatAdminDateTime } from "@/lib/adminTime";
-import { getServerSupabase, getServerSupabaseConfig } from "@/lib/supabase";
 
 const STALE_FEED_HOURS = 24;
 
@@ -35,10 +42,7 @@ const RSS_FEED_SELECT_COLUMNS = [
     "is_active",
 ].join(",");
 
-type SupabaseConfig = {
-    url: string;
-    serviceRoleKey: string;
-};
+type NumericValue = number | string | null;
 
 type FeedHealthDbRow = {
     id: number;
@@ -49,18 +53,18 @@ type FeedHealthDbRow = {
     last_failure_at: string | null;
     last_status: number | null;
     last_error_message: string | null;
-    last_article_count: number;
-    last_image_count: number;
-    last_accepted_count: number;
-    last_rejected_count: number;
-    consecutive_failure_count: number;
-    total_fetch_count: number;
-    total_success_count: number;
-    total_failure_count: number;
-    total_article_count: number;
-    total_image_count: number;
-    total_accepted_count: number;
-    total_rejected_count: number;
+    last_article_count: NumericValue;
+    last_image_count: NumericValue;
+    last_accepted_count: NumericValue;
+    last_rejected_count: NumericValue;
+    consecutive_failure_count: NumericValue;
+    total_fetch_count: NumericValue;
+    total_success_count: NumericValue;
+    total_failure_count: NumericValue;
+    total_article_count: NumericValue;
+    total_image_count: NumericValue;
+    total_accepted_count: NumericValue;
+    total_rejected_count: NumericValue;
     created_at: string;
     updated_at: string;
 };
@@ -151,14 +155,6 @@ export type FeedHealthDashboardData = {
     disableWeakFeedsSql: string;
 };
 
-function getSupabaseConfig(): SupabaseConfig | null {
-    try {
-        return getServerSupabaseConfig();
-    } catch {
-        return null;
-    }
-}
-
 function emptySummary(): FeedHealthSummary {
     return {
         totalFeeds: 0,
@@ -204,8 +200,14 @@ function emptyDashboardData(
     };
 }
 
-function safeNumber(value: number | null | undefined) {
-    return Number(value ?? 0);
+function safeNumber(value: NumericValue | undefined) {
+    const numberValue = Number(value ?? 0);
+
+    if (!Number.isFinite(numberValue)) {
+        return 0;
+    }
+
+    return numberValue;
 }
 
 function percent(numerator: number, denominator: number) {
@@ -410,42 +412,145 @@ function buildSummary(feeds: FeedHealthRow[]): FeedHealthSummary {
     };
 }
 
-export async function getAdminFeedHealthDashboardData(): Promise<FeedHealthDashboardData> {
-    const config = getSupabaseConfig();
+type FeedHealthDatabaseSnapshot = {
+    rssFeedRows: RssFeedDbRow[];
+    feedHealthRows: FeedHealthDbRow[];
+};
 
-    if (!config) {
-        return emptyDashboardData(
-            "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for the admin feed health dashboard.",
+type FeedHealthDatabaseResult = {
+    rows: AdminDatabaseJsonObject[];
+    rowCount?: number;
+    generatedAt?: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function requiredArrayField<T>(row: Record<string, unknown>, field: string): T[] {
+    const value = row[field];
+
+    if (!Array.isArray(value)) {
+        throw new Error(
+            `Admin RSS feed health operation returned an invalid ${field} array.`,
         );
     }
 
-    const supabase = getServerSupabase();
+    return value as T[];
+}
 
-    const [feedsResult, healthResult] = await Promise.all([
-        supabase
-            .from("rss_feeds")
-            .select(RSS_FEED_SELECT_COLUMNS)
-            .order("id", { ascending: true }),
-        supabase
-            .from("feed_health")
-            .select(FEED_HEALTH_SELECT_COLUMNS)
-            .order("total_accepted_count", { ascending: false }),
+function normalizeFeedHealthDatabaseResult(
+    result: FeedHealthDatabaseResult,
+): FeedHealthDatabaseSnapshot {
+    const row = result.rows?.[0];
+
+    if (!isRecord(row)) {
+        throw new Error(
+            "Admin RSS feed health operation returned no dashboard snapshot row.",
+        );
+    }
+
+    return {
+        rssFeedRows: requiredArrayField<RssFeedDbRow>(row, "rssFeedRows"),
+        feedHealthRows: requiredArrayField<FeedHealthDbRow>(row, "feedHealthRows"),
+    };
+}
+
+async function loadSupabaseRssFeedRows(
+    supabase: SupabaseClient,
+): Promise<RssFeedDbRow[]> {
+    const { data, error } = await supabase
+        .from("rss_feeds")
+        .select(RSS_FEED_SELECT_COLUMNS)
+        .order("id", { ascending: true });
+
+    if (error) {
+        throw new Error(`Failed to load rss_feeds: ${error.message}`);
+    }
+
+    return (data ?? []) as unknown as RssFeedDbRow[];
+}
+
+async function loadSupabaseFeedHealthRows(
+    supabase: SupabaseClient,
+): Promise<FeedHealthDbRow[]> {
+    const { data, error } = await supabase
+        .from("feed_health")
+        .select(FEED_HEALTH_SELECT_COLUMNS)
+        .order("total_accepted_count", { ascending: false });
+
+    if (error) {
+        throw new Error(`Failed to load feed_health: ${error.message}`);
+    }
+
+    return (data ?? []) as unknown as FeedHealthDbRow[];
+}
+
+async function loadSupabaseFeedHealthDatabaseSnapshot(
+    context: AdminSupabaseDatabaseContext,
+) {
+    context.getConfig();
+    const client = context.getClient();
+    const [rssFeedRows, feedHealthRows] = await Promise.all([
+        loadSupabaseRssFeedRows(client),
+        loadSupabaseFeedHealthRows(client),
     ]);
 
-    if (feedsResult.error) {
-        return emptyDashboardData(
-            `Failed to load rss_feeds: ${feedsResult.error.message}`,
-        );
+    return {
+        rows: [
+            {
+                rssFeedRows,
+                feedHealthRows,
+            } as unknown as AdminDatabaseJsonObject,
+        ],
+        rowCount: 1,
+        generatedAt: new Date().toISOString(),
+    };
+}
+
+async function loadFeedHealthDatabaseSnapshot() {
+    const result = await readAdminDatabase(
+        "load-admin-rss-feed-health",
+        {
+            limit: 10000,
+            staleAfterHours: STALE_FEED_HOURS,
+        },
+        loadSupabaseFeedHealthDatabaseSnapshot,
+        { cache: "no-store" },
+    );
+
+    return normalizeFeedHealthDatabaseResult(result as FeedHealthDatabaseResult);
+}
+
+function feedHealthDataAccessErrorMessage(error: unknown) {
+    if (error instanceof AdminDatabaseAccessError) {
+        return error.message;
     }
 
-    if (healthResult.error) {
-        return emptyDashboardData(
-            `Failed to load feed_health: ${healthResult.error.message}`,
-        );
+    if (
+        error instanceof Error &&
+        /server-side supabase access is not configured/i.test(error.message)
+    ) {
+        return "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for the admin feed health dashboard.";
     }
 
-    const feeds = (feedsResult.data ?? []) as unknown as RssFeedDbRow[];
-    const healthRows = (healthResult.data ?? []) as unknown as FeedHealthDbRow[];
+    return error instanceof Error
+        ? error.message
+        : "Unknown RSS feed health dashboard error.";
+}
+
+export async function getAdminFeedHealthDashboardData(): Promise<FeedHealthDashboardData> {
+    let feeds: RssFeedDbRow[];
+    let healthRows: FeedHealthDbRow[];
+
+    try {
+        const snapshot = await loadFeedHealthDatabaseSnapshot();
+        feeds = snapshot.rssFeedRows;
+        healthRows = snapshot.feedHealthRows;
+    } catch (error) {
+        return emptyDashboardData(feedHealthDataAccessErrorMessage(error));
+    }
+
     const healthByUrl = new Map(healthRows.map((row) => [row.feed_url, row]));
     const rows = feeds
         .map((feed) => buildFeedRow(feed, healthByUrl.get(feed.url)))
