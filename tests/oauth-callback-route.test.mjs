@@ -21,6 +21,9 @@ test("GET and POST OAuth paths both enforce the callback identity guard", async 
     );
   }
 
+  assert.match(source, /requiresOAuthFlowGuard\(request\)/);
+  assert.match(source, /action === "callback" \|\| action === "signin"/);
+  assert.match(source, /if \(!requiresOAuthFlowGuard\(request\)\) \{/);
   assert.match(source, /Cache-Control": "no-store"/);
   assert.match(source, /X-NutsNews-Auth-Error/);
   assert.match(source, /status: 503/);

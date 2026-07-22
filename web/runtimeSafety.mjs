@@ -12,6 +12,7 @@ const BACKEND_POSTGRES_PRIMARY_CONFIRMATION = "enable-backend-postgres-primary";
 const TRUTHY_CONFIG_VALUES = new Set(["1", "true", "yes", "on"]);
 const PRODUCTION_ADMIN_CANONICAL_ORIGIN = "https://www.nutsnews.com";
 const PRODUCTION_ADMIN_DIRECT_ORIGIN = "https://vps.nutsnews.com";
+const PRODUCTION_VPS_DEPLOYMENT_TARGETS = new Set(["production-vps", "vps"]);
 
 const SUPABASE_URL_VARIABLES = [
   "NUTSNEWS_SUPABASE_URL",
@@ -422,7 +423,11 @@ export function assertOAuthCallback(
   const configuredAuthUrl = authUrl || legacyAuthUrl;
   const hasConflictingAuthUrls = authUrlsConflict(authUrl, legacyAuthUrl);
 
-  if (policy.runtimeEnv === "production" && policy.sideEffectsMode === "live") {
+  if (
+    policy.runtimeEnv === "production" &&
+    policy.sideEffectsMode === "live" &&
+    PRODUCTION_VPS_DEPLOYMENT_TARGETS.has(envValue(env, "NUTSNEWS_DEPLOYMENT_TARGET"))
+  ) {
     const configuredCanonicalOrigin =
       envValue(env, "NUTSNEWS_ADMIN_CANONICAL_ORIGIN") ||
       PRODUCTION_ADMIN_CANONICAL_ORIGIN;
@@ -469,6 +474,10 @@ export function assertOAuthCallback(
         "Production OAuth requests must arrive through the canonical or direct VPS admin origin.",
       );
     }
+    return policy;
+  }
+
+  if (policy.runtimeEnv === "production" && policy.sideEffectsMode === "live") {
     return policy;
   }
 

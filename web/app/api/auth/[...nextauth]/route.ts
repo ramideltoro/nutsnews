@@ -33,7 +33,17 @@ function oauthDisabledResponse(error: RuntimeSafetyError) {
   );
 }
 
+function requiresOAuthFlowGuard(request: NextRequest) {
+  const action = new URL(request.url).pathname.split("/").filter(Boolean).at(2);
+
+  return action === "callback" || action === "signin";
+}
+
 async function allowOAuthCallbacks(request: NextRequest) {
+  if (!requiresOAuthFlowGuard(request)) {
+    return { allowed: true } as const;
+  }
+
   const identity = authRequestIdentity(request);
 
   try {

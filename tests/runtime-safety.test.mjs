@@ -39,6 +39,7 @@ function productionEnvironment(overrides = {}) {
     NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: "production-project",
     NUTSNEWS_PUBLIC_SUPABASE_URL: "https://production-project.supabase.co",
     NUTSNEWS_PUBLIC_SUPABASE_ANON_KEY: "test-anon-key",
+    NUTSNEWS_DEPLOYMENT_TARGET: "production-vps",
     AUTH_URL: "https://www.nutsnews.com",
     NEXTAUTH_URL: "https://www.nutsnews.com",
     AUTH_TRUST_HOST: "true",
@@ -269,6 +270,25 @@ test("OAuth callbacks require canonical production admin host identity", () => {
       (error) => error instanceof RuntimeSafetyError && error.code === code,
     );
   }
+});
+
+test("Vercel production auth session smoke is not blocked by the VPS canonical host guard", () => {
+  assert.doesNotThrow(() =>
+    assertOAuthCallback(
+      "auth-session",
+      {
+        url: "https://nutsnews-fixture.vercel.app/api/auth/session",
+        host: "nutsnews-fixture.vercel.app",
+        forwardedProto: "https",
+      },
+      productionEnvironment({
+        NUTSNEWS_DEPLOYMENT_TARGET: "vercel-production",
+        AUTH_URL: "https://nutsnews.vercel.app",
+        NEXTAUTH_URL: "https://nutsnews.vercel.app",
+        AUTH_TRUST_HOST: "false",
+      }),
+    ),
+  );
 });
 
 test("OAuth callbacks allow only the isolated staging identity", () => {
