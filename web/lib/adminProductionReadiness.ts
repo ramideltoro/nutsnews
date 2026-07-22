@@ -2,12 +2,20 @@ import "server-only";
 
 import { type SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  AdminDatabaseAccessError,
+  readAdminDatabase,
+  type AdminDatabaseJsonObject,
+  type AdminSupabaseDatabaseContext,
+} from "@/lib/adminDatabase";
 import { PAGE_SIZE } from "@/lib/articles";
 import { DEFAULT_LANGUAGE_CODE, SUPPORTED_LANGUAGES } from "@/lib/languages";
-import { getServerSupabase, getServerSupabaseConfig } from "@/lib/supabase";
 
 const RECENT_ARTICLE_LIMIT = 100;
 const TRANSLATION_SAMPLE_LIMIT = 60;
+const TARGET_TRANSLATION_LANGUAGE_CODES = SUPPORTED_LANGUAGES.map(
+  (language) => language.code,
+).filter((languageCode) => languageCode !== DEFAULT_LANGUAGE_CODE);
 const WORKER_STALE_WARNING_MINUTES = 180;
 const WORKER_STALE_FAILURE_MINUTES = 24 * 60;
 const IMAGE_GREEN_PERCENT = 85;
@@ -153,11 +161,6 @@ export type ProductionReadinessDashboardData = {
   signals: ProductionReadinessSignal[];
 };
 
-type SupabaseConfig = {
-  url: string;
-  serviceRoleKey: string;
-};
-
 type RecentArticleRow = {
   id: string;
   original_url: string | null;
@@ -203,13 +206,28 @@ type GitHubWorkflowRunsResponse = {
   workflow_runs?: GitHubWorkflowRun[];
 };
 
-function getSupabaseConfig(): SupabaseConfig | null {
-  try {
-    return getServerSupabaseConfig();
-  } catch {
-    return null;
-  }
-}
+type ProductionReadinessDatabaseSnapshot = {
+  articleCount: number;
+  publicFeedSnapshotCount: number;
+  recentArticles: RecentArticleRow[];
+  workerRun: WorkerRunRow | null;
+  articlesLast24Hours: number;
+  articlesLast7Days: number;
+  translationSummaries: SummaryRow[];
+  translationExpectedCount: number;
+};
+
+type ProductionReadinessDatabaseSnapshotRow =
+  Partial<ProductionReadinessDatabaseSnapshot> & {
+    summaries?: SummaryRow[];
+    expectedCount?: number;
+  };
+
+type ProductionReadinessDatabaseResult = {
+  rows?: ProductionReadinessDatabaseSnapshotRow[];
+  rowCount?: number;
+  generatedAt?: string;
+};
 
 function percent(part: number, total: number) {
   if (!total) {
@@ -349,9 +367,7 @@ async function loadRecentSummaries(client: SupabaseClient, articles: RecentArtic
     .slice(0, TRANSLATION_SAMPLE_LIMIT)
     .map((article) => article.original_url)
     .filter((originalUrl): originalUrl is string => Boolean(originalUrl));
-  const targetLanguages = SUPPORTED_LANGUAGES.map((language) => language.code).filter(
-    (languageCode) => languageCode !== DEFAULT_LANGUAGE_CODE,
-  );
+  const targetLanguages = TARGET_TRANSLATION_LANGUAGE_CODES;
 
   if (originalUrls.length === 0 || targetLanguages.length === 0) {
     return {
@@ -390,6 +406,138 @@ async function countArticlesSince(client: SupabaseClient, hours: number) {
   }
 
   return count ?? 0;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function requiredNumberField(row: Record<string, unknown>, field: string) {
+  const value = row[field];
+
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    throw new Error(`Admin production readiness operation returned an invalid ${field} value.`);
+  }
+
+  return value;
+}
+
+function requiredArrayField<T>(row: Record<string, unknown>, field: string): T[] {
+  const value = row[field];
+
+  if (!Array.isArray(value)) {
+    throw new Error(`Admin production readiness operation returned an invalid ${field} array.`);
+  }
+
+  return value as T[];
+}
+
+function optionalWorkerRunField(row: Record<string, unknown>) {
+  const value = row.workerRun;
+
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (!isRecord(value)) {
+    throw new Error("Admin production readiness operation returned an invalid workerRun value.");
+  }
+
+  return value as WorkerRunRow;
+}
+
+function normalizeProductionReadinessDatabaseResult(
+  result: ProductionReadinessDatabaseResult,
+): ProductionReadinessDatabaseSnapshot {
+  const row = result.rows?.[0];
+
+  if (!isRecord(row)) {
+    throw new Error("Admin production readiness operation returned no readiness snapshot row.");
+  }
+
+  const translationSummariesField = Array.isArray(row.translationSummaries)
+    ? "translationSummaries"
+    : "summaries";
+  const translationExpectedCount =
+    typeof row.translationExpectedCount === "number"
+      ? row.translationExpectedCount
+      : row.expectedCount;
+
+  return {
+    articleCount: requiredNumberField(row, "articleCount"),
+    publicFeedSnapshotCount: requiredNumberField(row, "publicFeedSnapshotCount"),
+    recentArticles: requiredArrayField<RecentArticleRow>(row, "recentArticles"),
+    workerRun: optionalWorkerRunField(row),
+    articlesLast24Hours: requiredNumberField(row, "articlesLast24Hours"),
+    articlesLast7Days: requiredNumberField(row, "articlesLast7Days"),
+    translationSummaries: requiredArrayField<SummaryRow>(row, translationSummariesField),
+    translationExpectedCount:
+      typeof translationExpectedCount === "number" &&
+      Number.isFinite(translationExpectedCount) &&
+      translationExpectedCount >= 0
+        ? translationExpectedCount
+        : requiredNumberField(row, "translationExpectedCount"),
+  };
+}
+
+async function loadSupabaseProductionReadinessDatabaseSnapshot({
+  getClient,
+  getConfig,
+}: AdminSupabaseDatabaseContext) {
+  getConfig();
+  const client = getClient();
+  const [
+    articleCount,
+    publicFeedSnapshotCount,
+    recentArticles,
+    workerRun,
+    articlesLast24Hours,
+    articlesLast7Days,
+  ] = await Promise.all([
+    getExactCount(client, "articles"),
+    getExactCount(client, "public_feed_snapshot"),
+    loadRecentArticles(client),
+    loadWorkerRun(client),
+    countArticlesSince(client, 24),
+    countArticlesSince(client, 24 * 7),
+  ]);
+  const { summaries, expectedCount } = await loadRecentSummaries(client, recentArticles);
+
+  return {
+    rows: [
+      {
+        articleCount,
+        publicFeedSnapshotCount,
+        recentArticles,
+        workerRun,
+        articlesLast24Hours,
+        articlesLast7Days,
+        translationSummaries: summaries,
+        translationExpectedCount: expectedCount,
+      } as unknown as AdminDatabaseJsonObject,
+    ],
+    rowCount: 1,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+async function loadProductionReadinessDatabaseSnapshot() {
+  const result = await readAdminDatabase(
+    "load-admin-production-readiness",
+    {
+      recentArticleLimit: RECENT_ARTICLE_LIMIT,
+      translationSampleLimit: TRANSLATION_SAMPLE_LIMIT,
+      defaultLanguageCode: DEFAULT_LANGUAGE_CODE,
+      targetLanguageCodes: TARGET_TRANSLATION_LANGUAGE_CODES,
+      articleGrowthWindowsHours: [24, 24 * 7],
+    },
+    loadSupabaseProductionReadinessDatabaseSnapshot,
+    { cache: "no-store" },
+  );
+
+  return normalizeProductionReadinessDatabaseResult(
+    result as ProductionReadinessDatabaseResult,
+  );
 }
 
 function buildPublicApiSignal({
@@ -1260,18 +1408,76 @@ async function buildCiSignal() {
   }
 }
 
-async function emptyDashboard(
+type ProductionReadinessDataSourceFailure = "backend-api" | "supabase" | "unknown";
+
+function dataSourceFailure(error: unknown): ProductionReadinessDataSourceFailure {
+  if (error instanceof AdminDatabaseAccessError) {
+    return error.providerMode === "backend_postgres_primary"
+      ? "backend-api"
+      : "supabase";
+  }
+
+  if (
+    error instanceof Error &&
+    /supabase|service-role|service role/i.test(error.message)
+  ) {
+    return "supabase";
+  }
+
+  return "unknown";
+}
+
+function dataSourceFailureCopy(
+  source: ProductionReadinessDataSourceFailure,
   errorMessage: string | null,
-): Promise<ProductionReadinessDashboardData> {
+) {
+  if (source === "backend-api") {
+    return {
+      value: "Backend API",
+      detail:
+        errorMessage ??
+        "Production readiness data cannot be loaded from the protected backend database API.",
+      nextStep:
+        "Set NUTSNEWS_BACKEND_API_URL and NUTSNEWS_BACKEND_API_TOKEN, then check the protected backend database API logs for the load-admin-production-readiness operation.",
+    };
+  }
+
+  if (source === "supabase") {
+    return {
+      value: "Supabase",
+      detail:
+        errorMessage ??
+        "Production readiness data cannot be loaded from server-side Supabase.",
+      nextStep:
+        "Set SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY for server-side admin readiness checks.",
+    };
+  }
+
+  return {
+    value: "Unavailable",
+    detail: errorMessage ?? "Production readiness data cannot be loaded.",
+    nextStep:
+      "Check the configured admin database provider, backend API config, and server logs for the readiness operation.",
+  };
+}
+
+async function emptyDashboard({
+  errorMessage,
+  source,
+}: {
+  errorMessage: string | null;
+  source: ProductionReadinessDataSourceFailure;
+}): Promise<ProductionReadinessDashboardData> {
+  const dataSource = dataSourceFailureCopy(source, errorMessage);
   const componentSignals = [
     signal({
       id: "configuration",
       title: "Readiness data source",
       status: "yellow",
       statusLabel: "Unconfigured",
-      value: "Missing env",
-      detail: errorMessage ?? "Production readiness data cannot be loaded.",
-      nextStep: "Set SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY for server-side admin readiness checks.",
+      value: dataSource.value,
+      detail: dataSource.detail,
+      nextStep: dataSource.nextStep,
       href: "/admin/guardrails",
       linkLabel: "Open guardrails",
     }),
@@ -1296,34 +1502,19 @@ async function emptyDashboard(
 }
 
 export async function getAdminProductionReadinessDashboardData(): Promise<ProductionReadinessDashboardData> {
-  const config = getSupabaseConfig();
-
-  if (!config) {
-    return emptyDashboard(
-      "Missing SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY.",
-    );
-  }
-
-  const client = getServerSupabase();
   const now = new Date();
 
   try {
-    const [
+    const {
       articleCount,
       publicFeedSnapshotCount,
       recentArticles,
       workerRun,
       articlesLast24Hours,
       articlesLast7Days,
-    ] = await Promise.all([
-      getExactCount(client, "articles"),
-      getExactCount(client, "public_feed_snapshot"),
-      loadRecentArticles(client),
-      loadWorkerRun(client),
-      countArticlesSince(client, 24),
-      countArticlesSince(client, 24 * 7),
-    ]);
-    const { summaries, expectedCount } = await loadRecentSummaries(client, recentArticles);
+      translationSummaries,
+      translationExpectedCount,
+    } = await loadProductionReadinessDatabaseSnapshot();
     const backupSignal = await buildBackupSignal();
     const ciSignal = await buildCiSignal();
     const componentSignals = [
@@ -1341,8 +1532,8 @@ export async function getAdminProductionReadinessDashboardData(): Promise<Produc
         articlesLast7Days,
       }),
       buildTranslationSignal({
-        expectedCount,
-        availableCount: summaries.length,
+        expectedCount: translationExpectedCount,
+        availableCount: translationSummaries.length,
       }),
       buildImageSignal(recentArticles),
       backupSignal,
@@ -1372,8 +1563,10 @@ export async function getAdminProductionReadinessDashboardData(): Promise<Produc
       signals,
     };
   } catch (error) {
-    return emptyDashboard(
-      error instanceof Error ? error.message : "Unknown readiness load failure.",
-    );
+    return emptyDashboard({
+      errorMessage:
+        error instanceof Error ? error.message : "Unknown readiness load failure.",
+      source: dataSourceFailure(error),
+    });
   }
 }
