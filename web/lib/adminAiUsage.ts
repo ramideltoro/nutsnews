@@ -1,4 +1,11 @@
-import { getServerSupabase } from "@/lib/supabase";
+import { type SupabaseClient } from "@supabase/supabase-js";
+
+import {
+    AdminDatabaseAccessError,
+    readAdminDatabase,
+    type AdminDatabaseJsonObject,
+    type AdminSupabaseDatabaseContext,
+} from "@/lib/adminDatabase";
 import {
     getAdminDateKey,
     getAdminTimeZone,
@@ -65,6 +72,18 @@ type AiUsageRunRow = {
     review_save_ok: boolean;
     article_save_ok: boolean;
     duration_ms: number;
+};
+
+type AiUsageDatabaseSnapshot = {
+    usageRunRows: AiUsageRunRow[];
+};
+
+type AiUsageDatabaseSnapshotRow = Partial<AiUsageDatabaseSnapshot>;
+
+type AiUsageDatabaseResult = {
+    rows?: AiUsageDatabaseSnapshotRow[];
+    rowCount?: number;
+    generatedAt?: string;
 };
 
 export type AiUsageSummary = {
@@ -181,6 +200,67 @@ export type AiUsageDashboardData = {
 };
 
 const MAX_RUN_ROWS_TO_LOAD = 5000;
+const AI_USAGE_RUN_SELECT_COLUMNS = [
+    "id",
+    "created_at",
+    "run_started_at",
+    "run_completed_at",
+    "run_source",
+    "request_id",
+    "shard_index",
+    "feeds_per_shard",
+    "max_ai_reviews",
+    "feed_count",
+    "fetched_count",
+    "candidate_count",
+    "already_reviewed_count",
+    "unreviewed_count",
+    "eligible_for_ai_count",
+    "ai_reviewed_count",
+    "openai_model",
+    "openai_call_count",
+    "openai_prompt_tokens",
+    "openai_completion_tokens",
+    "openai_total_tokens",
+    "estimated_openai_cost_usd",
+    "openai_review_count",
+    "openai_review_prompt_tokens",
+    "openai_review_completion_tokens",
+    "openai_review_total_tokens",
+    "estimated_openai_review_cost_usd",
+    "openai_translation_count",
+    "openai_translation_prompt_tokens",
+    "openai_translation_completion_tokens",
+    "openai_translation_total_tokens",
+    "estimated_openai_translation_cost_usd",
+    "local_ai_model",
+    "local_ai_call_count",
+    "local_ai_prompt_tokens",
+    "local_ai_completion_tokens",
+    "local_ai_total_tokens",
+    "local_ai_accepted_count",
+    "local_ai_rejected_count",
+    "local_ai_review_count",
+    "local_ai_review_prompt_tokens",
+    "local_ai_review_completion_tokens",
+    "local_ai_review_total_tokens",
+    "local_ai_translation_count",
+    "local_ai_translation_prompt_tokens",
+    "local_ai_translation_completion_tokens",
+    "local_ai_translation_total_tokens",
+    "estimated_local_ai_savings_usd",
+    "openai_accepted_count",
+    "openai_rejected_count",
+    "published_accepted_count",
+    "total_rejected_count",
+    "no_thumbnail_rejected_count",
+    "locally_rejected_count",
+    "cost_protection_limit_reached",
+    "spike_warning_triggered",
+    "review_save_ok",
+    "article_save_ok",
+    "duration_ms",
+].join(", ");
 
 function emptySummary(): AiUsageSummary {
     return {
@@ -474,74 +554,13 @@ function buildLatestRuns(rows: AiUsageRunRow[]): AiUsageLatestRun[] {
     }));
 }
 
-async function loadUsageRunsSince(since: Date) {
-    const supabase = getServerSupabase();
-
-    const { data, error } = await supabase
+async function loadSupabaseUsageRunsSince(
+    client: SupabaseClient,
+    since: Date,
+) {
+    const { data, error } = await client
         .from("ai_usage_runs")
-        .select(
-            [
-                "id",
-                "created_at",
-                "run_started_at",
-                "run_completed_at",
-                "run_source",
-                "request_id",
-                "shard_index",
-                "feeds_per_shard",
-                "max_ai_reviews",
-                "feed_count",
-                "fetched_count",
-                "candidate_count",
-                "already_reviewed_count",
-                "unreviewed_count",
-                "eligible_for_ai_count",
-                "ai_reviewed_count",
-                "openai_model",
-                "openai_call_count",
-                "openai_prompt_tokens",
-                "openai_completion_tokens",
-                "openai_total_tokens",
-                "estimated_openai_cost_usd",
-                "openai_review_count",
-                "openai_review_prompt_tokens",
-                "openai_review_completion_tokens",
-                "openai_review_total_tokens",
-                "estimated_openai_review_cost_usd",
-                "openai_translation_count",
-                "openai_translation_prompt_tokens",
-                "openai_translation_completion_tokens",
-                "openai_translation_total_tokens",
-                "estimated_openai_translation_cost_usd",
-                "local_ai_model",
-                "local_ai_call_count",
-                "local_ai_prompt_tokens",
-                "local_ai_completion_tokens",
-                "local_ai_total_tokens",
-                "local_ai_accepted_count",
-                "local_ai_rejected_count",
-                "local_ai_review_count",
-                "local_ai_review_prompt_tokens",
-                "local_ai_review_completion_tokens",
-                "local_ai_review_total_tokens",
-                "local_ai_translation_count",
-                "local_ai_translation_prompt_tokens",
-                "local_ai_translation_completion_tokens",
-                "local_ai_translation_total_tokens",
-                "estimated_local_ai_savings_usd",
-                "openai_accepted_count",
-                "openai_rejected_count",
-                "published_accepted_count",
-                "total_rejected_count",
-                "no_thumbnail_rejected_count",
-                "locally_rejected_count",
-                "cost_protection_limit_reached",
-                "spike_warning_triggered",
-                "review_save_ok",
-                "article_save_ok",
-                "duration_ms",
-            ].join(", "),
-        )
+        .select(AI_USAGE_RUN_SELECT_COLUMNS)
         .gte("run_started_at", since.toISOString())
         .order("run_started_at", { ascending: false })
         .limit(MAX_RUN_ROWS_TO_LOAD);
@@ -553,11 +572,91 @@ async function loadUsageRunsSince(since: Date) {
     return (data ?? []) as unknown as AiUsageRunRow[];
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function requiredArrayField<T>(row: Record<string, unknown>, field: string): T[] {
+    const value = row[field];
+
+    if (!Array.isArray(value)) {
+        throw new Error(
+            `Admin AI usage operation returned an invalid ${field} array.`,
+        );
+    }
+
+    return value as T[];
+}
+
+function normalizeAiUsageDatabaseResult(
+    result: AiUsageDatabaseResult,
+): AiUsageDatabaseSnapshot {
+    const row = result.rows?.[0];
+
+    if (!isRecord(row)) {
+        throw new Error("Admin AI usage operation returned no dashboard snapshot row.");
+    }
+
+    return {
+        usageRunRows: requiredArrayField<AiUsageRunRow>(row, "usageRunRows"),
+    };
+}
+
+async function loadSupabaseAiUsageDatabaseSnapshot(
+    context: AdminSupabaseDatabaseContext,
+    since: Date,
+) {
+    context.getConfig();
+    const client = context.getClient();
+    const usageRunRows = await loadSupabaseUsageRunsSince(client, since);
+
+    return {
+        rows: [
+            {
+                usageRunRows,
+            } as unknown as AdminDatabaseJsonObject,
+        ],
+        rowCount: 1,
+        generatedAt: new Date().toISOString(),
+    };
+}
+
+async function loadAiUsageDatabaseSnapshot(since: Date) {
+    const result = await readAdminDatabase(
+        "load-admin-ai-usage",
+        {
+            since: since.toISOString(),
+            limit: MAX_RUN_ROWS_TO_LOAD,
+        },
+        (context) => loadSupabaseAiUsageDatabaseSnapshot(context, since),
+        { cache: "no-store" },
+    );
+
+    return normalizeAiUsageDatabaseResult(result as AiUsageDatabaseResult);
+}
+
+function aiUsageDataAccessErrorMessage(error: unknown) {
+    if (error instanceof AdminDatabaseAccessError) {
+        return error.message;
+    }
+
+    if (
+        error instanceof Error &&
+        /server-side supabase access is not configured/i.test(error.message)
+    ) {
+        return "Missing SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.";
+    }
+
+    return error instanceof Error ? error.message : "Unable to load AI usage dashboard data.";
+}
+
 export async function getAdminAiUsageDashboardData(): Promise<AiUsageDashboardData> {
     const generatedAt = new Date().toISOString();
 
     try {
-        const rows = await loadUsageRunsSince(dateDaysAgo(30));
+        const { usageRunRows: rows } = await loadAiUsageDatabaseSnapshot(
+            dateDaysAgo(30),
+        );
         const last24HourRows = filterRowsSince(rows, dateHoursAgo(24));
         const last7DayRows = filterRowsSince(rows, dateDaysAgo(7));
         const last30DayRows = filterRowsSince(rows, dateDaysAgo(30));
@@ -574,10 +673,7 @@ export async function getAdminAiUsageDashboardData(): Promise<AiUsageDashboardDa
             latestRuns: buildLatestRuns(rows),
         };
     } catch (error) {
-        const message =
-            error instanceof Error
-                ? error.message
-                : "Unable to load AI usage dashboard data.";
+        const message = aiUsageDataAccessErrorMessage(error);
 
         return {
             isConfigured: false,
