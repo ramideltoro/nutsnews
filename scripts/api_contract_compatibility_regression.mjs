@@ -1525,12 +1525,18 @@ async function testAuthContract() {
     },
   });
   assertMethodExports(authRoute, ["GET", "POST"], "/api/auth/[...nextauth]");
-  const callbackUrl = "https://0.0.0.0:3000/api/auth/session";
+  const sessionUrl = "https://0.0.0.0:3000/api/auth/session";
+  const callbackUrl = "https://0.0.0.0:3000/api/auth/callback/google";
   const callbackHeaders = {
     host: "127.0.0.1:3000",
     "x-forwarded-host": "staging.nutsnews.com",
     "x-forwarded-proto": "https",
   };
+  assert.equal(
+    await (await authRoute.GET(new Request(sessionUrl, { headers: callbackHeaders }))).text(),
+    "GET",
+    "Auth session GET must bypass the OAuth flow guard",
+  );
   assert.equal(
     await (await authRoute.GET(new Request(callbackUrl, { headers: callbackHeaders }))).text(),
     "GET",
@@ -1582,13 +1588,18 @@ async function testAuthContract() {
 
   for (const method of ["GET", "POST"]) {
     const response = await blockedAuthRoute[method](
-      new Request("https://staging.nutsnews.com/api/auth/session", { method }),
+      new Request("https://staging.nutsnews.com/api/auth/callback/google", { method }),
     );
     assertStatus(response, 503, `Auth ${method} blocked identity`);
     assert.match(response.headers.get("cache-control") ?? "", /no-store/);
     assert.equal(response.headers.get("x-nutsnews-auth-error"), "blocked");
     assert.equal((await responseJson(response)).code, "blocked");
   }
+  assert.equal(
+    await (await blockedAuthRoute.GET(new Request("https://staging.nutsnews.com/api/auth/session"))).text(),
+    "GET",
+    "Auth session route must not fail with the OAuth callback diagnostic response",
+  );
   assert(
     loggedWarnings.some(
       ([event, message, fields]) =>

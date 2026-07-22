@@ -487,6 +487,25 @@ describe("guarded mutation and auth route handlers", () => {
     expect(mocks.authGet).not.toHaveBeenCalled();
   });
 
+  it("allows Auth.js session probes without the callback identity guard", async () => {
+    mocks.assertOAuthCallback.mockImplementation(() => {
+      throw new mocks.runtimeSafetyError("oauth_callback_identity_required");
+    });
+
+    const { GET } = await import("@/app/api/auth/[...nextauth]/route");
+    const requestValue = request(
+      "https://nutsnews-prod-candidate.vercel.app/api/auth/session",
+    ) as never;
+
+    const response = await GET(requestValue);
+    const body = await json(response);
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ ok: true, method: "GET" });
+    expect(mocks.assertOAuthCallback).not.toHaveBeenCalled();
+    expect(mocks.authGet).toHaveBeenCalledWith(requestValue);
+  });
+
   it("dispatches OAuth callbacks to Auth.js only after the runtime identity guard passes", async () => {
     const { POST } = await import("@/app/api/auth/[...nextauth]/route");
     const requestValue = request("https://www.nutsnews.com/api/auth/callback/google", {
