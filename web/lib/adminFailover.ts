@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHmac } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 
 import {
   FAILOVER_CHECK_INTERVAL_SECONDS,
@@ -13,10 +13,13 @@ import {
   FAILOVER_LIVE_ORIGIN_CLASSIFICATIONS,
   FAILOVER_LIVE_ORIGIN_DNS_STATES,
   FAILOVER_LIVE_ORIGIN_ERROR_CODES,
+  FAILOVER_MANUAL_ACTIONS,
+  FAILOVER_AUDIT_RESULTS,
   FAILOVER_OBSERVED_DEPLOYMENT_TARGETS,
   FAILOVER_STATUS_SCHEMA_VERSION,
   FAILOVER_STALE_REASONS,
   FAILOVER_VPS_STATUS_CODES,
+  type FailoverAuditResult,
   type FailoverDnsAction,
   type FailoverDnsTarget,
   type FailoverDnsTargetClassification,
@@ -27,6 +30,8 @@ import {
   type FailoverLiveOriginErrorCode,
   type FailoverLiveOriginHostReadiness,
   type FailoverLiveOriginReadiness,
+  type FailoverManualAction,
+  type FailoverManualAuditEvent,
   type FailoverObservedDeploymentTarget,
   type FailoverStatus,
   type FailoverStaleReason,
@@ -35,12 +40,17 @@ import {
 import { formatAdminDateTime } from "@/lib/adminTime";
 
 const DEFAULT_CONTROLLER_STATUS_URL = "https://nutsnews-controller.nutsnews.workers.dev/status?mode=dashboard";
+const DEFAULT_CONTROLLER_ACTION_PATH = "/actions";
+const DEFAULT_CONTROLLER_AUDIT_PATH = "/actions/audit";
 const STATUS_SIGNATURE_HEADER = "X-NutsNews-Failover-Signature";
 const STATUS_TIMESTAMP_HEADER = "X-NutsNews-Failover-Timestamp";
 const STATUS_SIGNATURE_VERSION = "v1";
 const STATUS_FETCH_TIMEOUT_MS = 5_000;
+const ACTION_FETCH_TIMEOUT_MS = 8_000;
 const HISTORY_UNAVAILABLE_MESSAGE =
   "Historical health-check and DNS-change rows are not exposed by the current controller status API. Showing the latest public-safe status snapshot instead.";
+const AUDIT_UNAVAILABLE_MESSAGE =
+  "Manual action audit rows are not available from the controller action API.";
 
 export type FailoverDashboardTone = "ok" | "watch" | "danger" | "neutral";
 
@@ -76,12 +86,42 @@ export type AdminFailoverDashboardData = {
   recentDnsChanges: FailoverTimelineRow[];
   historyAvailable: boolean;
   historyMessage: string;
+  actionsConfigured: boolean;
+  actionUrl: string;
+  auditEvents: FailoverManualAuditEvent[];
+  auditAvailable: boolean;
+  auditMessage: string;
   links: FailoverLink[];
+};
+
+export type AdminFailoverActionInput = {
+  actorEmail: string;
+  action: string;
+  confirmation: string;
+  reason: string;
+  expected: {
+    activeDnsTarget: string;
+    actualApexDnsTarget: string;
+    actualWwwDnsTarget: string;
+    statusGeneratedAt: string;
+  };
+};
+
+export type AdminFailoverActionResult = {
+  ok: boolean;
+  message: string;
+  error: string | null;
+  expectedDnsTarget: FailoverDnsTarget | null;
+  activeDnsTarget: FailoverDnsTarget | null;
+  manualLock: boolean | null;
 };
 
 type FailoverStatusConfig = {
   statusUrl: string;
+  actionUrl: string;
+  auditUrl: string;
   hmacSecret: string;
+  actionHmacSecret: string;
   runbookUrl: string;
   cloudflareDashboardUrl: string;
 };
@@ -124,6 +164,10 @@ function appendDashboardMode(value: string) {
   return url.toString();
 }
 
+function actionUrlFromStatusUrl(statusUrl: string, path = DEFAULT_CONTROLLER_ACTION_PATH) {
+  return new URL(path, statusUrl).toString();
+}
+
 function readConfig(): FailoverStatusConfig {
   const statusUrl = appendDashboardMode(
     publicHttpsUrl(
@@ -132,10 +176,18 @@ function readConfig(): FailoverStatusConfig {
       { allowLocalHttp: true },
     ),
   );
+  const actionUrl = publicHttpsUrl(
+    process.env.NUTSNEWS_FAILOVER_CONTROLLER_ACTION_URL,
+    actionUrlFromStatusUrl(statusUrl),
+    { allowLocalHttp: true },
+  );
 
   return {
     statusUrl,
+    actionUrl,
+    auditUrl: actionUrlFromStatusUrl(actionUrl, DEFAULT_CONTROLLER_AUDIT_PATH),
     hmacSecret: clean(process.env.NUTSNEWS_FAILOVER_STATUS_HMAC_SECRET),
+    actionHmacSecret: clean(process.env.NUTSNEWS_FAILOVER_ACTION_HMAC_SECRET),
     runbookUrl: publicHttpsUrl(process.env.NUTSNEWS_FAILOVER_RUNBOOK_URL),
     cloudflareDashboardUrl: publicHttpsUrl(process.env.NUTSNEWS_FAILOVER_CLOUDFLARE_DASHBOARD_URL),
   };
@@ -160,12 +212,40 @@ function signedHeaders(statusUrl: string, hmacSecret: string, now = Date.now()) 
   };
 }
 
+function sha256Hex(value: string) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function signedActionHeaders(actionUrl: string, hmacSecret: string, method: string, bodyText = "", now = Date.now()) {
+  const url = new URL(actionUrl);
+  const timestamp = String(Math.floor(now / 1000));
+  const signedPath = `${url.pathname}${url.search}`;
+  const payload = [
+    STATUS_SIGNATURE_VERSION,
+    method.toUpperCase(),
+    signedPath,
+    timestamp,
+    sha256Hex(bodyText),
+  ].join("\n");
+  const signature = createHmac("sha256", hmacSecret).update(payload).digest("hex");
+
+  return {
+    Accept: "application/json",
+    [STATUS_TIMESTAMP_HEADER]: timestamp,
+    [STATUS_SIGNATURE_HEADER]: `${STATUS_SIGNATURE_VERSION}=${signature}`,
+  };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function oneOf<const T extends readonly string[]>(value: unknown, allowed: T, fallback: T[number]): T[number] {
   return allowed.includes(value as T[number]) ? value as T[number] : fallback;
+}
+
+function optionalOneOf<const T extends readonly string[]>(value: unknown, allowed: T): T[number] | null {
+  return allowed.includes(value as T[number]) ? value as T[number] : null;
 }
 
 function optionalIsoDate(value: unknown) {
@@ -200,6 +280,22 @@ function identityText(value: unknown, fallback = "unknown") {
   const candidate = clean(value);
 
   return /^[A-Za-z0-9][A-Za-z0-9._:@/-]{1,127}$/.test(candidate) ? candidate : fallback;
+}
+
+function actorEmail(value: unknown) {
+  const candidate = clean(value).toLowerCase();
+
+  return /^[a-z0-9._%+-]{1,96}@[a-z0-9.-]{1,96}\.[a-z]{2,24}$/.test(candidate)
+    ? candidate
+    : "unknown-admin@example.invalid";
+}
+
+function safeDisplayText(value: unknown, fallback = "None", maxLength = 280) {
+  const candidate = clean(value)
+    .replace(/\s+/gu, " ")
+    .slice(0, maxLength);
+
+  return candidate || fallback;
 }
 
 function readinessCode(value: unknown, fallback = "unknown") {
@@ -344,6 +440,52 @@ function sanitizeStatus(value: unknown, nowMs = Date.now()): FailoverStatus | nu
       : oneOf(value.staleReason, FAILOVER_STALE_REASONS, "status_update_overdue") as FailoverStaleReason,
     controllerVersion: identityText(value.controllerVersion, "unknown"),
   };
+}
+
+function sanitizeAuditEvent(value: unknown, nowMs = Date.now()): FailoverManualAuditEvent | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const action = optionalOneOf(value.action, FAILOVER_MANUAL_ACTIONS);
+  const result = optionalOneOf(value.result, FAILOVER_AUDIT_RESULTS);
+
+  if (!action || !result) {
+    return null;
+  }
+
+  return {
+    id: identityText(value.id),
+    createdAt: requiredIsoDate(value.createdAt, nowMs),
+    actor: actorEmail(value.actor),
+    action: action as FailoverManualAction,
+    previousTarget: oneOf(
+      value.previousTarget,
+      FAILOVER_DNS_TARGET_CLASSIFICATIONS,
+      "unknown",
+    ) as FailoverDnsTargetClassification,
+    newTarget: oneOf(
+      value.newTarget,
+      FAILOVER_DNS_TARGET_CLASSIFICATIONS,
+      "unknown",
+    ) as FailoverDnsTargetClassification,
+    reason: safeDisplayText(value.reason, "No reason provided."),
+    result: result as FailoverAuditResult,
+    message: safeDisplayText(value.message, "No action detail."),
+    manualLock: booleanValue(value.manualLock),
+    idempotencyKey: identityText(value.idempotencyKey),
+  };
+}
+
+function sanitizeAuditEvents(value: unknown, nowMs = Date.now()) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((event) => sanitizeAuditEvent(event, nowMs))
+    .filter((event): event is FailoverManualAuditEvent => event !== null)
+    .slice(0, 30);
 }
 
 function ageSeconds(value: string | null, nowMs: number) {
@@ -546,6 +688,76 @@ function safeErrorMessage(error: unknown) {
   return "Failover controller status is not reachable from the admin server.";
 }
 
+function safeActionErrorMessage(error: unknown) {
+  if (error instanceof Error && error.name === "AbortError") {
+    return "Failover controller action request timed out.";
+  }
+
+  return "Failover controller action endpoint is not reachable from the admin server.";
+}
+
+async function fetchAuditEvents(config: FailoverStatusConfig, nowMs = Date.now()) {
+  if (!config.actionHmacSecret) {
+    return {
+      auditEvents: [],
+      auditAvailable: false,
+      auditMessage: "Missing NUTSNEWS_FAILOVER_ACTION_HMAC_SECRET for manual action audit history.",
+    };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), STATUS_FETCH_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(config.auditUrl, {
+      method: "GET",
+      headers: signedActionHeaders(config.auditUrl, config.actionHmacSecret, "GET", "", nowMs),
+      cache: "no-store",
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      return {
+        auditEvents: [],
+        auditAvailable: false,
+        auditMessage: `Failover action audit returned HTTP ${response.status}.`,
+      };
+    }
+
+    const payload = await response.json();
+    const events = sanitizeAuditEvents(isRecord(payload) ? payload.auditEvents : [], nowMs);
+
+    return {
+      auditEvents: events,
+      auditAvailable: true,
+      auditMessage: events.length > 0 ? "Manual action audit loaded." : "No manual failover actions are recorded yet.",
+    };
+  } catch {
+    return {
+      auditEvents: [],
+      auditAvailable: false,
+      auditMessage: AUDIT_UNAVAILABLE_MESSAGE,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function sanitizeActionResult(value: unknown, fallbackMessage: string): AdminFailoverActionResult {
+  const row = isRecord(value) ? value : {};
+
+  return {
+    ok: booleanValue(row.ok),
+    message: safeDisplayText(row.message, fallbackMessage),
+    error: row.error === null || row.error === undefined || row.error === ""
+      ? null
+      : readinessCode(row.error, "manual_action_failed"),
+    expectedDnsTarget: optionalOneOf(row.expectedDnsTarget, FAILOVER_DNS_TARGETS) as FailoverDnsTarget | null,
+    activeDnsTarget: optionalOneOf(row.activeDnsTarget, FAILOVER_DNS_TARGETS) as FailoverDnsTarget | null,
+    manualLock: typeof row.manualLock === "boolean" ? row.manualLock : null,
+  };
+}
+
 function emptyData(config: FailoverStatusConfig, message: string, nowMs = Date.now()): AdminFailoverDashboardData {
   const now = new Date(nowMs).toISOString();
 
@@ -565,6 +777,11 @@ function emptyData(config: FailoverStatusConfig, message: string, nowMs = Date.n
     recentDnsChanges: [],
     historyAvailable: false,
     historyMessage: HISTORY_UNAVAILABLE_MESSAGE,
+    actionsConfigured: Boolean(config.actionHmacSecret),
+    actionUrl: config.actionUrl,
+    auditEvents: [],
+    auditAvailable: false,
+    auditMessage: config.actionHmacSecret ? AUDIT_UNAVAILABLE_MESSAGE : "Missing NUTSNEWS_FAILOVER_ACTION_HMAC_SECRET for manual controls.",
     links: buildLinks(config),
   };
 }
@@ -609,6 +826,7 @@ export async function getAdminFailoverDashboardData(): Promise<AdminFailoverDash
 
     const statusAge = ageSeconds(status.generatedAt, nowMs);
     const tone = statusTone(status, statusAge);
+    const audit = await fetchAuditEvents(config, nowMs);
 
     return {
       isConfigured: true,
@@ -626,10 +844,94 @@ export async function getAdminFailoverDashboardData(): Promise<AdminFailoverDash
       recentDnsChanges: buildDnsRows(status),
       historyAvailable: false,
       historyMessage: HISTORY_UNAVAILABLE_MESSAGE,
+      actionsConfigured: Boolean(config.actionHmacSecret),
+      actionUrl: config.actionUrl,
+      auditEvents: audit.auditEvents,
+      auditAvailable: audit.auditAvailable,
+      auditMessage: audit.auditMessage,
       links: buildLinks(config),
     };
   } catch (error) {
     return emptyData(config, safeErrorMessage(error), nowMs);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function performAdminFailoverAction(input: AdminFailoverActionInput): Promise<AdminFailoverActionResult> {
+  const config = readConfig();
+  const nowMs = Date.now();
+
+  if (!config.actionHmacSecret) {
+    return {
+      ok: false,
+      message: "Missing NUTSNEWS_FAILOVER_ACTION_HMAC_SECRET for manual failover controls.",
+      error: "action_auth_not_configured",
+      expectedDnsTarget: null,
+      activeDnsTarget: null,
+      manualLock: null,
+    };
+  }
+
+  const action = optionalOneOf(input.action, FAILOVER_MANUAL_ACTIONS);
+  if (!action) {
+    return {
+      ok: false,
+      message: "Unsupported manual failover action.",
+      error: "unsupported_manual_action",
+      expectedDnsTarget: null,
+      activeDnsTarget: null,
+      manualLock: null,
+    };
+  }
+
+  const bodyText = JSON.stringify({
+    action,
+    actor: actorEmail(input.actorEmail),
+    confirmation: clean(input.confirmation),
+    reason: safeDisplayText(input.reason, "", 240),
+    idempotencyKey: `web-admin-${Date.now()}-${randomUUID()}`,
+    expected: {
+      activeDnsTarget: oneOf(input.expected.activeDnsTarget, FAILOVER_DNS_TARGET_CLASSIFICATIONS, "unknown"),
+      actualApexDnsTarget: oneOf(input.expected.actualApexDnsTarget, FAILOVER_DNS_TARGET_CLASSIFICATIONS, "unknown"),
+      actualWwwDnsTarget: oneOf(input.expected.actualWwwDnsTarget, FAILOVER_DNS_TARGET_CLASSIFICATIONS, "unknown"),
+      statusGeneratedAt: clean(input.expected.statusGeneratedAt).slice(0, 64),
+    },
+  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ACTION_FETCH_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(config.actionUrl, {
+      method: "POST",
+      headers: {
+        ...signedActionHeaders(config.actionUrl, config.actionHmacSecret, "POST", bodyText, nowMs),
+        "Content-Type": "application/json",
+      },
+      body: bodyText,
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    const payload = await response.json().catch(() => null);
+    const result = sanitizeActionResult(
+      payload,
+      response.ok ? "Manual failover action completed." : `Failover controller action returned HTTP ${response.status}.`,
+    );
+
+    return {
+      ...result,
+      ok: response.ok && result.ok,
+      message: result.message,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message: safeActionErrorMessage(error),
+      error: "manual_action_unreachable",
+      expectedDnsTarget: null,
+      activeDnsTarget: null,
+      manualLock: null,
+    };
   } finally {
     clearTimeout(timeout);
   }
