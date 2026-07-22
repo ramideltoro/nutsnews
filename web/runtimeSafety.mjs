@@ -550,7 +550,17 @@ export function assertSyntheticTestUser(namespace, env = process.env) {
     );
   }
 
-  return assertSyntheticFixtureMutation(namespace, env);
+  if (
+    policy.runtimeEnv === "staging" &&
+    SYNTHETIC_NAMESPACE_PATTERN.test(String(namespace ?? ""))
+  ) {
+    return policy;
+  }
+
+  refuse(
+    "synthetic_test_user_required",
+    "Admin test auth bypass requires a uniquely namespaced staging runtime.",
+  );
 }
 
 export function isSandboxEndpoint(endpoint) {

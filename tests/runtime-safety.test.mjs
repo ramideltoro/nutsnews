@@ -64,6 +64,11 @@ test("valid staging keeps read-only access available while side effects are disa
   const environment = stagingEnvironment();
   assert.equal(getRuntimeSafetyPolicy(environment).ready, true);
   assert.equal(assertDataRead("public-reader", environment).runtimeEnv, "staging");
+  assert.doesNotThrow(() => assertSyntheticTestUser("nutsnews-test-admin-smoke", environment));
+  assert.throws(
+    () => assertSyntheticFixtureMutation("nutsnews-test-disabled-fixture", environment),
+    (error) => error instanceof RuntimeSafetyError && error.code === "synthetic_fixture_required",
+  );
   assert.throws(
     () => assertExternalSideEffect("contact", "http://localhost:4000/emails", environment),
     (error) => error instanceof RuntimeSafetyError && error.code === "external_side_effect_blocked",
@@ -133,6 +138,21 @@ test("sandbox permits only isolated endpoints and isolated staging writes", () =
   assert.doesNotThrow(() => assertIsolatedDataMutation("quota-event", environment));
   assert.doesNotThrow(() => assertSyntheticFixtureMutation("nutsnews-test-sandbox-fixture", environment));
   assert.doesNotThrow(() => assertSyntheticTestUser("nutsnews-test-admin-smoke", environment));
+});
+
+test("synthetic admin auth bypass requires a staging test namespace", () => {
+  assert.throws(
+    () => assertSyntheticTestUser("admin-smoke", stagingEnvironment()),
+    (error) => error instanceof RuntimeSafetyError && error.code === "synthetic_test_user_required",
+  );
+  assert.throws(
+    () =>
+      assertSyntheticTestUser(
+        "nutsnews-test-admin-smoke",
+        productionEnvironment({ NUTSNEWS_SIDE_EFFECTS_MODE: "disabled" }),
+      ),
+    (error) => error instanceof RuntimeSafetyError && error.code === "synthetic_test_user_required",
+  );
 });
 
 test("staging recognizes Docker's isolated fixture hostname without allowing production access", () => {
