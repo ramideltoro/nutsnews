@@ -1,5 +1,12 @@
+import { type SupabaseClient } from "@supabase/supabase-js";
+
+import {
+  AdminDatabaseAccessError,
+  readAdminDatabase,
+  type AdminDatabaseJsonObject,
+  type AdminSupabaseDatabaseContext,
+} from "@/lib/adminDatabase";
 import { formatAdminDateTime } from "@/lib/adminTime";
-import { getServerSupabase, getServerSupabaseConfig } from "@/lib/supabase";
 
 const SOURCE_CATEGORY_SELECT_COLUMNS = [
   "source",
@@ -27,11 +34,6 @@ const ARTICLE_SELECT_COLUMNS = [
 export const ENGAGEMENT_SOURCE_CATEGORY_LIMIT = 100;
 export const ENGAGEMENT_ARTICLE_LIMIT = 25;
 
-type SupabaseConfig = {
-  url: string;
-  serviceRoleKey: string;
-};
-
 type SourceCategoryDbRow = {
   source: string | null;
   category: string | null;
@@ -53,6 +55,22 @@ type ArticleEngagementDbRow = {
   first_event_date: string | null;
   latest_event_date: string | null;
   last_updated_at: string | null;
+};
+
+type ArticleEngagementDatabaseSnapshot = {
+  sourceCategoryRows: SourceCategoryDbRow[];
+  sourceCategoryError: string | null;
+  articleRows: ArticleEngagementDbRow[];
+  articleError: string | null;
+};
+
+type ArticleEngagementDatabaseSnapshotRow =
+  Partial<ArticleEngagementDatabaseSnapshot>;
+
+type ArticleEngagementDatabaseResult = {
+  rows?: ArticleEngagementDatabaseSnapshotRow[];
+  rowCount?: number;
+  generatedAt?: string;
 };
 
 export type ArticleEngagementSourceCategoryRow = {
@@ -113,14 +131,6 @@ export type ArticleEngagementDashboardData = {
   articleSql: string;
 };
 
-function getSupabaseConfig(): SupabaseConfig | null {
-  try {
-    return getServerSupabaseConfig();
-  } catch {
-    return null;
-  }
-}
-
 function toNumber(value: number | string | null | undefined) {
   const numericValue = Number(value ?? 0);
 
@@ -180,7 +190,49 @@ function buildSourceCategorySql() {
 }
 
 function buildArticleSql() {
-  return `select\n  article_id,\n  title,\n  source,\n  category,\n  outbound_click_count,\n  latest_event_date,\n  last_updated_at\nfrom public.article_engagement_article_summary\norder by outbound_click_count desc, latest_event_date desc nulls last\nlimit ${ENGAGEMENT_ARTICLE_LIMIT};`;
+  return `select\n  article_id,\n  title,\n  original_url,\n  source,\n  category,\n  outbound_click_count,\n  first_event_date,\n  latest_event_date,\n  last_updated_at\nfrom public.article_engagement_article_summary\norder by outbound_click_count desc, latest_event_date desc nulls last\nlimit ${ENGAGEMENT_ARTICLE_LIMIT};`;
+}
+
+async function loadSourceCategoryRows(client: SupabaseClient) {
+  const { data, error } = await client
+    .from("article_engagement_source_category_summary")
+    .select(SOURCE_CATEGORY_SELECT_COLUMNS)
+    .order("total_engagement_count", { ascending: false })
+    .order("latest_event_date", { ascending: false, nullsFirst: false })
+    .limit(ENGAGEMENT_SOURCE_CATEGORY_LIMIT);
+
+  if (error) {
+    return {
+      sourceCategoryRows: [],
+      sourceCategoryError: error.message,
+    };
+  }
+
+  return {
+    sourceCategoryRows: (data ?? []) as unknown as SourceCategoryDbRow[],
+    sourceCategoryError: null,
+  };
+}
+
+async function loadArticleRows(client: SupabaseClient) {
+  const { data, error } = await client
+    .from("article_engagement_article_summary")
+    .select(ARTICLE_SELECT_COLUMNS)
+    .order("outbound_click_count", { ascending: false })
+    .order("latest_event_date", { ascending: false, nullsFirst: false })
+    .limit(ENGAGEMENT_ARTICLE_LIMIT);
+
+  if (error) {
+    return {
+      articleRows: [],
+      articleError: error.message,
+    };
+  }
+
+  return {
+    articleRows: (data ?? []) as unknown as ArticleEngagementDbRow[],
+    articleError: null,
+  };
 }
 
 function mapSourceCategoryRow(
@@ -288,50 +340,127 @@ function summarizeRows(
   };
 }
 
-export async function getAdminArticleEngagementDashboardData(): Promise<ArticleEngagementDashboardData> {
-  const config = getSupabaseConfig();
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
 
-  if (!config) {
-    return emptyDashboardData(
-      "Missing SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.",
+function requiredArrayField<T>(row: Record<string, unknown>, field: string): T[] {
+  const value = row[field];
+
+  if (!Array.isArray(value)) {
+    throw new Error(
+      `Admin article engagement operation returned an invalid ${field} array.`,
     );
   }
 
-  const client = getServerSupabase();
-  const [sourceCategoryResult, articleResult] = await Promise.all([
-    client
-      .from("article_engagement_source_category_summary")
-      .select(SOURCE_CATEGORY_SELECT_COLUMNS)
-      .order("total_engagement_count", { ascending: false })
-      .order("latest_event_date", { ascending: false, nullsFirst: false })
-      .limit(ENGAGEMENT_SOURCE_CATEGORY_LIMIT),
-    client
-      .from("article_engagement_article_summary")
-      .select(ARTICLE_SELECT_COLUMNS)
-      .order("outbound_click_count", { ascending: false })
-      .order("latest_event_date", { ascending: false, nullsFirst: false })
-      .limit(ENGAGEMENT_ARTICLE_LIMIT),
-  ]);
+  return value as T[];
+}
 
-  if (sourceCategoryResult.error) {
-    return emptyDashboardData(sourceCategoryResult.error.message);
+function optionalStringField(row: Record<string, unknown>, field: string) {
+  const value = row[field];
+
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function normalizeArticleEngagementDatabaseResult(
+  result: ArticleEngagementDatabaseResult,
+): ArticleEngagementDatabaseSnapshot {
+  const row = result.rows?.[0];
+
+  if (!isRecord(row)) {
+    throw new Error("Admin article engagement operation returned no dashboard snapshot row.");
   }
 
-  const sourceCategoryRows = (
-    (sourceCategoryResult.data ?? []) as unknown as SourceCategoryDbRow[]
-  ).map(mapSourceCategoryRow);
+  return {
+    sourceCategoryRows: requiredArrayField<SourceCategoryDbRow>(
+      row,
+      "sourceCategoryRows",
+    ),
+    sourceCategoryError: optionalStringField(row, "sourceCategoryError"),
+    articleRows: requiredArrayField<ArticleEngagementDbRow>(row, "articleRows"),
+    articleError: optionalStringField(row, "articleError"),
+  };
+}
+
+async function loadSupabaseArticleEngagementDatabaseSnapshot(
+  context: AdminSupabaseDatabaseContext,
+) {
+  context.getConfig();
+  const client = context.getClient();
+  const [sourceCategoryResult, articleResult] = await Promise.all([
+    loadSourceCategoryRows(client),
+    loadArticleRows(client),
+  ]);
+
+  return {
+    rows: [
+      {
+        sourceCategoryRows: sourceCategoryResult.sourceCategoryRows,
+        sourceCategoryError: sourceCategoryResult.sourceCategoryError,
+        articleRows: articleResult.articleRows,
+        articleError: articleResult.articleError,
+      } as unknown as AdminDatabaseJsonObject,
+    ],
+    rowCount: 1,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+async function loadArticleEngagementDatabaseSnapshot() {
+  const result = await readAdminDatabase(
+    "load-admin-article-engagement",
+    {
+      sourceCategoryLimit: ENGAGEMENT_SOURCE_CATEGORY_LIMIT,
+      articleLimit: ENGAGEMENT_ARTICLE_LIMIT,
+    },
+    loadSupabaseArticleEngagementDatabaseSnapshot,
+    { cache: "no-store" },
+  );
+
+  return normalizeArticleEngagementDatabaseResult(
+    result as ArticleEngagementDatabaseResult,
+  );
+}
+
+function articleEngagementDataAccessErrorMessage(error: unknown) {
+  if (error instanceof AdminDatabaseAccessError) {
+    return error.message;
+  }
+
+  if (
+    error instanceof Error &&
+    /server-side supabase access is not configured/i.test(error.message)
+  ) {
+    return "Missing SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.";
+  }
+
+  return error instanceof Error ? error.message : "Unknown article engagement load failure.";
+}
+
+export async function getAdminArticleEngagementDashboardData(): Promise<ArticleEngagementDashboardData> {
+  let snapshot: ArticleEngagementDatabaseSnapshot;
+
+  try {
+    snapshot = await loadArticleEngagementDatabaseSnapshot();
+  } catch (error) {
+    return emptyDashboardData(articleEngagementDataAccessErrorMessage(error));
+  }
+
+  if (snapshot.sourceCategoryError) {
+    return emptyDashboardData(snapshot.sourceCategoryError);
+  }
+
+  const sourceCategoryRows = snapshot.sourceCategoryRows.map(mapSourceCategoryRow);
   const topSources = rollUpRows(sourceCategoryRows, "source");
   const topCategories = rollUpRows(sourceCategoryRows, "category");
-  const topArticles = articleResult.error
+  const topArticles = snapshot.articleError
     ? []
-    : ((articleResult.data ?? []) as unknown as ArticleEngagementDbRow[]).map(
-        mapArticleRow,
-      );
+    : snapshot.articleRows.map(mapArticleRow);
 
   return {
     isConfigured: true,
     errorMessage: null,
-    articleErrorMessage: articleResult.error?.message ?? null,
+    articleErrorMessage: snapshot.articleError,
     generatedAt: new Date().toISOString(),
     summary: summarizeRows(sourceCategoryRows, topSources, topCategories),
     sourceCategoryRows,
