@@ -1501,11 +1501,22 @@ async function testLogTestContract() {
 async function testAuthContract() {
   const handlerGet = () => new Response("GET");
   const handlerPost = () => new Response("POST");
-  class RuntimeSafetyError extends Error {}
+  class RuntimeSafetyError extends Error {
+    constructor(code) {
+      super("Runtime safety policy refused this operation.");
+      this.code = code;
+    }
+  }
   const guardedRequests = [];
+  const loggedWarnings = [];
   const authRoute = loadModule("web/app/api/auth/[...nextauth]/route.ts", {
     "@/auth": { handlers: { GET: handlerGet, POST: handlerPost } },
     "next/server": nextServerMock(),
+    "@/lib/logger": {
+      logWarn(event, message, fields) {
+        loggedWarnings.push([event, message, fields]);
+      },
+    },
     "@/lib/runtimeSafety": {
       RuntimeSafetyError,
       assertOAuthCallback(operation, requestUrl) {
@@ -1516,7 +1527,8 @@ async function testAuthContract() {
   assertMethodExports(authRoute, ["GET", "POST"], "/api/auth/[...nextauth]");
   const callbackUrl = "https://0.0.0.0:3000/api/auth/session";
   const callbackHeaders = {
-    host: "staging.nutsnews.com",
+    host: "127.0.0.1:3000",
+    "x-forwarded-host": "staging.nutsnews.com",
     "x-forwarded-proto": "https",
   };
   assert.equal(
@@ -1555,6 +1567,11 @@ async function testAuthContract() {
   const blockedAuthRoute = loadModule("web/app/api/auth/[...nextauth]/route.ts", {
     "@/auth": { handlers: { GET: handlerGet, POST: handlerPost } },
     "next/server": nextServerMock(),
+    "@/lib/logger": {
+      logWarn(event, message, fields) {
+        loggedWarnings.push([event, message, fields]);
+      },
+    },
     "@/lib/runtimeSafety": {
       RuntimeSafetyError,
       assertOAuthCallback() {
@@ -1569,7 +1586,18 @@ async function testAuthContract() {
     );
     assertStatus(response, 503, `Auth ${method} blocked identity`);
     assert.match(response.headers.get("cache-control") ?? "", /no-store/);
+    assert.equal(response.headers.get("x-nutsnews-auth-error"), "blocked");
+    assert.equal((await responseJson(response)).code, "blocked");
   }
+  assert(
+    loggedWarnings.some(
+      ([event, message, fields]) =>
+        event === "admin.oauth_callback.blocked" &&
+        message === "Admin OAuth callback refused runtime identity." &&
+        fields?.code === "blocked",
+    ),
+    "/api/auth/[...nextauth] must log a safe diagnostic code when the callback guard blocks",
+  );
 
   let capturedConfiguration;
   const googleProvider = { id: "google" };
@@ -1592,12 +1620,23 @@ async function testAuthContract() {
         return email === "admin@example.com";
       },
     },
+    "@/lib/adminAuthOrigin": {
+      canonicalizeAdminAuthRedirect(url) {
+        return `canonical:${url}`;
+      },
+    },
   });
   assert.equal(authModule.handlers.GET, handlerGet);
+  assert.equal(capturedConfiguration.trustHost, true);
   assert.equal(capturedConfiguration.providers[0], googleProvider);
   assert.equal(capturedConfiguration.session.strategy, "jwt");
   assert.equal(capturedConfiguration.pages.signIn, "/admin/login");
   assert.equal(capturedConfiguration.pages.error, "/admin/access-denied");
+  assert.equal(
+    await capturedConfiguration.callbacks.redirect({ url: "https://vps.nutsnews.com/admin" }),
+    "canonical:https://vps.nutsnews.com/admin",
+    "Auth.js must delegate post-login redirects through the canonical admin origin helper",
+  );
   assert.equal(
     await capturedConfiguration.callbacks.signIn({ user: { email: "admin@example.com" } }),
     true,

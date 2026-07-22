@@ -1,8 +1,10 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import { isAllowedAdminEmail } from "@/lib/adminAuth";
+import { canonicalizeAdminAuthRedirect } from "@/lib/adminAuthOrigin";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+    trustHost: true,
     providers: [Google],
     pages: {
         signIn: "/admin/login",
@@ -12,6 +14,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         strategy: "jwt",
     },
     callbacks: {
+        async redirect({ url }) {
+            return canonicalizeAdminAuthRedirect(url);
+        },
         async signIn({ user }) {
             if (isAllowedAdminEmail(user.email)) {
                 return true;

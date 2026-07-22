@@ -39,6 +39,11 @@ function productionEnvironment(overrides = {}) {
     NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: "production-project",
     NUTSNEWS_PUBLIC_SUPABASE_URL: "https://production-project.supabase.co",
     NUTSNEWS_PUBLIC_SUPABASE_ANON_KEY: "test-anon-key",
+    AUTH_URL: "https://www.nutsnews.com",
+    NEXTAUTH_URL: "https://www.nutsnews.com",
+    AUTH_TRUST_HOST: "true",
+    NUTSNEWS_ADMIN_CANONICAL_ORIGIN: "https://www.nutsnews.com",
+    NUTSNEWS_ADMIN_DIRECT_ORIGIN: "https://vps.nutsnews.com",
     ...overrides,
   };
 }
@@ -176,7 +181,7 @@ test("production writer pause blocks app writes and external effects while prese
   assert.equal(isTelemetryDeliveryAllowed(environment), false);
 });
 
-test("OAuth callbacks preserve production behavior and allow only the isolated staging identity", () => {
+test("OAuth callbacks require canonical production admin host identity", () => {
   assert.doesNotThrow(() =>
     assertOAuthCallback(
       "oauth-callback",
@@ -189,12 +194,84 @@ test("OAuth callbacks preserve production behavior and allow only the isolated s
       "oauth-callback",
       {
         url: "http://0.0.0.0:3000/api/auth/callback/google",
-        host: "unexpected.example.test",
-        forwardedProto: "http",
+        host: "www.nutsnews.com",
+        forwardedProto: "https",
       },
       productionEnvironment(),
     ),
   );
+  assert.doesNotThrow(() =>
+    assertOAuthCallback(
+      "oauth-callback",
+      {
+        url: "http://0.0.0.0:3000/api/auth/callback/google",
+        host: "www.nutsnews.com:443",
+        forwardedProto: "https",
+      },
+      productionEnvironment(),
+    ),
+  );
+  assert.doesNotThrow(() =>
+    assertOAuthCallback(
+      "oauth-callback",
+      {
+        url: "http://0.0.0.0:3000/api/auth/callback/google",
+        host: "vps.nutsnews.com",
+        forwardedProto: "https",
+      },
+      productionEnvironment(),
+    ),
+  );
+  assert.throws(
+    () =>
+      assertOAuthCallback(
+        "oauth-callback",
+        {
+          url: "http://0.0.0.0:3000/api/auth/callback/google",
+          host: "unexpected.example.test",
+          forwardedProto: "https",
+        },
+        productionEnvironment(),
+      ),
+    (error) =>
+      error instanceof RuntimeSafetyError &&
+      error.code === "oauth_request_origin_mismatch",
+  );
+
+  for (const [environment, code] of [
+    [
+      productionEnvironment({
+        AUTH_URL: "https://vps.nutsnews.com",
+        NEXTAUTH_URL: "https://vps.nutsnews.com",
+      }),
+      "oauth_canonical_origin_mismatch",
+    ],
+    [
+      productionEnvironment({ NEXTAUTH_URL: "https://vps.nutsnews.com" }),
+      "oauth_auth_url_conflict",
+    ],
+    [
+      productionEnvironment({ AUTH_TRUST_HOST: "false" }),
+      "oauth_trust_host_disabled",
+    ],
+    [
+      productionEnvironment({ NUTSNEWS_ADMIN_CANONICAL_ORIGIN: "http://www.nutsnews.com" }),
+      "oauth_admin_origin_invalid",
+    ],
+  ]) {
+    assert.throws(
+      () =>
+        assertOAuthCallback(
+          "oauth-callback",
+          "https://www.nutsnews.com/api/auth/callback/google",
+          environment,
+        ),
+      (error) => error instanceof RuntimeSafetyError && error.code === code,
+    );
+  }
+});
+
+test("OAuth callbacks allow only the isolated staging identity", () => {
   assert.doesNotThrow(() =>
     assertOAuthCallback(
       "oauth-callback",
@@ -208,6 +285,17 @@ test("OAuth callbacks preserve production behavior and allow only the isolated s
       {
         url: "https://0.0.0.0:3000/api/auth/callback/google",
         host: "staging.nutsnews.com",
+        forwardedProto: "https",
+      },
+      stagingOAuthEnvironment(),
+    ),
+  );
+  assert.doesNotThrow(() =>
+    assertOAuthCallback(
+      "oauth-callback",
+      {
+        url: "https://0.0.0.0:3000/api/auth/callback/google",
+        host: "staging.nutsnews.com:443",
         forwardedProto: "https",
       },
       stagingOAuthEnvironment(),
@@ -264,11 +352,6 @@ test("staging OAuth callbacks fail closed for missing, mixed, or ambiguous ident
       url: "https://0.0.0.0:3000/api/auth/callback/google",
       host: "staging.nutsnews.com",
       forwardedProto: "http",
-    },
-    {
-      url: "https://0.0.0.0:3000/api/auth/callback/google",
-      host: "staging.nutsnews.com:443",
-      forwardedProto: "https",
     },
   ]) {
     assert.throws(
