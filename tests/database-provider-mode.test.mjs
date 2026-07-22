@@ -317,3 +317,27 @@ test("Backend primary admin article engagement uses provider-neutral admin datab
   assert.doesNotMatch(articleEngagementSource, /getServerSupabase\(/);
   assert.match(articleEngagementSource, /AdminDatabaseAccessError/);
 });
+
+test("Backend primary admin AI usage uses provider-neutral admin database operation", async () => {
+  const aiUsageSource = await readFile(
+    resolve(import.meta.dirname, "../web/lib/adminAiUsage.ts"),
+    "utf8",
+  );
+
+  assert.match(aiUsageSource, /readAdminDatabase\(\s*"load-admin-ai-usage"/);
+  assert.doesNotMatch(aiUsageSource, /from "@\/lib\/supabase"/);
+  assert.doesNotMatch(aiUsageSource, /getServerSupabase\(/);
+  assert.match(aiUsageSource, /AdminDatabaseAccessError/);
+});
+
+test("Backend primary admin local AI uses provider-neutral admin database operation", async () => {
+  const localAiSource = await readFile(
+    resolve(import.meta.dirname, "../web/lib/adminLocalAi.ts"),
+    "utf8",
+  );
+
+  assert.match(localAiSource, /readAdminDatabase\(\s*"load-admin-local-ai"/);
+  assert.doesNotMatch(localAiSource, /from "@\/lib\/supabase"/);
+  assert.doesNotMatch(localAiSource, /getServerSupabase\(/);
+  assert.match(localAiSource, /AdminDatabaseAccessError/);
+});

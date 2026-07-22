@@ -45,11 +45,9 @@ test("every discovered mutation or live operational path has a central runtime g
 test("service-role clients are centralized behind the runtime-validated Supabase factory", async () => {
   const sources = await Promise.all(
     [
-      "web/lib/adminAiUsage.ts",
       "web/lib/adminCostGuardrails.ts",
       "web/lib/adminFeedHealth.ts",
       "web/lib/adminFeedManagement.ts",
-      "web/lib/adminLocalAi.ts",
       "web/lib/adminShardHealth.ts",
       "web/lib/adminTranslationQuality.ts",
       "web/lib/runtimeFeatureFlags.ts",
@@ -85,6 +83,22 @@ test("service-role clients are centralized behind the runtime-validated Supabase
   assert.match(migratedArticleEngagementSource, /@\/lib\/adminDatabase/);
   assert.doesNotMatch(migratedArticleEngagementSource, /createClient\(/);
   assert.doesNotMatch(migratedArticleEngagementSource, /getServerSupabase\(/);
+
+  const migratedAiUsageSource = await readFile(
+    resolve(root, "web/lib/adminAiUsage.ts"),
+    "utf8",
+  );
+  assert.match(migratedAiUsageSource, /@\/lib\/adminDatabase/);
+  assert.doesNotMatch(migratedAiUsageSource, /createClient\(/);
+  assert.doesNotMatch(migratedAiUsageSource, /getServerSupabase\(/);
+
+  const migratedLocalAiSource = await readFile(
+    resolve(root, "web/lib/adminLocalAi.ts"),
+    "utf8",
+  );
+  assert.match(migratedLocalAiSource, /@\/lib\/adminDatabase/);
+  assert.doesNotMatch(migratedLocalAiSource, /createClient\(/);
+  assert.doesNotMatch(migratedLocalAiSource, /getServerSupabase\(/);
 });
 
 test("the web image has no ingestion schedule, startup migration, and CI fixtures remain non-production", async () => {

@@ -1,4 +1,11 @@
-import { getServerSupabase } from "@/lib/supabase";
+import { type SupabaseClient } from "@supabase/supabase-js";
+
+import {
+  AdminDatabaseAccessError,
+  readAdminDatabase,
+  type AdminDatabaseJsonObject,
+  type AdminSupabaseDatabaseContext,
+} from "@/lib/adminDatabase";
 import {
   getAdminDateKey,
   getAdminTimeZone,
@@ -39,6 +46,19 @@ type LocalAiReviewDbRow = {
   ai_provider: string | null;
   ai_model: string | null;
   review_duration_ms: number | string | null;
+};
+
+type LocalAiDatabaseSnapshot = {
+  usageRunRows: LocalAiUsageRunRow[];
+  recentReviewRows: LocalAiReviewDbRow[];
+};
+
+type LocalAiDatabaseSnapshotRow = Partial<LocalAiDatabaseSnapshot>;
+
+type LocalAiDatabaseResult = {
+  rows?: LocalAiDatabaseSnapshotRow[];
+  rowCount?: number;
+  generatedAt?: string;
 };
 
 export type LocalAiSummary = {
@@ -128,6 +148,40 @@ export type LocalAiDashboardData = {
 
 const MAX_RUN_ROWS_TO_LOAD = 5000;
 const MAX_REVIEW_ROWS_TO_LOAD = 50;
+const LOCAL_AI_RUN_SELECT_COLUMNS = [
+  "id",
+  "run_started_at",
+  "run_completed_at",
+  "run_source",
+  "shard_index",
+  "ai_provider",
+  "local_ai_model",
+  "local_ai_call_count",
+  "local_ai_prompt_tokens",
+  "local_ai_completion_tokens",
+  "local_ai_total_tokens",
+  "local_ai_accepted_count",
+  "local_ai_rejected_count",
+  "local_ai_duration_ms",
+  "openai_call_count",
+  "ai_reviewed_count",
+  "duration_ms",
+].join(", ");
+const LOCAL_AI_REVIEW_SELECT_COLUMNS = [
+  "id",
+  "reviewed_at",
+  "original_url",
+  "source",
+  "title",
+  "decision",
+  "category",
+  "positivity_score",
+  "summary",
+  "reason",
+  "ai_provider",
+  "ai_model",
+  "review_duration_ms",
+].join(", ");
 
 function dateHoursAgo(hours: number) {
   return new Date(Date.now() - hours * 60 * 60 * 1000);
@@ -361,36 +415,13 @@ function buildRecentReviews(rows: LocalAiReviewDbRow[]): LocalAiRecentReview[] {
   }));
 }
 
-function createSupabaseAdminClient() {
-  return getServerSupabase();
-}
-
-async function loadLocalAiRunsSince(since: Date) {
-  const supabase = createSupabaseAdminClient();
-
-  const { data, error } = await supabase
+async function loadSupabaseLocalAiRunsSince(
+  client: SupabaseClient,
+  since: Date,
+) {
+  const { data, error } = await client
     .from("ai_usage_runs")
-    .select(
-      [
-        "id",
-        "run_started_at",
-        "run_completed_at",
-        "run_source",
-        "shard_index",
-        "ai_provider",
-        "local_ai_model",
-        "local_ai_call_count",
-        "local_ai_prompt_tokens",
-        "local_ai_completion_tokens",
-        "local_ai_total_tokens",
-        "local_ai_accepted_count",
-        "local_ai_rejected_count",
-        "local_ai_duration_ms",
-        "openai_call_count",
-        "ai_reviewed_count",
-        "duration_ms",
-      ].join(", "),
-    )
+    .select(LOCAL_AI_RUN_SELECT_COLUMNS)
     .or("ai_provider.eq.local,local_ai_call_count.gt.0")
     .gte("run_started_at", since.toISOString())
     .order("run_started_at", { ascending: false })
@@ -403,28 +434,10 @@ async function loadLocalAiRunsSince(since: Date) {
   return (data ?? []) as unknown as LocalAiUsageRunRow[];
 }
 
-async function loadRecentLocalReviews() {
-  const supabase = createSupabaseAdminClient();
-
-  const { data, error } = await supabase
+async function loadSupabaseRecentLocalReviews(client: SupabaseClient) {
+  const { data, error } = await client
     .from("article_ai_reviews")
-    .select(
-      [
-        "id",
-        "reviewed_at",
-        "original_url",
-        "source",
-        "title",
-        "decision",
-        "category",
-        "positivity_score",
-        "summary",
-        "reason",
-        "ai_provider",
-        "ai_model",
-        "review_duration_ms",
-      ].join(", "),
-    )
+    .select(LOCAL_AI_REVIEW_SELECT_COLUMNS)
     .eq("ai_provider", "local")
     .order("reviewed_at", { ascending: false })
     .limit(MAX_REVIEW_ROWS_TO_LOAD);
@@ -436,14 +449,99 @@ async function loadRecentLocalReviews() {
   return (data ?? []) as unknown as LocalAiReviewDbRow[];
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function requiredArrayField<T>(row: Record<string, unknown>, field: string): T[] {
+  const value = row[field];
+
+  if (!Array.isArray(value)) {
+    throw new Error(
+      `Admin local AI operation returned an invalid ${field} array.`,
+    );
+  }
+
+  return value as T[];
+}
+
+function normalizeLocalAiDatabaseResult(
+  result: LocalAiDatabaseResult,
+): LocalAiDatabaseSnapshot {
+  const row = result.rows?.[0];
+
+  if (!isRecord(row)) {
+    throw new Error("Admin local AI operation returned no dashboard snapshot row.");
+  }
+
+  return {
+    usageRunRows: requiredArrayField<LocalAiUsageRunRow>(row, "usageRunRows"),
+    recentReviewRows: requiredArrayField<LocalAiReviewDbRow>(
+      row,
+      "recentReviewRows",
+    ),
+  };
+}
+
+async function loadSupabaseLocalAiDatabaseSnapshot(
+  context: AdminSupabaseDatabaseContext,
+  since: Date,
+) {
+  context.getConfig();
+  const client = context.getClient();
+  const [usageRunRows, recentReviewRows] = await Promise.all([
+    loadSupabaseLocalAiRunsSince(client, since),
+    loadSupabaseRecentLocalReviews(client),
+  ]);
+
+  return {
+    rows: [
+      {
+        usageRunRows,
+        recentReviewRows,
+      } as unknown as AdminDatabaseJsonObject,
+    ],
+    rowCount: 1,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+async function loadLocalAiDatabaseSnapshot(since: Date) {
+  const result = await readAdminDatabase(
+    "load-admin-local-ai",
+    {
+      since: since.toISOString(),
+      runLimit: MAX_RUN_ROWS_TO_LOAD,
+      reviewLimit: MAX_REVIEW_ROWS_TO_LOAD,
+    },
+    (context) => loadSupabaseLocalAiDatabaseSnapshot(context, since),
+    { cache: "no-store" },
+  );
+
+  return normalizeLocalAiDatabaseResult(result as LocalAiDatabaseResult);
+}
+
+function localAiDataAccessErrorMessage(error: unknown) {
+  if (error instanceof AdminDatabaseAccessError) {
+    return error.message;
+  }
+
+  if (
+    error instanceof Error &&
+    /server-side supabase access is not configured/i.test(error.message)
+  ) {
+    return "Missing SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.";
+  }
+
+  return error instanceof Error ? error.message : "Unable to load local AI dashboard data.";
+}
+
 export async function getAdminLocalAiDashboardData(): Promise<LocalAiDashboardData> {
   const generatedAt = new Date().toISOString();
 
   try {
-    const [runs, reviews] = await Promise.all([
-      loadLocalAiRunsSince(dateDaysAgo(30)),
-      loadRecentLocalReviews(),
-    ]);
+    const { usageRunRows: runs, recentReviewRows: reviews } =
+      await loadLocalAiDatabaseSnapshot(dateDaysAgo(30));
     const last24HourRuns = filterRowsSince(runs, dateHoursAgo(24));
     const last7DayRuns = filterRowsSince(runs, dateDaysAgo(7));
     const last30DayRuns = filterRowsSince(runs, dateDaysAgo(30));
@@ -461,10 +559,7 @@ export async function getAdminLocalAiDashboardData(): Promise<LocalAiDashboardDa
       recentReviews: buildRecentReviews(reviews),
     };
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Unable to load local AI dashboard data.";
+    const message = localAiDataAccessErrorMessage(error);
 
     return {
       isConfigured: false,
