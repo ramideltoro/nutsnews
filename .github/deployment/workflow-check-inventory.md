@@ -62,7 +62,7 @@ Manual recovery and dispatch-only release workflows are outside this budget beca
 | `sitemap-robots-check.yml` | PR-required | Runs local sitemap/robots contract coverage before merge and keeps live URL probing scheduled/manual. | No deployment. |
 | `snyk.yml` | PR-required | Runs Snyk dependency tests for dependency-risk PRs while keeping default-branch project monitoring main-only. | No deployment. |
 | `staging-release-regression.yml` | PR-required | Guards staging and release workflow contracts before release workflow changes merge. | No deployment. |
-| `staging-release.yml` | manual recovery | Typed operator workflow for manual VPS staging recovery dispatch; normal PR releases use the pre-merge VPS staging deploy job. | Dispatches staging only on manual recovery. |
+| `staging-release.yml` | manual recovery | Typed operator workflow for manual VPS staging recovery dispatch with an operator reason, bounded TTL declaration, and required auto-idle acknowledgement. | Dispatches staging only on manual recovery; teardown/off-state verification is owned by the infra auto-idle path. |
 | `staging-supabase-migration-regression.yml` | PR-required | Guards staging migration workflow behavior before migration automation changes merge. | No deployment. |
 | `staging-supabase-migration.yml` | manual recovery | Protected, typed-confirmation workflow for applying staging Supabase migrations. | Mutates staging data schema. |
 | `supabase-backup.yml` | scheduled/operational | Creates and verifies production backups on schedule or operator request. | No deployment. |

@@ -4,6 +4,9 @@ This runbook is the maintainer checklist for explicit deployment and recovery pa
 
 Normal PR merges do not deploy. The `Container Image` workflow no longer runs on ordinary pull requests; it archives immutable images from `main` pushes or explicit operator dispatches. Protected staging and production deployment validation must stay manual or explicit release-only.
 
+For the staging off-state, bounded enablement, auto-idle teardown, and
+verification contract, see [Staging Active-Use Runbook](./staging-active-use-runbook.md).
+
 ## Normal Release Targets
 
 | Order | Jobs | Target type | Runtime env | GitHub environment | Target URL source | Expected target URL |
@@ -109,7 +112,7 @@ Use these paths only for operator recovery. They are not branch-protection check
 
 | Need | Workflow | Trigger and required confirmation | Inputs to carry forward |
 | --- | --- | --- | --- |
-| Recover VPS staging to a known immutable candidate | `staging-release.yml` | `workflow_dispatch` with `confirmation` set to `request-vps-staging-recovery` | `source_commit`, `image_digest`, `build_id`, `schema_version`, `migration_head`, `supabase_project_ref` |
+| Recover VPS staging to a known immutable candidate | `staging-release.yml` | `workflow_dispatch` with `confirmation` set to `request-vps-staging-recovery`, `operator_reason`, `validation_ttl_hours`, and `off_state_acknowledgement=staging-auto-idle-required` | `source_commit`, `image_digest`, `build_id`, `schema_version`, `migration_head`, `supabase_project_ref`; the operator reason and TTL stay in app-side audit summaries, not the infra candidate payload |
 | Recover Vercel production from the protected infra chain | `vercel-production-release.yml` | `repository_dispatch` event `nutsnews-vercel-production-release`; no manual dispatch | `source_commit`, `image_digest`, `build_id`, `vps_apply_run_id`, `release_kind`; release payloads also include staging evidence, rollback payloads may omit staging qualification fields |
 | Roll back VPS production to the recorded last-known-good release | `protected-nutsnews-rollback.yml` in `ramideltoro/nutsnews-infra` | `workflow_dispatch` with `rollback_confirmation` set to `rollback-recorded-last-known-good` | `failed_image_digest` and a sanitized `rollback_reason`; the infra workflow selects the recorded restored source commit, image digest, build ID, schema version, migration head, and Supabase project ref |
 | Manually purge Cloudflare production cache | `cloudflare-production-cache-purge.yml` | `workflow_dispatch` with `confirmation` set to `purge-production-cache` | `reason` and optional `dry_run`; requires `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ZONE_ID`, `NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF`, and `NUTSNEWS_PRODUCTION_SUPABASE_URL` |
