@@ -54,6 +54,7 @@ Common entry points:
 | Validate public web flows | [Web Offline E2E Test](https://github.com/ramideltoro/nutsnews-docs/blob/main/WEB_OFFLINE_E2E_REGRESSION_TEST.md) and [Vercel Preview Smoke Test](https://github.com/ramideltoro/nutsnews-docs/blob/main/VERCEL_PREVIEW_SMOKE_TEST.md) |
 | Validate homepage performance | [Homepage Performance Budget](https://github.com/ramideltoro/nutsnews-docs/blob/main/HOMEPAGE_PERFORMANCE_BUDGET.md) |
 | Monitor cache regressions | [Cloudflare Cache Observability](https://github.com/ramideltoro/nutsnews-docs/blob/main/CLOUDFLARE_CACHE_OBSERVABILITY.md) |
+| Operate VPS failover visibility | [Failover Visibility Runbook](.github/deployment/failover-visibility-runbook.md) |
 | Review security hardening | [Security Hardening](https://github.com/ramideltoro/nutsnews-docs/blob/main/SECURITY_HARDENING.md) |
 | Validate Worker flows | See `ramideltoro/nutsnews-worker` |
 
@@ -68,6 +69,7 @@ Common entry points:
 | AI usage | `/admin/ai-usage` |
 | Local AI | `/admin/local-ai` |
 | Home server | `/admin/home-server` |
+| Failover visibility | `/admin/failover` |
 | Worker shards | `/admin/shards` |
 | Feed health | `/admin/feed-health` |
 | Feed management | `/admin/feeds` |
