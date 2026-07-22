@@ -137,6 +137,14 @@ function assertEqual(actual, expected, label) {
   }
 }
 
+function assertOneOf(actual, expectedValues, label) {
+  if (!expectedValues.includes(actual)) {
+    throw new Error(
+      `${label} mismatch: expected ${expectedValues.join(" or ")}, received ${actual ?? "missing"}`,
+    );
+  }
+}
+
 function optionalBoolean(value, label) {
   if (value === undefined || value === "") {
     return undefined;
@@ -207,6 +215,13 @@ const expectedHealthDeploymentTarget =
   option("--expected-health-deployment-target") ||
   process.env.NUTSNEWS_EXPECTED_HEALTH_DEPLOYMENT_TARGET ||
   expectedDeploymentTarget;
+const expectedHealthDeploymentTargets = expectedHealthDeploymentTarget
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+if (expectedHealthDeploymentTargets.length === 0) {
+  throw new Error("Expected health deployment target must include at least one value");
+}
 const expectedRuntimeEnv = option("--expected-runtime-env") || process.env.NUTSNEWS_EXPECTED_RUNTIME_ENV;
 const expectedSupabaseUrl = option("--expected-supabase-url") || process.env.NUTSNEWS_EXPECTED_SUPABASE_URL;
 const expectedImageDigest = option("--expected-image-digest") || process.env.NUTSNEWS_EXPECTED_IMAGE_DIGEST;
@@ -244,7 +259,7 @@ if (health?.ok !== true || health?.service !== "nutsnews-web") {
 
 assertEqual(health.sourceCommit, expectedSourceCommit, "Health source commit");
 assertEqual(health.buildId, expectedBuildId, "Health build ID");
-assertEqual(health.deploymentTarget, expectedHealthDeploymentTarget, "Health deployment target");
+assertOneOf(health.deploymentTarget, expectedHealthDeploymentTargets, "Health deployment target");
 assertEqual(
   healthResponse.headers.get("x-nutsnews-source-commit"),
   expectedSourceCommit,
@@ -255,9 +270,9 @@ assertEqual(
   expectedBuildId,
   "Health build ID header",
 );
-assertEqual(
+assertOneOf(
   healthResponse.headers.get("x-nutsnews-deployment-target"),
-  expectedHealthDeploymentTarget,
+  expectedHealthDeploymentTargets,
   "Health deployment target header",
 );
 if (productionSafeSurfaces && !/s-maxage=60/.test(healthResponse.headers.get("cdn-cache-control") ?? "")) {
