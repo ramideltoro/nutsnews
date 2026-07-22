@@ -356,3 +356,18 @@ test("Backend primary admin translation quality uses provider-neutral admin data
   assert.doesNotMatch(translationQualitySource, /getServerSupabase\(/);
   assert.match(translationQualitySource, /AdminDatabaseAccessError/);
 });
+
+test("Backend primary admin guardrails uses provider-neutral admin database operation", async () => {
+  const guardrailsSource = await readFile(
+    resolve(import.meta.dirname, "../web/lib/adminCostGuardrails.ts"),
+    "utf8",
+  );
+
+  assert.match(
+    guardrailsSource,
+    /readAdminDatabase\(\s*"load-admin-guardrails"/,
+  );
+  assert.doesNotMatch(guardrailsSource, /from "@\/lib\/supabase"/);
+  assert.doesNotMatch(guardrailsSource, /getServerSupabase\(/);
+  assert.match(guardrailsSource, /AdminDatabaseAccessError/);
+});

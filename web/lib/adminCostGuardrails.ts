@@ -1,7 +1,12 @@
 import { type SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  AdminDatabaseAccessError,
+  readAdminDatabase,
+  type AdminDatabaseJsonObject,
+  type AdminSupabaseDatabaseContext,
+} from "@/lib/adminDatabase";
 import { formatAdminDateTime } from "@/lib/adminTime";
-import { getServerSupabase, getServerSupabaseConfig } from "@/lib/supabase";
 
 type RiskLevel = "ok" | "watch" | "danger" | "unknown";
 type ForecastStatus = "safe" | "approaching_limit" | "projected_to_breach" | "insufficient_trend_data";
@@ -71,6 +76,16 @@ export type GuardrailMetric = {
   inputNames: string[];
 };
 
+type GuardrailWindowStats = {
+  workerRuns: number | null;
+  failedWorkerRuns: number | null;
+  openAiCalls: number | null;
+  openAiTokens: number | null;
+  openAiCostUsd: number | null;
+  localAiCalls: number | null;
+  emailSends: number | null;
+};
+
 export type GuardrailsDashboardData = {
   isConfigured: boolean;
   errorMessage: string | null;
@@ -79,33 +94,9 @@ export type GuardrailsDashboardData = {
   overallRiskLevel: RiskLevel;
   metrics: GuardrailMetric[];
   warnings: GuardrailMetric[];
-  last24Hours: {
-    workerRuns: number;
-    failedWorkerRuns: number;
-    openAiCalls: number;
-    openAiTokens: number;
-    openAiCostUsd: number;
-    localAiCalls: number;
-    emailSends: number;
-  };
-  last7Days: {
-    workerRuns: number;
-    failedWorkerRuns: number;
-    openAiCalls: number;
-    openAiTokens: number;
-    openAiCostUsd: number;
-    localAiCalls: number;
-    emailSends: number;
-  };
-  last30Days: {
-    workerRuns: number;
-    failedWorkerRuns: number;
-    openAiCalls: number;
-    openAiTokens: number;
-    openAiCostUsd: number;
-    localAiCalls: number;
-    emailSends: number;
-  };
+  last24Hours: GuardrailWindowStats;
+  last7Days: GuardrailWindowStats;
+  last30Days: GuardrailWindowStats;
 };
 
 const MAX_ROWS_TO_LOAD = 10000;
@@ -1424,13 +1415,91 @@ function buildCloudflareUsageMetrics(usage: CloudflareGraphQlUsage, eventRows: Q
   });
 }
 
-function getSupabaseAdminConfig() {
-  try {
-    const { url, serviceRoleKey } = getServerSupabaseConfig();
-    return { supabaseUrl: url, supabaseServiceRoleKey: serviceRoleKey };
-  } catch {
-    return { supabaseUrl: undefined, supabaseServiceRoleKey: undefined };
+type GuardrailsDatabaseSnapshot = {
+  aiUsageRunRows: AiUsageRunRow[];
+  workerRunRows: WorkerRunRow[];
+  quotaUsageEventRows: QuotaUsageEventRow[];
+  articleCount: number | null;
+  summaryCount: number | null;
+  feedCount: number | null;
+  partialErrors: string[];
+  isConfigured: boolean;
+  errorMessage: string | null;
+};
+
+type GuardrailsDatabaseResult = {
+  rows: AdminDatabaseJsonObject[];
+  rowCount?: number;
+  generatedAt?: string;
+};
+
+type SupabaseLoadFailure = {
+  label: string;
+  message: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function requiredArrayField<T>(row: Record<string, unknown>, field: string): T[] {
+  const value = row[field];
+
+  if (!Array.isArray(value)) {
+    throw new Error(`Admin guardrails operation returned an invalid ${field} array.`);
   }
+
+  return value as T[];
+}
+
+function optionalStringArrayField(row: Record<string, unknown>, field: string): string[] {
+  const value = row[field];
+
+  if (value === undefined || value === null) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    throw new Error(`Admin guardrails operation returned an invalid ${field} array.`);
+  }
+
+  return value.filter((item): item is string => typeof item === "string" && item.length > 0);
+}
+
+function optionalCountField(row: Record<string, unknown>, field: string) {
+  const value = row[field];
+
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`Admin guardrails operation returned an invalid ${field} count.`);
+  }
+
+  return value;
+}
+
+function normalizeGuardrailsDatabaseResult(
+  result: GuardrailsDatabaseResult,
+): GuardrailsDatabaseSnapshot {
+  const row = result.rows?.[0];
+
+  if (!isRecord(row)) {
+    throw new Error("Admin guardrails operation returned no dashboard snapshot row.");
+  }
+
+  return {
+    aiUsageRunRows: requiredArrayField<AiUsageRunRow>(row, "aiUsageRunRows"),
+    workerRunRows: requiredArrayField<WorkerRunRow>(row, "workerRunRows"),
+    quotaUsageEventRows: requiredArrayField<QuotaUsageEventRow>(row, "quotaUsageEventRows"),
+    articleCount: optionalCountField(row, "articleCount"),
+    summaryCount: optionalCountField(row, "summaryCount"),
+    feedCount: optionalCountField(row, "feedCount"),
+    partialErrors: optionalStringArrayField(row, "partialErrors"),
+    isConfigured: true,
+    errorMessage: null,
+  };
 }
 
 async function getExactCount(
@@ -1442,8 +1511,7 @@ async function getExactCount(
     .select("*", { count: "exact", head: true });
 
   if (error) {
-    console.warn(`Unable to load ${tableName} row count for guardrails`, error.message);
-    return null;
+    throw new Error(error.message);
   }
 
   return count ?? 0;
@@ -1531,6 +1599,157 @@ async function loadWorkerRuns(
   return (data ?? []) as unknown as WorkerRunRow[];
 }
 
+function supabaseLoadFailure(label: string, error: unknown): SupabaseLoadFailure {
+  return {
+    label,
+    message: error instanceof Error ? error.message : "Unknown Supabase read failure.",
+  };
+}
+
+async function settleSupabaseRead<T>({
+  label,
+  read,
+  fallback,
+  failures,
+}: {
+  label: string;
+  read: Promise<T>;
+  fallback: T;
+  failures: SupabaseLoadFailure[];
+}) {
+  try {
+    return await read;
+  } catch (error) {
+    const failure = supabaseLoadFailure(label, error);
+    failures.push(failure);
+    console.warn(`Unable to load ${label} for guardrails`, failure.message);
+    return fallback;
+  }
+}
+
+async function loadSupabaseGuardrailsDatabaseSnapshot(
+  context: AdminSupabaseDatabaseContext,
+  since: Date,
+) {
+  context.getConfig();
+  const client = context.getClient();
+  const failures: SupabaseLoadFailure[] = [];
+
+  const [
+    aiUsageRunRows,
+    workerRunRows,
+    quotaUsageEventRows,
+    articleCount,
+    summaryCount,
+    feedCount,
+  ] = await Promise.all([
+    settleSupabaseRead({
+      label: "ai_usage_runs",
+      read: loadAiUsageRuns(client, since),
+      fallback: [] as AiUsageRunRow[],
+      failures,
+    }),
+    settleSupabaseRead({
+      label: "worker_runs",
+      read: loadWorkerRuns(client, since),
+      fallback: [] as WorkerRunRow[],
+      failures,
+    }),
+    settleSupabaseRead({
+      label: "quota_usage_events",
+      read: loadQuotaUsageEvents(client, since),
+      fallback: [] as QuotaUsageEventRow[],
+      failures,
+    }),
+    settleSupabaseRead({
+      label: "articles row count",
+      read: getExactCount(client, "articles"),
+      fallback: null,
+      failures,
+    }),
+    settleSupabaseRead({
+      label: "article_summaries row count",
+      read: getExactCount(client, "article_summaries"),
+      fallback: null,
+      failures,
+    }),
+    settleSupabaseRead({
+      label: "rss_feeds row count",
+      read: getExactCount(client, "rss_feeds"),
+      fallback: null,
+      failures,
+    }),
+  ]);
+
+  return {
+    rows: [
+      {
+        aiUsageRunRows,
+        workerRunRows,
+        quotaUsageEventRows,
+        articleCount,
+        summaryCount,
+        feedCount,
+        partialErrors: failures.map(
+          (failure) => `${failure.label}: ${failure.message}`,
+        ),
+      } as unknown as AdminDatabaseJsonObject,
+    ],
+    rowCount: 1,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+function guardrailsDataAccessErrorMessage(error: unknown) {
+  if (error instanceof AdminDatabaseAccessError) {
+    return error.message;
+  }
+
+  if (
+    error instanceof Error &&
+    /server-side supabase access is not configured/i.test(error.message)
+  ) {
+    return "Missing SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.";
+  }
+
+  return error instanceof Error
+    ? error.message
+    : "Unable to load guardrails database telemetry.";
+}
+
+function unavailableDatabaseSnapshot(errorMessage: string): GuardrailsDatabaseSnapshot {
+  return {
+    aiUsageRunRows: [],
+    workerRunRows: [],
+    quotaUsageEventRows: [],
+    articleCount: null,
+    summaryCount: null,
+    feedCount: null,
+    partialErrors: [],
+    isConfigured: false,
+    errorMessage,
+  };
+}
+
+async function loadGuardrailsDatabaseSnapshot(since: Date): Promise<GuardrailsDatabaseSnapshot> {
+  try {
+    const result = await readAdminDatabase(
+      "load-admin-guardrails",
+      {
+        since: since.toISOString(),
+        limit: MAX_ROWS_TO_LOAD,
+        countTables: ["articles", "article_summaries", "rss_feeds"],
+      },
+      (context) => loadSupabaseGuardrailsDatabaseSnapshot(context, since),
+      { cache: "no-store" },
+    );
+
+    return normalizeGuardrailsDatabaseResult(result as GuardrailsDatabaseResult);
+  } catch (error) {
+    return unavailableDatabaseSnapshot(guardrailsDataAccessErrorMessage(error));
+  }
+}
+
 function buildWindowStats({
   workerRows,
   aiRows,
@@ -1554,13 +1773,20 @@ function buildWindowStats({
   };
 }
 
-function getOverallRiskLevel(metrics: GuardrailMetric[]): RiskLevel {
+function getOverallRiskLevel(
+  metrics: GuardrailMetric[],
+  options: { hasDataAccessWarning?: boolean } = {},
+): RiskLevel {
   if (metrics.some((metric) => metric.riskLevel === "danger")) {
     return "danger";
   }
 
   if (metrics.some((metric) => metric.riskLevel === "watch")) {
     return "watch";
+  }
+
+  if (options.hasDataAccessWarning) {
+    return "unknown";
   }
 
   if (metrics.every((metric) => metric.riskLevel === "unknown")) {
@@ -1570,124 +1796,127 @@ function getOverallRiskLevel(metrics: GuardrailMetric[]): RiskLevel {
   return "ok";
 }
 
-function emptyDashboard(generatedAt: string, errorMessage: string | null): GuardrailsDashboardData {
+function unknownWindowStats(): GuardrailWindowStats {
   return {
-    isConfigured: false,
-    errorMessage,
-    generatedAt,
-    latestRunLabel: "No data yet",
-    overallRiskLevel: "unknown",
-    metrics: [],
-    warnings: [],
-    last24Hours: {
-      workerRuns: 0,
-      failedWorkerRuns: 0,
-      openAiCalls: 0,
-      openAiTokens: 0,
-      openAiCostUsd: 0,
-      localAiCalls: 0,
-      emailSends: 0,
-    },
-    last7Days: {
-      workerRuns: 0,
-      failedWorkerRuns: 0,
-      openAiCalls: 0,
-      openAiTokens: 0,
-      openAiCostUsd: 0,
-      localAiCalls: 0,
-      emailSends: 0,
-    },
-    last30Days: {
-      workerRuns: 0,
-      failedWorkerRuns: 0,
-      openAiCalls: 0,
-      openAiTokens: 0,
-      openAiCostUsd: 0,
-      localAiCalls: 0,
-      emailSends: 0,
-    },
+    workerRuns: null,
+    failedWorkerRuns: null,
+    openAiCalls: null,
+    openAiTokens: null,
+    openAiCostUsd: null,
+    localAiCalls: null,
+    emailSends: null,
   };
+}
+
+function joinDataAccessMessages(messages: Array<string | null | undefined>) {
+  const cleanMessages = messages.filter(
+    (message): message is string => Boolean(message && message.trim()),
+  );
+
+  return cleanMessages.length > 0 ? cleanMessages.join(" ") : null;
+}
+
+function databaseUnavailableReason(message: string | null) {
+  return message
+    ? `Database telemetry is unavailable: ${message}`
+    : "Database telemetry is unavailable.";
+}
+
+function readNumberEnvWithDatabaseFallback(
+  envName: string,
+  fallback: number,
+  databaseTelemetryAvailable: boolean,
+) {
+  const manualValue = readNumberEnv(envName, null);
+
+  if (manualValue !== null) {
+    return manualValue;
+  }
+
+  return databaseTelemetryAvailable ? fallback : null;
 }
 
 export async function getAdminCostGuardrailsDashboardData(): Promise<GuardrailsDashboardData> {
   const generatedAt = new Date().toISOString();
-  const { supabaseUrl, supabaseServiceRoleKey } = getSupabaseAdminConfig();
+  const since30 = daysAgo(30);
+  const [databaseSnapshot, cloudflareUsage] = await Promise.all([
+    loadGuardrailsDatabaseSnapshot(since30),
+    loadCloudflareGraphQlUsage(),
+  ]);
+  const databaseTelemetryAvailable = databaseSnapshot.isConfigured;
+  const databaseErrorMessage = joinDataAccessMessages([
+    databaseSnapshot.errorMessage,
+    ...databaseSnapshot.partialErrors,
+  ]);
+  const databaseInsufficientReason = databaseTelemetryAvailable
+    ? undefined
+    : databaseUnavailableReason(databaseErrorMessage);
+  const aiRows = databaseSnapshot.aiUsageRunRows;
+  const workerRows = databaseSnapshot.workerRunRows;
+  const eventRows = databaseSnapshot.quotaUsageEventRows;
+  const { articleCount, summaryCount, feedCount } = databaseSnapshot;
+  const last24Hours = databaseTelemetryAvailable
+    ? buildWindowStats({
+        workerRows: filterSince(workerRows, daysAgo(1)),
+        aiRows: filterSince(aiRows, daysAgo(1)),
+        eventRows: filterSince(eventRows, daysAgo(1)),
+      })
+    : unknownWindowStats();
+  const last7Days = databaseTelemetryAvailable
+    ? buildWindowStats({
+        workerRows: filterSince(workerRows, daysAgo(7)),
+        aiRows: filterSince(aiRows, daysAgo(7)),
+        eventRows: filterSince(eventRows, daysAgo(7)),
+      })
+    : unknownWindowStats();
+  const last30Days = databaseTelemetryAvailable
+    ? buildWindowStats({ workerRows, aiRows, eventRows })
+    : unknownWindowStats();
+  const persistedRedisKvOps = sumQuotaEventTypes(eventRows, [
+    "redis_kv_operation",
+    "redis_kv_ops",
+    "kv_operation",
+    "kv_read",
+    "kv_write",
+  ]);
+  const persistedEgressGb = sumQuotaEventTypes(eventRows, [
+    "egress_gb",
+    "bandwidth_gb",
+    "fast_data_transfer_gb",
+    "fast_origin_transfer_gb",
+  ]);
+  const persistedPageSpeedCalls = sumQuotaEventTypes(eventRows, [
+    "pagespeed_api_call",
+    "pagespeed_api_calls",
+    "third_party_api_call",
+  ]);
+  const vercelFastOriginTransferGb =
+    readNumberEnv("NUTSNEWS_VERCEL_FAST_ORIGIN_TRANSFER_GB", 1.31) ?? 1.31;
+  const vercelFastDataTransferGb =
+    readNumberEnv("NUTSNEWS_VERCEL_FAST_DATA_TRANSFER_GB", 1.93) ?? 1.93;
+  const vercelEstimatedEgressGb = vercelFastOriginTransferGb + vercelFastDataTransferGb;
 
-  if (!supabaseUrl || !supabaseServiceRoleKey) {
-    return emptyDashboard(
-      generatedAt,
-      "Missing SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY.",
-    );
-  }
+  const totalContentRows =
+    articleCount === null || summaryCount === null || feedCount === null
+      ? null
+      : articleCount + summaryCount + feedCount;
 
-  try {
-    const supabase = getServerSupabase();
-
-    const since30 = daysAgo(30);
-    const [aiRows, workerRows, eventRows, articleCount, summaryCount, feedCount, cloudflareUsage] =
-      await Promise.all([
-        loadAiUsageRuns(supabase, since30),
-        loadWorkerRuns(supabase, since30),
-        loadQuotaUsageEvents(supabase, since30),
-        getExactCount(supabase, "articles"),
-        getExactCount(supabase, "article_summaries"),
-        getExactCount(supabase, "rss_feeds"),
-        loadCloudflareGraphQlUsage(),
-      ]);
-
-    const last24Hours = buildWindowStats({
-      workerRows: filterSince(workerRows, daysAgo(1)),
-      aiRows: filterSince(aiRows, daysAgo(1)),
-      eventRows: filterSince(eventRows, daysAgo(1)),
-    });
-    const last7Days = buildWindowStats({
-      workerRows: filterSince(workerRows, daysAgo(7)),
-      aiRows: filterSince(aiRows, daysAgo(7)),
-      eventRows: filterSince(eventRows, daysAgo(7)),
-    });
-    const last30Days = buildWindowStats({ workerRows, aiRows, eventRows });
-    const persistedRedisKvOps = sumQuotaEventTypes(eventRows, [
-      "redis_kv_operation",
-      "redis_kv_ops",
-      "kv_operation",
-      "kv_read",
-      "kv_write",
-    ]);
-    const persistedEgressGb = sumQuotaEventTypes(eventRows, [
-      "egress_gb",
-      "bandwidth_gb",
-      "fast_data_transfer_gb",
-      "fast_origin_transfer_gb",
-    ]);
-    const persistedPageSpeedCalls = sumQuotaEventTypes(eventRows, [
-      "pagespeed_api_call",
-      "pagespeed_api_calls",
-      "third_party_api_call",
-    ]);
-    const vercelFastOriginTransferGb =
-      readNumberEnv("NUTSNEWS_VERCEL_FAST_ORIGIN_TRANSFER_GB", 1.31) ?? 1.31;
-    const vercelFastDataTransferGb =
-      readNumberEnv("NUTSNEWS_VERCEL_FAST_DATA_TRANSFER_GB", 1.93) ?? 1.93;
-    const vercelEstimatedEgressGb = vercelFastOriginTransferGb + vercelFastDataTransferGb;
-
-    const totalContentRows =
-      articleCount === null || summaryCount === null || feedCount === null
-        ? null
-        : articleCount + summaryCount + feedCount;
-
-    const metrics: GuardrailMetric[] = [
-      buildMetric({
+  const metrics: GuardrailMetric[] = [
+    buildMetric({
         id: "db-content-rows",
         label: "Database content rows",
         group: "Database",
         value: totalContentRows,
         limit: readNumberEnv("NUTSNEWS_DB_CONTENT_ROW_LIMIT", 50000),
         unit: "rows",
+        forecastSourceValue: databaseTelemetryAvailable ? undefined : null,
+        forecastSourceDays: databaseTelemetryAvailable ? undefined : null,
+        forecastInsufficientReason: databaseInsufficientReason,
         description:
-          "Approximate Supabase growth using articles, article_summaries, and rss_feeds row counts.",
+          "Approximate primary database growth using articles, article_summaries, and rss_feeds row counts.",
         mitigation:
           "Archive old rejected reviews, reduce retained summaries, prune duplicate feeds, and export backups before deleting historical rows.",
-        dataSource: "Supabase row counts",
+        dataSource: "Admin database row counts",
       }),
       buildMetric({
         id: "article-count",
@@ -1696,10 +1925,13 @@ export async function getAdminCostGuardrailsDashboardData(): Promise<GuardrailsD
         value: articleCount,
         limit: readNumberEnv("NUTSNEWS_ARTICLE_ROW_LIMIT", 30000),
         unit: "articles",
+        forecastSourceValue: databaseTelemetryAvailable ? undefined : null,
+        forecastSourceDays: databaseTelemetryAvailable ? undefined : null,
+        forecastInsufficientReason: databaseInsufficientReason,
         description: "Total rows currently stored in public.articles.",
         mitigation:
           "Lower article retention, keep only published/needed rows, or move old rows into an archive export.",
-        dataSource: "Supabase articles count",
+        dataSource: "Admin database articles count",
       }),
       buildMetric({
         id: "summary-count",
@@ -1708,25 +1940,33 @@ export async function getAdminCostGuardrailsDashboardData(): Promise<GuardrailsD
         value: summaryCount,
         limit: readNumberEnv("NUTSNEWS_ARTICLE_SUMMARY_ROW_LIMIT", 90000),
         unit: "summaries",
+        forecastSourceValue: databaseTelemetryAvailable ? undefined : null,
+        forecastSourceDays: databaseTelemetryAvailable ? undefined : null,
+        forecastInsufficientReason: databaseInsufficientReason,
         description: "Total rows stored in public.article_summaries for translated article titles and summaries.",
         mitigation:
           "Reduce enabled languages, backfill in smaller batches, or archive old translated rows for articles no longer shown.",
-        dataSource: "Supabase article_summaries count",
+        dataSource: "Admin database article_summaries count",
       }),
       buildMetric({
         id: "openai-month-cost",
         label: "OpenAI cost, last 30 days",
         group: "AI",
-        value: Number(last30Days.openAiCostUsd.toFixed(6)),
+        value:
+          last30Days.openAiCostUsd === null
+            ? null
+            : Number(last30Days.openAiCostUsd.toFixed(6)),
         limit: readNumberEnv("NUTSNEWS_OPENAI_MONTHLY_BUDGET_USD", 5),
         unit: "USD",
         warningThresholdPercent: 60,
         dangerThresholdPercent: 85,
-        forecastSourceLast7Days: last7Days.openAiCostUsd,
+        forecastSourceValue: databaseTelemetryAvailable ? last7Days.openAiCostUsd : null,
+        forecastSourceDays: databaseTelemetryAvailable ? 7 : null,
+        forecastInsufficientReason: databaseInsufficientReason,
         description: "Estimated OpenAI cost from Worker usage rows in the last 30 days.",
         mitigation:
           "Lower MAX_AI_REVIEWS, prefer local AI, increase local prefilters, or temporarily pause non-critical shards.",
-        dataSource: "ai_usage_runs",
+        dataSource: "Admin database ai_usage_runs",
       }),
       buildMetric({
         id: "openai-month-calls",
@@ -1735,11 +1975,13 @@ export async function getAdminCostGuardrailsDashboardData(): Promise<GuardrailsD
         value: last30Days.openAiCalls,
         limit: readNumberEnv("NUTSNEWS_OPENAI_MONTHLY_CALL_LIMIT", 50000),
         unit: "calls",
-        forecastSourceLast7Days: last7Days.openAiCalls,
+        forecastSourceValue: databaseTelemetryAvailable ? last7Days.openAiCalls : null,
+        forecastSourceDays: databaseTelemetryAvailable ? 7 : null,
+        forecastInsufficientReason: databaseInsufficientReason,
         description: "Number of OpenAI calls captured from Worker usage rows in the last 30 days.",
         mitigation:
           "Reduce AI review concurrency, reduce per-shard review limits, and push more review work to the local model.",
-        dataSource: "ai_usage_runs",
+        dataSource: "Admin database ai_usage_runs",
       }),
       buildMetric({
         id: "worker-month-runs",
@@ -1748,11 +1990,13 @@ export async function getAdminCostGuardrailsDashboardData(): Promise<GuardrailsD
         value: last30Days.workerRuns,
         limit: readNumberEnv("NUTSNEWS_WORKER_MONTHLY_INVOCATION_LIMIT", 100000),
         unit: "runs",
-        forecastSourceLast7Days: last7Days.workerRuns,
+        forecastSourceValue: databaseTelemetryAvailable ? last7Days.workerRuns : null,
+        forecastSourceDays: databaseTelemetryAvailable ? 7 : null,
+        forecastInsufficientReason: databaseInsufficientReason,
         description: "Saved Worker run rows over the last 30 days. This is the best available proxy for Worker invocations.",
         mitigation:
           "Increase cron interval, reduce shard count, pause low-quality feeds, or consolidate shards when free-tier pressure rises.",
-        dataSource: "worker_runs",
+        dataSource: "Admin database worker_runs",
       }),
       buildMetric({
         id: "worker-failures-24h",
@@ -1763,10 +2007,13 @@ export async function getAdminCostGuardrailsDashboardData(): Promise<GuardrailsD
         unit: "failures",
         warningThresholdPercent: 40,
         dangerThresholdPercent: 100,
+        forecastSourceValue: databaseTelemetryAvailable ? undefined : null,
+        forecastSourceDays: databaseTelemetryAvailable ? undefined : null,
+        forecastInsufficientReason: databaseInsufficientReason,
         description: "Failed Worker rows in the last 24 hours.",
         mitigation:
           "Inspect /admin/shards, check failed feed errors, temporarily disable failing feeds, and verify secrets/bindings.",
-        dataSource: "worker_runs",
+        dataSource: "Admin database worker_runs",
       }),
       buildMetric({
         id: "email-sends-30d",
@@ -1775,20 +2022,29 @@ export async function getAdminCostGuardrailsDashboardData(): Promise<GuardrailsD
         value: last30Days.emailSends,
         limit: readNumberEnv("NUTSNEWS_EMAIL_MONTHLY_SEND_LIMIT", 3000),
         unit: "emails",
-        forecastSourceLast7Days: last7Days.emailSends,
+        forecastSourceValue: databaseTelemetryAvailable ? last7Days.emailSends : null,
+        forecastSourceDays: databaseTelemetryAvailable ? 7 : null,
+        forecastInsufficientReason: databaseInsufficientReason,
         description:
           "Contact form email sends recorded after successful provider delivery. Older deployments may show zero until quota_usage_events exists.",
         mitigation:
           "Tighten Turnstile protection, add rate limiting, or temporarily route contact submissions to a cheaper provider/queue.",
-        dataSource: "quota_usage_events.email_send",
+        dataSource: "Admin database quota_usage_events.email_send",
       }),
       buildMetric({
         id: "redis-kv-ops",
         label: "Redis/KV usage",
         group: "Redis/KV",
-        value: readNumberEnv("NUTSNEWS_REDIS_KV_30D_OPS", persistedRedisKvOps),
+        value: readNumberEnvWithDatabaseFallback(
+          "NUTSNEWS_REDIS_KV_30D_OPS",
+          persistedRedisKvOps,
+          databaseTelemetryAvailable,
+        ),
         limit: readNumberEnv("NUTSNEWS_REDIS_KV_30D_OP_LIMIT", 100000),
         unit: "ops",
+        forecastSourceValue: databaseTelemetryAvailable ? undefined : null,
+        forecastSourceDays: databaseTelemetryAvailable ? undefined : null,
+        forecastInsufficientReason: databaseInsufficientReason,
         description:
           "Redis/KV operations in the last 30 days from quota_usage_events when present, or from manual environment input. A zero value means no matching quota events have been recorded yet.",
         mitigation:
@@ -1834,9 +2090,16 @@ export async function getAdminCostGuardrailsDashboardData(): Promise<GuardrailsD
         id: "pagespeed-api-calls",
         label: "PageSpeed/API calls, last 30 days",
         group: "PageSpeed/API",
-        value: readNumberEnv("NUTSNEWS_PAGESPEED_30D_CALLS", persistedPageSpeedCalls),
+        value: readNumberEnvWithDatabaseFallback(
+          "NUTSNEWS_PAGESPEED_30D_CALLS",
+          persistedPageSpeedCalls,
+          databaseTelemetryAvailable,
+        ),
         limit: readNumberEnv("NUTSNEWS_PAGESPEED_30D_CALL_LIMIT", 25000),
         unit: "calls",
+        forecastSourceValue: databaseTelemetryAvailable ? undefined : null,
+        forecastSourceDays: databaseTelemetryAvailable ? undefined : null,
+        forecastInsufficientReason: databaseInsufficientReason,
         description:
           "PageSpeed or third-party API calls in the last 30 days from quota_usage_events when present, or from manual environment input. A zero value means audits have not recorded quota events yet.",
         mitigation:
@@ -1857,27 +2120,27 @@ export async function getAdminCostGuardrailsDashboardData(): Promise<GuardrailsD
       ...buildVercelUsageMetrics(),
     ];
 
-    const warnings = metrics.filter(
-      (metric) => metric.riskLevel === "watch" || metric.riskLevel === "danger",
-    );
-    const latestRun = workerRows[0]?.run_started_at ?? aiRows[0]?.run_started_at ?? null;
+  const warnings = metrics.filter(
+    (metric) => metric.riskLevel === "watch" || metric.riskLevel === "danger",
+  );
+  const latestRun = databaseTelemetryAvailable
+    ? workerRows[0]?.run_started_at ?? aiRows[0]?.run_started_at ?? null
+    : null;
 
-    return {
-      isConfigured: true,
-      errorMessage: null,
-      generatedAt,
-      latestRunLabel: formatAdminDateTime(latestRun, "No Worker/AI usage rows yet"),
-      overallRiskLevel: getOverallRiskLevel(metrics),
-      metrics,
-      warnings,
-      last24Hours,
-      last7Days,
-      last30Days,
-    };
-  } catch (error) {
-    return emptyDashboard(
-      generatedAt,
-      error instanceof Error ? error.message : "Unable to load free-tier guardrail data.",
-    );
-  }
+  return {
+    isConfigured: databaseTelemetryAvailable,
+    errorMessage: databaseErrorMessage,
+    generatedAt,
+    latestRunLabel: databaseTelemetryAvailable
+      ? formatAdminDateTime(latestRun, "No Worker/AI usage rows yet")
+      : "Database telemetry unavailable",
+    overallRiskLevel: getOverallRiskLevel(metrics, {
+      hasDataAccessWarning: Boolean(databaseErrorMessage),
+    }),
+    metrics,
+    warnings,
+    last24Hours,
+    last7Days,
+    last30Days,
+  };
 }
