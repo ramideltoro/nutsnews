@@ -14,11 +14,22 @@ export type BackendDatabaseApiConfig = {
   timeoutMs: number;
 };
 
+export type BackendDatabaseOperationOptions = {
+  env?: NodeJS.ProcessEnv;
+  fetchImpl?: typeof fetch;
+  cache?: RequestCache;
+  next?: {
+    revalidate?: number | false;
+    tags?: string[];
+  };
+};
+
 const typedBackendDatabase = backendDatabase as unknown as {
   getBackendDatabaseApiConfig(): BackendDatabaseApiConfig;
   callBackendDatabaseOperation<T>(
     operation: string,
     body?: Record<string, unknown>,
+    options?: BackendDatabaseOperationOptions,
   ): Promise<T>;
 };
 

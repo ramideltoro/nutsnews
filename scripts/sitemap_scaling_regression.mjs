@@ -36,6 +36,7 @@ assertIncludes(sitemapConfig, "getArticleSitemapRange", "sitemapConfig.ts");
 assertIncludes(sitemapConfig, "numericValue >= MAX_ARTICLE_SITEMAP_SHARDS", "sitemapConfig.ts");
 
 assertIncludes(rootSitemap, "ROOT_SITEMAP_RECENT_ARTICLE_LIMIT", "app/sitemap.ts");
+assertIncludes(rootSitemap, 'export const dynamic = "force-dynamic"', "app/sitemap.ts");
 assertIncludes(
   rootSitemap,
   "getRecentArticleSitemapItems(ROOT_SITEMAP_RECENT_ARTICLE_LIMIT)",
@@ -44,11 +45,13 @@ assertIncludes(
 assertExcludes(rootSitemap, "getRecentArticleSitemapItems(1000)", "app/sitemap.ts");
 
 assertIncludes(articleSitemap, "export async function generateSitemaps()", "app/articles/sitemap.ts");
+assertIncludes(articleSitemap, 'export const dynamic = "force-dynamic"', "app/articles/sitemap.ts");
 assertIncludes(articleSitemap, "id: Promise<string>", "app/articles/sitemap.ts");
 assertIncludes(articleSitemap, "getPublishedArticleSitemapCount", "app/articles/sitemap.ts");
 assertIncludes(articleSitemap, "getArticleSitemapItemsPage(shardId)", "app/articles/sitemap.ts");
 
 assertIncludes(sitemapIndex, "buildSitemapIndexXml", "app/sitemap-index.xml/route.ts");
+assertIncludes(sitemapIndex, 'export const dynamic = "force-dynamic"', "app/sitemap-index.xml/route.ts");
 assertIncludes(sitemapIndex, "<sitemapindex", "app/sitemap-index.xml/route.ts");
 assertIncludes(sitemapIndex, "getArticleSitemapShardIds(articleCount)", "app/sitemap-index.xml/route.ts");
 assertIncludes(sitemapIndex, "getArticleSitemapUrl(SITE_URL, shardId)", "app/sitemap-index.xml/route.ts");

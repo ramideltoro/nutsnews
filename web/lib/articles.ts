@@ -40,6 +40,13 @@ export const HOME_FEED_SECTIONS = [
 ] as const;
 export const SITE_URL = "https://www.nutsnews.com";
 export const PUBLIC_FEED_SNAPSHOT_TABLE = "public_feed_snapshot";
+const SITEMAP_BACKEND_FETCH_OPTIONS = {
+  cache: "force-cache" as const,
+  next: {
+    revalidate: 3600,
+    tags: ["sitemap"],
+  },
+};
 
 export type Article = {
   id: string;
@@ -1204,9 +1211,13 @@ export async function getRecentArticleSitemapItems(limit = ROOT_SITEMAP_RECENT_A
 
   const providerMode = getDatabaseProviderMode() as DatabaseProviderMode;
   if (providerMode === "backend_postgres_primary") {
-    return callBackendDatabaseOperation<ArticleSitemapItem[]>("load-recent-article-sitemap-items", {
-      limit: safeLimit,
-    });
+    return callBackendDatabaseOperation<ArticleSitemapItem[]>(
+      "load-recent-article-sitemap-items",
+      {
+        limit: safeLimit,
+      },
+      SITEMAP_BACKEND_FETCH_OPTIONS,
+    );
   }
 
   const { data, error } = await getSupabase()
@@ -1232,6 +1243,8 @@ export async function getPublishedArticleSitemapCount() {
   if (providerMode === "backend_postgres_primary") {
     const result = await callBackendDatabaseOperation<{ articleCount?: number }>(
       "load-published-article-sitemap-count",
+      {},
+      SITEMAP_BACKEND_FETCH_OPTIONS,
     );
     return result.articleCount ?? 0;
   }
@@ -1255,10 +1268,14 @@ export async function getArticleSitemapItemsPage(shardId: number) {
   const { from, to } = getArticleSitemapRange(shardId);
   const providerMode = getDatabaseProviderMode() as DatabaseProviderMode;
   if (providerMode === "backend_postgres_primary") {
-    return callBackendDatabaseOperation<ArticleSitemapItem[]>("load-article-sitemap-items-page", {
-      offset: from,
-      limit: to - from + 1,
-    });
+    return callBackendDatabaseOperation<ArticleSitemapItem[]>(
+      "load-article-sitemap-items-page",
+      {
+        offset: from,
+        limit: to - from + 1,
+      },
+      SITEMAP_BACKEND_FETCH_OPTIONS,
+    );
   }
 
   const { data, error } = await getSupabase()

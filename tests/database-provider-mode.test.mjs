@@ -189,6 +189,43 @@ test("Backend primary smoke can call a mock compatibility endpoint without Supab
   }
 });
 
+test("Backend primary compatibility calls can opt into cacheable fetch for sitemap metadata", async () => {
+  let capturedRequest = null;
+
+  const result = await callBackendDatabaseOperation(
+    "load-published-article-sitemap-count",
+    {},
+    {
+      env: stagingBackendPrimary({
+        NUTSNEWS_BACKEND_API_URL: "https://backend.example.test/api/app/db",
+        NUTSNEWS_BACKEND_API_TOKEN: "server-only-smoke-token",
+      }),
+      cache: "force-cache",
+      next: {
+        revalidate: 3600,
+        tags: ["sitemap"],
+      },
+      async fetchImpl(url, init) {
+        capturedRequest = { url: String(url), init };
+        return new Response(JSON.stringify({ articleCount: 42 }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    },
+  );
+
+  assert.deepEqual(result, { articleCount: 42 });
+  assert.equal(capturedRequest.url, "https://backend.example.test/api/app/db/load-published-article-sitemap-count");
+  assert.equal(capturedRequest.init.method, "POST");
+  assert.equal(capturedRequest.init.cache, "force-cache");
+  assert.deepEqual(capturedRequest.init.next, {
+    revalidate: 3600,
+    tags: ["sitemap"],
+  });
+  assert.equal(JSON.parse(capturedRequest.init.body).providerMode, "backend_postgres_primary");
+});
+
 test("Backend primary public article reads use backend compatibility operations", async () => {
   const articlesSource = await readFile(
     resolve(import.meta.dirname, "../web/lib/articles.ts"),

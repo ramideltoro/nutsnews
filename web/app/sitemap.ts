@@ -4,6 +4,7 @@ import { getRecentArticleSitemapItems, SITE_URL } from "@/lib/articles";
 import { ROOT_SITEMAP_RECENT_ARTICLE_LIMIT } from "@/lib/sitemapConfig";
 
 export const revalidate = 3600;
+export const dynamic = "force-dynamic";
 
 function getSitemapDate(value?: string | null) {
   return new Date(value ?? Date.now());
