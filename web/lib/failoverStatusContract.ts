@@ -83,6 +83,25 @@ export const FAILOVER_STALE_REASONS = [
   "next_check_due_missed",
   "clock_skew_detected",
 ] as const;
+export const FAILOVER_MANUAL_ACTION_SCHEMA_VERSION = "nutsnews.failover.manual_action.v1" as const;
+export const FAILOVER_MANUAL_ACTIONS = [
+  "enable_manual_lock",
+  "disable_manual_lock",
+  "force_dns_to_vercel",
+  "force_dns_to_vps",
+] as const;
+export const FAILOVER_MANUAL_ACTION_CONFIRMATIONS = {
+  enable_manual_lock: "ENABLE MANUAL LOCK",
+  disable_manual_lock: "DISABLE MANUAL LOCK",
+  force_dns_to_vercel: "FAILOVER TO VERCEL",
+  force_dns_to_vps: "FAILBACK TO VPS",
+} as const satisfies Record<(typeof FAILOVER_MANUAL_ACTIONS)[number], string>;
+export const FAILOVER_AUDIT_RESULTS = [
+  "success",
+  "failed",
+  "refused",
+  "duplicate",
+] as const;
 
 export const FAILOVER_CHECK_INTERVAL_SECONDS = 15 as const;
 export const FAILOVER_FAILURE_THRESHOLD = 3 as const;
@@ -100,6 +119,8 @@ export type FailoverVpsStatusCode = (typeof FAILOVER_VPS_STATUS_CODES)[number];
 export type FailoverDnsAction = (typeof FAILOVER_DNS_ACTIONS)[number];
 export type FailoverControllerState = (typeof FAILOVER_CONTROLLER_STATES)[number];
 export type FailoverStaleReason = (typeof FAILOVER_STALE_REASONS)[number];
+export type FailoverManualAction = (typeof FAILOVER_MANUAL_ACTIONS)[number];
+export type FailoverAuditResult = (typeof FAILOVER_AUDIT_RESULTS)[number];
 export type FailoverIsoDateTime = string;
 export type FailoverVpsStatus = number | FailoverVpsStatusCode | null;
 export type FailoverLiveOriginHostReadiness = {
@@ -152,6 +173,20 @@ export type FailoverStatus = {
   stale: boolean;
   staleReason: FailoverStaleReason | null;
   controllerVersion: string;
+};
+
+export type FailoverManualAuditEvent = {
+  id: string;
+  createdAt: FailoverIsoDateTime;
+  actor: string;
+  action: FailoverManualAction;
+  previousTarget: FailoverDnsTargetClassification;
+  newTarget: FailoverDnsTargetClassification;
+  reason: string;
+  result: FailoverAuditResult;
+  message: string;
+  manualLock: boolean;
+  idempotencyKey: string;
 };
 
 export const FAILOVER_STATUS_REQUIRED_FIELDS = [

@@ -1,19 +1,26 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import { auth, signOut } from "@/auth";
+import { isAllowedAdminEmail } from "@/lib/adminAuth";
 import {
   formatFailoverTarget,
   formatFailoverTimestamp,
   getAdminFailoverDashboardData,
+  performAdminFailoverAction,
   type AdminFailoverDashboardData,
   type FailoverDashboardTone,
   type FailoverTimelineRow,
 } from "@/lib/adminFailover";
 import type {
+  FailoverManualAction,
+  FailoverManualAuditEvent,
   FailoverLiveOriginHostReadiness,
   FailoverStatus,
 } from "@/lib/failoverStatusContract";
+import { FAILOVER_MANUAL_ACTION_CONFIRMATIONS } from "@/lib/failoverStatusContract";
 
 export const metadata = {
   title: "Failover | NutsNews Admin",
@@ -21,6 +28,54 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+type FailoverPageProps = {
+  searchParams?: Promise<{
+    updated?: string | string[];
+    error?: string | string[];
+  }>;
+};
+
+function getSingleSearchValue(value?: string | string[]) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+async function failoverManualAction(formData: FormData) {
+  "use server";
+
+  const session = await auth();
+  const actorEmail = session?.user?.email;
+
+  if (!actorEmail) {
+    redirect("/admin/login");
+  }
+
+  if (!isAllowedAdminEmail(actorEmail)) {
+    redirect("/admin/access-denied");
+  }
+
+  const result = await performAdminFailoverAction({
+    actorEmail,
+    action: String(formData.get("action") ?? ""),
+    confirmation: String(formData.get("confirmation") ?? ""),
+    reason: String(formData.get("reason") ?? ""),
+    expected: {
+      activeDnsTarget: String(formData.get("activeDnsTarget") ?? ""),
+      actualApexDnsTarget: String(formData.get("actualApexDnsTarget") ?? ""),
+      actualWwwDnsTarget: String(formData.get("actualWwwDnsTarget") ?? ""),
+      statusGeneratedAt: String(formData.get("statusGeneratedAt") ?? ""),
+    },
+  });
+
+  revalidatePath("/admin/failover");
+  revalidatePath("/admin/audit");
+
+  if (!result.ok) {
+    redirect(`/admin/failover?error=${encodeURIComponent(result.message)}`);
+  }
+
+  redirect(`/admin/failover?updated=${encodeURIComponent(result.message)}`);
+}
 
 const toneClasses: Record<FailoverDashboardTone, string> = {
   ok: "border-emerald-300/25 bg-emerald-400/10 text-emerald-100",
@@ -112,6 +167,7 @@ function MetricCard({
 function QuickNav() {
   const links = [
     ["Overview", "#overview"],
+    ["Controls", "#controls"],
     ["DNS", "#dns"],
     ["Live Origin", "#live-origin"],
     ["VPS Health", "#vps-health"],
@@ -188,6 +244,202 @@ function readinessDetail(host: FailoverLiveOriginHostReadiness) {
   const latency = typeof host.latencyMs === "number" ? `${host.latencyMs}ms` : "no latency";
 
   return `HTTP ${status}; ${latency}; ${host.cacheState} cache; ${host.readinessCode}.`;
+}
+
+function actionLabel(action: FailoverManualAction) {
+  if (action === "force_dns_to_vercel") {
+    return "Force DNS to Vercel";
+  }
+
+  if (action === "force_dns_to_vps") {
+    return "Force DNS to VPS";
+  }
+
+  if (action === "enable_manual_lock") {
+    return "Enable Manual Lock";
+  }
+
+  return "Disable Manual Lock";
+}
+
+function actionTone(action: FailoverManualAction): FailoverDashboardTone {
+  if (action === "force_dns_to_vercel" || action === "enable_manual_lock") {
+    return "watch";
+  }
+
+  return "ok";
+}
+
+function auditResultTone(result: FailoverManualAuditEvent["result"]): FailoverDashboardTone {
+  if (result === "success") {
+    return "ok";
+  }
+
+  if (result === "refused" || result === "duplicate") {
+    return "watch";
+  }
+
+  return "danger";
+}
+
+function FlashMessages({
+  updated,
+  error,
+}: {
+  updated?: string;
+  error?: string;
+}) {
+  if (!updated && !error) {
+    return null;
+  }
+
+  return (
+    <div className="mb-5 grid gap-3">
+      {updated ? (
+        <div className="rounded-[1.25rem] border border-emerald-300/25 bg-emerald-400/10 p-4 text-sm leading-6 text-emerald-100">
+          {updated}
+        </div>
+      ) : null}
+      {error ? (
+        <div className="rounded-[1.25rem] border border-rose-300/25 bg-rose-500/10 p-4 text-sm leading-6 text-rose-100">
+          {error}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function HiddenExpectedStatus({ status }: { status: FailoverStatus }) {
+  return (
+    <>
+      <input type="hidden" name="activeDnsTarget" value={status.activeDnsTarget} />
+      <input type="hidden" name="actualApexDnsTarget" value={status.actualApexDnsTarget} />
+      <input type="hidden" name="actualWwwDnsTarget" value={status.actualWwwDnsTarget} />
+      <input type="hidden" name="statusGeneratedAt" value={status.generatedAt} />
+    </>
+  );
+}
+
+function ActionCard({
+  status,
+  action,
+  title,
+  detail,
+  disabled,
+}: {
+  status: FailoverStatus;
+  action: FailoverManualAction;
+  title: string;
+  detail: string;
+  disabled: boolean;
+}) {
+  const confirmation = FAILOVER_MANUAL_ACTION_CONFIRMATIONS[action];
+
+  return (
+    <form
+      action={failoverManualAction}
+      className={`grid gap-3 rounded-[1.5rem] border bg-black/20 p-4 ${disabled ? "border-amber-300/10 opacity-65" : "border-amber-300/20"}`}
+    >
+      <input type="hidden" name="action" value={action} />
+      <HiddenExpectedStatus status={status} />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <StatusPill label={actionLabel(action)} tone={actionTone(action)} />
+        {disabled ? <StatusPill label="Unavailable" tone="neutral" /> : null}
+      </div>
+
+      <div>
+        <h3 className="text-base font-black text-amber-50">{title}</h3>
+        <p className="mt-1 text-xs leading-5 text-amber-100/60">{detail}</p>
+      </div>
+
+      <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-amber-300/70">
+        Confirmation
+        <input
+          name="confirmation"
+          autoComplete="off"
+          placeholder={confirmation}
+          disabled={disabled}
+          className="rounded-[1rem] border border-amber-300/15 bg-black/35 px-3 py-2 text-sm normal-case tracking-normal text-amber-50 placeholder:text-amber-100/30 disabled:cursor-not-allowed"
+        />
+      </label>
+
+      <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-amber-300/70">
+        Reason
+        <textarea
+          name="reason"
+          rows={3}
+          disabled={disabled}
+          placeholder="Incident ticket, maintenance window, or operator context"
+          className="resize-none rounded-[1rem] border border-amber-300/15 bg-black/35 px-3 py-2 text-sm normal-case tracking-normal text-amber-50 placeholder:text-amber-100/30 disabled:cursor-not-allowed"
+        />
+      </label>
+
+      <button
+        type="submit"
+        disabled={disabled}
+        className="rounded-full border border-amber-300/25 bg-amber-400/10 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-amber-100 transition hover:border-amber-300/50 hover:bg-amber-400/15 disabled:cursor-not-allowed disabled:border-amber-300/10 disabled:bg-black/20 disabled:text-amber-100/35"
+      >
+        {title}
+      </button>
+    </form>
+  );
+}
+
+function ControlsSection({ data }: { data: AdminFailoverDashboardData }) {
+  const status = data.status;
+
+  return (
+    <Section
+      id="controls"
+      eyebrow="Guarded Actions"
+      title="Manual Failover Controls"
+      description="Actions are submitted to the protected failover controller. The controller re-checks Cloudflare DNS before any DNS write."
+    >
+      {!data.actionsConfigured ? (
+        <div className="mb-4 rounded-[1.25rem] border border-orange-300/20 bg-orange-400/10 p-4 text-sm leading-6 text-orange-100">
+          Missing NUTSNEWS_FAILOVER_ACTION_HMAC_SECRET for manual failover controls.
+        </div>
+      ) : null}
+
+      {!status ? (
+        <div className="rounded-[1.5rem] border border-rose-300/25 bg-rose-500/10 p-5 text-sm leading-6 text-rose-100">
+          Manual controls require a fresh controller status snapshot.
+        </div>
+      ) : (
+        <div className="grid gap-4 xl:grid-cols-2">
+          <ActionCard
+            status={status}
+            action="enable_manual_lock"
+            title="Enable Manual Lock"
+            detail="Stops automatic failback from changing the desired target while health checks continue to record VPS readiness."
+            disabled={!data.actionsConfigured || status.manualLock}
+          />
+          <ActionCard
+            status={status}
+            action="disable_manual_lock"
+            title="Disable Manual Lock"
+            detail="Allows automatic failback decisions to resume on the next health-check cycle."
+            disabled={!data.actionsConfigured || !status.manualLock}
+          />
+          <ActionCard
+            status={status}
+            action="force_dns_to_vercel"
+            title="Force DNS to Vercel"
+            detail="Writes the configured apex and www Cloudflare records to the Vercel fallback target after fresh DNS validation."
+            disabled={!data.actionsConfigured || status.stale}
+          />
+          <ActionCard
+            status={status}
+            action="force_dns_to_vps"
+            title="Force DNS to VPS"
+            detail="Writes the configured apex and www Cloudflare records back to the VPS primary target after fresh DNS validation."
+            disabled={!data.actionsConfigured || status.stale}
+          />
+        </div>
+      )}
+    </Section>
+  );
 }
 
 function Overview({ data }: { data: AdminFailoverDashboardData }) {
@@ -414,6 +666,60 @@ function TimelineList({
   );
 }
 
+function AuditTrailList({ data }: { data: AdminFailoverDashboardData }) {
+  return (
+    <div className="mt-4 rounded-[1.5rem] border border-amber-300/15 bg-black/20">
+      <div className="border-b border-amber-300/10 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-sm font-black text-amber-50">Manual Action Audit</h3>
+          <StatusPill label={data.auditAvailable ? "Loaded" : "Unavailable"} tone={data.auditAvailable ? "ok" : "watch"} />
+        </div>
+      </div>
+      {data.auditEvents.length === 0 ? (
+        <p className="px-4 py-5 text-sm leading-6 text-amber-100/60">
+          {data.auditMessage}
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-amber-300/10 text-sm">
+            <thead className="bg-black/30 text-left text-[10px] font-black uppercase tracking-[0.14em] text-amber-300/75">
+              <tr>
+                <th className="px-4 py-3">When</th>
+                <th className="px-4 py-3">Actor</th>
+                <th className="px-4 py-3">Action</th>
+                <th className="px-4 py-3">Target</th>
+                <th className="px-4 py-3">Result</th>
+                <th className="px-4 py-3">Reason</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-amber-300/10 bg-black/15 text-amber-100/75">
+              {data.auditEvents.map((event) => (
+                <tr key={event.id}>
+                  <td className="px-4 py-4 font-mono text-xs text-amber-100/55">
+                    {formatFailoverTimestamp(event.createdAt)}
+                  </td>
+                  <td className="px-4 py-4 font-semibold text-amber-50">{event.actor}</td>
+                  <td className="px-4 py-4">{actionLabel(event.action)}</td>
+                  <td className="px-4 py-4">
+                    {formatFailoverTarget(event.previousTarget)} to {formatFailoverTarget(event.newTarget)}
+                  </td>
+                  <td className="px-4 py-4">
+                    <StatusPill label={event.result} tone={auditResultTone(event.result)} />
+                  </td>
+                  <td className="px-4 py-4">
+                    <p className="max-w-md text-xs leading-5 text-amber-100/65">{event.reason}</p>
+                    <p className="mt-1 max-w-md text-[11px] leading-5 text-amber-100/45">{event.message}</p>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HistorySection({ data }: { data: AdminFailoverDashboardData }) {
   return (
     <Section
@@ -432,6 +738,8 @@ function HistorySection({ data }: { data: AdminFailoverDashboardData }) {
         <TimelineList title="Recent Health Checks" rows={data.recentHealthChecks} />
         <TimelineList title="Recent DNS Changes" rows={data.recentDnsChanges} />
       </div>
+
+      <AuditTrailList data={data} />
     </Section>
   );
 }
@@ -478,11 +786,14 @@ function SetupSection({ data }: { data: AdminFailoverDashboardData }) {
     >
       <div className="mb-4 flex flex-wrap gap-2">
         <StatusPill label={data.isConfigured ? "Configured" : "Needs setup"} tone={data.isConfigured ? "ok" : "watch"} />
+        <StatusPill label={data.actionsConfigured ? "Actions configured" : "Actions locked"} tone={data.actionsConfigured ? "ok" : "watch"} />
         <StatusPill label={data.controllerReachable ? "Controller reachable" : "Controller unavailable"} tone={data.controllerReachable ? "ok" : "danger"} />
       </div>
       <pre className="overflow-x-auto rounded-[1.25rem] border border-amber-300/15 bg-black/40 p-4 text-xs leading-6 text-amber-100/80">
 {`NUTSNEWS_FAILOVER_CONTROLLER_STATUS_URL=https://nutsnews-controller.nutsnews.workers.dev/status?mode=dashboard
+NUTSNEWS_FAILOVER_CONTROLLER_ACTION_URL=https://nutsnews-controller.nutsnews.workers.dev/actions
 NUTSNEWS_FAILOVER_STATUS_HMAC_SECRET=<shared controller status secret>
+NUTSNEWS_FAILOVER_ACTION_HMAC_SECRET=<shared controller action secret>
 NUTSNEWS_FAILOVER_RUNBOOK_URL=<optional failover runbook URL>
 NUTSNEWS_FAILOVER_CLOUDFLARE_DASHBOARD_URL=<optional Cloudflare DNS page>`}
       </pre>
@@ -490,10 +801,13 @@ NUTSNEWS_FAILOVER_CLOUDFLARE_DASHBOARD_URL=<optional Cloudflare DNS page>`}
   );
 }
 
-export default async function AdminFailoverPage() {
+export default async function AdminFailoverPage({ searchParams }: FailoverPageProps) {
   const session = await auth();
   const data = await getAdminFailoverDashboardData();
   const status = data.status;
+  const params = await searchParams;
+  const updated = getSingleSearchValue(params?.updated);
+  const error = getSingleSearchValue(params?.error);
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#0a0a0a] px-4 py-6 text-amber-50 sm:px-6 lg:px-8">
@@ -557,9 +871,11 @@ export default async function AdminFailoverPage() {
         </header>
 
         <QuickNav />
+        <FlashMessages updated={updated} error={error} />
 
         <div className="space-y-5">
           <Overview data={data} />
+          <ControlsSection data={data} />
 
           {status ? (
             <>
