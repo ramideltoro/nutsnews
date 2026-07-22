@@ -1,4 +1,11 @@
-import { getServerSupabase, getServerSupabaseConfig } from "@/lib/supabase";
+import { type SupabaseClient } from "@supabase/supabase-js";
+
+import {
+    AdminDatabaseAccessError,
+    readAdminDatabase,
+    type AdminDatabaseJsonObject,
+    type AdminSupabaseDatabaseContext,
+} from "@/lib/adminDatabase";
 import {
     getAdminDateKey,
     getAdminTimeZone,
@@ -43,11 +50,6 @@ const WORKER_RUN_SELECT_COLUMNS = [
     "spike_warning_triggered",
     "duration_ms",
 ].join(",");
-
-type SupabaseConfig = {
-    url: string;
-    serviceRoleKey: string;
-};
 
 type WorkerRunRow = {
     id: number;
@@ -212,14 +214,6 @@ export type ShardHealthDashboardData = {
     daily: WorkerHealthDailyPoint[];
     recentRuns: RecentShardRun[];
 };
-
-function getSupabaseConfig(): SupabaseConfig | null {
-    try {
-        return getServerSupabaseConfig();
-    } catch {
-        return null;
-    }
-}
 
 function getOptionalNumber(value: string | undefined, fallback: number) {
     if (!value) {
@@ -716,17 +710,51 @@ function buildSummary({
     };
 }
 
-async function getWorkerRunRows() {
-    const config = getSupabaseConfig();
+type WorkerShardsDatabaseSnapshot = {
+    workerRunRows: WorkerRunRow[];
+};
 
-    if (!config) {
+type WorkerShardsDatabaseResult = {
+    rows: AdminDatabaseJsonObject[];
+    rowCount?: number;
+    generatedAt?: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function requiredArrayField<T>(row: Record<string, unknown>, field: string): T[] {
+    const value = row[field];
+
+    if (!Array.isArray(value)) {
         throw new Error(
-            "Missing SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY.",
+            `Admin worker shards operation returned an invalid ${field} array.`,
         );
     }
 
-    const supabase = getServerSupabase();
+    return value as T[];
+}
 
+function normalizeWorkerShardsDatabaseResult(
+    result: WorkerShardsDatabaseResult,
+): WorkerShardsDatabaseSnapshot {
+    const row = result.rows?.[0];
+
+    if (!isRecord(row)) {
+        throw new Error(
+            "Admin worker shards operation returned no dashboard snapshot row.",
+        );
+    }
+
+    return {
+        workerRunRows: requiredArrayField<WorkerRunRow>(row, "workerRunRows"),
+    };
+}
+
+async function loadSupabaseWorkerRunRows(
+    supabase: SupabaseClient,
+): Promise<WorkerRunRow[]> {
     const { data, error } = await supabase
         .from("worker_runs")
         .select(WORKER_RUN_SELECT_COLUMNS)
@@ -740,6 +768,68 @@ async function getWorkerRunRows() {
     }
 
     return (data ?? []) as unknown as WorkerRunRow[];
+}
+
+async function loadSupabaseWorkerShardsDatabaseSnapshot(
+    context: AdminSupabaseDatabaseContext,
+) {
+    context.getConfig();
+    const client = context.getClient();
+    const workerRunRows = await loadSupabaseWorkerRunRows(client);
+
+    return {
+        rows: [
+            {
+                workerRunRows,
+            } as unknown as AdminDatabaseJsonObject,
+        ],
+        rowCount: 1,
+        generatedAt: new Date().toISOString(),
+    };
+}
+
+async function loadWorkerShardsDatabaseSnapshot({
+    shardCount,
+    staleAfterMinutes,
+    slowRunMs,
+}: {
+    shardCount: number;
+    staleAfterMinutes: number;
+    slowRunMs: number;
+}) {
+    const result = await readAdminDatabase(
+        "load-admin-worker-shards",
+        {
+            limit: 500,
+            shardCount,
+            staleAfterMinutes,
+            slowRunMs,
+            dailyWindowDays: DAILY_WINDOW_DAYS,
+        },
+        loadSupabaseWorkerShardsDatabaseSnapshot,
+        { cache: "no-store" },
+    );
+
+    return normalizeWorkerShardsDatabaseResult(
+        result as WorkerShardsDatabaseResult,
+    );
+}
+
+function shardHealthDataAccessErrorMessage(error: unknown) {
+    if (error instanceof AdminDatabaseAccessError) {
+        return error.message;
+    }
+
+    if (
+        error instanceof Error &&
+        /server-side supabase access is not configured/i.test(error.message)
+    ) {
+        return "Missing SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.";
+    }
+
+    return error instanceof Error
+        ? error.message
+        : "Unknown shard health dashboard error.";
 }
 
 export async function getAdminShardHealthDashboardData(): Promise<ShardHealthDashboardData> {
@@ -757,7 +847,11 @@ export async function getAdminShardHealthDashboardData(): Promise<ShardHealthDas
     );
 
     try {
-        const runs = await getWorkerRunRows();
+        const { workerRunRows: runs } = await loadWorkerShardsDatabaseSnapshot({
+            shardCount,
+            staleAfterMinutes,
+            slowRunMs,
+        });
         const shards = buildShardRows({
             runs,
             shardCount,
@@ -803,10 +897,7 @@ export async function getAdminShardHealthDashboardData(): Promise<ShardHealthDas
 
         return {
             isConfigured: false,
-            errorMessage:
-                error instanceof Error
-                    ? error.message
-                    : "Unknown shard health dashboard error.",
+            errorMessage: shardHealthDataAccessErrorMessage(error),
             generatedAt: new Date().toISOString(),
             staleAfterMinutes,
             slowRunMs,
