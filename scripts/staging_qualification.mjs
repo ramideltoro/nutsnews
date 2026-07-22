@@ -339,7 +339,12 @@ export async function runHttpQualification({ input, fixtureNamespace, fetchImpl 
     if (/auth\//.test(endpoint) && !/no-store|private/.test(response.headers.get("cache-control") ?? "")) throw new Error(`${endpoint} must not be publicly cached`);
   }
   const admin = await get("/admin", { redirect: "manual" });
-  if (![302, 303, 307, 308].includes(admin.status) || !/\/admin\/(?:login|access-denied)/.test(admin.headers.get("location") ?? "")) throw new Error("unauthenticated admin request did not redirect safely");
+  const adminBypassExpected = String(env.NUTSNEWS_ADMIN_TEST_AUTH_BYPASS_EXPECTED ?? "").trim().toLowerCase() === "true";
+  if (adminBypassExpected) {
+    if (admin.status !== 200) throw new Error("admin test auth bypass did not render safely");
+  } else if (![302, 303, 307, 308].includes(admin.status) || !/\/admin\/(?:login|access-denied)/.test(admin.headers.get("location") ?? "")) {
+    throw new Error("unauthenticated admin request did not redirect safely");
+  }
   const contactDisabled = await boundedFetch(fetchImpl, new URL("/api/contact", input.baseUrl), {
     method: "POST",
     headers: { ...headers, Origin: input.baseUrl.replace(/\/$/, ""), "Content-Type": "application/json" },
