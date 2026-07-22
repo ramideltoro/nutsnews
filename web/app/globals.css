@@ -1022,6 +1022,70 @@ body {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
+.site-footer-modern__mobile-menu {
+  position: relative;
+  display: none;
+}
+
+.footer-menu-icon {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 0.18rem;
+}
+
+.footer-menu-icon__line {
+  display: block;
+  width: 0.92rem;
+  height: 0.1rem;
+  border-radius: 9999px;
+  background: currentColor;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.footer-menu-icon--open .footer-menu-icon__line:nth-child(1) {
+  transform: translateY(0.28rem) rotate(45deg);
+}
+
+.footer-menu-icon--open .footer-menu-icon__line:nth-child(2) {
+  opacity: 0;
+}
+
+.footer-menu-icon--open .footer-menu-icon__line:nth-child(3) {
+  transform: translateY(-0.28rem) rotate(-45deg);
+}
+
+.site-footer-modern__mobile-panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 0.58rem);
+  display: grid;
+  width: min(15.5rem, calc(100vw - 1.5rem));
+  gap: 0.18rem;
+  border: 1px solid var(--theme-border);
+  border-radius: 0.8rem;
+  background: var(--theme-surface);
+  padding: 0.42rem;
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.5), 0 0 30px var(--theme-glow-soft);
+}
+
+.site-footer-modern__mobile-link {
+  border-radius: 0.58rem;
+  color: var(--theme-heading);
+  font-size: 0.78rem;
+  font-weight: 850;
+  line-height: 1.2;
+  padding: 0.72rem 0.82rem;
+  text-decoration: none;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.site-footer-modern__mobile-link:hover,
+.site-footer-modern__mobile-link:focus-visible {
+  background: var(--theme-glow-soft);
+  color: var(--theme-accent-soft);
+}
+
 .site-footer-modern__link {
   border-radius: 9999px;
   color: var(--theme-accent-soft);
@@ -1056,6 +1120,25 @@ body {
 
   .site-footer-modern__link {
     padding-inline: 0.48rem;
+  }
+}
+
+@media (max-width: 719px) {
+  .site-footer-modern__top-row {
+    justify-content: center;
+  }
+
+  .site-footer-modern__nav {
+    display: none;
+  }
+
+  .site-footer-modern__mobile-menu {
+    display: block;
+  }
+
+  .site-footer-modern__copyright {
+    max-width: calc(100vw - 1.25rem);
+    white-space: normal;
   }
 }
 
