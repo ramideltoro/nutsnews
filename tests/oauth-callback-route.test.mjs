@@ -22,7 +22,13 @@ test("GET and POST OAuth paths both enforce the callback identity guard", async 
   }
 
   assert.match(source, /Cache-Control": "no-store"/);
+  assert.match(source, /X-NutsNews-Auth-Error/);
   assert.match(source, /status: 503/);
-  assert.match(source, /host: request\.headers\.get\("host"\)/);
-  assert.match(source, /forwardedProto: request\.headers\.get\("x-forwarded-proto"\)/);
+  assert.match(source, /code: error\.code/);
+  assert.match(source, /logWarn\(\s*"admin\.oauth_callback\.blocked"/);
+  assert.match(source, /request\.headers\.get\("x-forwarded-host"\)/);
+  assert.match(source, /request\.headers\.get\("host"\)/);
+  assert.match(source, /requestUrl\.host/);
+  assert.match(source, /request\.headers\.get\("x-forwarded-proto"\)/);
+  assert.match(source, /requestUrl\.protocol\.slice\(0, -1\)/);
 });

@@ -260,8 +260,15 @@ async function testAuthBoundaryContracts() {
     );
   }
   assertIncludes(oauthRoute, "assertOAuthCallback", "OAuth callback route");
+  assertIncludes(oauthRoute, "x-forwarded-host", "OAuth callback route proxy host identity");
+  assertIncludes(oauthRoute, "requestUrl.protocol.slice(0, -1)", "OAuth callback route proto fallback");
+  assertIncludes(oauthRoute, "logWarn", "OAuth denied diagnostic log");
   assertIncludes(oauthRoute, "status: 503", "OAuth denied response");
   assertIncludes(oauthRoute, '"Cache-Control": "no-store"', "OAuth denied response");
+  assertIncludes(oauthRoute, '"X-NutsNews-Auth-Error": error.code', "OAuth denied diagnostic header");
+  assertIncludes(oauthRoute, "code: error.code", "OAuth denied diagnostic body");
+  assertIncludes(authConfig, "trustHost: true", "Auth.js proxy host trust");
+  assertIncludes(authConfig, "canonicalizeAdminAuthRedirect", "Auth.js canonical admin redirect");
   assertIncludes(authConfig, "isAllowedAdminEmail(user.email)", "Auth.js sign-in callback");
   assertIncludes(authConfig, 'return "/admin/access-denied"', "Auth.js rejected sign-in redirect");
   assertIncludes(nextConfig, 'source: "/admin/:path*"', "admin route no-store config");

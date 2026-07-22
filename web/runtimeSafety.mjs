@@ -10,6 +10,8 @@ const PROJECT_REF_PATTERN = /^[a-z0-9][a-z0-9-]{2,62}$/;
 const SYNTHETIC_NAMESPACE_PATTERN = /^nutsnews-test-[a-z0-9][a-z0-9-]{5,96}$/;
 const BACKEND_POSTGRES_PRIMARY_CONFIRMATION = "enable-backend-postgres-primary";
 const TRUTHY_CONFIG_VALUES = new Set(["1", "true", "yes", "on"]);
+const PRODUCTION_ADMIN_CANONICAL_ORIGIN = "https://www.nutsnews.com";
+const PRODUCTION_ADMIN_DIRECT_ORIGIN = "https://vps.nutsnews.com";
 
 const SUPABASE_URL_VARIABLES = [
   "NUTSNEWS_SUPABASE_URL",
@@ -77,24 +79,74 @@ function exactOrigin(value, expectedOrigin) {
   }
 }
 
-function requestUsesOrigin(value, expectedOrigin) {
+function isBareHttpsOrigin(value) {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      url.username === "" &&
+      url.password === "" &&
+      (url.pathname === "" || url.pathname === "/") &&
+      url.search === "" &&
+      url.hash === ""
+    );
+  } catch {
+    return false;
+  }
+}
+
+function normalizedBareHttpsOrigin(value) {
+  return isBareHttpsOrigin(value) ? new URL(value).origin : "";
+}
+
+function authUrlsConflict(authUrl, legacyAuthUrl) {
+  if (!authUrl || !legacyAuthUrl) {
+    return false;
+  }
+
+  return (
+    (normalizedBareHttpsOrigin(authUrl) || authUrl) !==
+    (normalizedBareHttpsOrigin(legacyAuthUrl) || legacyAuthUrl)
+  );
+}
+
+function firstForwardedValue(value) {
+  return String(value ?? "").split(",", 1)[0]?.trim() ?? "";
+}
+
+function requestOrigin(value) {
   if (value && typeof value === "object") {
     try {
-      const expected = new URL(expectedOrigin);
-      return (
-        value.host === expected.host &&
-        value.forwardedProto === expected.protocol.slice(0, -1)
-      );
+      const fallback = value.url ? new URL(value.url) : null;
+      const forwardedProto =
+        firstForwardedValue(value.forwardedProto) ||
+        fallback?.protocol.slice(0, -1) ||
+        "";
+      const host = firstForwardedValue(value.host) || fallback?.host || "";
+      if (!forwardedProto || !host) {
+        return "";
+      }
+
+      return new URL(`${forwardedProto}://${host}`).origin;
     } catch {
-      return false;
+      return "";
     }
   }
 
   try {
-    return new URL(value).origin === expectedOrigin;
+    return new URL(value).origin;
   } catch {
-    return false;
+    return "";
   }
+}
+
+function requestUsesOrigin(value, expectedOrigin) {
+  return requestOrigin(value) === expectedOrigin;
+}
+
+function requestUsesAnyOrigin(value, expectedOrigins) {
+  const origin = requestOrigin(value);
+  return expectedOrigins.includes(origin);
 }
 
 function getDatabaseProviderModeValue(env) {
@@ -365,16 +417,62 @@ export function assertOAuthCallback(
 ) {
   void operation;
   const policy = assertRuntimeReady(env);
+  const authUrl = envValue(env, "AUTH_URL");
+  const legacyAuthUrl = envValue(env, "NEXTAUTH_URL");
+  const configuredAuthUrl = authUrl || legacyAuthUrl;
+  const hasConflictingAuthUrls = authUrlsConflict(authUrl, legacyAuthUrl);
 
   if (policy.runtimeEnv === "production" && policy.sideEffectsMode === "live") {
+    const configuredCanonicalOrigin =
+      envValue(env, "NUTSNEWS_ADMIN_CANONICAL_ORIGIN") ||
+      PRODUCTION_ADMIN_CANONICAL_ORIGIN;
+    const configuredDirectOrigin =
+      envValue(env, "NUTSNEWS_ADMIN_DIRECT_ORIGIN") ||
+      PRODUCTION_ADMIN_DIRECT_ORIGIN;
+    const canonicalOrigin = normalizedBareHttpsOrigin(configuredCanonicalOrigin);
+    const directOrigin = normalizedBareHttpsOrigin(configuredDirectOrigin);
+    const trustHost = envValue(env, "AUTH_TRUST_HOST").toLowerCase();
+
+    if (!canonicalOrigin || !directOrigin) {
+      refuse(
+        "oauth_admin_origin_invalid",
+        "Production admin OAuth origins must be bare HTTPS origins.",
+      );
+    }
+    if (hasConflictingAuthUrls) {
+      refuse(
+        "oauth_auth_url_conflict",
+        "Production AUTH_URL and NEXTAUTH_URL must resolve to the same canonical admin origin.",
+      );
+    }
+    if (!authUrl || !exactOrigin(authUrl, canonicalOrigin)) {
+      refuse(
+        "oauth_canonical_origin_mismatch",
+        "Production AUTH_URL must match the canonical admin origin.",
+      );
+    }
+    if (legacyAuthUrl && !exactOrigin(legacyAuthUrl, canonicalOrigin)) {
+      refuse(
+        "oauth_canonical_origin_mismatch",
+        "Production NEXTAUTH_URL must match the canonical admin origin when set.",
+      );
+    }
+    if (trustHost && !TRUTHY_CONFIG_VALUES.has(trustHost)) {
+      refuse(
+        "oauth_trust_host_disabled",
+        "Production Auth.js host trust must stay enabled behind the VPS proxy.",
+      );
+    }
+    if (!requestUsesAnyOrigin(requestIdentity, [canonicalOrigin, directOrigin])) {
+      refuse(
+        "oauth_request_origin_mismatch",
+        "Production OAuth requests must arrive through the canonical or direct VPS admin origin.",
+      );
+    }
     return policy;
   }
 
   const expectedOrigin = "https://staging.nutsnews.com";
-  const authUrl = envValue(env, "AUTH_URL");
-  const legacyAuthUrl = envValue(env, "NEXTAUTH_URL");
-  const configuredAuthUrl = authUrl || legacyAuthUrl;
-  const authUrlsConflict = authUrl && legacyAuthUrl && authUrl !== legacyAuthUrl;
   const stagingCredentials =
     envValue(env, "NUTSNEWS_OAUTH_CREDENTIALS_ENV") === "staging" &&
     envValue(env, "AUTH_GOOGLE_ID") !== "" &&
@@ -384,7 +482,7 @@ export function assertOAuthCallback(
     policy.runtimeEnv === "staging" &&
     policy.sideEffectsMode === "disabled" &&
     stagingCredentials &&
-    !authUrlsConflict &&
+    !hasConflictingAuthUrls &&
     exactOrigin(configuredAuthUrl, expectedOrigin) &&
     requestUsesOrigin(requestIdentity, expectedOrigin)
   ) {

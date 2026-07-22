@@ -153,6 +153,14 @@ The admin portal is protected by Google login and an approved email allowlist.
 
 Only the configured admin Google account can access protected admin pages. Unauthorized accounts are redirected to an access denied page.
 
+Production admin OAuth uses `https://www.nutsnews.com` as the canonical browser origin. The Google OAuth client redirect URI must include:
+
+```text
+https://www.nutsnews.com/api/auth/callback/google
+```
+
+VPS production should render `AUTH_URL=https://www.nutsnews.com`, legacy `NEXTAUTH_URL=https://www.nutsnews.com`, and `AUTH_TRUST_HOST=true`. `https://vps.nutsnews.com` is kept as a direct-origin/operator URL for health checks and explicit origin access, but it must not be the default post-login admin destination. Staging and local auth bypass settings are for verification paths only and should not be copied into production.
+
 This gives NutsNews a safer foundation for future operational controls such as:
 
 * AI usage monitoring

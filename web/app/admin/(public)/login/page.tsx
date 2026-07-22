@@ -1,4 +1,5 @@
 import { signIn } from "@/auth";
+import { getAdminSignInRedirectUrl } from "@/lib/adminAuthOrigin";
 
 export const metadata = {
     title: "Admin Login | NutsNews",
@@ -46,7 +47,7 @@ export default function AdminLoginPage() {
                         "use server";
 
                         await signIn("google", {
-                            redirectTo: "/admin",
+                            redirectTo: getAdminSignInRedirectUrl(),
                         });
                     }}
                 >

@@ -458,14 +458,32 @@ describe("guarded mutation and auth route handlers", () => {
     const { GET } = await import("@/app/api/auth/[...nextauth]/route");
     const response = await GET(
       request("https://www.nutsnews.com/api/auth/callback/google", {
-        headers: { host: "www.nutsnews.com", "x-forwarded-proto": "https" },
+        headers: {
+          host: "127.0.0.1:3000",
+          "x-forwarded-host": "www.nutsnews.com",
+          "x-forwarded-proto": "https",
+        },
       }) as never,
     );
     const body = await json(response);
 
     expect(response.status).toBe(503);
-    expect(body).toEqual({ error: "OAuth callbacks are disabled in this environment." });
+    expect(body).toEqual({
+      error: "OAuth callbacks are disabled in this environment.",
+      code: "oauth_callback_identity_required",
+    });
     expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("x-nutsnews-auth-error")).toBe("oauth_callback_identity_required");
+    expect(mocks.logWarn).toHaveBeenCalledWith(
+      "admin.oauth_callback.blocked",
+      "Admin OAuth callback refused runtime identity.",
+      {
+        code: "oauth_callback_identity_required",
+        host: "www.nutsnews.com",
+        forwardedProto: "https",
+        pathname: "/api/auth/callback/google",
+      },
+    );
     expect(mocks.authGet).not.toHaveBeenCalled();
   });
 
@@ -473,7 +491,10 @@ describe("guarded mutation and auth route handlers", () => {
     const { POST } = await import("@/app/api/auth/[...nextauth]/route");
     const requestValue = request("https://www.nutsnews.com/api/auth/callback/google", {
       method: "POST",
-      headers: { host: "www.nutsnews.com", "x-forwarded-proto": "https" },
+      headers: {
+        host: "127.0.0.1:3000",
+        "x-forwarded-host": "www.nutsnews.com",
+      },
     }) as never;
 
     const response = await POST(requestValue);
