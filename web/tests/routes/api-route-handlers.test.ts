@@ -488,7 +488,7 @@ describe("guarded mutation and auth route handlers", () => {
   });
 
   it("allows Auth.js session probes without the callback identity guard", async () => {
-    mocks.assertOAuthCallback.mockImplementationOnce(() => {
+    mocks.assertOAuthCallback.mockImplementation(() => {
       throw new mocks.runtimeSafetyError("oauth_callback_identity_required");
     });
 

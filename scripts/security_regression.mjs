@@ -259,6 +259,17 @@ async function testAuthBoundaryContracts() {
       `${method} OAuth callback path must guard before Auth.js dispatch`,
     );
   }
+  assertIncludes(oauthRoute, "requiresOAuthFlowGuard(request)", "OAuth callback route path classifier");
+  assertIncludes(
+    oauthRoute,
+    'action === "callback" || action === "signin"',
+    "OAuth callback route guarded path list",
+  );
+  assertIncludes(
+    oauthRoute,
+    "if (!requiresOAuthFlowGuard(request))",
+    "Auth session route guard bypass",
+  );
   assertIncludes(oauthRoute, "assertOAuthCallback", "OAuth callback route");
   assertIncludes(oauthRoute, "x-forwarded-host", "OAuth callback route proxy host identity");
   assertIncludes(oauthRoute, "requestUrl.protocol.slice(0, -1)", "OAuth callback route proto fallback");
