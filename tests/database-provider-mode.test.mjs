@@ -302,3 +302,18 @@ test("Backend primary admin article reviews uses provider-neutral admin database
   assert.doesNotMatch(articleReviewsSource, /getServerSupabase\(/);
   assert.match(articleReviewsSource, /AdminDatabaseAccessError/);
 });
+
+test("Backend primary admin article engagement uses provider-neutral admin database operation", async () => {
+  const articleEngagementSource = await readFile(
+    resolve(import.meta.dirname, "../web/lib/adminArticleEngagement.ts"),
+    "utf8",
+  );
+
+  assert.match(
+    articleEngagementSource,
+    /readAdminDatabase\(\s*"load-admin-article-engagement"/,
+  );
+  assert.doesNotMatch(articleEngagementSource, /from "@\/lib\/supabase"/);
+  assert.doesNotMatch(articleEngagementSource, /getServerSupabase\(/);
+  assert.match(articleEngagementSource, /AdminDatabaseAccessError/);
+});
