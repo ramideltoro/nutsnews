@@ -1,6 +1,11 @@
 import { type SupabaseClient } from "@supabase/supabase-js";
+import {
+  AdminDatabaseAccessError,
+  readAdminDatabase,
+  type AdminDatabaseJsonObject,
+  type AdminSupabaseDatabaseContext,
+} from "@/lib/adminDatabase";
 import { formatAdminDateTime } from "@/lib/adminTime";
-import { getServerSupabase, getServerSupabaseConfig } from "@/lib/supabase";
 
 const REVIEW_SELECT_COLUMNS = [
   "id",
@@ -62,11 +67,6 @@ export const ARTICLE_REVIEW_PAGE_SIZE = 50;
 export const RECENT_PUBLISHED_ARTICLE_LIMIT = 10;
 export const AI_DECISION_VERSION_REPORT_LIMIT = 20;
 const MAX_OPTION_ROWS = 5000;
-
-type SupabaseConfig = {
-  url: string;
-  serviceRoleKey: string;
-};
 
 export type ArticleReviewDecision = "accept" | "reject";
 export type ArticleReviewDecisionFilter = "all" | ArticleReviewDecision;
@@ -144,6 +144,27 @@ type PublishedArticleDbRow = {
 type ArticleReviewOptionRow = {
   source: string | null;
   category: string | null;
+};
+
+type ArticleReviewsDatabaseSnapshot = {
+  sourceOptions: string[];
+  categoryOptions: string[];
+  recentPublishedArticleRows: PublishedArticleDbRow[];
+  recentPublishedReviewRows: ArticleReviewDbRow[];
+  versionReportRows: AiDecisionVersionReportDbRow[];
+  versionReportError: string | null;
+  reviewRows: ArticleReviewDbRow[];
+  publishedArticlesForReviews: PublishedArticleDbRow[];
+  totalMatchingReviews: number;
+  reviewError: string | null;
+};
+
+type ArticleReviewsDatabaseSnapshotRow = Partial<ArticleReviewsDatabaseSnapshot>;
+
+type ArticleReviewsDatabaseResult = {
+  rows?: ArticleReviewsDatabaseSnapshotRow[];
+  rowCount?: number;
+  generatedAt?: string;
 };
 
 export type ArticleReviewPublishedArticle = {
@@ -253,14 +274,6 @@ export type ArticleReviewDashboardData = {
   versionReportSql: string;
   recentPublishedArticlesSql: string;
 };
-
-function getSupabaseConfig(): SupabaseConfig | null {
-  try {
-    return getServerSupabaseConfig();
-  } catch {
-    return null;
-  }
-}
 
 function getSingleSearchParam(value: SearchParamValue) {
   if (Array.isArray(value)) {
@@ -632,7 +645,7 @@ function mapRecentPublishedArticle(
   };
 }
 
-async function loadVersionReports(client: SupabaseClient) {
+async function loadVersionReportRows(client: SupabaseClient) {
   const { data, error } = await client
     .from("ai_decision_version_report")
     .select(AI_DECISION_VERSION_REPORT_SELECT_COLUMNS)
@@ -641,19 +654,22 @@ async function loadVersionReports(client: SupabaseClient) {
 
   if (error) {
     return {
-      versionReports: [],
+      versionReportRows: [],
       versionReportError: error.message,
     };
   }
 
   return {
-    versionReports: ((data ?? []) as unknown as AiDecisionVersionReportDbRow[])
-      .map(mapVersionReportRow),
+    versionReportRows: (data ?? []) as unknown as AiDecisionVersionReportDbRow[],
     versionReportError: null,
   };
 }
 
-async function loadRecentPublishedArticles(client: SupabaseClient) {
+function mapVersionReportRows(rows: AiDecisionVersionReportDbRow[]) {
+  return rows.map(mapVersionReportRow);
+}
+
+async function loadRecentPublishedArticleRows(client: SupabaseClient) {
   const { data, error } = await client
     .from("articles")
     .select(PUBLISHED_ARTICLE_SELECT_COLUMNS)
@@ -664,7 +680,10 @@ async function loadRecentPublishedArticles(client: SupabaseClient) {
     .limit(RECENT_PUBLISHED_ARTICLE_LIMIT);
 
   if (error) {
-    return [];
+    return {
+      recentPublishedArticleRows: [],
+      recentPublishedReviewRows: [],
+    };
   }
 
   const articleRows = (data ?? []) as unknown as PublishedArticleDbRow[];
@@ -685,9 +704,250 @@ async function loadRecentPublishedArticles(client: SupabaseClient) {
     }
   }
 
-  return articleRows.map((article) =>
+  return {
+    recentPublishedArticleRows: articleRows,
+    recentPublishedReviewRows: Array.from(reviewByOriginalUrl.values()),
+  };
+}
+
+function mapRecentPublishedArticles({
+  recentPublishedArticleRows,
+  recentPublishedReviewRows,
+}: Pick<
+  ArticleReviewsDatabaseSnapshot,
+  "recentPublishedArticleRows" | "recentPublishedReviewRows"
+>) {
+  const reviewByOriginalUrl = new Map<string, ArticleReviewDbRow>();
+
+  for (const review of recentPublishedReviewRows) {
+    reviewByOriginalUrl.set(review.original_url, review);
+  }
+
+  return recentPublishedArticleRows.map((article) =>
     mapRecentPublishedArticle(article, reviewByOriginalUrl),
   );
+}
+
+async function loadReviewRowsForFilters(
+  client: SupabaseClient,
+  filters: ArticleReviewFilters,
+) {
+  const from = filters.page * ARTICLE_REVIEW_PAGE_SIZE;
+  const to = from + ARTICLE_REVIEW_PAGE_SIZE - 1;
+
+  let reviewQuery = client
+    .from("article_ai_reviews")
+    .select(REVIEW_SELECT_COLUMNS, { count: "exact" });
+
+  if (filters.decision !== "all") {
+    reviewQuery = reviewQuery.eq("decision", filters.decision);
+  }
+
+  if (filters.source) {
+    reviewQuery = reviewQuery.eq("source", filters.source);
+  }
+
+  if (filters.category) {
+    reviewQuery = reviewQuery.ilike("category", `%${filters.category}%`);
+  }
+
+  if (filters.minScore !== null) {
+    reviewQuery = reviewQuery.gte("positivity_score", filters.minScore);
+  }
+
+  if (filters.maxScore !== null) {
+    reviewQuery = reviewQuery.lte("positivity_score", filters.maxScore);
+  }
+
+  const { data, error, count } = await reviewQuery
+    .order("reviewed_at", { ascending: filters.sort === "oldest" })
+    .order("id", { ascending: filters.sort === "oldest" })
+    .range(from, to);
+
+  if (error) {
+    return {
+      reviewRows: [],
+      publishedArticlesForReviews: [],
+      totalMatchingReviews: 0,
+      reviewError: error.message,
+    };
+  }
+
+  const reviewRows = (data ?? []) as unknown as ArticleReviewDbRow[];
+  const originalUrls = Array.from(
+    new Set(reviewRows.map((row) => row.original_url).filter(Boolean)),
+  );
+  const publishedByOriginalUrl = new Map<string, PublishedArticleDbRow>();
+
+  if (originalUrls.length > 0) {
+    const { data: articleData } = await client
+      .from("articles")
+      .select(PUBLISHED_ARTICLE_SELECT_COLUMNS)
+      .in("original_url", originalUrls);
+
+    for (const article of (articleData ??
+      []) as unknown as PublishedArticleDbRow[]) {
+      publishedByOriginalUrl.set(article.original_url, article);
+    }
+  }
+
+  return {
+    reviewRows,
+    publishedArticlesForReviews: Array.from(publishedByOriginalUrl.values()),
+    totalMatchingReviews: count ?? reviewRows.length,
+    reviewError: null,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function requiredArrayField<T>(row: Record<string, unknown>, field: string): T[] {
+  const value = row[field];
+
+  if (!Array.isArray(value)) {
+    throw new Error(`Admin article reviews operation returned an invalid ${field} array.`);
+  }
+
+  return value as T[];
+}
+
+function optionalStringField(row: Record<string, unknown>, field: string) {
+  const value = row[field];
+
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function requiredNonNegativeNumberField(
+  row: Record<string, unknown>,
+  field: string,
+) {
+  const value = row[field];
+
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    throw new Error(`Admin article reviews operation returned an invalid ${field} value.`);
+  }
+
+  return value;
+}
+
+function normalizeArticleReviewsDatabaseResult(
+  result: ArticleReviewsDatabaseResult,
+): ArticleReviewsDatabaseSnapshot {
+  const row = result.rows?.[0];
+
+  if (!isRecord(row)) {
+    throw new Error("Admin article reviews operation returned no dashboard snapshot row.");
+  }
+
+  return {
+    sourceOptions: requiredArrayField<string>(row, "sourceOptions"),
+    categoryOptions: requiredArrayField<string>(row, "categoryOptions"),
+    recentPublishedArticleRows: requiredArrayField<PublishedArticleDbRow>(
+      row,
+      "recentPublishedArticleRows",
+    ),
+    recentPublishedReviewRows: requiredArrayField<ArticleReviewDbRow>(
+      row,
+      "recentPublishedReviewRows",
+    ),
+    versionReportRows: requiredArrayField<AiDecisionVersionReportDbRow>(
+      row,
+      "versionReportRows",
+    ),
+    versionReportError: optionalStringField(row, "versionReportError"),
+    reviewRows: requiredArrayField<ArticleReviewDbRow>(row, "reviewRows"),
+    publishedArticlesForReviews: requiredArrayField<PublishedArticleDbRow>(
+      row,
+      "publishedArticlesForReviews",
+    ),
+    totalMatchingReviews: requiredNonNegativeNumberField(
+      row,
+      "totalMatchingReviews",
+    ),
+    reviewError: optionalStringField(row, "reviewError"),
+  };
+}
+
+async function loadSupabaseArticleReviewsDatabaseSnapshot(
+  context: AdminSupabaseDatabaseContext,
+  filters: ArticleReviewFilters,
+) {
+  context.getConfig();
+  const client = context.getClient();
+  const [
+    { sourceOptions, categoryOptions },
+    recentPublishedRows,
+    { versionReportRows, versionReportError },
+    reviewRows,
+  ] = await Promise.all([
+    loadOptions(client),
+    loadRecentPublishedArticleRows(client),
+    loadVersionReportRows(client),
+    loadReviewRowsForFilters(client, filters),
+  ]);
+
+  return {
+    rows: [
+      {
+        sourceOptions,
+        categoryOptions,
+        recentPublishedArticleRows: recentPublishedRows.recentPublishedArticleRows,
+        recentPublishedReviewRows: recentPublishedRows.recentPublishedReviewRows,
+        versionReportRows,
+        versionReportError,
+        reviewRows: reviewRows.reviewRows,
+        publishedArticlesForReviews: reviewRows.publishedArticlesForReviews,
+        totalMatchingReviews: reviewRows.totalMatchingReviews,
+        reviewError: reviewRows.reviewError,
+      } as unknown as AdminDatabaseJsonObject,
+    ],
+    rowCount: 1,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+async function loadArticleReviewsDatabaseSnapshot(filters: ArticleReviewFilters) {
+  const result = await readAdminDatabase(
+    "load-admin-article-reviews",
+    {
+      filters: {
+        decision: filters.decision,
+        source: filters.source,
+        category: filters.category,
+        minScore: filters.minScore,
+        maxScore: filters.maxScore,
+        page: filters.page,
+        sort: filters.sort,
+      },
+      pageSize: ARTICLE_REVIEW_PAGE_SIZE,
+      recentPublishedArticleLimit: RECENT_PUBLISHED_ARTICLE_LIMIT,
+      aiDecisionVersionReportLimit: AI_DECISION_VERSION_REPORT_LIMIT,
+      maxOptionRows: MAX_OPTION_ROWS,
+    },
+    (context) => loadSupabaseArticleReviewsDatabaseSnapshot(context, filters),
+    { cache: "no-store" },
+  );
+
+  return normalizeArticleReviewsDatabaseResult(
+    result as ArticleReviewsDatabaseResult,
+  );
+}
+
+function articleReviewDataAccessErrorMessage(error: unknown) {
+  if (error instanceof AdminDatabaseAccessError) {
+    return error.message;
+  }
+
+  if (
+    error instanceof Error &&
+    /server-side supabase access is not configured/i.test(error.message)
+  ) {
+    return "Missing SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.";
+  }
+
+  return error instanceof Error ? error.message : "Unknown article review load failure.";
 }
 
 function summarizeVisibleReviews(
@@ -728,93 +988,43 @@ function summarizeVisibleReviews(
 export async function getAdminArticleReviewDashboardData(
   filters: ArticleReviewFilters,
 ): Promise<ArticleReviewDashboardData> {
-  const config = getSupabaseConfig();
+  let snapshot: ArticleReviewsDatabaseSnapshot;
 
-  if (!config) {
+  try {
+    snapshot = await loadArticleReviewsDatabaseSnapshot(filters);
+  } catch (error) {
     return emptyDashboardData(
       filters,
-      "Missing SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.",
+      articleReviewDataAccessErrorMessage(error),
     );
   }
 
-  const client = getServerSupabase();
-
-  const [
-    { sourceOptions, categoryOptions },
-    recentPublishedArticles,
-    { versionReports, versionReportError },
-  ] =
-    await Promise.all([
-      loadOptions(client),
-      loadRecentPublishedArticles(client),
-      loadVersionReports(client),
-    ]);
-
   const from = filters.page * ARTICLE_REVIEW_PAGE_SIZE;
   const to = from + ARTICLE_REVIEW_PAGE_SIZE - 1;
+  const versionReports = mapVersionReportRows(snapshot.versionReportRows);
+  const recentPublishedArticles = mapRecentPublishedArticles(snapshot);
 
-  let reviewQuery = client
-    .from("article_ai_reviews")
-    .select(REVIEW_SELECT_COLUMNS, { count: "exact" });
-
-  if (filters.decision !== "all") {
-    reviewQuery = reviewQuery.eq("decision", filters.decision);
-  }
-
-  if (filters.source) {
-    reviewQuery = reviewQuery.eq("source", filters.source);
-  }
-
-  if (filters.category) {
-    reviewQuery = reviewQuery.ilike("category", `%${filters.category}%`);
-  }
-
-  if (filters.minScore !== null) {
-    reviewQuery = reviewQuery.gte("positivity_score", filters.minScore);
-  }
-
-  if (filters.maxScore !== null) {
-    reviewQuery = reviewQuery.lte("positivity_score", filters.maxScore);
-  }
-
-  const { data, error, count } = await reviewQuery
-    .order("reviewed_at", { ascending: filters.sort === "oldest" })
-    .order("id", { ascending: filters.sort === "oldest" })
-    .range(from, to);
-
-  if (error) {
+  if (snapshot.reviewError) {
     return {
-      ...emptyDashboardData(filters, error.message),
-      sourceOptions,
-      categoryOptions,
+      ...emptyDashboardData(filters, snapshot.reviewError),
+      sourceOptions: snapshot.sourceOptions,
+      categoryOptions: snapshot.categoryOptions,
       versionReports,
-      versionReportError,
+      versionReportError: snapshot.versionReportError,
       recentPublishedArticles,
     };
   }
 
-  const reviewRows = (data ?? []) as unknown as ArticleReviewDbRow[];
-  const originalUrls = Array.from(
-    new Set(reviewRows.map((row) => row.original_url).filter(Boolean)),
-  );
   const publishedByOriginalUrl = new Map<string, PublishedArticleDbRow>();
 
-  if (originalUrls.length > 0) {
-    const { data: articleData } = await client
-      .from("articles")
-      .select(PUBLISHED_ARTICLE_SELECT_COLUMNS)
-      .in("original_url", originalUrls);
-
-    for (const article of (articleData ??
-      []) as unknown as PublishedArticleDbRow[]) {
-      publishedByOriginalUrl.set(article.original_url, article);
-    }
+  for (const article of snapshot.publishedArticlesForReviews) {
+    publishedByOriginalUrl.set(article.original_url, article);
   }
 
-  const reviews = reviewRows.map((row) =>
+  const reviews = snapshot.reviewRows.map((row) =>
     mapReviewRow(row, publishedByOriginalUrl),
   );
-  const totalMatchingReviews = count ?? reviews.length;
+  const totalMatchingReviews = snapshot.totalMatchingReviews;
 
   return {
     isConfigured: true,
@@ -824,10 +1034,10 @@ export async function getAdminArticleReviewDashboardData(
     summary: summarizeVisibleReviews(filters, reviews, totalMatchingReviews),
     reviews,
     versionReports,
-    versionReportError,
+    versionReportError: snapshot.versionReportError,
     recentPublishedArticles,
-    sourceOptions,
-    categoryOptions,
+    sourceOptions: snapshot.sourceOptions,
+    categoryOptions: snapshot.categoryOptions,
     hasPreviousPage: filters.page > 0,
     hasNextPage: to + 1 < totalMatchingReviews,
     previousPageHref: buildHref(filters, Math.max(0, filters.page - 1)),
