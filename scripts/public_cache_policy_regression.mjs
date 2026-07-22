@@ -32,6 +32,8 @@ const articlesApi = read("web/app/api/articles/route.ts");
 const homeFeedApi = read("web/app/api/home-feed/route.ts");
 const healthz = read("web/app/healthz/route.ts");
 const cacheObservability = read("web/cache-observability.config.json");
+const cacheObservabilityLib = read("web/lib/cacheObservability.ts");
+const cacheObservabilityScript = read("web/scripts/cache-observability.mjs");
 const middleware = read("web/middleware.ts");
 
 assertIncludes(cacheHeaders, "DEFAULT_PUBLIC_CDN_S_MAXAGE_SECONDS = 3600", "cacheHeaders.ts");
@@ -103,5 +105,31 @@ assertIncludes(cacheObservability, '"expectedPolicy": "public-sitemap-index-cach
 assertIncludes(cacheObservability, '"expectedPolicy": "public-article-sitemap-cache-3600s"', "cache-observability.config.json");
 assertIncludes(cacheObservability, '"s-maxage=3600"', "cache-observability.config.json");
 assertExcludes(cacheObservability, '"s-maxage=300"', "cache-observability.config.json");
+assertIncludes(cacheObservability, '"hiddenAfterCdnHeaders"', "cache-observability.config.json");
+assertIncludes(cacheObservability, '"cloudflareFrontedHosts"', "cache-observability.config.json");
+assertIncludes(cacheObservability, '"www.nutsnews.com"', "cache-observability.config.json");
+assertIncludes(cacheObservability, '"vps.nutsnews.com"', "cache-observability.config.json");
+
+for (const source of [
+  ["admin cache dashboard loader", cacheObservabilityLib],
+  ["cache observability CLI", cacheObservabilityScript],
+]) {
+  assertIncludes(source[1], "hiddenAfterCdnHeaders", source[0]);
+  assertIncludes(source[1], "urlUsesCloudflareFrontedHost", source[0]);
+  assertIncludes(source[1], "Public edge caching is ambiguous", source[0]);
+  assertIncludes(source[1], "public edge caching was not confirmed", source[0]);
+  assertIncludes(source[1], "BYPASS", source[0]);
+  assertIncludes(source[1], "DYNAMIC", source[0]);
+  assertExcludes(
+    source[1],
+    "This can be normal after Cloudflare processes the origin response.",
+    source[0],
+  );
+  assertExcludes(
+    source[1],
+    "This can be normal after Vercel processes the origin response.",
+    source[0],
+  );
+}
 
 console.log("Public cache policy regression safeguards passed.");

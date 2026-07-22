@@ -34,6 +34,13 @@
     "hiddenAfterCdnHeaders": [
       "cloudflare-cdn-cache-control",
       "vercel-cdn-cache-control"
+    ],
+    "cloudflareFrontedHosts": [
+      "nutsnews.com",
+      "www.nutsnews.com"
+    ],
+    "originOnlyHosts": [
+      "vps.nutsnews.com"
     ]
   },
   "routes": [
