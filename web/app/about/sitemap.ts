@@ -1,6 +1,8 @@
 import type { MetadataRoute } from "next";
 import { getRecentArticleSitemapItems, SITE_URL } from "@/lib/articles";
 
+export const dynamic = "force-dynamic";
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const articles = await getRecentArticleSitemapItems();
 

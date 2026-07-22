@@ -68,28 +68,38 @@ export function getBackendDatabaseApiConfig(env = process.env) {
 export async function callBackendDatabaseOperation(
   operation,
   body = {},
-  { env = process.env, fetchImpl = fetch } = {},
+  {
+    env = process.env,
+    fetchImpl = fetch,
+    cache = "no-store",
+    next,
+  } = {},
 ) {
   const config = getBackendDatabaseApiConfig(env);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+  const requestInit = {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      authorization: `Bearer ${config.token}`,
+      "content-type": "application/json",
+      "x-nutsnews-db-client": "web",
+    },
+    body: JSON.stringify({
+      ...body,
+      providerMode: config.providerMode,
+    }),
+    cache,
+    signal: controller.signal,
+  };
+
+  if (next) {
+    requestInit.next = next;
+  }
 
   try {
-    const response = await fetchImpl(operationUrl(config.baseUrl, operation), {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        authorization: `Bearer ${config.token}`,
-        "content-type": "application/json",
-        "x-nutsnews-db-client": "web",
-      },
-      body: JSON.stringify({
-        ...body,
-        providerMode: config.providerMode,
-      }),
-      cache: "no-store",
-      signal: controller.signal,
-    });
+    const response = await fetchImpl(operationUrl(config.baseUrl, operation), requestInit);
 
     if (!response.ok) {
       throw new RuntimeSafetyError(

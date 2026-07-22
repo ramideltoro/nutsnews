@@ -11,6 +11,7 @@ import {
 } from "@/lib/sitemapConfig";
 
 export const revalidate = 3600;
+export const dynamic = "force-dynamic";
 
 type ArticleSitemapProps = {
   id: Promise<string>;

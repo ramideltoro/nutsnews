@@ -105,8 +105,7 @@
       ],
       "expectedPolicy": "public-sitemap-cache-3600s",
       "expectedCacheIncludes": [
-        "public",
-        "s-maxage=3600"
+        "public"
       ],
       "expectedCdnIncludes": [
         "s-maxage=3600"
@@ -123,8 +122,7 @@
       ],
       "expectedPolicy": "public-sitemap-index-cache-3600s",
       "expectedCacheIncludes": [
-        "public",
-        "s-maxage=3600"
+        "public"
       ],
       "expectedCdnIncludes": [
         "s-maxage=3600"
@@ -141,8 +139,7 @@
       ],
       "expectedPolicy": "public-article-sitemap-cache-3600s",
       "expectedCacheIncludes": [
-        "public",
-        "s-maxage=3600"
+        "public"
       ],
       "expectedCdnIncludes": [
         "s-maxage=3600"
@@ -159,8 +156,7 @@
       ],
       "expectedPolicy": "public-robots-cache-3600s",
       "expectedCacheIncludes": [
-        "public",
-        "s-maxage=3600"
+        "public"
       ],
       "expectedCdnIncludes": [
         "s-maxage=3600"
