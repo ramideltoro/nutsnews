@@ -303,6 +303,9 @@ async function testAuthBoundaryContracts() {
   assertIncludes(vercelProductionRelease, "staging_qualification_admin_backend_evidence.mjs", "Vercel production staging evidence gate");
   assertIncludes(vercelProductionRelease, "NUTSNEWS_INFRA_STAGING_TOKEN is required to verify staging qualification admin backend evidence", "Vercel production staging evidence gate token");
   assertIncludes(vercelProductionRelease, "vps_staging_admin_backend_smoke_result", "Vercel production release evidence");
+  assertIncludes(vercelProductionRelease, "Run Vercel production admin backend operation smoke", "Vercel production admin backend smoke");
+  assertIncludes(vercelProductionRelease, "npm run smoke:admin-backend-operations", "Vercel production admin backend smoke command");
+  assertIncludes(vercelProductionRelease, "vercel_admin_backend_smoke_result", "Vercel production admin backend smoke evidence");
 
   for (const route of [
     "/admin",

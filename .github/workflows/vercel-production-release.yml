@@ -319,6 +319,37 @@ jobs:
             --production-safe-surfaces
           echo "result=pass" >> "$GITHUB_OUTPUT"
 
+      - name: Run Vercel production admin backend operation smoke
+        id: vercel_admin_backend_smoke
+        if: ${{ env.DATABASE_PROVIDER_MODE == 'backend_postgres_primary' }}
+        shell: bash
+        working-directory: web
+        env:
+          NUTSNEWS_BACKEND_API_URL: ${{ env.BACKEND_API_URL }}
+          NUTSNEWS_BACKEND_API_TOKEN: ${{ secrets.NUTSNEWS_BACKEND_API_TOKEN }}
+          NUTSNEWS_DATABASE_PROVIDER_MODE: ${{ env.DATABASE_PROVIDER_MODE }}
+        run: |
+          set -euo pipefail
+          smoke_log="$RUNNER_TEMP/vercel-admin-backend-operation-smoke.txt"
+          npm run smoke:admin-backend-operations | tee "$smoke_log"
+          operation_count="$(grep -c '^ok load-admin-' "$smoke_log")"
+          {
+            echo "result=pass"
+            echo "operation_count=$operation_count"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "## Vercel production admin backend operation smoke"
+            echo
+            echo "- Backend API route: \`${NUTSNEWS_BACKEND_API_URL%/}/{operation}\`"
+            echo "- Provider mode: \`${NUTSNEWS_DATABASE_PROVIDER_MODE}\`"
+            echo "- Operations passed: \`${operation_count}\`"
+            while IFS= read -r line; do
+              if [[ "$line" == ok\ load-admin-* ]]; then
+                echo "- \`${line}\`"
+              fi
+            done < "$smoke_log"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Promote staged Vercel deployment after qualification
         id: promote
         shell: bash
@@ -444,6 +475,7 @@ jobs:
           STAGED_DEPLOYMENT_URL: ${{ steps.stage.outputs.staged_deployment_url }}
           VERCEL_DEPLOYMENT_ID: ${{ steps.stage.outputs.vercel_deployment_id }}
           STAGED_SMOKE_RESULT: ${{ steps.staged_smoke.outputs.result }}
+          VERCEL_ADMIN_BACKEND_OPERATION_COUNT: ${{ steps.vercel_admin_backend_smoke.outputs.operation_count || '' }}
           PROMOTION_RESULT: ${{ steps.promote.outputs.result }}
           NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS: ${{ vars.NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS || '' }}
           NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES: ${{ vars.NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES || 'false' }}
@@ -466,6 +498,9 @@ jobs:
             echo "- Vercel staged deployment URL: ${STAGED_DEPLOYMENT_URL}"
             echo "- Vercel deployment ID: \`${VERCEL_DEPLOYMENT_ID}\`"
             echo "- Vercel staged smoke result: \`${STAGED_SMOKE_RESULT}\`"
+            if [[ "$DATABASE_PROVIDER_MODE" == "backend_postgres_primary" ]]; then
+              echo "- Vercel admin backend operation smoke: \`${VERCEL_ADMIN_BACKEND_OPERATION_COUNT:-missing}\` operation(s) verified"
+            fi
             echo "- Vercel promotion result: \`${PROMOTION_RESULT}\`"
             echo "- Vercel secondary targets: \`${NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS:-$STAGED_DEPLOYMENT_URL}\`"
             echo "- Controlled failover aliases verified: \`${NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES}\`"
@@ -486,6 +521,8 @@ jobs:
           STAGING_ADMIN_BACKEND_ARTIFACT_NAME: ${{ steps.staging_admin_backend_evidence.outputs.artifact_name || '' }}
           STAGING_ADMIN_BACKEND_OPERATION_COUNT: ${{ steps.staging_admin_backend_evidence.outputs.operation_count || '' }}
           STAGING_ADMIN_BACKEND_SMOKE_RESULT: ${{ steps.staging_admin_backend_evidence.outputs.result || '' }}
+          VERCEL_ADMIN_BACKEND_OPERATION_COUNT: ${{ steps.vercel_admin_backend_smoke.outputs.operation_count || '' }}
+          VERCEL_ADMIN_BACKEND_SMOKE_RESULT: ${{ steps.vercel_admin_backend_smoke.outputs.result || '' }}
           PROMOTION_RESULT: ${{ steps.promote.outputs.result }}
           NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS: ${{ vars.NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS || '' }}
           NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES: ${{ vars.NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES || 'false' }}
@@ -511,6 +548,8 @@ jobs:
             vercel_deployment_url: process.env.STAGED_DEPLOYMENT_URL || "",
             vercel_source_sha: process.env.VERCEL_SOURCE_SHA || "",
             vercel_config_generation: process.env.VERCEL_CONFIG_GENERATION || "",
+            vercel_admin_backend_smoke_result: process.env.VERCEL_ADMIN_BACKEND_SMOKE_RESULT || "",
+            vercel_admin_backend_operation_count: process.env.VERCEL_ADMIN_BACKEND_OPERATION_COUNT || "",
             vercel_secondary_targets: process.env.NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS || process.env.STAGED_DEPLOYMENT_URL || "",
             vercel_failover_alias_verification: process.env.NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES || "false",
             vercel_failover_aliases: process.env.NUTSNEWS_VERCEL_FAILOVER_PRODUCTION_ALIASES || "",

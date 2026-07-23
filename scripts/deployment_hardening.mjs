@@ -379,6 +379,9 @@ export function safeDeploymentDebugSummary(details) {
     "vercel_deployment_id",
     "github_deployment_id",
     "infra_run_id",
+    "admin_backend_operation_smoke_result",
+    "admin_backend_operation_count",
+    "admin_backend_backend_route",
     "result",
   ];
   return Object.fromEntries(

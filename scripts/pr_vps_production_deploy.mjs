@@ -19,6 +19,7 @@ import {
   configuredVpsPrimaryProductionTarget,
   defaultVpsPrimaryProductionUrl,
 } from "./production_topology.mjs";
+import { smokeAdminBackendOperations } from "./admin_backend_operation_smoke.mjs";
 
 const infraRepository = "ramideltoro/nutsnews-infra";
 const premergeProductionWorkflow = "nutsnews-premerge-production-vps-deploy.yml";
@@ -237,7 +238,64 @@ export async function verifyVpsProductionRuntime({ fetchImpl = fetch, env, metad
   );
 }
 
-export function buildVpsProductionEvidence({ env, metadata, deploymentId, targetUrl, infraRun, runtimeIdentity, result = "success" }) {
+function adminBackendOperationEvidence(result) {
+  const evidence = {
+    operation: clean(result?.operation),
+    status: result?.status === "pass" ? "pass" : "fail",
+  };
+  if (typeof result?.rows === "number") evidence.rows = result.rows;
+  if (typeof result?.rowCount === "number" || result?.rowCount === null) evidence.row_count = result.rowCount;
+  if (typeof result?.emptyValidDataset === "boolean") evidence.empty_valid_dataset = result.emptyValidDataset;
+  if (evidence.status !== "pass" && result?.error) evidence.error = clean(result.error);
+  return evidence;
+}
+
+function productionAdminBackendSmokeConfig(env) {
+  const baseUrl = clean(env.NUTSNEWS_BACKEND_API_URL) || "https://backend.nutsnews.com/api/app/db";
+  const token = clean(env.NUTSNEWS_BACKEND_API_TOKEN);
+  const providerMode = clean(env.NUTSNEWS_ADMIN_BACKEND_SMOKE_PROVIDER_MODE) || clean(env.NUTSNEWS_DATABASE_PROVIDER_MODE) || "backend_postgres_primary";
+  if (providerMode !== "backend_postgres_primary") {
+    throw new DeploymentValidationError("Production admin backend operation smoke requires backend_postgres_primary provider mode.");
+  }
+  if (!/^https:\/\/[^/\s]+\/api\/app\/db\/?$/.test(baseUrl)) {
+    throw new DeploymentValidationError("NUTSNEWS_BACKEND_API_URL must be an HTTPS /api/app/db route for production admin backend operation smoke.");
+  }
+  if (!token) {
+    throw new DeploymentValidationError("NUTSNEWS_BACKEND_API_TOKEN is required for production admin backend operation smoke.");
+  }
+  return {
+    baseUrl: baseUrl.replace(/\/+$/, ""),
+    token,
+    providerMode,
+  };
+}
+
+export async function runVpsProductionAdminBackendSmoke({ fetchImpl = fetch, env = process.env, timeoutMs = 15_000 }) {
+  const config = productionAdminBackendSmokeConfig(env);
+  const operations = [];
+  try {
+    await smokeAdminBackendOperations({
+      ...config,
+      timeoutMs: Math.min(Number(timeoutMs) || 15_000, 15_000),
+      limit: 1,
+      fetchImpl,
+      onOperationResult: (result) => {
+        operations.push(adminBackendOperationEvidence(result));
+      },
+    });
+  } catch (error) {
+    throw new DeploymentValidationError(`Production admin backend operation smoke failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  return {
+    result: "pass",
+    provider_mode: config.providerMode,
+    backend_route: `${config.baseUrl}/{operation}`,
+    operation_count: operations.length,
+    operations,
+  };
+}
+
+export function buildVpsProductionEvidence({ env, metadata, deploymentId, targetUrl, infraRun, runtimeIdentity, adminBackendSmoke, result = "success" }) {
   const infraRunId = clean(infraRun?.id ?? infraRun?.run_id);
   if (!/^[1-9][0-9]{0,19}$/.test(infraRunId)) throw new DeploymentValidationError("VPS production deploy evidence requires an infra run ID.");
   return {
@@ -263,6 +321,10 @@ export function buildVpsProductionEvidence({ env, metadata, deploymentId, target
     workflow_run_id: clean(env.GITHUB_RUN_ID),
     workflow_run_attempt: clean(env.GITHUB_RUN_ATTEMPT),
     status_log_url: clean(infraRun?.html_url ?? infraRun?.url),
+    admin_backend_operation_smoke_result: clean(adminBackendSmoke?.result),
+    admin_backend_operation_count: adminBackendSmoke?.operation_count ?? "",
+    admin_backend_backend_route: clean(adminBackendSmoke?.backend_route),
+    admin_backend_operation_smoke: adminBackendSmoke,
   };
 }
 
@@ -321,6 +383,13 @@ export async function runPrVpsProductionDeploy(env = process.env, adapters = {})
     sleep: adapters.sleep,
     now: adapters.now,
   });
+  const adminBackendSmoke = adapters.runAdminBackendSmoke
+    ? await adapters.runAdminBackendSmoke({ env, metadata, targetUrl, timeoutMs })
+    : await runVpsProductionAdminBackendSmoke({
+        fetchImpl: adapters.fetchImpl,
+        env,
+        timeoutMs,
+      });
   return buildVpsProductionEvidence({
     env,
     metadata,
@@ -333,6 +402,7 @@ export async function runPrVpsProductionDeploy(env = process.env, adapters = {})
       url: infraRun.url || completedInfraRun.html_url,
     },
     runtimeIdentity,
+    adminBackendSmoke,
   });
 }
 

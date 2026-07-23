@@ -213,7 +213,7 @@ test("admin backend operation qualification attaches sanitized per-operation fai
       },
     }),
     (error) => {
-      assert.match(error.message, /load-admin-ai-usage returned HTTP 503/);
+      assert.match(error.message, /load-admin-ai-usage.*HTTP 503/);
       assert.doesNotMatch(error.message, /staging-backend-token-fixture|secret response body/);
       assert.deepEqual(error.qualificationDetails.operations.map((entry) => `${entry.operation}:${entry.status}`), [
         "load-admin-production-readiness:pass",
