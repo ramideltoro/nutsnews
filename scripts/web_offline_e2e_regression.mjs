@@ -371,6 +371,25 @@ function backendAdminReadResult(operation) {
       return backendRowsSnapshot({ feedQualityRows: [] });
     case "load-admin-audit-log":
       return backendRowsSnapshot({ auditEventRows: [] });
+    case "load-admin-runtime-feature-flags":
+      return {
+        rows: [
+          {
+            key: "reader_archive_search",
+            enabled: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+          {
+            key: "worker_public_feed_edge_snapshot_publish",
+            enabled: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+        rowCount: 2,
+        generatedAt: new Date().toISOString(),
+      };
     default:
       return null;
   }

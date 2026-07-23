@@ -198,6 +198,7 @@ describe("admin database access", () => {
         "load-admin-rss-feed-health",
         "load-admin-feed-management",
         "load-admin-audit-log",
+        "load-admin-runtime-feature-flags",
       ]),
     );
     expect(ADMIN_DATABASE_MUTATION_OPERATIONS).toEqual(
