@@ -30,6 +30,7 @@ test("failover status contract keeps the required issue #404 fields", () => {
     "nextCheckDueAt",
     "controllerVersion",
     "healthHistory",
+    "dnsHistory",
   ]) {
     assertIncludes(field, `${field} must remain part of the status contract`);
   }
@@ -72,6 +73,15 @@ test("failover status contract defines the DNS target, health result, and DNS ac
   ]) {
     assertIncludes(value, `DNS action enum must include ${value}`);
   }
+
+  for (const value of [
+    "no_op",
+    "manual_lock_skip",
+    "dns_api_error",
+    "drift_detected",
+  ]) {
+    assertIncludes(value, `DNS history action enum must include ${value}`);
+  }
 });
 
 test("failover status contract documents state coverage, unreachable health, and safe field exposure", () => {
@@ -96,6 +106,7 @@ test("failover status contract documents state coverage, unreachable health, and
   assertIncludes("FAILOVER_PUBLIC_SAFE_STATUS_FIELDS", "public-safe field list must exist");
   assertIncludes("FAILOVER_STATUS_OPTIONAL_FIELDS", "optional public-safe field list must exist");
   assertIncludes("FailoverHealthHistoryRow", "health history row type must exist");
+  assertIncludes("FailoverDnsHistoryRow", "DNS history row type must exist");
   assertIncludes("FAILOVER_INTERNAL_ONLY_FIELD_NAMES", "internal-only field denylist must exist");
   for (const internalName of [
     "cloudflareApiToken",

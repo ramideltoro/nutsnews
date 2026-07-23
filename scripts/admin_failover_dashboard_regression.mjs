@@ -61,6 +61,7 @@ for (const token of [
   "cache: \"no-store\"",
   "HISTORY_UNAVAILABLE_MESSAGE",
   "DNS_HISTORY_UNAVAILABLE_MESSAGE",
+  "HEALTH_HISTORY_UNAVAILABLE_MESSAGE",
   "AUDIT_UNAVAILABLE_MESSAGE",
   "signedActionHeaders",
   "sha256Hex",
@@ -69,9 +70,11 @@ for (const token of [
   "controller_history",
   "sanitizeStatus",
   "sanitizeHealthHistory",
+  "sanitizeDnsHistory",
   "sanitizeAuditEvent",
   "liveOriginReadiness",
   "healthHistory",
+  "dnsHistory",
   "formatFailoverTarget",
 ]) {
   assertIncludes(lib, token, "adminFailover.ts");
@@ -82,6 +85,9 @@ for (const token of [
   "FAILOVER_LIVE_ORIGIN_DNS_STATES",
   "FailoverLiveOriginReadiness",
   "FailoverHealthHistoryRow",
+  "FailoverDnsHistoryRow",
+  "FAILOVER_DNS_HISTORY_ACTIONS",
+  "FAILOVER_DNS_HISTORY_RESULTS",
   "FAILOVER_STATUS_OPTIONAL_FIELDS",
   "FAILOVER_MANUAL_ACTIONS",
   "FAILOVER_MANUAL_ACTION_CONFIRMATIONS",
@@ -92,6 +98,7 @@ for (const token of [
   "FailoverManualAuditEvent",
   "liveOriginReadiness",
   "healthHistory",
+  "dnsHistory",
 ]) {
   assertIncludes(contract, token, "failoverStatusContract.ts");
 }

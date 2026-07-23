@@ -69,6 +69,29 @@ export const FAILOVER_DNS_ACTIONS = [
   "reconcile_dns_to_vps",
   "reconcile_dns_to_vercel",
 ] as const;
+export const FAILOVER_DNS_HISTORY_ACTIONS = [
+  "no_op",
+  "dns_readback",
+  "failover_to_vercel",
+  "failback_to_vps",
+  "manual_failover_to_vercel",
+  "manual_failback_to_vps",
+  "manual_lock_enabled",
+  "manual_lock_disabled",
+  "manual_lock_skip",
+  "dns_api_error",
+  "drift_detected",
+  "reconcile_dns_to_vps",
+  "reconcile_dns_to_vercel",
+] as const;
+export const FAILOVER_DNS_HISTORY_RESULTS = [
+  "success",
+  "failed",
+  "skipped",
+  "refused",
+  "duplicate",
+  "unknown",
+] as const;
 export const FAILOVER_CONTROLLER_STATES = [
   "vps_primary_healthy",
   "vps_health_degraded",
@@ -117,6 +140,8 @@ export type FailoverLiveOriginErrorCode = (typeof FAILOVER_LIVE_ORIGIN_ERROR_COD
 export type FailoverHealthResult = (typeof FAILOVER_HEALTH_RESULTS)[number];
 export type FailoverVpsStatusCode = (typeof FAILOVER_VPS_STATUS_CODES)[number];
 export type FailoverDnsAction = (typeof FAILOVER_DNS_ACTIONS)[number];
+export type FailoverDnsHistoryAction = (typeof FAILOVER_DNS_HISTORY_ACTIONS)[number];
+export type FailoverDnsHistoryResult = (typeof FAILOVER_DNS_HISTORY_RESULTS)[number];
 export type FailoverControllerState = (typeof FAILOVER_CONTROLLER_STATES)[number];
 export type FailoverStaleReason = (typeof FAILOVER_STALE_REASONS)[number];
 export type FailoverManualAction = (typeof FAILOVER_MANUAL_ACTIONS)[number];
@@ -160,6 +185,19 @@ export type FailoverHealthHistoryRow = {
   desiredDnsTarget: FailoverDnsTargetClassification;
   errorCode: string | null;
 };
+export type FailoverDnsHistoryRow = {
+  changedAt: FailoverIsoDateTime;
+  dnsAction: FailoverDnsHistoryAction;
+  previousTarget: FailoverDnsTargetClassification;
+  newTarget: FailoverDnsTargetClassification;
+  activeDnsTarget: FailoverDnsTargetClassification;
+  desiredDnsTarget: FailoverDnsTargetClassification;
+  actualApexDnsTarget: FailoverDnsTargetClassification;
+  actualWwwDnsTarget: FailoverDnsTargetClassification;
+  result: FailoverDnsHistoryResult;
+  skipReason: string | null;
+  errorCode: string | null;
+};
 
 export type FailoverStatus = {
   schemaVersion: typeof FAILOVER_STATUS_SCHEMA_VERSION;
@@ -187,6 +225,7 @@ export type FailoverStatus = {
   staleReason: FailoverStaleReason | null;
   controllerVersion: string;
   healthHistory?: FailoverHealthHistoryRow[];
+  dnsHistory?: FailoverDnsHistoryRow[];
 };
 
 export type FailoverManualAuditEvent = {
@@ -232,6 +271,7 @@ export const FAILOVER_STATUS_REQUIRED_FIELDS = [
 
 export const FAILOVER_STATUS_OPTIONAL_FIELDS = [
   "healthHistory",
+  "dnsHistory",
 ] as const satisfies readonly (keyof FailoverStatus)[];
 
 const nullableDateTimeSchema = {
@@ -328,6 +368,41 @@ const healthHistoryRowSchema = {
   },
 } as const;
 
+const dnsHistoryRowSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "changedAt",
+    "dnsAction",
+    "previousTarget",
+    "newTarget",
+    "activeDnsTarget",
+    "desiredDnsTarget",
+    "actualApexDnsTarget",
+    "actualWwwDnsTarget",
+    "result",
+    "skipReason",
+    "errorCode",
+  ],
+  properties: {
+    changedAt: { type: "string", format: "date-time" },
+    dnsAction: { enum: FAILOVER_DNS_HISTORY_ACTIONS },
+    previousTarget: { enum: FAILOVER_DNS_TARGET_CLASSIFICATIONS },
+    newTarget: { enum: FAILOVER_DNS_TARGET_CLASSIFICATIONS },
+    activeDnsTarget: { enum: FAILOVER_DNS_TARGET_CLASSIFICATIONS },
+    desiredDnsTarget: { enum: FAILOVER_DNS_TARGET_CLASSIFICATIONS },
+    actualApexDnsTarget: { enum: FAILOVER_DNS_TARGET_CLASSIFICATIONS },
+    actualWwwDnsTarget: { enum: FAILOVER_DNS_TARGET_CLASSIFICATIONS },
+    result: { enum: FAILOVER_DNS_HISTORY_RESULTS },
+    skipReason: {
+      oneOf: [{ type: "string" }, { type: "null" }],
+    },
+    errorCode: {
+      oneOf: [{ type: "string" }, { type: "null" }],
+    },
+  },
+} as const;
+
 export const failoverStatusJsonSchema = {
   $schema: "https://json-schema.org/draft/2020-12/schema",
   $id: "https://nutsnews.com/schemas/failover-status.v1.json",
@@ -387,6 +462,11 @@ export const failoverStatusJsonSchema = {
       type: "array",
       maxItems: 20,
       items: healthHistoryRowSchema,
+    },
+    dnsHistory: {
+      type: "array",
+      maxItems: 20,
+      items: dnsHistoryRowSchema,
     },
   },
 } as const;
@@ -459,6 +539,7 @@ export const failoverStatusFieldVisibility = {
   staleReason: "public",
   controllerVersion: "public",
   healthHistory: "public",
+  dnsHistory: "public",
 } as const satisfies Record<keyof FailoverStatus, "public">;
 
 export function isPublicSafeFailoverStatusField(
