@@ -6,6 +6,8 @@ import {
   FAILOVER_CHECK_INTERVAL_SECONDS,
   FAILOVER_CONTROLLER_STALE_AFTER_SECONDS,
   FAILOVER_DNS_ACTIONS,
+  FAILOVER_DNS_HISTORY_ACTIONS,
+  FAILOVER_DNS_HISTORY_RESULTS,
   FAILOVER_DNS_TARGETS,
   FAILOVER_DNS_TARGET_CLASSIFICATIONS,
   FAILOVER_HEALTH_RESULTS,
@@ -21,6 +23,9 @@ import {
   FAILOVER_VPS_STATUS_CODES,
   type FailoverAuditResult,
   type FailoverDnsAction,
+  type FailoverDnsHistoryAction,
+  type FailoverDnsHistoryResult,
+  type FailoverDnsHistoryRow,
   type FailoverDnsTarget,
   type FailoverDnsTargetClassification,
   type FailoverHealthHistoryRow,
@@ -52,6 +57,8 @@ const HISTORY_UNAVAILABLE_MESSAGE =
   "Historical health-check and DNS-change rows are not available from the current controller status API. Showing the latest public-safe status snapshot instead.";
 const DNS_HISTORY_UNAVAILABLE_MESSAGE =
   "Recent health checks are loaded from controller history. DNS-change history is not exposed by the current controller status API, so DNS rows use the latest public-safe status snapshot.";
+const HEALTH_HISTORY_UNAVAILABLE_MESSAGE =
+  "Recent DNS changes are loaded from controller history. Health-check history is not available from the current controller status API, so health rows use the latest public-safe status snapshot.";
 const AUDIT_UNAVAILABLE_MESSAGE =
   "Manual action audit rows are not available from the controller action API.";
 
@@ -456,6 +463,76 @@ function sanitizeHealthHistory(value: unknown) {
     .slice(0, 20);
 }
 
+function historyCode(value: unknown) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const candidate = clean(value).toLowerCase();
+
+  return /^[a-z][a-z0-9_]{1,63}$/.test(candidate) ? candidate : null;
+}
+
+function sanitizeDnsHistoryRow(value: unknown): FailoverDnsHistoryRow | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const changedAt = optionalIsoDate(value.changedAt);
+  if (!changedAt) {
+    return null;
+  }
+
+  return {
+    changedAt,
+    dnsAction: oneOf(value.dnsAction, FAILOVER_DNS_HISTORY_ACTIONS, "no_op") as FailoverDnsHistoryAction,
+    previousTarget: oneOf(
+      value.previousTarget,
+      FAILOVER_DNS_TARGET_CLASSIFICATIONS,
+      "unknown",
+    ) as FailoverDnsTargetClassification,
+    newTarget: oneOf(
+      value.newTarget,
+      FAILOVER_DNS_TARGET_CLASSIFICATIONS,
+      "unknown",
+    ) as FailoverDnsTargetClassification,
+    activeDnsTarget: oneOf(
+      value.activeDnsTarget,
+      FAILOVER_DNS_TARGET_CLASSIFICATIONS,
+      "unknown",
+    ) as FailoverDnsTargetClassification,
+    desiredDnsTarget: oneOf(
+      value.desiredDnsTarget,
+      FAILOVER_DNS_TARGET_CLASSIFICATIONS,
+      "unknown",
+    ) as FailoverDnsTargetClassification,
+    actualApexDnsTarget: oneOf(
+      value.actualApexDnsTarget,
+      FAILOVER_DNS_TARGET_CLASSIFICATIONS,
+      "unknown",
+    ) as FailoverDnsTargetClassification,
+    actualWwwDnsTarget: oneOf(
+      value.actualWwwDnsTarget,
+      FAILOVER_DNS_TARGET_CLASSIFICATIONS,
+      "unknown",
+    ) as FailoverDnsTargetClassification,
+    result: oneOf(value.result, FAILOVER_DNS_HISTORY_RESULTS, "unknown") as FailoverDnsHistoryResult,
+    skipReason: historyCode(value.skipReason),
+    errorCode: historyCode(value.errorCode),
+  };
+}
+
+function sanitizeDnsHistory(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((row) => sanitizeDnsHistoryRow(row))
+    .filter((row): row is FailoverDnsHistoryRow => row !== null)
+    .slice(0, 20);
+}
+
 function sanitizeStatus(value: unknown, nowMs = Date.now()): FailoverStatus | null {
   if (!isRecord(value)) {
     return null;
@@ -515,6 +592,7 @@ function sanitizeStatus(value: unknown, nowMs = Date.now()): FailoverStatus | nu
       : oneOf(value.staleReason, FAILOVER_STALE_REASONS, "status_update_overdue") as FailoverStaleReason,
     controllerVersion: identityText(value.controllerVersion, "unknown"),
     healthHistory: sanitizeHealthHistory(value.healthHistory),
+    dnsHistory: sanitizeDnsHistory(value.dnsHistory),
   };
 }
 
@@ -726,6 +804,10 @@ function buildHistoryMessage(healthHistoryAvailable: boolean, dnsHistoryAvailabl
     return DNS_HISTORY_UNAVAILABLE_MESSAGE;
   }
 
+  if (!healthHistoryAvailable && dnsHistoryAvailable) {
+    return HEALTH_HISTORY_UNAVAILABLE_MESSAGE;
+  }
+
   if (!healthHistoryAvailable && !dnsHistoryAvailable) {
     return HISTORY_UNAVAILABLE_MESSAGE;
   }
@@ -733,9 +815,96 @@ function buildHistoryMessage(healthHistoryAvailable: boolean, dnsHistoryAvailabl
   return "";
 }
 
+function dnsActionLabel(value: FailoverDnsHistoryAction) {
+  switch (value) {
+    case "no_op":
+      return "No DNS change";
+    case "dns_readback":
+      return "DNS readback";
+    case "failover_to_vercel":
+      return "Failover decision";
+    case "failback_to_vps":
+      return "Failback decision";
+    case "manual_failover_to_vercel":
+      return "Manual failover";
+    case "manual_failback_to_vps":
+      return "Manual failback";
+    case "manual_lock_enabled":
+      return "Manual lock enabled";
+    case "manual_lock_disabled":
+      return "Manual lock disabled";
+    case "manual_lock_skip":
+      return "Manual lock skip";
+    case "dns_api_error":
+      return "DNS API error";
+    case "drift_detected":
+      return "DNS drift detected";
+    case "reconcile_dns_to_vps":
+      return "Reconcile DNS to VPS";
+    case "reconcile_dns_to_vercel":
+      return "Reconcile DNS to Vercel";
+    default:
+      return "DNS decision";
+  }
+}
+
+function dnsHistoryTone(row: FailoverDnsHistoryRow): FailoverDashboardTone {
+  if (row.result === "failed" || row.result === "refused" || row.dnsAction === "dns_api_error" || row.dnsAction === "drift_detected") {
+    return "danger";
+  }
+
+  if (row.result === "skipped" || row.activeDnsTarget === "vercel" || row.newTarget === "vercel") {
+    return "watch";
+  }
+
+  return row.dnsAction === "no_op" ? "neutral" : "ok";
+}
+
+function dnsHistoryValue(row: FailoverDnsHistoryRow) {
+  if (row.result === "failed") {
+    return "Failed";
+  }
+
+  if (row.result === "refused") {
+    return "Refused";
+  }
+
+  if (row.result === "skipped") {
+    return "Skipped";
+  }
+
+  if (row.result === "duplicate") {
+    return "Duplicate";
+  }
+
+  return targetLabel(row.newTarget);
+}
+
+function codeLabel(value: string | null) {
+  return value ? value.replaceAll("_", " ") : "";
+}
+
 function buildDnsRows(status: FailoverStatus | null): FailoverTimelineRow[] {
   if (!status) {
     return [];
+  }
+
+  const history = status.dnsHistory ?? [];
+  if (history.length > 0) {
+    return history.map((row, index) => {
+      const skipReason = row.skipReason ? `; skipped because ${codeLabel(row.skipReason)}` : "";
+      const errorCode = row.errorCode ? `; error ${codeLabel(row.errorCode)}` : "";
+
+      return {
+        id: `dns-history-${row.changedAt}-${index}`,
+        timestamp: row.changedAt,
+        title: dnsActionLabel(row.dnsAction),
+        detail: `${targetLabel(row.previousTarget)} to ${targetLabel(row.newTarget)}; active ${targetLabel(row.activeDnsTarget)}; desired ${targetLabel(row.desiredDnsTarget)}; apex ${targetLabel(row.actualApexDnsTarget)}; www ${targetLabel(row.actualWwwDnsTarget)}${skipReason}${errorCode}.`,
+        value: dnsHistoryValue(row),
+        tone: dnsHistoryTone(row),
+        source: "controller_history",
+      };
+    });
   }
 
   if (!status.lastDnsChangeAt || status.lastDnsChangeReason === "none") {
@@ -937,7 +1106,7 @@ export async function getAdminFailoverDashboardData(): Promise<AdminFailoverDash
     const tone = statusTone(status, statusAge);
     const audit = await fetchAuditEvents(config, nowMs);
     const healthHistoryAvailable = (status.healthHistory ?? []).length > 0;
-    const dnsHistoryAvailable = false;
+    const dnsHistoryAvailable = (status.dnsHistory ?? []).length > 0;
 
     return {
       isConfigured: true,
