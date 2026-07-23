@@ -23,6 +23,7 @@ import {
   type FailoverDnsAction,
   type FailoverDnsTarget,
   type FailoverDnsTargetClassification,
+  type FailoverHealthHistoryRow,
   type FailoverHealthResult,
   type FailoverLiveOriginCacheState,
   type FailoverLiveOriginClassification,
@@ -48,7 +49,9 @@ const STATUS_SIGNATURE_VERSION = "v1";
 const STATUS_FETCH_TIMEOUT_MS = 5_000;
 const ACTION_FETCH_TIMEOUT_MS = 8_000;
 const HISTORY_UNAVAILABLE_MESSAGE =
-  "Historical health-check and DNS-change rows are not exposed by the current controller status API. Showing the latest public-safe status snapshot instead.";
+  "Historical health-check and DNS-change rows are not available from the current controller status API. Showing the latest public-safe status snapshot instead.";
+const DNS_HISTORY_UNAVAILABLE_MESSAGE =
+  "Recent health checks are loaded from controller history. DNS-change history is not exposed by the current controller status API, so DNS rows use the latest public-safe status snapshot.";
 const AUDIT_UNAVAILABLE_MESSAGE =
   "Manual action audit rows are not available from the controller action API.";
 
@@ -61,7 +64,7 @@ export type FailoverTimelineRow = {
   detail: string;
   value: string;
   tone: FailoverDashboardTone;
-  source: "status_snapshot" | "metrics_unavailable";
+  source: "controller_history" | "status_snapshot" | "metrics_unavailable";
 };
 
 export type FailoverLink = {
@@ -84,6 +87,8 @@ export type AdminFailoverDashboardData = {
   controllerReachable: boolean;
   recentHealthChecks: FailoverTimelineRow[];
   recentDnsChanges: FailoverTimelineRow[];
+  healthHistoryAvailable: boolean;
+  dnsHistoryAvailable: boolean;
   historyAvailable: boolean;
   historyMessage: string;
   actionsConfigured: boolean;
@@ -381,6 +386,76 @@ function sanitizeLiveOriginReadiness(value: unknown, nowMs: number): FailoverLiv
   };
 }
 
+function healthHistorySource(value: unknown) {
+  const candidate = clean(value).toLowerCase();
+
+  return /^[a-z][a-z0-9_:-]{1,63}$/.test(candidate) ? candidate : "unknown";
+}
+
+function healthHistoryErrorCode(value: unknown, healthResult: FailoverHealthResult) {
+  const fallback = healthResult === "reachable" || healthResult === "unknown" ? null : healthResult;
+
+  if (value === null || value === undefined || value === "") {
+    return fallback;
+  }
+
+  const candidate = clean(value).toLowerCase();
+
+  return /^[a-z][a-z0-9_]{1,63}$/.test(candidate) ? candidate : fallback;
+}
+
+function sanitizeHealthHistoryRow(value: unknown): FailoverHealthHistoryRow | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const checkedAt = optionalIsoDate(value.checkedAt);
+  if (!checkedAt) {
+    return null;
+  }
+
+  const healthResult = oneOf(value.healthResult, FAILOVER_HEALTH_RESULTS, "unknown") as FailoverHealthResult;
+
+  return {
+    checkedAt,
+    source: healthHistorySource(value.source),
+    healthResult,
+    vpsReachable: typeof value.vpsReachable === "boolean"
+      ? value.vpsReachable
+      : healthResult === "reachable",
+    vpsStatus: vpsStatus(value.vpsStatus),
+    vpsLatencyMs: finiteInteger(value.vpsLatencyMs, null),
+    observedDeploymentTarget: oneOf(
+      value.observedDeploymentTarget,
+      FAILOVER_OBSERVED_DEPLOYMENT_TARGETS,
+      "unexpected",
+    ) as FailoverObservedDeploymentTarget,
+    consecutiveVpsFailures: finiteInteger(value.consecutiveVpsFailures, 0) ?? 0,
+    activeDnsTarget: oneOf(
+      value.activeDnsTarget,
+      FAILOVER_DNS_TARGET_CLASSIFICATIONS,
+      "unknown",
+    ) as FailoverDnsTargetClassification,
+    desiredDnsTarget: oneOf(
+      value.desiredDnsTarget,
+      FAILOVER_DNS_TARGET_CLASSIFICATIONS,
+      "unknown",
+    ) as FailoverDnsTargetClassification,
+    errorCode: healthHistoryErrorCode(value.errorCode, healthResult),
+  };
+}
+
+function sanitizeHealthHistory(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((row) => sanitizeHealthHistoryRow(row))
+    .filter((row): row is FailoverHealthHistoryRow => row !== null)
+    .slice(0, 20);
+}
+
 function sanitizeStatus(value: unknown, nowMs = Date.now()): FailoverStatus | null {
   if (!isRecord(value)) {
     return null;
@@ -439,6 +514,7 @@ function sanitizeStatus(value: unknown, nowMs = Date.now()): FailoverStatus | nu
       ? null
       : oneOf(value.staleReason, FAILOVER_STALE_REASONS, "status_update_overdue") as FailoverStaleReason,
     controllerVersion: identityText(value.controllerVersion, "unknown"),
+    healthHistory: sanitizeHealthHistory(value.healthHistory),
   };
 }
 
@@ -610,6 +686,25 @@ function buildHealthRows(status: FailoverStatus | null): FailoverTimelineRow[] {
     return [];
   }
 
+  const history = status.healthHistory ?? [];
+  if (history.length > 0) {
+    return history.map((row, index) => {
+      const statusValue = typeof row.vpsStatus === "number" ? String(row.vpsStatus) : row.vpsStatus ?? "n/a";
+      const latency = typeof row.vpsLatencyMs === "number" ? `${row.vpsLatencyMs}ms` : "no latency";
+      const errorCode = row.errorCode ? `; error ${row.errorCode}` : "";
+
+      return {
+        id: `health-history-${row.checkedAt}-${index}`,
+        timestamp: row.checkedAt,
+        title: "VPS readiness check",
+        detail: `${row.healthResult}; HTTP ${statusValue}; ${latency}; ${row.consecutiveVpsFailures}/${status.failureThreshold} consecutive failures; source ${row.source}${errorCode}.`,
+        value: row.vpsReachable ? "Reachable" : "Unreachable",
+        tone: row.vpsReachable ? "ok" : "danger",
+        source: "controller_history",
+      };
+    });
+  }
+
   const statusValue = typeof status.lastVpsStatus === "number" ? String(status.lastVpsStatus) : status.lastVpsStatus ?? "n/a";
   const latency = typeof status.lastVpsLatencyMs === "number" ? `${status.lastVpsLatencyMs}ms` : "no latency";
 
@@ -624,6 +719,18 @@ function buildHealthRows(status: FailoverStatus | null): FailoverTimelineRow[] {
       source: "status_snapshot",
     },
   ];
+}
+
+function buildHistoryMessage(healthHistoryAvailable: boolean, dnsHistoryAvailable: boolean) {
+  if (healthHistoryAvailable && !dnsHistoryAvailable) {
+    return DNS_HISTORY_UNAVAILABLE_MESSAGE;
+  }
+
+  if (!healthHistoryAvailable && !dnsHistoryAvailable) {
+    return HISTORY_UNAVAILABLE_MESSAGE;
+  }
+
+  return "";
 }
 
 function buildDnsRows(status: FailoverStatus | null): FailoverTimelineRow[] {
@@ -775,6 +882,8 @@ function emptyData(config: FailoverStatusConfig, message: string, nowMs = Date.n
     controllerReachable: false,
     recentHealthChecks: [],
     recentDnsChanges: [],
+    healthHistoryAvailable: false,
+    dnsHistoryAvailable: false,
     historyAvailable: false,
     historyMessage: HISTORY_UNAVAILABLE_MESSAGE,
     actionsConfigured: Boolean(config.actionHmacSecret),
@@ -827,6 +936,8 @@ export async function getAdminFailoverDashboardData(): Promise<AdminFailoverDash
     const statusAge = ageSeconds(status.generatedAt, nowMs);
     const tone = statusTone(status, statusAge);
     const audit = await fetchAuditEvents(config, nowMs);
+    const healthHistoryAvailable = (status.healthHistory ?? []).length > 0;
+    const dnsHistoryAvailable = false;
 
     return {
       isConfigured: true,
@@ -842,8 +953,10 @@ export async function getAdminFailoverDashboardData(): Promise<AdminFailoverDash
       controllerReachable: true,
       recentHealthChecks: buildHealthRows(status),
       recentDnsChanges: buildDnsRows(status),
-      historyAvailable: false,
-      historyMessage: HISTORY_UNAVAILABLE_MESSAGE,
+      healthHistoryAvailable,
+      dnsHistoryAvailable,
+      historyAvailable: healthHistoryAvailable && dnsHistoryAvailable,
+      historyMessage: buildHistoryMessage(healthHistoryAvailable, dnsHistoryAvailable),
       actionsConfigured: Boolean(config.actionHmacSecret),
       actionUrl: config.actionUrl,
       auditEvents: audit.auditEvents,
