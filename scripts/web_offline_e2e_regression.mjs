@@ -181,6 +181,8 @@ const forbiddenAdminDashboardPatterns = [
   { label: "framework 404", pattern: /This page could not be found|NEXT_HTTP_ERROR_FALLBACK;404|404: This page could not be found/i },
   { label: "generic client exception", pattern: /Application error|Unhandled Runtime Error|Minified React error|Hydration failed because/i },
   { label: "backend-primary Supabase access error", pattern: /supabase_access_disabled_for_backend_primary|Server-side Supabase access is not configured|Missing SUPABASE_URL|Missing runtime public Supabase/i },
+  { label: "admin dashboard setup warning", pattern: /Dashboard Setup Needed/i },
+  { label: "admin database operation error", pattern: /Admin database operation/i },
 ];
 
 const emailDeliveries = [];

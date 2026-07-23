@@ -290,7 +290,11 @@ async function testAuthBoundaryContracts() {
   assertIncludes(offlineE2e, "backend_postgres_primary", "protected admin dashboard smoke backend primary fixture");
   assertIncludes(offlineE2e, "NUTSNEWS_BACKEND_API_URL", "protected admin dashboard smoke backend API config");
   assertIncludes(offlineE2e, "Server-side Supabase access is not configured", "protected admin dashboard smoke forbidden Supabase error copy");
+  assertIncludes(offlineE2e, "Dashboard Setup Needed", "offline protected admin dashboard smoke forbidden setup copy");
+  assertIncludes(offlineE2e, "Admin database operation", "offline protected admin dashboard smoke forbidden backend operation copy");
   assertIncludes(stagingQualificationSpec, "NUTSNEWS_ADMIN_TEST_AUTH_BYPASS_EXPECTED", "staging protected admin dashboard smoke");
+  assertIncludes(stagingQualificationSpec, "Dashboard Setup Needed", "staging protected admin dashboard smoke forbidden setup copy");
+  assertIncludes(stagingQualificationSpec, "Admin database operation", "staging protected admin dashboard smoke forbidden backend operation copy");
 
   for (const route of [
     "/admin",
