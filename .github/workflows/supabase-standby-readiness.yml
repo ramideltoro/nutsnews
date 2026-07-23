@@ -1,0 +1,107 @@
+name: Supabase Standby Credential Readiness
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type verify-supabase-standby-readiness to check protected standby credentials.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nutsnews-supabase-standby-readiness
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Validate typed operator confirmation
+    if: github.repository == 'ramideltoro/nutsnews' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Validate confirmation before protected environment access
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          if [[ "$CONFIRMATION" != "verify-supabase-standby-readiness" ]]; then
+            echo "Type verify-supabase-standby-readiness to run the protected standby credential check." >&2
+            exit 1
+          fi
+          echo "Supabase standby readiness confirmation accepted."
+
+  readiness:
+    name: Verify protected standby credential readiness
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: supabase-standby
+
+    steps:
+      - name: Checkout reviewed standby automation
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5
+        with:
+          node-version: 22
+
+      - name: Install PostgreSQL client
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Validate protected standby credential inventory
+        env:
+          NUTSNEWS_STANDBY_PROJECT_POLICY: fresh-project
+          NUTSNEWS_STANDBY_SUPABASE_PROJECT_REF: ${{ secrets.NUTSNEWS_STANDBY_SUPABASE_PROJECT_REF }}
+          NUTSNEWS_STANDBY_SUPABASE_URL: ${{ secrets.NUTSNEWS_STANDBY_SUPABASE_URL }}
+          NUTSNEWS_STANDBY_SUPABASE_DB_URL: ${{ secrets.NUTSNEWS_STANDBY_SUPABASE_DB_URL }}
+          NUTSNEWS_STANDBY_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NUTSNEWS_STANDBY_SUPABASE_SERVICE_ROLE_KEY }}
+          NUTSNEWS_STANDBY_SUPABASE_ANON_KEY: ${{ secrets.NUTSNEWS_STANDBY_SUPABASE_ANON_KEY }}
+          NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+          node scripts/supabase_standby_readiness.mjs
+
+      - name: Confirm direct standby database connectivity
+        env:
+          NUTSNEWS_STANDBY_SUPABASE_DB_URL: ${{ secrets.NUTSNEWS_STANDBY_SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          result="$RUNNER_TEMP/nutsnews-standby-readiness.tsv"
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 "$NUTSNEWS_STANDBY_SUPABASE_DB_URL" > "$result" <<'SQL'
+          \pset footer off
+          \pset format unaligned
+          \pset tuples_only on
+          begin read only;
+          select
+            'connected' as status,
+            current_database() = 'postgres' as expected_database,
+            current_setting('server_version_num')::int >= 150000 as supported_postgres,
+            pg_is_in_recovery() in (true, false) as recovery_function_available;
+          rollback;
+          SQL
+
+          if [[ "$(wc -l < "$result" | tr -d ' ')" != "1" ]]; then
+            echo "Unexpected standby connectivity metadata row count." >&2
+            exit 1
+          fi
+          if ! grep -Eq '^connected\|t\|t\|t$' "$result"; then
+            echo "Direct standby database connectivity check did not return the expected safe metadata." >&2
+            exit 1
+          fi
+          {
+            echo "## Direct standby database connectivity"
+            echo
+            echo "- Protected workflow reached the standby database through the direct DB URL."
+            echo "- Query ran in a read-only transaction and returned only boolean metadata."
+            echo "- Raw URLs, keys, database users, passwords, and row data were not printed."
+          } >> "$GITHUB_STEP_SUMMARY"

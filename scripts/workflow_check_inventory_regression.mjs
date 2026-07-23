@@ -306,7 +306,7 @@ for (const workflow of workflowFiles) {
     assert.ok(!deploymentStatus, `${workflow} is PR-required but listens to deployment_status.`);
     assert.ok(!repositoryDispatch, `${workflow} is PR-required but listens to repository_dispatch.`);
     assert.ok(!workflowRun, `${workflow} is PR-required but listens to workflow_run.`);
-    const protectedDeploymentEnvironment = /environment:\s*(Production|production-supabase|staging-supabase)/.test(text);
+    const protectedDeploymentEnvironment = /environment:\s*(Production|production-supabase|staging-supabase|supabase-standby)/.test(text);
     assert.equal(protectedDeploymentEnvironment, false, `${workflow} is PR-required but uses a protected deployment environment.`);
   }
 

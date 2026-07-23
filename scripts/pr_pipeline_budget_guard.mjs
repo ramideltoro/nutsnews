@@ -10,7 +10,7 @@ const inventoryPath = resolve(root, ".github/deployment/workflow-check-inventory
 const defaultPrWorkflowBudget = 8;
 const recommendedDefaultPrWorkflowMinimum = 5;
 const protectedEnvironmentPattern =
-  /(?:^|\n)\s*environment:\s*(?:(?:"|')?(?:Production|production|production-supabase|staging-supabase)(?:"|')?|\n\s+name:\s*(?:"|')?(?:Production|production|production-supabase|staging-supabase)(?:"|')?)/;
+  /(?:^|\n)\s*environment:\s*(?:(?:"|')?(?:Production|production|production-supabase|staging-supabase|supabase-standby)(?:"|')?|\n\s+name:\s*(?:"|')?(?:Production|production|production-supabase|staging-supabase|supabase-standby)(?:"|')?)/;
 const heavyweightWorkflowPattern =
   /(accessibility|cache-observability|codeql|container|deploy|deployment|e2e|lighthouse|osv|playwright|release|smoke|snyk|visual)/i;
 const buildOwnerPatterns = [

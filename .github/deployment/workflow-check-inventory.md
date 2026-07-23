@@ -67,6 +67,8 @@ Manual recovery and dispatch-only release workflows are outside this budget beca
 | `staging-supabase-migration.yml` | manual recovery | Protected, typed-confirmation workflow for applying staging Supabase migrations. | Mutates staging data schema. |
 | `supabase-backup.yml` | scheduled/operational | Creates and verifies production backups on schedule or operator request. | No deployment. |
 | `supabase-restore-fire-drill-regression.yml` | PR-required | Guards restore fire drill automation before recovery workflow changes merge. | No deployment. |
+| `supabase-standby-readiness-regression.yml` | PR-required | Guards the standby credential readiness workflow before protected standby automation changes merge. | No deployment. |
+| `supabase-standby-readiness.yml` | manual recovery | Protected, typed-confirmation workflow for checking Supabase hot-standby credential readiness and direct DB connectivity. | Reads protected standby credentials only on manual dispatch; no app deployment and no row data export. |
 | `translation-coverage.yml` | scheduled/operational | Reports live translation coverage from production data; strict release translation checks run in the PR release candidate. | No deployment. |
 | `vercel-backend-token-sync.yml` | manual recovery | Protected operator workflow that syncs backend API token material into Vercel production. | Mutates protected provider configuration. |
 | `vercel-preview-smoke.yml` | optional PR | Runs against Vercel preview deployment statuses or manual preview URLs; shared target-agnostic UI smoke evidence replaces it for required deployment gates. | No production deployment. |
