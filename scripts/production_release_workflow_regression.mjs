@@ -135,6 +135,28 @@ requireText(
   "Vercel production recovery evidence must record the staging admin backend smoke result.",
 );
 requireText(
+  vercelRecoveryWorkflow,
+  "Run Vercel production admin backend operation smoke",
+  "Vercel production recovery must run admin backend smoke before promotion when backend primary is active.",
+);
+requireText(
+  vercelRecoveryWorkflow,
+  "npm run smoke:admin-backend-operations",
+  "Vercel production recovery must use the canonical admin backend operation smoke command.",
+);
+requireText(
+  vercelRecoveryWorkflow,
+  "vercel_admin_backend_smoke_result",
+  "Vercel production recovery evidence must record the Vercel admin backend smoke result.",
+);
+assert(
+  vercelRecoveryWorkflow.indexOf("Run staged Vercel qualification smoke")
+    < vercelRecoveryWorkflow.indexOf("Run Vercel production admin backend operation smoke")
+    && vercelRecoveryWorkflow.indexOf("Run Vercel production admin backend operation smoke")
+      < vercelRecoveryWorkflow.indexOf("Promote staged Vercel deployment after qualification"),
+  "Vercel admin backend smoke must run after staged smoke and before promotion.",
+);
+requireText(
   recoveryRunbook,
   "passing admin backend operation smoke results",
   "Recovery docs must require staging admin backend smoke evidence for Vercel production release payloads.",

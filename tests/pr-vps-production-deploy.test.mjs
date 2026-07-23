@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import {
@@ -6,6 +7,7 @@ import {
   computeVpsProductionDeploymentId,
   findInfraPremergeProductionRun,
   runPrVpsProductionDeploy,
+  runVpsProductionAdminBackendSmoke,
   selectVpsProductionRuntimeTargetUrl,
 } from "../scripts/pr_vps_production_deploy.mjs";
 
@@ -26,6 +28,8 @@ const metadata = {
   schema_version: "20260720110000",
   supabase_project_ref: "abcdefghijklmnopqrst",
 };
+const adminOperationContracts = JSON.parse(readFileSync(new URL("../api-contracts/admin-backend-operations.json", import.meta.url), "utf8")).operations;
+const adminOperationNames = adminOperationContracts.map((entry) => entry.operation);
 
 function json(payload, status = 200, headers = {}) {
   return new Response(JSON.stringify(payload), { status, headers: { "content-type": "application/json", ...headers } });
@@ -39,6 +43,9 @@ function env(overrides = {}) {
     GITHUB_RUN_ID: "456",
     GITHUB_RUN_ATTEMPT: "1",
     NUTSNEWS_DEPLOY_HARDENING_TIMEOUT_MS: "30000",
+    NUTSNEWS_DATABASE_PROVIDER_MODE: "backend_postgres_primary",
+    NUTSNEWS_BACKEND_API_URL: "https://backend.nutsnews.com/api/app/db",
+    NUTSNEWS_BACKEND_API_TOKEN: "production-backend-token",
     ...overrides,
   };
 }
@@ -53,6 +60,20 @@ function fakeClock() {
       sleeps.push(ms);
       current += ms;
     },
+  };
+}
+
+function adminBackendOperationPayload(operation) {
+  const contract = adminOperationContracts.find((entry) => entry.operation === operation);
+  if (!contract) throw new Error(`Unknown operation ${operation}`);
+  const expectsSingleSnapshotRow = String(contract.responseShape?.rows ?? "").includes("single");
+  if (!expectsSingleSnapshotRow) return { rows: [], rowCount: 0, generatedAt: "2026-07-01T00:00:00.000Z" };
+  return {
+    rows: [
+      Object.fromEntries((contract.responseShape?.minimalRowFields ?? []).map((field) => [field, []])),
+    ],
+    rowCount: 1,
+    generatedAt: "2026-07-01T00:00:00.000Z",
   };
 }
 
@@ -73,6 +94,7 @@ test("VPS production payload binds artifact identity and idempotency", () => {
 test("PR VPS production deploy dispatches, waits, verifies runtime identity, and writes evidence", async () => {
   const deploymentId = computeVpsProductionDeploymentId(metadata);
   const dispatches = [];
+  const backendRequests = [];
   let runPolls = 0;
   const fetchImpl = async (url, init = {}) => {
     const parsed = new URL(url);
@@ -111,6 +133,15 @@ test("PR VPS production deploy dispatches, waits, verifies runtime identity, and
     if (parsed.hostname === "www.nutsnews.com" && parsed.pathname === "/readyz") {
       return json({ ok: true, runtimeEnv: "production" }, 200, { "x-nutsnews-runtime-environment": "production", "x-nutsnews-deployment-target": "production-vps", "x-nutsnews-source-commit": sourceCommit, "x-nutsnews-build-id": "123-1", "x-nutsnews-expected-image-digest": imageDigest });
     }
+    if (parsed.hostname === "backend.nutsnews.com" && parsed.pathname.startsWith("/api/app/db/load-admin-")) {
+      const operation = parsed.pathname.split("/").at(-1);
+      backendRequests.push({
+        operation,
+        authorization: new Headers(init.headers).get("authorization"),
+        body: JSON.parse(init.body),
+      });
+      return json(adminBackendOperationPayload(operation));
+    }
     throw new Error(`Unexpected fetch ${parsed}`);
   };
 
@@ -126,6 +157,37 @@ test("PR VPS production deploy dispatches, waits, verifies runtime identity, and
   assert.equal(evidence.runtime_env, "production");
   assert.equal(evidence.deployment_target, "production-vps");
   assert.equal(evidence.image_digest, imageDigest);
+  assert.equal(evidence.admin_backend_operation_smoke_result, "pass");
+  assert.equal(evidence.admin_backend_operation_count, adminOperationNames.length);
+  assert.equal(evidence.admin_backend_backend_route, "https://backend.nutsnews.com/api/app/db/{operation}");
+  assert.deepEqual(evidence.admin_backend_operation_smoke.operations.map((entry) => entry.operation), adminOperationNames);
+  assert.deepEqual(backendRequests.map((request) => request.operation), adminOperationNames);
+  assert(backendRequests.every((request) => request.authorization === "Bearer production-backend-token"));
+  assert(backendRequests.every((request) => request.body.providerMode === "backend_postgres_primary"));
+  assert.doesNotMatch(JSON.stringify(evidence.admin_backend_operation_smoke), /production-backend-token|authorization/i);
+});
+
+test("production admin backend smoke failure names operation and route without leaking secrets", async () => {
+  await assert.rejects(
+    runVpsProductionAdminBackendSmoke({
+      env: env(),
+      fetchImpl: async (url) => {
+        const parsed = new URL(url);
+        const operation = parsed.pathname.split("/").at(-1);
+        if (operation === "load-admin-ai-usage") {
+          return new Response("secret response body", { status: 503 });
+        }
+        return json(adminBackendOperationPayload(operation));
+      },
+    }),
+    (error) => {
+      assert.match(error.message, /load-admin-ai-usage/);
+      assert.match(error.message, /\/api\/app\/db\/load-admin-ai-usage/);
+      assert.match(error.message, /HTTP 503/);
+      assert.doesNotMatch(error.message, /production-backend-token|secret response body/);
+      return true;
+    },
+  );
 });
 
 test("findInfraPremergeProductionRun waits for the matching repository dispatch workflow", async () => {

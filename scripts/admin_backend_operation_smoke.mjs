@@ -230,10 +230,12 @@ async function postOperation({
   body,
 }) {
   const { operation } = operationContract;
+  const operationUrl = adminBackendOperationUrl(baseUrl, operation);
+  const operationRoute = operationUrl.pathname;
   let response;
 
   try {
-    response = await fetchImpl(adminBackendOperationUrl(baseUrl, operation), {
+    response = await fetchImpl(operationUrl, {
       method: "POST",
       headers: {
         accept: "application/json",
@@ -246,21 +248,27 @@ async function postOperation({
     });
   } catch (error) {
     const message = error instanceof Error ? error.name || "request_failed" : "request_failed";
-    throw new Error(`${operation} request failed before receiving an HTTP response: ${message}`);
+    throw new Error(`${operation} (${operationRoute}) request failed before receiving an HTTP response: ${message}`);
   }
 
   if (!response.ok) {
-    throw new Error(`${operation} returned HTTP ${response.status}`);
+    throw new Error(`${operation} (${operationRoute}) returned HTTP ${response.status}`);
   }
 
   let payload;
   try {
     payload = await response.json();
   } catch {
-    throw new Error(`${operation} returned HTTP ${response.status} but the body was not valid JSON`);
+    throw new Error(`${operation} (${operationRoute}) returned HTTP ${response.status} but the body was not valid JSON`);
   }
 
-  return assertMinimalResponseShape(operationContract, payload);
+  try {
+    return assertMinimalResponseShape(operationContract, payload);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const suffix = message.startsWith(operation) ? message.slice(operation.length) : ` ${message}`;
+    throw new Error(`${operation} (${operationRoute})${suffix}`);
+  }
 }
 
 export async function smokeAdminBackendOperations({

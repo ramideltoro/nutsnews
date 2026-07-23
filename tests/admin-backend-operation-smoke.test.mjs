@@ -103,7 +103,7 @@ test("smokeAdminBackendOperations fails non-2xx responses with exact operation n
           onOperationResult: (result) => operationResults.push(result),
         }),
         (error) => {
-          assert.match(error.message, /load-admin-ai-usage returned HTTP 503/);
+          assert.match(error.message, /load-admin-ai-usage \(\/api\/app\/db\/load-admin-ai-usage\) returned HTTP 503/);
           assert.doesNotMatch(error.message, /server-only-smoke-token/);
           assert.doesNotMatch(error.message, /secret response body/);
           return true;
