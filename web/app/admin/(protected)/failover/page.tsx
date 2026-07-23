@@ -726,9 +726,9 @@ function HistorySection({ data }: { data: AdminFailoverDashboardData }) {
       id="history"
       eyebrow="History"
       title="Recent Health Checks and DNS Changes"
-      description="The dashboard renders current status immediately and leaves a clear state when metrics history is not available."
+      description="The dashboard renders current status immediately and leaves a clear state when a history stream is not available."
     >
-      {!data.historyAvailable ? (
+      {data.historyMessage ? (
         <div className="mb-4 rounded-[1.25rem] border border-orange-300/20 bg-orange-400/10 p-4 text-sm leading-6 text-orange-100">
           {data.historyMessage}
         </div>

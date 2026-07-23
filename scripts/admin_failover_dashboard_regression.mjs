@@ -60,13 +60,18 @@ for (const token of [
   "NUTSNEWS_FAILOVER_CLOUDFLARE_DASHBOARD_URL",
   "cache: \"no-store\"",
   "HISTORY_UNAVAILABLE_MESSAGE",
+  "DNS_HISTORY_UNAVAILABLE_MESSAGE",
   "AUDIT_UNAVAILABLE_MESSAGE",
   "signedActionHeaders",
   "sha256Hex",
   "Historical health-check and DNS-change rows",
+  "healthHistoryAvailable",
+  "controller_history",
   "sanitizeStatus",
+  "sanitizeHealthHistory",
   "sanitizeAuditEvent",
   "liveOriginReadiness",
+  "healthHistory",
   "formatFailoverTarget",
 ]) {
   assertIncludes(lib, token, "adminFailover.ts");
@@ -76,6 +81,8 @@ for (const token of [
   "FAILOVER_LIVE_ORIGIN_CLASSIFICATIONS",
   "FAILOVER_LIVE_ORIGIN_DNS_STATES",
   "FailoverLiveOriginReadiness",
+  "FailoverHealthHistoryRow",
+  "FAILOVER_STATUS_OPTIONAL_FIELDS",
   "FAILOVER_MANUAL_ACTIONS",
   "FAILOVER_MANUAL_ACTION_CONFIRMATIONS",
   "FAILOVER TO VERCEL",
@@ -84,6 +91,7 @@ for (const token of [
   "DISABLE MANUAL LOCK",
   "FailoverManualAuditEvent",
   "liveOriginReadiness",
+  "healthHistory",
 ]) {
   assertIncludes(contract, token, "failoverStatusContract.ts");
 }

@@ -147,6 +147,19 @@ export type FailoverLiveOriginReadiness = {
   apex: FailoverLiveOriginHostReadiness;
   www: FailoverLiveOriginHostReadiness;
 };
+export type FailoverHealthHistoryRow = {
+  checkedAt: FailoverIsoDateTime;
+  source: string;
+  healthResult: FailoverHealthResult;
+  vpsReachable: boolean;
+  vpsStatus: FailoverVpsStatus;
+  vpsLatencyMs: number | null;
+  observedDeploymentTarget: FailoverObservedDeploymentTarget;
+  consecutiveVpsFailures: number;
+  activeDnsTarget: FailoverDnsTargetClassification;
+  desiredDnsTarget: FailoverDnsTargetClassification;
+  errorCode: string | null;
+};
 
 export type FailoverStatus = {
   schemaVersion: typeof FAILOVER_STATUS_SCHEMA_VERSION;
@@ -173,6 +186,7 @@ export type FailoverStatus = {
   stale: boolean;
   staleReason: FailoverStaleReason | null;
   controllerVersion: string;
+  healthHistory?: FailoverHealthHistoryRow[];
 };
 
 export type FailoverManualAuditEvent = {
@@ -214,6 +228,10 @@ export const FAILOVER_STATUS_REQUIRED_FIELDS = [
   "stale",
   "staleReason",
   "controllerVersion",
+] as const satisfies readonly (keyof FailoverStatus)[];
+
+export const FAILOVER_STATUS_OPTIONAL_FIELDS = [
+  "healthHistory",
 ] as const satisfies readonly (keyof FailoverStatus)[];
 
 const nullableDateTimeSchema = {
@@ -265,6 +283,47 @@ const liveOriginHostReadinessSchema = {
     cacheState: { enum: FAILOVER_LIVE_ORIGIN_CACHE_STATES },
     error: {
       oneOf: [{ enum: FAILOVER_LIVE_ORIGIN_ERROR_CODES }, { type: "null" }],
+    },
+  },
+} as const;
+
+const healthHistoryRowSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "checkedAt",
+    "source",
+    "healthResult",
+    "vpsReachable",
+    "vpsStatus",
+    "vpsLatencyMs",
+    "observedDeploymentTarget",
+    "consecutiveVpsFailures",
+    "activeDnsTarget",
+    "desiredDnsTarget",
+    "errorCode",
+  ],
+  properties: {
+    checkedAt: { type: "string", format: "date-time" },
+    source: { type: "string" },
+    healthResult: { enum: FAILOVER_HEALTH_RESULTS },
+    vpsReachable: { type: "boolean" },
+    vpsStatus: {
+      oneOf: [
+        { type: "integer", minimum: 100, maximum: 599 },
+        { enum: FAILOVER_VPS_STATUS_CODES },
+        { type: "null" },
+      ],
+    },
+    vpsLatencyMs: {
+      oneOf: [{ type: "integer", minimum: 0 }, { type: "null" }],
+    },
+    observedDeploymentTarget: { enum: FAILOVER_OBSERVED_DEPLOYMENT_TARGETS },
+    consecutiveVpsFailures: { type: "integer", minimum: 0 },
+    activeDnsTarget: { enum: FAILOVER_DNS_TARGET_CLASSIFICATIONS },
+    desiredDnsTarget: { enum: FAILOVER_DNS_TARGET_CLASSIFICATIONS },
+    errorCode: {
+      oneOf: [{ type: "string" }, { type: "null" }],
     },
   },
 } as const;
@@ -324,6 +383,11 @@ export const failoverStatusJsonSchema = {
       type: "string",
       pattern: FAILOVER_CONTROLLER_VERSION_PATTERN,
     },
+    healthHistory: {
+      type: "array",
+      maxItems: 20,
+      items: healthHistoryRowSchema,
+    },
   },
 } as const;
 
@@ -352,7 +416,10 @@ export const failoverStaleControllerContract = {
   ],
 } as const;
 
-export const FAILOVER_PUBLIC_SAFE_STATUS_FIELDS = FAILOVER_STATUS_REQUIRED_FIELDS;
+export const FAILOVER_PUBLIC_SAFE_STATUS_FIELDS = [
+  ...FAILOVER_STATUS_REQUIRED_FIELDS,
+  ...FAILOVER_STATUS_OPTIONAL_FIELDS,
+] as const;
 export const FAILOVER_INTERNAL_ONLY_FIELD_NAMES = [
   "cloudflareApiToken",
   "cloudflareZoneId",
@@ -391,6 +458,7 @@ export const failoverStatusFieldVisibility = {
   stale: "public",
   staleReason: "public",
   controllerVersion: "public",
+  healthHistory: "public",
 } as const satisfies Record<keyof FailoverStatus, "public">;
 
 export function isPublicSafeFailoverStatusField(
