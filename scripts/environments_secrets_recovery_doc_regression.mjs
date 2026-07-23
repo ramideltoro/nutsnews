@@ -59,9 +59,17 @@ for (const fragment of [
   "`NUTSNEWS_STANDBY_SUPABASE_DB_URL`",
   "`NUTSNEWS_STANDBY_SUPABASE_SERVICE_ROLE_KEY`",
   "`NUTSNEWS_STANDBY_SUPABASE_ANON_KEY`",
+  "existing production Supabase",
+  "must match `NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF`",
+  "lag <= 30 seconds, parity, schema, sequence, writer-pause, and split-brain checks must pass first",
 ]) {
   requireText(doc, fragment, `${docPath} must document environment or recovery dependency ${fragment}.`);
 }
+assert.doesNotMatch(
+  doc,
+  /fresh standby project|fresh project ref|must differ from `NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF`/,
+  `${docPath} must not require a fresh standby Supabase project for issue #496.`,
+);
 
 for (const fragment of [
   "`NUTSNEWS_VPS_STAGING_URL`",

@@ -9,24 +9,28 @@ import {
 } from "../scripts/supabase_standby_readiness.mjs";
 
 const validEnv = Object.freeze({
-  NUTSNEWS_STANDBY_PROJECT_POLICY: "fresh-project",
+  NUTSNEWS_STANDBY_PROJECT_POLICY: "existing-production-supabase",
   NUTSNEWS_STANDBY_SUPABASE_PROJECT_REF: "abcdefghijklmnopqrst",
   NUTSNEWS_STANDBY_SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co",
   NUTSNEWS_STANDBY_SUPABASE_DB_URL:
     "postgresql://postgres:standby-password@db.abcdefghijklmnopqrst.supabase.co:5432/postgres?sslmode=require",
   NUTSNEWS_STANDBY_SUPABASE_SERVICE_ROLE_KEY: "sb_secret_standby_service_role_key",
   NUTSNEWS_STANDBY_SUPABASE_ANON_KEY: "sb_publishable_standby_anon_key",
-  NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: "uvwxyzabcdefghijklmn",
+  NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: "abcdefghijklmnopqrst",
 });
 
 test("valid standby protected inventory returns only safe metadata", () => {
   const metadata = validateSupabaseStandbyReadinessEnv(validEnv);
 
-  assert.equal(metadata.policy, "fresh-project");
+  assert.equal(metadata.policy, "existing-production-supabase");
   assert.equal(metadata.requiredValueCount, REQUIRED_STANDBY_VALUES.length);
   assert.equal(metadata.standbyUrlShape, "https-project-url");
   assert.equal(metadata.databaseUrlShape, "direct-postgres-ssl");
-  assert.equal(metadata.productionIsolation, "standby-ref-differs-from-production-ref");
+  assert.equal(metadata.standbyTarget, "existing-production-supabase");
+  assert.equal(metadata.targetAlignment, "standby-ref-matches-production-ref");
+  assert.equal(metadata.primaryDatabase, "backend-postgres-primary-read-write");
+  assert.equal(metadata.writeIsolation, "withheld-from-app-worker-until-approved-failover");
+  assert.equal(metadata.failoverReadinessGate, "requires-lag-parity-schema-sequence-checks");
 
   const summary = standbyReadinessSummary(metadata);
   for (const secret of [
@@ -40,21 +44,26 @@ test("valid standby protected inventory returns only safe metadata", () => {
   }
 });
 
-test("standby project must be fresh and differ from production", () => {
+test("standby project must be the existing production Supabase project", () => {
   assert.throws(
     () =>
       validateSupabaseStandbyReadinessEnv({
         ...validEnv,
-        NUTSNEWS_STANDBY_SUPABASE_PROJECT_REF: validEnv.NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF,
-        NUTSNEWS_STANDBY_SUPABASE_URL: `https://${validEnv.NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF}.supabase.co`,
-        NUTSNEWS_STANDBY_SUPABASE_DB_URL: `postgresql://postgres:password@db.${validEnv.NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF}.supabase.co:5432/postgres?sslmode=require`,
+        NUTSNEWS_STANDBY_SUPABASE_PROJECT_REF: "uvwxyzabcdefghijklmn",
+        NUTSNEWS_STANDBY_SUPABASE_URL: "https://uvwxyzabcdefghijklmn.supabase.co",
+        NUTSNEWS_STANDBY_SUPABASE_DB_URL: "postgresql://postgres:password@db.uvwxyzabcdefghijklmn.supabase.co:5432/postgres?sslmode=require",
       }),
-    /must differ from the production Supabase project ref/,
+    /must match the production Supabase project ref/,
   );
 
   assert.throws(
-    () => validateSupabaseStandbyReadinessEnv({ ...validEnv, NUTSNEWS_STANDBY_PROJECT_POLICY: "designated-existing-project" }),
-    /fresh-project policy/,
+    () => validateSupabaseStandbyReadinessEnv({ ...validEnv, NUTSNEWS_STANDBY_PROJECT_POLICY: "fresh-project" }),
+    /existing-production-supabase policy/,
+  );
+
+  assert.throws(
+    () => validateSupabaseStandbyReadinessEnv({ ...validEnv, NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: "" }),
+    /NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF/,
   );
 });
 
