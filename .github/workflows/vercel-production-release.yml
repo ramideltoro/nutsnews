@@ -122,13 +122,13 @@ jobs:
           echo "RELEASE_KIND=$release_kind" >> "$GITHUB_ENV"
 
       - name: Checkout exact app source commit
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v5
         with:
           ref: ${{ env.SOURCE_COMMIT }}
           persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with:
           node-version: 26
           cache: npm
@@ -563,7 +563,7 @@ jobs:
 
       - name: Retain sanitized Vercel release evidence
         if: ${{ always() }}
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: nutsnews-vercel-production-release-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/vercel-release-evidence.json

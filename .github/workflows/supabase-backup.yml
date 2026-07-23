@@ -26,13 +26,13 @@ jobs:
       BACKUP_LIMIT_PER_TABLE: "5000"
     steps:
       - name: Checkout repository
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v5
       - name: Use Node.js
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with:
           node-version: 22
       - name: Use Supabase CLI
-        uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1  # v1
+        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # v1
         with:
           version: 2.105.0
       - name: Install PostgreSQL client
@@ -60,7 +60,7 @@ jobs:
           fi
       - name: Upload backup artifact
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: supabase-rest-backup
           path: backups/supabase
@@ -68,7 +68,7 @@ jobs:
           if-no-files-found: ignore
       - name: Upload restore fire drill report
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: supabase-restore-fire-drill-report
           path: reports/supabase-restore
