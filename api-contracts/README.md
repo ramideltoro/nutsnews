@@ -13,3 +13,9 @@ When adding a new protected admin dashboard read, add the operation to the JSON 
 The API Contract Compatibility workflow checks out `ramideltoro/nutsnews-backend@main` as the deployment-intended backend source for this gate and prints the resolved backend commit SHA. The check is read-only: it parses source files and does not use production secrets, database credentials, or live write paths. For local runs, set `NUTSNEWS_BACKEND_REPO_PATH` to a backend checkout or `NUTSNEWS_BACKEND_DB_API_PATH` directly to `nutsnews_worker_db_api.py`.
 
 This gate is a production release blocker for admin backend-provider changes.
+
+## Tokened Admin Backend Smoke
+
+`npm run smoke:admin-backend-operations` posts to every operation in `admin-backend-operations.json` against a protected backend app database API. It requires `NUTSNEWS_BACKEND_API_URL` and `NUTSNEWS_BACKEND_API_TOKEN`, sends `Authorization: Bearer <token>`, includes `providerMode`, and uses small read-only payloads such as one-row limits. The script validates HTTP status and the minimal response envelope for each operation.
+
+The smoke command intentionally does not log tokens or response bodies. Non-2xx failures include the exact operation name and HTTP status only. Empty top-level rows are accepted only for contract entries that are not single dashboard snapshot rows; empty nested dashboard datasets remain valid.
