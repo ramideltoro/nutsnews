@@ -1,0 +1,304 @@
+{
+  "schemaVersion": 1,
+  "title": "NutsNews admin backend operation contract",
+  "sourceOfTruth": {
+    "repository": "ramideltoro/nutsnews",
+    "contractFile": "api-contracts/admin-backend-operations.json",
+    "typescriptAllowlist": "web/lib/adminDatabase.ts#ADMIN_DATABASE_READ_OPERATIONS",
+    "validation": "tests/admin-backend-operation-contract.test.mjs"
+  },
+  "backendConsumption": {
+    "backendRepository": "ramideltoro/nutsnews-backend",
+    "routePattern": "/api/app/db/{operation}",
+    "notes": "Backend compatibility checks should consume this JSON file directly and mirror every read operation in the backend app database API allowlist. Do not scrape TypeScript source for cross-repo compatibility."
+  },
+  "defaults": {
+    "method": "POST",
+    "classification": "read",
+    "safeRead": true,
+    "allowedProviderModes": [
+      "backend_postgres_shadow",
+      "backend_postgres_primary"
+    ],
+    "auth": "protected admin server session plus backend API bearer token",
+    "responseEnvelope": {
+      "type": "AdminDatabaseRowsResult",
+      "requiredFields": [
+        "rows"
+      ],
+      "optionalFields": [
+        "rowCount",
+        "generatedAt"
+      ]
+    }
+  },
+  "operations": [
+    {
+      "operation": "load-admin-production-readiness",
+      "dashboardRoute": "/admin/readiness",
+      "dashboardFile": "web/app/admin/(protected)/readiness/page.tsx",
+      "loaderFile": "web/lib/adminProductionReadiness.ts",
+      "backendPath": "/api/app/db/load-admin-production-readiness",
+      "method": "POST",
+      "classification": "read",
+      "safeRead": true,
+      "allowedProviderModes": [
+        "backend_postgres_shadow",
+        "backend_postgres_primary"
+      ],
+      "responseShape": {
+        "rows": "single dashboard snapshot row",
+        "minimalRowFields": [
+          "articleCount",
+          "publicFeedSnapshotCount",
+          "recentArticles",
+          "workerRun",
+          "articlesLast24Hours",
+          "articlesLast7Days",
+          "translationSummaries",
+          "translationExpectedCount"
+        ]
+      }
+    },
+    {
+      "operation": "load-admin-article-reviews",
+      "dashboardRoute": "/admin/articles",
+      "dashboardFile": "web/app/admin/(protected)/articles/page.tsx",
+      "loaderFile": "web/lib/adminArticleReviews.ts",
+      "backendPath": "/api/app/db/load-admin-article-reviews",
+      "method": "POST",
+      "classification": "read",
+      "safeRead": true,
+      "allowedProviderModes": [
+        "backend_postgres_shadow",
+        "backend_postgres_primary"
+      ],
+      "responseShape": {
+        "rows": "single dashboard snapshot row",
+        "minimalRowFields": [
+          "sourceOptions",
+          "categoryOptions",
+          "recentPublishedArticleRows",
+          "recentPublishedReviewRows",
+          "versionReportRows",
+          "reviewRows",
+          "publishedArticlesForReviews",
+          "totalMatchingReviews"
+        ]
+      }
+    },
+    {
+      "operation": "load-admin-article-engagement",
+      "dashboardRoute": "/admin/engagement",
+      "dashboardFile": "web/app/admin/(protected)/engagement/page.tsx",
+      "loaderFile": "web/lib/adminArticleEngagement.ts",
+      "backendPath": "/api/app/db/load-admin-article-engagement",
+      "method": "POST",
+      "classification": "read",
+      "safeRead": true,
+      "allowedProviderModes": [
+        "backend_postgres_shadow",
+        "backend_postgres_primary"
+      ],
+      "responseShape": {
+        "rows": "single dashboard snapshot row",
+        "minimalRowFields": [
+          "sourceCategoryRows",
+          "articleRows",
+          "sourceCategoryError",
+          "articleError"
+        ]
+      }
+    },
+    {
+      "operation": "load-admin-ai-usage",
+      "dashboardRoute": "/admin/ai-usage",
+      "dashboardFile": "web/app/admin/(protected)/ai-usage/page.tsx",
+      "loaderFile": "web/lib/adminAiUsage.ts",
+      "backendPath": "/api/app/db/load-admin-ai-usage",
+      "method": "POST",
+      "classification": "read",
+      "safeRead": true,
+      "allowedProviderModes": [
+        "backend_postgres_shadow",
+        "backend_postgres_primary"
+      ],
+      "responseShape": {
+        "rows": "single dashboard snapshot row",
+        "minimalRowFields": [
+          "usageRunRows"
+        ]
+      }
+    },
+    {
+      "operation": "load-admin-local-ai",
+      "dashboardRoute": "/admin/local-ai",
+      "dashboardFile": "web/app/admin/(protected)/local-ai/page.tsx",
+      "loaderFile": "web/lib/adminLocalAi.ts",
+      "backendPath": "/api/app/db/load-admin-local-ai",
+      "method": "POST",
+      "classification": "read",
+      "safeRead": true,
+      "allowedProviderModes": [
+        "backend_postgres_shadow",
+        "backend_postgres_primary"
+      ],
+      "responseShape": {
+        "rows": "single dashboard snapshot row",
+        "minimalRowFields": [
+          "usageRunRows",
+          "recentReviewRows"
+        ]
+      }
+    },
+    {
+      "operation": "load-admin-translation-quality",
+      "dashboardRoute": "/admin/translations",
+      "dashboardFile": "web/app/admin/(protected)/translations/page.tsx",
+      "loaderFile": "web/lib/adminTranslationQuality.ts",
+      "backendPath": "/api/app/db/load-admin-translation-quality",
+      "method": "POST",
+      "classification": "read",
+      "safeRead": true,
+      "allowedProviderModes": [
+        "backend_postgres_shadow",
+        "backend_postgres_primary"
+      ],
+      "responseShape": {
+        "rows": "single dashboard snapshot row",
+        "minimalRowFields": [
+          "articleRows",
+          "summaryRows"
+        ]
+      }
+    },
+    {
+      "operation": "load-admin-guardrails",
+      "dashboardRoute": "/admin/guardrails",
+      "dashboardFile": "web/app/admin/(protected)/guardrails/page.tsx",
+      "loaderFile": "web/lib/adminCostGuardrails.ts",
+      "backendPath": "/api/app/db/load-admin-guardrails",
+      "method": "POST",
+      "classification": "read",
+      "safeRead": true,
+      "allowedProviderModes": [
+        "backend_postgres_shadow",
+        "backend_postgres_primary"
+      ],
+      "responseShape": {
+        "rows": "single dashboard snapshot row",
+        "minimalRowFields": [
+          "articleCount",
+          "feedCount",
+          "summaryCount",
+          "aiUsageRunRows",
+          "workerRunRows",
+          "quotaUsageEventRows",
+          "partialErrors"
+        ]
+      }
+    },
+    {
+      "operation": "load-admin-worker-shards",
+      "dashboardRoute": "/admin/shards",
+      "dashboardFile": "web/app/admin/(protected)/shards/page.tsx",
+      "loaderFile": "web/lib/adminShardHealth.ts",
+      "backendPath": "/api/app/db/load-admin-worker-shards",
+      "method": "POST",
+      "classification": "read",
+      "safeRead": true,
+      "allowedProviderModes": [
+        "backend_postgres_shadow",
+        "backend_postgres_primary"
+      ],
+      "responseShape": {
+        "rows": "single dashboard snapshot row",
+        "minimalRowFields": [
+          "workerRunRows"
+        ]
+      }
+    },
+    {
+      "operation": "load-admin-rss-feed-health",
+      "dashboardRoute": "/admin/feed-health",
+      "dashboardFile": "web/app/admin/(protected)/feed-health/page.tsx",
+      "loaderFile": "web/lib/adminFeedHealth.ts",
+      "backendPath": "/api/app/db/load-admin-rss-feed-health",
+      "method": "POST",
+      "classification": "read",
+      "safeRead": true,
+      "allowedProviderModes": [
+        "backend_postgres_shadow",
+        "backend_postgres_primary"
+      ],
+      "responseShape": {
+        "rows": "single dashboard snapshot row",
+        "minimalRowFields": [
+          "rssFeedRows",
+          "feedHealthRows"
+        ]
+      }
+    },
+    {
+      "operation": "load-admin-feed-management",
+      "dashboardRoute": "/admin/feeds",
+      "dashboardFile": "web/app/admin/(protected)/feeds/page.tsx",
+      "loaderFile": "web/lib/adminFeedManagement.ts",
+      "backendPath": "/api/app/db/load-admin-feed-management",
+      "method": "POST",
+      "classification": "read",
+      "safeRead": true,
+      "allowedProviderModes": [
+        "backend_postgres_shadow",
+        "backend_postgres_primary"
+      ],
+      "responseShape": {
+        "rows": "single dashboard snapshot row",
+        "minimalRowFields": [
+          "feedQualityRows"
+        ]
+      }
+    },
+    {
+      "operation": "load-admin-audit-log",
+      "dashboardRoute": "/admin/audit",
+      "dashboardFile": "web/app/admin/(protected)/audit/page.tsx",
+      "loaderFile": "web/lib/adminAuditLog.ts",
+      "backendPath": "/api/app/db/load-admin-audit-log",
+      "method": "POST",
+      "classification": "read",
+      "safeRead": true,
+      "allowedProviderModes": [
+        "backend_postgres_shadow",
+        "backend_postgres_primary"
+      ],
+      "responseShape": {
+        "rows": "single dashboard snapshot row",
+        "minimalRowFields": [
+          "auditEventRows"
+        ]
+      }
+    },
+    {
+      "operation": "load-admin-runtime-feature-flags",
+      "dashboardRoute": "/admin/feature-flags",
+      "dashboardFile": "web/app/admin/(protected)/feature-flags/page.tsx",
+      "loaderFile": "web/lib/runtimeFeatureFlags.ts",
+      "backendPath": "/api/app/db/load-admin-runtime-feature-flags",
+      "method": "POST",
+      "classification": "read",
+      "safeRead": true,
+      "allowedProviderModes": [
+        "backend_postgres_shadow",
+        "backend_postgres_primary"
+      ],
+      "responseShape": {
+        "rows": "runtime feature flag rows",
+        "minimalRowFields": [
+          "key",
+          "enabled"
+        ]
+      }
+    }
+  ]
+}
