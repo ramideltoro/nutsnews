@@ -212,6 +212,15 @@ function assertMinimalResponseShape(operationContract, payload) {
     if (missingFields.length > 0) {
       throw new Error(`${operation} first row is missing required field(s): ${missingFields.join(", ")}`);
     }
+
+    if (operation === "load-admin-article-reviews") {
+      if (!Array.isArray(firstRow.versionReportRows)) {
+        throw new Error(`${operation} first row returned an invalid versionReportRows array`);
+      }
+      if (!Object.hasOwn(firstRow, "versionReportError") || firstRow.versionReportError !== null) {
+        throw new Error(`${operation} first row returned versionReportError; expected null`);
+      }
+    }
   }
 
   return {
@@ -401,7 +410,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   });
 }
 
-export function createAdminBackendSmokeMockServer({ token, operations, failOperation }) {
+export function createAdminBackendSmokeMockServer({ token, operations, failOperation, operationPayloads = {} }) {
   const requests = [];
   const server = http.createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -444,6 +453,16 @@ export function createAdminBackendSmokeMockServer({ token, operations, failOpera
     const row = Object.fromEntries(
       operationContract.minimalRowFields.map((field) => [field, field === "enabled" ? true : []]),
     );
+    if (operationPayloads[operation]) {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify(operationPayloads[operation]));
+      return;
+    }
+
+    if (operation === "load-admin-article-reviews") {
+      row.versionReportError = null;
+    }
+
     const payload = operation === "load-admin-runtime-feature-flags"
       ? { rows: [], rowCount: 0, generatedAt: "2026-07-23T00:00:00.000Z" }
       : { rows: [row], rowCount: 1, generatedAt: "2026-07-23T00:00:00.000Z" };
