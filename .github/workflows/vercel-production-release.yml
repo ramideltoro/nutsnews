@@ -27,7 +27,7 @@ jobs:
       VPS_APPLY_RUN_ID: ${{ github.event.client_payload.vps_apply_run_id }}
       VPS_STAGING_DEPLOYMENT_ID: ${{ github.event.client_payload.staging_deployment_id }}
       VPS_QUALIFICATION_RUN_ID: ${{ github.event.client_payload.qualification_run_id }}
-      RELEASE_KIND: ${{ github.event.client_payload.release_kind }}
+      RELEASE_KIND: ${{ github.event.client_payload.release_kind || 'release' }}
       DATABASE_PROVIDER_MODE: ${{ github.event.client_payload.provider_switch.database_provider_mode }}
       BACKEND_API_URL: ${{ github.event.client_payload.provider_switch.backend_api_url || '' }}
       PROVIDER_SWITCH_CONFIRMATION: ${{ github.event.client_payload.provider_switch.provider_switch_confirmation || '' }}
@@ -42,6 +42,7 @@ jobs:
         shell: bash
         env:
           NUTSNEWS_BACKEND_API_TOKEN: ${{ secrets.NUTSNEWS_BACKEND_API_TOKEN }}
+          NUTSNEWS_INFRA_STAGING_TOKEN: ${{ secrets.NUTSNEWS_INFRA_STAGING_TOKEN }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           set -euo pipefail
@@ -105,6 +106,10 @@ jobs:
               echo "Staging qualification run ID is required for a Vercel production release." >&2
               exit 1
             fi
+            if [[ -z "$NUTSNEWS_INFRA_STAGING_TOKEN" ]]; then
+              echo "NUTSNEWS_INFRA_STAGING_TOKEN is required to verify staging qualification admin backend evidence." >&2
+              exit 1
+            fi
           fi
           if [[ ! "$VERCEL_CONFIG_GENERATION" =~ ^vercel-[0-9a-f]{40}-[1-9][0-9]{0,19}-[1-9][0-9]{0,5}$ ]]; then
             echo "Vercel config generation must bind the source commit and workflow run." >&2
@@ -158,6 +163,16 @@ jobs:
           writeFileSync(outputPath, await response.text(), "utf8");
           NODE
           node --check "$RUNNER_TEMP/dual_target_web_smoke.mjs"
+
+      - name: Verify VPS staging admin backend operation evidence
+        id: staging_admin_backend_evidence
+        if: ${{ env.RELEASE_KIND == 'release' }}
+        shell: bash
+        env:
+          NUTSNEWS_INFRA_STAGING_TOKEN: ${{ secrets.NUTSNEWS_INFRA_STAGING_TOKEN }}
+        run: |
+          set -euo pipefail
+          node scripts/staging_qualification_admin_backend_evidence.mjs
 
       - name: Stage remote Vercel production candidate
         id: stage
@@ -433,6 +448,7 @@ jobs:
           NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS: ${{ vars.NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS || '' }}
           NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES: ${{ vars.NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES || 'false' }}
           NUTSNEWS_VERCEL_FAILOVER_PRODUCTION_ALIASES: ${{ vars.NUTSNEWS_VERCEL_FAILOVER_PRODUCTION_ALIASES || '' }}
+          STAGING_ADMIN_BACKEND_OPERATION_COUNT: ${{ steps.staging_admin_backend_evidence.outputs.operation_count || '' }}
         run: |
           {
             echo "## Dispatch-only Vercel production recovery"
@@ -445,6 +461,7 @@ jobs:
             if [[ "$RELEASE_KIND" == "release" ]]; then
               echo "- VPS staging deployment: \`${VPS_STAGING_DEPLOYMENT_ID}\`"
               echo "- VPS staging qualification run: ${VPS_QUALIFICATION_RUN_ID}"
+              echo "- VPS staging admin backend operation smoke: \`${STAGING_ADMIN_BACKEND_OPERATION_COUNT:-missing}\` operation(s) verified"
             fi
             echo "- Vercel staged deployment URL: ${STAGED_DEPLOYMENT_URL}"
             echo "- Vercel deployment ID: \`${VERCEL_DEPLOYMENT_ID}\`"
@@ -466,6 +483,9 @@ jobs:
           VERCEL_DEPLOYMENT_ID: ${{ steps.stage.outputs.vercel_deployment_id }}
           VERCEL_SOURCE_SHA: ${{ steps.stage.outputs.vercel_source_sha }}
           STAGED_SMOKE_RESULT: ${{ steps.staged_smoke.outputs.result }}
+          STAGING_ADMIN_BACKEND_ARTIFACT_NAME: ${{ steps.staging_admin_backend_evidence.outputs.artifact_name || '' }}
+          STAGING_ADMIN_BACKEND_OPERATION_COUNT: ${{ steps.staging_admin_backend_evidence.outputs.operation_count || '' }}
+          STAGING_ADMIN_BACKEND_SMOKE_RESULT: ${{ steps.staging_admin_backend_evidence.outputs.result || '' }}
           PROMOTION_RESULT: ${{ steps.promote.outputs.result }}
           NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS: ${{ vars.NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS || '' }}
           NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES: ${{ vars.NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES || 'false' }}
@@ -484,6 +504,9 @@ jobs:
             vps_apply_run_id: process.env.VPS_APPLY_RUN_ID || "",
             vps_staging_deployment_id: process.env.VPS_STAGING_DEPLOYMENT_ID || "",
             vps_qualification_run_id: process.env.VPS_QUALIFICATION_RUN_ID || "",
+            vps_staging_admin_backend_smoke_result: process.env.STAGING_ADMIN_BACKEND_SMOKE_RESULT || "",
+            vps_staging_admin_backend_operation_count: process.env.STAGING_ADMIN_BACKEND_OPERATION_COUNT || "",
+            vps_staging_admin_backend_artifact_name: process.env.STAGING_ADMIN_BACKEND_ARTIFACT_NAME || "",
             vercel_deployment_id: process.env.VERCEL_DEPLOYMENT_ID || "",
             vercel_deployment_url: process.env.STAGED_DEPLOYMENT_URL || "",
             vercel_source_sha: process.env.VERCEL_SOURCE_SHA || "",

@@ -279,7 +279,9 @@ async function testAuthBoundaryContracts() {
   const nextConfig = read("web/next.config.ts");
   const runtimeSafety = read("web/runtimeSafety.mjs");
   const offlineE2e = read("scripts/web_offline_e2e_regression.mjs");
+  const stagingQualification = read("scripts/staging_qualification.mjs");
   const stagingQualificationSpec = read("web/tests/staging-qualification.spec.ts");
+  const vercelProductionRelease = read(".github/workflows/vercel-production-release.yml");
 
   assertIncludes(protectedAdminLayout, "const session = await auth();", "protected admin layout");
   assertIncludes(protectedAdminLayout, 'redirect("/admin/login")', "protected admin layout unauthenticated denial");
@@ -295,6 +297,12 @@ async function testAuthBoundaryContracts() {
   assertIncludes(stagingQualificationSpec, "NUTSNEWS_ADMIN_TEST_AUTH_BYPASS_EXPECTED", "staging protected admin dashboard smoke");
   assertIncludes(stagingQualificationSpec, "Dashboard Setup Needed", "staging protected admin dashboard smoke forbidden setup copy");
   assertIncludes(stagingQualificationSpec, "Admin database operation", "staging protected admin dashboard smoke forbidden backend operation copy");
+  assertIncludes(stagingQualification, "admin-backend-operation-smoke", "protected staging qualification admin backend smoke");
+  assertIncludes(stagingQualification, "smokeAdminBackendOperations", "protected staging qualification admin backend smoke");
+  assertIncludes(stagingQualification, "NUTSNEWS_STAGING_BACKEND_API_TOKEN", "protected staging qualification admin backend smoke token");
+  assertIncludes(vercelProductionRelease, "staging_qualification_admin_backend_evidence.mjs", "Vercel production staging evidence gate");
+  assertIncludes(vercelProductionRelease, "NUTSNEWS_INFRA_STAGING_TOKEN is required to verify staging qualification admin backend evidence", "Vercel production staging evidence gate token");
+  assertIncludes(vercelProductionRelease, "vps_staging_admin_backend_smoke_result", "Vercel production release evidence");
 
   for (const route of [
     "/admin",
