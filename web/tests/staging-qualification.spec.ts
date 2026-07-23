@@ -22,9 +22,26 @@ const protectedAdminRoutes = [
 ];
 
 const forbiddenAdminDashboardPatterns = [
-  /This page could not be found|NEXT_HTTP_ERROR_FALLBACK;404|404: This page could not be found/i,
-  /Application error|Unhandled Runtime Error|Minified React error|Hydration failed because/i,
-  /supabase_access_disabled_for_backend_primary|Server-side Supabase access is not configured|Missing SUPABASE_URL|Missing runtime public Supabase/i,
+  {
+    label: 'framework 404',
+    pattern: /This page could not be found|NEXT_HTTP_ERROR_FALLBACK;404|404: This page could not be found/i,
+  },
+  {
+    label: 'generic client exception',
+    pattern: /Application error|Unhandled Runtime Error|Minified React error|Hydration failed because/i,
+  },
+  {
+    label: 'backend-primary Supabase access error',
+    pattern: /supabase_access_disabled_for_backend_primary|Server-side Supabase access is not configured|Missing SUPABASE_URL|Missing runtime public Supabase/i,
+  },
+  {
+    label: 'admin dashboard setup warning',
+    pattern: /Dashboard Setup Needed/i,
+  },
+  {
+    label: 'admin database operation error',
+    pattern: /Admin database operation/i,
+  },
 ];
 
 function isTransientNextStaticAsset(pathname: string) {
@@ -81,8 +98,8 @@ test('bounded private-staging navigation and accessibility smoke', async ({ page
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
       const bodyText = await page.locator('body').innerText({ timeout: 10000 });
-      for (const pattern of forbiddenAdminDashboardPatterns) {
-        expect(bodyText, `${route} rendered blocked admin smoke text ${pattern}`).not.toMatch(pattern);
+      for (const { label, pattern } of forbiddenAdminDashboardPatterns) {
+        expect(bodyText, `${route} rendered ${label} copy`).not.toMatch(pattern);
       }
     }
   }
