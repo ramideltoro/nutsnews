@@ -7,6 +7,7 @@ on:
       - "web/**"
       - "supabase/**"
       - "scripts/**"
+      - "tests/admin-backend-*.test.mjs"
       - "api-contracts/**"
       - ".github/workflows/api-contracts.yml"
   push:
@@ -15,6 +16,7 @@ on:
       - "web/**"
       - "supabase/**"
       - "scripts/**"
+      - "tests/admin-backend-*.test.mjs"
       - "api-contracts/**"
       - ".github/workflows/api-contracts.yml"
   workflow_dispatch:
@@ -40,6 +42,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
 
+      - name: Checkout backend allowlist source
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
+        with:
+          repository: ramideltoro/nutsnews-backend
+          ref: main
+          path: backend/nutsnews-backend
+
       - name: Use Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5
         with:
@@ -50,5 +59,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run API contract compatibility suite
+      - name: Run admin/backend and API contract compatibility suite
+        env:
+          NUTSNEWS_BACKEND_COMPAT_REF: main
+          NUTSNEWS_BACKEND_REPO_PATH: ${{ github.workspace }}/backend/nutsnews-backend
         run: npm run test:api-contracts
