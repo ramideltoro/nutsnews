@@ -43,6 +43,7 @@ assert.doesNotMatch(containerWorkflow, /^\s+environment:\s+Production\b/m, ".git
 for (const fragment of [
   "`staging-supabase`",
   "`production-supabase`",
+  "`supabase-standby`",
   "`NUTSNEWS_INFRA_STAGING_TOKEN`",
   "`NUTSNEWS_INFRA_PRODUCTION_TOKEN`",
   "`NUTSNEWS_BACKEND_API_TOKEN`",
@@ -53,6 +54,11 @@ for (const fragment of [
   "`NUTSNEWS_STAGING_MIGRATION_DATABASE_URL`",
   "`NUTSNEWS_PRODUCTION_SUPABASE_ACCESS_TOKEN`",
   "`NUTSNEWS_PRODUCTION_SUPABASE_URL`",
+  "`NUTSNEWS_STANDBY_SUPABASE_PROJECT_REF`",
+  "`NUTSNEWS_STANDBY_SUPABASE_URL`",
+  "`NUTSNEWS_STANDBY_SUPABASE_DB_URL`",
+  "`NUTSNEWS_STANDBY_SUPABASE_SERVICE_ROLE_KEY`",
+  "`NUTSNEWS_STANDBY_SUPABASE_ANON_KEY`",
 ]) {
   requireText(doc, fragment, `${docPath} must document environment or recovery dependency ${fragment}.`);
 }
@@ -122,6 +128,8 @@ for (const fragment of [
   "`apply-staging-supabase-migrations`",
   "`production-supabase-migration.yml`",
   "`apply-production-supabase-migrations`",
+  "`supabase-standby-readiness.yml`",
+  "`verify-supabase-standby-readiness`",
   "`supabase-backup.yml`",
   "`supabase-rest-backup`",
   "`supabase-restore-fire-drill-report`",

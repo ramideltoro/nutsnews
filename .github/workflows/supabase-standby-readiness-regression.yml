@@ -1,0 +1,55 @@
+name: Supabase Standby Readiness Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/supabase-standby-readiness.yml"
+      - ".github/workflows/supabase-standby-readiness-regression.yml"
+      - ".github/deployment/workflow-check-inventory.md"
+      - ".github/deployment/environments-secrets-recovery.md"
+      - "scripts/supabase_standby_readiness.mjs"
+      - "scripts/supabase_standby_readiness_regression.mjs"
+      - "scripts/workflow_check_inventory_regression.mjs"
+      - "scripts/environments_secrets_recovery_doc_regression.mjs"
+      - "tests/supabase-standby-readiness.test.mjs"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/supabase-standby-readiness.yml"
+      - ".github/workflows/supabase-standby-readiness-regression.yml"
+      - ".github/deployment/workflow-check-inventory.md"
+      - ".github/deployment/environments-secrets-recovery.md"
+      - "scripts/supabase_standby_readiness.mjs"
+      - "scripts/supabase_standby_readiness_regression.mjs"
+      - "scripts/workflow_check_inventory_regression.mjs"
+      - "scripts/environments_secrets_recovery_doc_regression.mjs"
+      - "tests/supabase-standby-readiness.test.mjs"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  regression:
+    name: Verify standby readiness automation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
+
+      - name: Use Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5
+        with:
+          node-version: 22
+
+      - name: Run standby readiness tests and workflow guard
+        run: |
+          set -euo pipefail
+          node --test tests/supabase-standby-readiness.test.mjs
+          node scripts/supabase_standby_readiness_regression.mjs
