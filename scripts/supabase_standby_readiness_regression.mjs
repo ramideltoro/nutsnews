@@ -26,7 +26,7 @@ for (const fragment of [
   "group: nutsnews-supabase-standby-readiness",
   "cancel-in-progress: false",
   "environment: supabase-standby",
-  "NUTSNEWS_STANDBY_PROJECT_POLICY: fresh-project",
+  "NUTSNEWS_STANDBY_PROJECT_POLICY: existing-production-supabase",
   "NUTSNEWS_STANDBY_SUPABASE_PROJECT_REF",
   "NUTSNEWS_STANDBY_SUPABASE_URL",
   "NUTSNEWS_STANDBY_SUPABASE_DB_URL",
@@ -37,6 +37,7 @@ for (const fragment of [
   "psql --no-psqlrc",
   "begin read only;",
   "Raw URLs, keys, database users, passwords, and row data were not printed.",
+  "lag <= 30 seconds, parity, schema, sequence, writer-pause, and split-brain checks must pass first.",
   "persist-credentials: false",
 ]) {
   requireText(workflow, fragment, `Standby readiness workflow is missing ${fragment}.`);
@@ -55,14 +56,18 @@ assert.doesNotMatch(workflow, /cat\s+.*NUTSNEWS_STANDBY|echo\s+["']?\$NUTSNEWS_S
 assert.doesNotMatch(workflow, /SUPABASE_SERVICE_ROLE_KEY:\s*\$\{\{\s*secrets\.SUPABASE_SERVICE_ROLE_KEY/, "Standby readiness must not use legacy production service-role fallback secrets.");
 
 for (const fragment of [
-  "STANDBY_PROJECT_POLICY = \"fresh-project\"",
-  "Standby project ref must differ from the production Supabase project ref",
+  "STANDBY_PROJECT_POLICY = \"existing-production-supabase\"",
+  "Standby project ref must match the production Supabase project ref",
+  "backend-postgres-primary-read-write",
+  "withheld-from-app-worker-until-approved-failover",
+  "requires-lag-parity-schema-sequence-checks",
   "direct standby Supabase database host",
   "sslmode=require",
   "standbyReadinessSummary",
 ]) {
   requireText(validator, fragment, `Standby readiness validator is missing ${fragment}.`);
 }
+assert.doesNotMatch(validator, /fresh-project|must differ from the production Supabase project ref/, "Standby readiness must not require a fresh project or a production-ref mismatch.");
 
 for (const fragment of [
   "node --test tests/supabase-standby-readiness.test.mjs",
@@ -87,9 +92,17 @@ for (const fragment of [
   "`NUTSNEWS_STANDBY_SUPABASE_ANON_KEY`",
   "`supabase-standby-readiness.yml`",
   "`verify-supabase-standby-readiness`",
+  "existing production Supabase",
+  "must match `NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF`",
+  "lag <= 30 seconds, parity, schema, sequence, writer-pause, and split-brain checks must pass first",
 ]) {
   requireText(recoveryDoc, fragment, `Recovery doc is missing ${fragment}.`);
 }
+assert.doesNotMatch(
+  recoveryDoc,
+  /fresh standby project|fresh project ref|must differ from `NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF`/,
+  "Recovery docs must not require a fresh standby Supabase project for issue #496.",
+);
 
 const allowedSecretWorkflow = "supabase-standby-readiness.yml";
 const standbySecretContextPattern =

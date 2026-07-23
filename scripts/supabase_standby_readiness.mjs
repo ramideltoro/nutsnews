@@ -2,7 +2,7 @@
 
 import { appendFileSync } from "node:fs";
 
-export const STANDBY_PROJECT_POLICY = "fresh-project";
+export const STANDBY_PROJECT_POLICY = "existing-production-supabase";
 
 export const REQUIRED_STANDBY_VALUES = Object.freeze([
   "NUTSNEWS_STANDBY_SUPABASE_PROJECT_REF",
@@ -47,7 +47,7 @@ function validateKeyShape(value, name, allowedPrefixes) {
 export function validateSupabaseStandbyReadinessEnv(env = process.env) {
   const policy = String(env.NUTSNEWS_STANDBY_PROJECT_POLICY ?? STANDBY_PROJECT_POLICY).trim();
   if (policy !== STANDBY_PROJECT_POLICY) {
-    throw new SupabaseStandbyReadinessError("Supabase standby must use the fresh-project policy for issue #496.");
+    throw new SupabaseStandbyReadinessError("Supabase standby must use the existing-production-supabase policy for issue #496.");
   }
 
   const projectRef = requireTrimmedEnv(env, "NUTSNEWS_STANDBY_SUPABASE_PROJECT_REF");
@@ -55,14 +55,12 @@ export function validateSupabaseStandbyReadinessEnv(env = process.env) {
   const databaseUrlValue = requireTrimmedEnv(env, "NUTSNEWS_STANDBY_SUPABASE_DB_URL");
   const serviceRoleKey = requireTrimmedEnv(env, "NUTSNEWS_STANDBY_SUPABASE_SERVICE_ROLE_KEY");
   const anonKey = requireTrimmedEnv(env, "NUTSNEWS_STANDBY_SUPABASE_ANON_KEY");
-  const productionProjectRef = String(env.NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF ?? "").trim();
+  const productionProjectRef = requireTrimmedEnv(env, "NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF");
 
   validateProjectRef(projectRef, "NUTSNEWS_STANDBY_SUPABASE_PROJECT_REF");
-  if (productionProjectRef) {
-    validateProjectRef(productionProjectRef, "NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF");
-    if (productionProjectRef === projectRef) {
-      throw new SupabaseStandbyReadinessError("Standby project ref must differ from the production Supabase project ref.");
-    }
+  validateProjectRef(productionProjectRef, "NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF");
+  if (productionProjectRef !== projectRef) {
+    throw new SupabaseStandbyReadinessError("Standby project ref must match the production Supabase project ref for the existing standby target.");
   }
 
   const standbyUrl = parseUrl(standbyUrlValue, "NUTSNEWS_STANDBY_SUPABASE_URL");
@@ -99,7 +97,11 @@ export function validateSupabaseStandbyReadinessEnv(env = process.env) {
     projectRefIsPresent: true,
     standbyUrlShape: "https-project-url",
     databaseUrlShape: "direct-postgres-ssl",
-    productionIsolation: productionProjectRef ? "standby-ref-differs-from-production-ref" : "production-ref-not-provided",
+    standbyTarget: "existing-production-supabase",
+    targetAlignment: "standby-ref-matches-production-ref",
+    primaryDatabase: "backend-postgres-primary-read-write",
+    writeIsolation: "withheld-from-app-worker-until-approved-failover",
+    failoverReadinessGate: "requires-lag-parity-schema-sequence-checks",
   });
 }
 
@@ -109,9 +111,13 @@ export function standbyReadinessSummary(metadata) {
     "",
     `- Standby project policy: \`${metadata.policy}\``,
     `- Required protected values present: \`${metadata.requiredValueCount}/${REQUIRED_STANDBY_VALUES.length}\``,
+    `- Primary read/write database: \`${metadata.primaryDatabase}\``,
+    `- Supabase standby target: \`${metadata.standbyTarget}\``,
+    `- Target alignment: \`${metadata.targetAlignment}\``,
     `- Standby URL shape: \`${metadata.standbyUrlShape}\``,
     `- Direct database URL shape: \`${metadata.databaseUrlShape}\``,
-    `- Production isolation: \`${metadata.productionIsolation}\``,
+    `- Write isolation: \`${metadata.writeIsolation}\``,
+    `- Required before failover: \`${metadata.failoverReadinessGate}\``,
     "- Raw URLs, keys, database users, passwords, and row data were not printed.",
     "",
   ].join("\n");

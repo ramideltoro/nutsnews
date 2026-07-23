@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: Type verify-supabase-standby-readiness to check protected standby credentials.
+        description: Type verify-supabase-standby-readiness to check protected existing production Supabase standby credentials.
         required: true
         type: string
 
@@ -58,9 +58,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes postgresql-client
 
-      - name: Validate protected standby credential inventory
+      - name: Validate protected existing production Supabase standby inventory
         env:
-          NUTSNEWS_STANDBY_PROJECT_POLICY: fresh-project
+          NUTSNEWS_STANDBY_PROJECT_POLICY: existing-production-supabase
           NUTSNEWS_STANDBY_SUPABASE_PROJECT_REF: ${{ secrets.NUTSNEWS_STANDBY_SUPABASE_PROJECT_REF }}
           NUTSNEWS_STANDBY_SUPABASE_URL: ${{ secrets.NUTSNEWS_STANDBY_SUPABASE_URL }}
           NUTSNEWS_STANDBY_SUPABASE_DB_URL: ${{ secrets.NUTSNEWS_STANDBY_SUPABASE_DB_URL }}
@@ -71,7 +71,7 @@ jobs:
           set -euo pipefail
           node scripts/supabase_standby_readiness.mjs
 
-      - name: Confirm direct standby database connectivity
+      - name: Confirm direct existing production Supabase standby connectivity
         env:
           NUTSNEWS_STANDBY_SUPABASE_DB_URL: ${{ secrets.NUTSNEWS_STANDBY_SUPABASE_DB_URL }}
         run: |
@@ -101,7 +101,8 @@ jobs:
           {
             echo "## Direct standby database connectivity"
             echo
-            echo "- Protected workflow reached the standby database through the direct DB URL."
+            echo "- Protected workflow reached the existing production Supabase database through the direct standby DB URL."
             echo "- Query ran in a read-only transaction and returned only boolean metadata."
             echo "- Raw URLs, keys, database users, passwords, and row data were not printed."
+            echo "- This readiness check does not approve failover; lag <= 30 seconds, parity, schema, sequence, writer-pause, and split-brain checks must pass first."
           } >> "$GITHUB_STEP_SUMMARY"
