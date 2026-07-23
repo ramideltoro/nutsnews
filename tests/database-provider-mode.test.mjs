@@ -35,6 +35,20 @@ async function close(server) {
   });
 }
 
+async function captureConsoleError(fn) {
+  const original = console.error;
+  const calls = [];
+  console.error = (...args) => {
+    calls.push(args);
+  };
+
+  try {
+    await fn(calls);
+  } finally {
+    console.error = original;
+  }
+}
+
 function stagingSupabasePrimary(overrides = {}) {
   return {
     NUTSNEWS_RUNTIME_ENV: "staging",
@@ -224,6 +238,120 @@ test("Backend primary compatibility calls can opt into cacheable fetch for sitem
     tags: ["sitemap"],
   });
   assert.equal(JSON.parse(capturedRequest.init.body).providerMode, "backend_postgres_primary");
+});
+
+test("Backend operation failures emit structured safe server logs", async () => {
+  const env = stagingBackendPrimary({
+    NUTSNEWS_BACKEND_API_URL: "https://backend.example.test/api/app/db",
+    NUTSNEWS_BACKEND_API_TOKEN: "server-only-secret-token",
+    NUTSNEWS_SOURCE_COMMIT: "source-commit-1",
+    NUTSNEWS_BUILD_ID: "build-42",
+    NUTSNEWS_DEPLOYMENT_TARGET: "production-vps",
+    VERCEL_ENV: "production",
+    VERCEL_DEPLOYMENT_ID: "dpl_123",
+  });
+  let thrown = null;
+
+  await captureConsoleError(async (calls) => {
+    await assert.rejects(
+      callBackendDatabaseOperation(
+        "load-admin-ai-usage",
+        {
+          providerMode: "malicious-overwrite",
+          sensitiveBodyValue: "request-body-secret",
+        },
+        {
+          env,
+          async fetchImpl() {
+            return new Response("raw response secret should not be logged", { status: 500 });
+          },
+        },
+      ),
+      (error) => {
+        thrown = error;
+        return error instanceof RuntimeSafetyError && error.code === "backend_api_request_failed";
+      },
+    );
+
+    assert.equal(calls.length, 1);
+    const payload = JSON.parse(calls[0][0]);
+    assert.equal(payload.event, "backend_database_operation_failed");
+    assert.equal(payload.operation, "load-admin-ai-usage");
+    assert.equal(payload.backend_url_host, "backend.example.test");
+    assert.equal(payload.backend_url_path, "/api/app/db/load-admin-ai-usage");
+    assert.equal(payload.http_status, 500);
+    assert.equal(payload.provider_mode, "backend_postgres_primary");
+    assert.equal(payload.failure_class, "backend_internal_error");
+    assert.equal(payload.level, "error");
+    assert.equal(payload.service, "nutsnews-web");
+    assert.equal(payload.deployment.source_commit, "source-commit-1");
+    assert.equal(payload.deployment.build_id, "build-42");
+    assert.equal(payload.deployment.deployment_target, "production-vps");
+    assert.equal(payload.deployment.vercel_env, "production");
+    assert.equal(payload.deployment.vercel_deployment_id, "dpl_123");
+    assert.equal(typeof payload.duration_ms, "number");
+    assert(payload.duration_ms >= 0);
+
+    const serialized = JSON.stringify(payload);
+    assert.doesNotMatch(serialized, /server-only-secret-token/);
+    assert.doesNotMatch(serialized, /Bearer/);
+    assert.doesNotMatch(serialized, /request-body-secret/);
+    assert.doesNotMatch(serialized, /raw response secret/);
+  });
+
+  assert(thrown instanceof RuntimeSafetyError);
+  assert.doesNotMatch(thrown.message, /request-body-secret|raw response secret|server-only-secret-token/);
+});
+
+test("Backend operation failure logs distinguish status and timeout classes", async () => {
+  const cases = [
+    { status: 404, failureClass: "unknown_operation" },
+    { status: 401, failureClass: "auth_failure" },
+    { status: 403, failureClass: "auth_failure" },
+    { status: 503, failureClass: "backend_internal_error" },
+    { status: 422, failureClass: "backend_request_error" },
+    { errorName: "AbortError", failureClass: "timeout" },
+  ];
+
+  for (const entry of cases) {
+    await captureConsoleError(async (calls) => {
+      await assert.rejects(
+        callBackendDatabaseOperation(
+          "load-admin-production-readiness",
+          { sensitiveBodyValue: "request-body-secret" },
+          {
+            env: stagingBackendPrimary({
+              NUTSNEWS_BACKEND_API_URL: "https://backend.example.test/api/app/db",
+              NUTSNEWS_BACKEND_API_TOKEN: "server-only-secret-token",
+            }),
+            async fetchImpl() {
+              if (entry.errorName) {
+                const error = new Error("timeout contained server-only-secret-token");
+                error.name = entry.errorName;
+                throw error;
+              }
+              return new Response("raw response secret should not be logged", { status: entry.status });
+            },
+          },
+        ),
+        (error) => error instanceof RuntimeSafetyError && error.code === "backend_api_request_failed",
+      );
+
+      assert.equal(calls.length, 1);
+      const payload = JSON.parse(calls[0][0]);
+      assert.equal(payload.failure_class, entry.failureClass);
+      assert.equal(payload.http_status, entry.status ?? null);
+      assert.equal(payload.operation, "load-admin-production-readiness");
+      assert.equal(payload.backend_url_path, "/api/app/db/load-admin-production-readiness");
+      if (entry.errorName) {
+        assert.equal(payload.error_name, entry.errorName);
+      }
+      const serialized = JSON.stringify(payload);
+      assert.doesNotMatch(serialized, /server-only-secret-token/);
+      assert.doesNotMatch(serialized, /request-body-secret/);
+      assert.doesNotMatch(serialized, /raw response secret/);
+    });
+  }
 });
 
 test("Backend primary public article reads use backend compatibility operations", async () => {
