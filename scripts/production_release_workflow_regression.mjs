@@ -106,6 +106,11 @@ requireText(
 );
 requireText(
   vercelRecoveryWorkflow,
+  "RELEASE_KIND: ${{ github.event.client_payload.release_kind || 'release' }}",
+  "Vercel production recovery must default omitted release_kind payloads to release.",
+);
+requireText(
+  vercelRecoveryWorkflow,
   "NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES",
   "Vercel production recovery must require an explicit flag before checking failover aliases.",
 );
@@ -113,6 +118,26 @@ requireText(
   vercelRecoveryWorkflow,
   "NUTSNEWS_VERCEL_FAILOVER_PRODUCTION_ALIASES",
   "Vercel production recovery must name controlled failover aliases separately from secondary targets.",
+);
+requireText(
+  vercelRecoveryWorkflow,
+  "staging_qualification_admin_backend_evidence.mjs",
+  "Vercel production recovery must verify staging admin backend operation evidence before staging Vercel.",
+);
+requireText(
+  vercelRecoveryWorkflow,
+  "NUTSNEWS_INFRA_STAGING_TOKEN is required to verify staging qualification admin backend evidence",
+  "Vercel production recovery must require the infra staging token for release evidence verification.",
+);
+requireText(
+  vercelRecoveryWorkflow,
+  "vps_staging_admin_backend_smoke_result",
+  "Vercel production recovery evidence must record the staging admin backend smoke result.",
+);
+requireText(
+  recoveryRunbook,
+  "passing admin backend operation smoke results",
+  "Recovery docs must require staging admin backend smoke evidence for Vercel production release payloads.",
 );
 assert.doesNotMatch(
   vercelRecoveryWorkflow,

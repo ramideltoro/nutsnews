@@ -1,17 +1,20 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
 import { execFileSync } from "node:child_process";
 
-import { assertFixtureTargetMatchesRuntime, assertRequiredPlaywrightReport, deploymentSmokeEnvironment, qualificationPasses, redact, runQualification, sanitizePlaywrightArtifacts } from "../scripts/staging_qualification.mjs";
+import { assertFixtureTargetMatchesRuntime, assertRequiredPlaywrightReport, deploymentSmokeEnvironment, qualificationPasses, redact, runAdminBackendOperationQualification, runQualification, sanitizePlaywrightArtifacts } from "../scripts/staging_qualification.mjs";
 
 const commit = "a".repeat(40);
 const digest = `sha256:${"b".repeat(64)}`;
 const deploymentId = `stg-${"c".repeat(24)}`;
 const configGeneration = `staging-${deploymentId}-dddddddddddd`;
+const adminOperationContracts = JSON.parse(readFileSync(new URL("../api-contracts/admin-backend-operations.json", import.meta.url), "utf8")).operations;
+const adminOperationNames = adminOperationContracts.map((entry) => entry.operation);
 
 function input(artifactDir) {
   return {
@@ -66,12 +69,43 @@ function mockFetch({ adminBypass = false } = {}) {
   };
 }
 
+function passingAdminBackendSmokeEvidence() {
+  return {
+    result: "pass",
+    providerMode: "backend_postgres_primary",
+    targetHost: "staging-backend.nutsnews.test",
+    operationCount: adminOperationNames.length,
+    operations: adminOperationNames.map((operation) => ({
+      operation,
+      status: "pass",
+      rows: operation === "load-admin-runtime-feature-flags" ? 0 : 1,
+      rowCount: operation === "load-admin-runtime-feature-flags" ? 0 : 1,
+      emptyValidDataset: operation === "load-admin-runtime-feature-flags",
+    })),
+  };
+}
+
+function adminBackendOperationPayload(operation) {
+  const contract = adminOperationContracts.find((entry) => entry.operation === operation);
+  if (!contract) throw new Error(`Unknown operation ${operation}`);
+  const expectsSingleSnapshotRow = String(contract.responseShape?.rows ?? "").includes("single");
+  if (!expectsSingleSnapshotRow) return { rows: [], rowCount: 0, generatedAt: "2026-07-01T00:00:00.000Z" };
+  return {
+    rows: [
+      Object.fromEntries((contract.responseShape?.minimalRowFields ?? []).map((field) => [field, []])),
+    ],
+    rowCount: 1,
+    generatedAt: "2026-07-01T00:00:00.000Z",
+  };
+}
+
 async function fixtureRun(overrides = {}) {
   const artifactDir = await mkdtemp(path.join(os.tmpdir(), "nutsnews-qualification-"));
   const events = [];
   const report = await runQualification(input(artifactDir), {
     env: { CF_ACCESS_CLIENT_ID: "client-id-secret", CF_ACCESS_CLIENT_SECRET: "client-secret-value" },
     fetchImpl: mockFetch(),
+    runAdminBackendSmoke: async () => passingAdminBackendSmokeEvidence(),
     runDeploymentSmoke: async () => ({ reused: true }),
     seedFixture: async (namespace) => { events.push(`seed:${namespace}`); return { synthetic: true }; },
     cleanupFixture: async (namespace) => { events.push(`cleanup:${namespace}`); },
@@ -87,9 +121,110 @@ test("deterministic local fixture qualification passes and retains JSON/JUnit", 
   try {
     assert.equal(run.report.result, "pass");
     assert.deepEqual(run.events, ["seed:nutsnews-test-deterministic-177", "cleanup:nutsnews-test-deterministic-177"]);
-    assert.match(await readFile(path.join(run.artifactDir, "staging-qualification.json"), "utf8"), /"suiteRevision"/);
+    const evidence = await readFile(path.join(run.artifactDir, "staging-qualification.json"), "utf8");
+    assert.match(evidence, /"suiteRevision"/);
+    assert.match(evidence, /"admin-backend-operation-smoke"/);
+    assert.match(evidence, /"load-admin-production-readiness"/);
     assert.match(await readFile(path.join(run.artifactDir, "staging-qualification.junit.xml"), "utf8"), /testsuite/);
   } finally { await rm(run.artifactDir, { recursive: true, force: true }); }
+});
+
+test("admin backend operation smoke failure stops before fixture mutation and writes evidence", async () => {
+  const run = await fixtureRun({
+    runAdminBackendSmoke: async () => {
+      const error = new Error("load-admin-ai-usage returned HTTP 503");
+      error.qualificationDetails = {
+        result: "fail",
+        providerMode: "backend_postgres_primary",
+        targetHost: "staging-backend.nutsnews.test",
+        operationCount: 1,
+        operations: [
+          {
+            operation: "load-admin-ai-usage",
+            status: "fail",
+            error: "load-admin-ai-usage returned HTTP 503",
+          },
+        ],
+      };
+      throw error;
+    },
+  });
+  try {
+    assert.equal(run.report.result, "fail");
+    assert.deepEqual(run.events, []);
+    assert.equal(run.report.originalFailure, "load-admin-ai-usage returned HTTP 503");
+    const smokeResult = run.report.results.find((result) => result.name === "admin-backend-operation-smoke");
+    assert.equal(smokeResult?.status, "fail");
+    assert.deepEqual(smokeResult?.details.operations.map((entry) => `${entry.operation}:${entry.status}`), ["load-admin-ai-usage:fail"]);
+    const evidence = await readFile(path.join(run.artifactDir, "staging-qualification.json"), "utf8");
+    assert.match(evidence, /"admin-backend-operation-smoke"/);
+    assert.match(evidence, /"operation": "load-admin-ai-usage"/);
+    assert.match(evidence, /"status": "fail"/);
+    assert.match(await readFile(path.join(run.artifactDir, "staging-qualification.junit.xml"), "utf8"), /admin-backend-operation-smoke/);
+    assert.match(await readFile(path.join(run.artifactDir, "staging-qualification.junit.xml"), "utf8"), /failure/);
+  } finally { await rm(run.artifactDir, { recursive: true, force: true }); }
+});
+
+test("admin backend operation qualification uses staging backend credentials and returns sanitized evidence", async () => {
+  const requests = [];
+  const result = await runAdminBackendOperationQualification({
+    input: input("unused"),
+    env: {
+      NUTSNEWS_STAGING_BACKEND_API_URL: "https://staging-backend.nutsnews.test/api/app/db/",
+      NUTSNEWS_STAGING_BACKEND_API_TOKEN: "staging-backend-token-fixture",
+      NUTSNEWS_DATABASE_PROVIDER_MODE: "backend_postgres_primary",
+    },
+    fetchImpl: async (url, init = {}) => {
+      const parsed = new URL(url);
+      const operation = parsed.pathname.split("/").at(-1);
+      requests.push({
+        operation,
+        authorization: new Headers(init.headers).get("authorization"),
+        body: JSON.parse(init.body),
+      });
+      return json(adminBackendOperationPayload(operation));
+    },
+  });
+
+  assert.equal(result.result, "pass");
+  assert.equal(result.targetHost, "staging-backend.nutsnews.test");
+  assert.equal(result.operationCount, adminOperationNames.length);
+  assert.deepEqual(result.operations.map((entry) => entry.operation), adminOperationNames);
+  assert(requests.every((request) => request.authorization === "Bearer staging-backend-token-fixture"));
+  assert(requests.every((request) => request.body.providerMode === "backend_postgres_primary"));
+  assert.doesNotMatch(JSON.stringify(result), /staging-backend-token-fixture|authorization/i);
+});
+
+test("admin backend operation qualification attaches sanitized per-operation failure evidence", async () => {
+  await assert.rejects(
+    runAdminBackendOperationQualification({
+      input: input("unused"),
+      env: {
+        NUTSNEWS_STAGING_BACKEND_API_URL: "https://staging-backend.nutsnews.test/api/app/db/",
+        NUTSNEWS_STAGING_BACKEND_API_TOKEN: "staging-backend-token-fixture",
+        NUTSNEWS_DATABASE_PROVIDER_MODE: "backend_postgres_primary",
+      },
+      fetchImpl: async (url) => {
+        const operation = new URL(url).pathname.split("/").at(-1);
+        if (operation === "load-admin-ai-usage") {
+          return new Response("secret response body", { status: 503 });
+        }
+        return json(adminBackendOperationPayload(operation));
+      },
+    }),
+    (error) => {
+      assert.match(error.message, /load-admin-ai-usage returned HTTP 503/);
+      assert.doesNotMatch(error.message, /staging-backend-token-fixture|secret response body/);
+      assert.deepEqual(error.qualificationDetails.operations.map((entry) => `${entry.operation}:${entry.status}`), [
+        "load-admin-production-readiness:pass",
+        "load-admin-article-reviews:pass",
+        "load-admin-article-engagement:pass",
+        "load-admin-ai-usage:fail",
+      ]);
+      assert.doesNotMatch(JSON.stringify(error.qualificationDetails), /staging-backend-token-fixture|secret response body|authorization/i);
+      return true;
+    },
+  );
 });
 
 test("deterministic local fixture qualification accepts expected admin bypass", async () => {

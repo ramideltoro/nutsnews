@@ -273,6 +273,7 @@ export async function smokeAdminBackendOperations({
   operations = readContractOperations(),
   fetchImpl = fetch,
   log = () => {},
+  onOperationResult = () => {},
 }) {
   required(baseUrl, "NUTSNEWS_BACKEND_API_URL or --backend-api-url");
   required(token, "NUTSNEWS_BACKEND_API_TOKEN or --backend-api-token");
@@ -287,19 +288,34 @@ export async function smokeAdminBackendOperations({
       limit,
       since,
     });
-    const result = await postOperation({
-      baseUrl,
-      token,
-      timeoutMs,
-      fetchImpl,
-      operationContract,
-      body,
-    });
+    let result;
+    try {
+      result = await postOperation({
+        baseUrl,
+        token,
+        timeoutMs,
+        fetchImpl,
+        operationContract,
+        body,
+      });
+    } catch (error) {
+      onOperationResult({
+        operation: operationContract.operation,
+        status: "fail",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
 
     const emptySuffix = result.emptyValidDataset ? " empty-valid-dataset" : "";
     log(
       `ok ${operationContract.operation} status=200 rows=${result.rows} rowCount=${result.rowCount ?? "n/a"}${emptySuffix}`,
     );
+    onOperationResult({
+      operation: operationContract.operation,
+      status: "pass",
+      ...result,
+    });
     results.push({
       operation: operationContract.operation,
       ...result,

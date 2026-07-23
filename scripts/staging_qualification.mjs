@@ -14,6 +14,7 @@ import {
   resetStagingFixture,
   seedStagingFixture,
 } from "./staging_fixtures.mjs";
+import { smokeAdminBackendOperations } from "./admin_backend_operation_smoke.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const webDir = path.join(repoRoot, "web");
@@ -207,6 +208,73 @@ function accessHeaders(env) {
   return { "CF-Access-Client-Id": clientId, "CF-Access-Client-Secret": clientSecret };
 }
 
+function adminBackendSmokeConfig(input, env) {
+  const baseUrl = String(env.NUTSNEWS_STAGING_BACKEND_API_URL ?? env.NUTSNEWS_BACKEND_API_URL ?? "").trim();
+  const token = String(env.NUTSNEWS_STAGING_BACKEND_API_TOKEN ?? env.NUTSNEWS_BACKEND_API_TOKEN ?? "").trim();
+  if (!baseUrl) throw new Error("NUTSNEWS_STAGING_BACKEND_API_URL or NUTSNEWS_BACKEND_API_URL is required for admin backend operation smoke");
+  if (!token) throw new Error("NUTSNEWS_STAGING_BACKEND_API_TOKEN or NUTSNEWS_BACKEND_API_TOKEN is required for admin backend operation smoke");
+  let parsed;
+  try {
+    parsed = new URL(baseUrl);
+  } catch {
+    throw new Error("Admin backend operation smoke API URL is malformed");
+  }
+  if (parsed.protocol !== "https:") throw new Error("Admin backend operation smoke API URL must be HTTPS");
+  const providerMode =
+    String(env.NUTSNEWS_ADMIN_BACKEND_SMOKE_PROVIDER_MODE ?? env.NUTSNEWS_DATABASE_PROVIDER_MODE ?? "").trim() ||
+    "backend_postgres_primary";
+  return {
+    baseUrl: parsed.toString().replace(/\/+$/, ""),
+    token,
+    providerMode,
+    timeoutMs: Math.min(input.timeoutMs, 15_000),
+    limit: 1,
+  };
+}
+
+function adminBackendOperationEvidence(result) {
+  const evidence = {
+    operation: String(result?.operation ?? ""),
+    status: result?.status === "pass" ? "pass" : "fail",
+  };
+  if (typeof result?.rows === "number") evidence.rows = result.rows;
+  if (typeof result?.rowCount === "number" || result?.rowCount === null) evidence.rowCount = result.rowCount;
+  if (typeof result?.emptyValidDataset === "boolean") evidence.emptyValidDataset = result.emptyValidDataset;
+  if (evidence.status !== "pass" && result?.error) evidence.error = String(result.error);
+  return evidence;
+}
+
+export async function runAdminBackendOperationQualification({ input, env = process.env, fetchImpl = fetch }) {
+  const config = adminBackendSmokeConfig(input, env);
+  const operations = [];
+  try {
+    await smokeAdminBackendOperations({
+      ...config,
+      fetchImpl,
+      onOperationResult: (result) => {
+        operations.push(adminBackendOperationEvidence(result));
+      },
+    });
+  } catch (error) {
+    const failure = new Error(error instanceof Error ? error.message : String(error));
+    failure.qualificationDetails = {
+      result: "fail",
+      providerMode: config.providerMode,
+      targetHost: new URL(config.baseUrl).hostname,
+      operationCount: operations.length,
+      operations,
+    };
+    throw failure;
+  }
+  return {
+    result: "pass",
+    providerMode: config.providerMode,
+    targetHost: new URL(config.baseUrl).hostname,
+    operationCount: operations.length,
+    operations,
+  };
+}
+
 async function boundedFetch(fetchImpl, url, init, timeoutMs, signal) {
   const timeoutSignal = AbortSignal.timeout(timeoutMs);
   return fetchImpl(url, { ...init, signal: signal ? AbortSignal.any([timeoutSignal, signal]) : timeoutSignal });
@@ -398,7 +466,7 @@ function junitXml(report) {
 
 async function writeEvidence(report, input, env) {
   await mkdir(input.artifactDir, { recursive: true });
-  const secrets = [env.CF_ACCESS_CLIENT_ID, env.CF_ACCESS_CLIENT_SECRET, env.GITHUB_TOKEN, env.GH_TOKEN, env.SUPABASE_SERVICE_ROLE_KEY, env.NUTSNEWS_PUBLIC_SUPABASE_ANON_KEY, env.NUTSNEWS_TEST_USER_PASSWORD];
+  const secrets = [env.CF_ACCESS_CLIENT_ID, env.CF_ACCESS_CLIENT_SECRET, env.GITHUB_TOKEN, env.GH_TOKEN, env.SUPABASE_SERVICE_ROLE_KEY, env.NUTSNEWS_PUBLIC_SUPABASE_ANON_KEY, env.NUTSNEWS_TEST_USER_PASSWORD, env.NUTSNEWS_STAGING_BACKEND_API_TOKEN, env.NUTSNEWS_BACKEND_API_TOKEN];
   const safe = redact(report, secrets);
   await writeFile(path.join(input.artifactDir, "staging-qualification.json"), `${JSON.stringify(safe, null, 2)}\n`);
   await writeFile(path.join(input.artifactDir, "staging-qualification.junit.xml"), junitXml(safe));
@@ -429,7 +497,11 @@ export async function runQualification(inputValue, adapters = {}) {
     } catch (error) {
       const status = error?.name === "TimeoutError" ? "timeout" : error?.name === "AbortError" ? "cancelled" : error?.code === "REQUIRED_SKIP" ? "skip" : "fail";
       const message = error instanceof Error ? error.message : String(error);
-      results.push({ name, required: true, status, durationSeconds: (Date.now() - stepStarted) / 1000, error: message });
+      const failureResult = { name, required: true, status, durationSeconds: (Date.now() - stepStarted) / 1000, error: message };
+      if (error && typeof error === "object" && "qualificationDetails" in error) {
+        failureResult.details = error.qualificationDetails;
+      }
+      results.push(failureResult);
       if (!originalFailure) originalFailure = message;
       throw error;
     }
@@ -438,6 +510,10 @@ export async function runQualification(inputValue, adapters = {}) {
   try {
     runtimePreflight = await record("cloudflare-access-and-runtime-identity", () => verifyAccessAndIdentity({ input, fetchImpl, env, signal }));
     await record("github-staging-deployment-identity", () => verifyGitHubDeployment({ input, fetchImpl, env, signal }));
+    await record("admin-backend-operation-smoke", () => {
+      if (adapters.runAdminBackendSmoke) return adapters.runAdminBackendSmoke(input);
+      return runAdminBackendOperationQualification({ input, env, fetchImpl });
+    });
     await record("existing-deployment-smoke", async () => {
       if (adapters.runDeploymentSmoke) return adapters.runDeploymentSmoke(input);
       const child = await runChild(process.execPath, [path.join(repoRoot, "scripts", "dual_target_web_smoke.mjs")], {

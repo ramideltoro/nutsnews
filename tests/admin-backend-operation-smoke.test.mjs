@@ -60,6 +60,7 @@ async function withMockServer(callback, options = {}) {
 test("smokeAdminBackendOperations posts every contract operation with safe bounded read payloads", async () => {
   await withMockServer(async ({ baseUrl, token, requests }) => {
     const logs = [];
+    const operationResults = [];
     const results = await smokeAdminBackendOperations({
       baseUrl,
       token,
@@ -69,9 +70,11 @@ test("smokeAdminBackendOperations posts every contract operation with safe bound
       since: "2026-07-01T00:00:00.000Z",
       operations,
       log: (message) => logs.push(message),
+      onOperationResult: (result) => operationResults.push(result),
     });
 
     assert.deepEqual(results.map((result) => result.operation), operations.map((entry) => entry.operation));
+    assert.deepEqual(operationResults.map((result) => `${result.operation}:${result.status}`), operations.map((entry) => `${entry.operation}:pass`));
     assert.deepEqual(requests.map((request) => request.operation), operations.map((entry) => entry.operation));
     assert(requests.every((request) => request.authorization === `Bearer ${token}`));
     assert(requests.every((request) => request.body.providerMode === "backend_postgres_primary"));
@@ -89,6 +92,7 @@ test("smokeAdminBackendOperations posts every contract operation with safe bound
 test("smokeAdminBackendOperations fails non-2xx responses with exact operation name and status only", async () => {
   await withMockServer(
     async ({ baseUrl, token }) => {
+      const operationResults = [];
       await assert.rejects(
         () => smokeAdminBackendOperations({
           baseUrl,
@@ -96,6 +100,7 @@ test("smokeAdminBackendOperations fails non-2xx responses with exact operation n
           providerMode: "backend_postgres_primary",
           timeoutMs: 5000,
           operations,
+          onOperationResult: (result) => operationResults.push(result),
         }),
         (error) => {
           assert.match(error.message, /load-admin-ai-usage returned HTTP 503/);
@@ -104,6 +109,10 @@ test("smokeAdminBackendOperations fails non-2xx responses with exact operation n
           return true;
         },
       );
+      assert.deepEqual(operationResults.map((result) => `${result.operation}:${result.status}`), [
+        "load-admin-production-readiness:pass",
+        "load-admin-ai-usage:fail",
+      ]);
     },
     { failOperation: "load-admin-ai-usage" },
   );
