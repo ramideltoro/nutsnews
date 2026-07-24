@@ -8,9 +8,10 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const workflowDir = resolve(root, ".github/workflows");
 const read = (path) => readFile(resolve(root, path), "utf8");
 
-const [workflow, regressionWorkflow, validator, inventory, recoveryDoc] = await Promise.all([
+const [workflow, regressionWorkflow, actionlintConfig, validator, inventory, recoveryDoc] = await Promise.all([
   read(".github/workflows/supabase-standby-readiness.yml"),
   read(".github/workflows/supabase-standby-readiness-regression.yml"),
+  read(".github/actionlint.yaml"),
   read("scripts/supabase_standby_readiness.mjs"),
   read(".github/deployment/workflow-check-inventory.md"),
   read(".github/deployment/environments-secrets-recovery.md"),
@@ -88,6 +89,14 @@ for (const fragment of [
   "node scripts/supabase_standby_readiness_regression.mjs",
 ]) {
   requireText(regressionWorkflow, fragment, `Standby readiness regression workflow is missing ${fragment}.`);
+}
+
+for (const fragment of [
+  "self-hosted-runner:",
+  "labels:",
+  "- supabase-standby-ipv6",
+]) {
+  requireText(actionlintConfig, fragment, `Actionlint config is missing the dedicated runner label declaration: ${fragment}.`);
 }
 
 for (const fragment of [
