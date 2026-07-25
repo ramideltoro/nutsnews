@@ -59,8 +59,13 @@ for (const fragment of [
   "`NUTSNEWS_STANDBY_SUPABASE_DB_URL`",
   "`NUTSNEWS_STANDBY_SUPABASE_SERVICE_ROLE_KEY`",
   "`NUTSNEWS_STANDBY_SUPABASE_ANON_KEY`",
+  "`NUTSNEWS_STANDBY_PROBE_SSH_PRIVATE_KEY`",
+  "`NUTSNEWS_STANDBY_PROBE_KNOWN_HOSTS`",
+  "`NUTSNEWS_STANDBY_PROBE_HOST`",
+  "`NUTSNEWS_STANDBY_PROBE_USER`",
   "existing production Supabase",
   "must match `NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF`",
+  "restricted backend forced-command SSH probe",
   "lag <= 30 seconds, parity, schema, sequence, writer-pause, and split-brain checks must pass first",
 ]) {
   requireText(doc, fragment, `${docPath} must document environment or recovery dependency ${fragment}.`);

@@ -7,11 +7,12 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const workflowDir = resolve(root, ".github/workflows");
 const read = (path) => readFile(resolve(root, path), "utf8");
+const obsoleteRunnerLabel = ["supabase", "standby", "ipv6"].join("-");
 
-const [workflow, regressionWorkflow, actionlintConfig, validator, inventory, recoveryDoc] = await Promise.all([
+const [workflow, regressionWorkflow, actionlintWorkflow, validator, inventory, recoveryDoc] = await Promise.all([
   read(".github/workflows/supabase-standby-readiness.yml"),
   read(".github/workflows/supabase-standby-readiness-regression.yml"),
-  read(".github/actionlint.yaml"),
+  read(".github/workflows/actionlint.yml"),
   read("scripts/supabase_standby_readiness.mjs"),
   read(".github/deployment/workflow-check-inventory.md"),
   read(".github/deployment/environments-secrets-recovery.md"),
@@ -29,7 +30,6 @@ for (const fragment of [
   "preflight:",
   "runs-on: ubuntu-latest",
   "readiness:",
-  "runs-on: [supabase-standby-ipv6]",
   "environment: supabase-standby",
   "NUTSNEWS_STANDBY_PROJECT_POLICY: existing-production-supabase",
   "NUTSNEWS_STANDBY_SUPABASE_PROJECT_REF",
@@ -37,12 +37,25 @@ for (const fragment of [
   "NUTSNEWS_STANDBY_SUPABASE_DB_URL",
   "NUTSNEWS_STANDBY_SUPABASE_SERVICE_ROLE_KEY",
   "NUTSNEWS_STANDBY_SUPABASE_ANON_KEY",
+  "NUTSNEWS_STANDBY_PROBE_SSH_PRIVATE_KEY",
+  "NUTSNEWS_STANDBY_PROBE_KNOWN_HOSTS",
+  "NUTSNEWS_STANDBY_PROBE_HOST",
+  "NUTSNEWS_STANDBY_PROBE_USER",
   "NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF",
   "node scripts/supabase_standby_readiness.mjs",
-  "Assert preinstalled PostgreSQL client",
-  "command -v psql >/dev/null",
-  "psql --no-psqlrc",
-  "begin read only;",
+  "chmod 600 \"$private_key_file\" \"$known_hosts_file\"",
+  "printf '%s' \"$NUTSNEWS_STANDBY_SUPABASE_DB_URL\" |",
+  "timeout 45s ssh",
+  "-o BatchMode=yes",
+  "-o IdentitiesOnly=yes",
+  "-o StrictHostKeyChecking=yes",
+  "-o UserKnownHostsFile=\"$known_hosts_file\"",
+  "-o ClearAllForwardings=yes",
+  "-o RequestTTY=no",
+  "-o ConnectTimeout=10",
+  "\"$NUTSNEWS_STANDBY_PROBE_USER@$NUTSNEWS_STANDBY_PROBE_HOST\"",
+  "probe_response\" != \"READY\"",
+  "Protected backend probe returned the safe",
   "Raw URLs, keys, database users, passwords, and row data were not printed.",
   "lag <= 30 seconds, parity, schema, sequence, writer-pause, and split-brain checks must pass first.",
   "persist-credentials: false",
@@ -62,12 +75,18 @@ assert.doesNotMatch(workflow, /pull_request:|push:/, "Standby readiness must be 
 assert.doesNotMatch(workflow, /\bsudo\b|apt-get|apt\s+install/, "Standby readiness must not install packages or use sudo at job runtime.");
 assert.doesNotMatch(workflow, /cat\s+.*NUTSNEWS_STANDBY|echo\s+["']?\$NUTSNEWS_STANDBY/, "Standby readiness must not print protected values.");
 assert.doesNotMatch(workflow, /SUPABASE_SERVICE_ROLE_KEY:\s*\$\{\{\s*secrets\.SUPABASE_SERVICE_ROLE_KEY/, "Standby readiness must not use legacy production service-role fallback secrets.");
+assert.doesNotMatch(workflow, new RegExp(`\\b${obsoleteRunnerLabel}\\b`), "Standby readiness must not target the retired self-hosted runner label.");
+assert.doesNotMatch(workflow, /\bcommand -v psql\b|\bpsql\s+--|<<'SQL'|\bbegin read only\b/i, "GitHub-hosted standby readiness must not execute SQL or psql directly.");
+assert.doesNotMatch(workflow, /\bset -x\b|\bprintenv\b|\benv\s*\|/, "Standby readiness must not dump the job environment.");
+assert.doesNotMatch(workflow, /\bssh\s+-v\b|\bssh\s+-vv\b|\bssh\s+-vvv\b/, "Standby readiness must not enable verbose SSH logging around protected material.");
+assert.doesNotMatch(actionlintWorkflow, /\.github\/actionlint\.ya?ml/, "Actionlint must not keep a custom self-hosted runner label config after retiring the label.");
 
 const preflightBlock = workflow.match(/\n  preflight:[\s\S]*?(?=\n  readiness:|\n[a-zA-Z_][\w-]*:|$)/)?.[0] ?? "";
 const readinessBlock = workflow.match(/\n  readiness:[\s\S]*?(?=\n[a-zA-Z_][\w-]*:|$)/)?.[0] ?? "";
 assert.ok(preflightBlock.includes("runs-on: ubuntu-latest"), "Preflight must stay on GitHub-hosted ubuntu-latest.");
-assert.doesNotMatch(preflightBlock, /supabase-standby-ipv6/, "Preflight must not target the dedicated IPv6 label.");
-assert.ok(readinessBlock.includes("runs-on: [supabase-standby-ipv6]"), "Only readiness must target the dedicated IPv6 label.");
+assert.doesNotMatch(preflightBlock, new RegExp(`\\b${obsoleteRunnerLabel}\\b`), "Preflight must not target the retired self-hosted label.");
+assert.ok(readinessBlock.includes("runs-on: ubuntu-latest"), "Readiness must stay on GitHub-hosted ubuntu-latest.");
+assert.doesNotMatch(readinessBlock, new RegExp(`\\b${obsoleteRunnerLabel}\\b`), "Readiness must not target the retired self-hosted label.");
 assert.doesNotMatch(readinessBlock, /\bsudo\b|apt-get|apt\s+install/, "Readiness must not need root package installation on the runner.");
 
 for (const fragment of [
@@ -92,14 +111,6 @@ for (const fragment of [
 }
 
 for (const fragment of [
-  "self-hosted-runner:",
-  "labels:",
-  "- supabase-standby-ipv6",
-]) {
-  requireText(actionlintConfig, fragment, `Actionlint config is missing the dedicated runner label declaration: ${fragment}.`);
-}
-
-for (const fragment of [
   "`supabase-standby-readiness-regression.yml` | PR-required",
   "`supabase-standby-readiness.yml` | manual recovery",
 ]) {
@@ -113,10 +124,15 @@ for (const fragment of [
   "`NUTSNEWS_STANDBY_SUPABASE_DB_URL`",
   "`NUTSNEWS_STANDBY_SUPABASE_SERVICE_ROLE_KEY`",
   "`NUTSNEWS_STANDBY_SUPABASE_ANON_KEY`",
+  "`NUTSNEWS_STANDBY_PROBE_SSH_PRIVATE_KEY`",
+  "`NUTSNEWS_STANDBY_PROBE_KNOWN_HOSTS`",
+  "`NUTSNEWS_STANDBY_PROBE_HOST`",
+  "`NUTSNEWS_STANDBY_PROBE_USER`",
   "`supabase-standby-readiness.yml`",
   "`verify-supabase-standby-readiness`",
   "existing production Supabase",
   "must match `NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF`",
+  "restricted backend forced-command SSH probe",
   "lag <= 30 seconds, parity, schema, sequence, writer-pause, and split-brain checks must pass first",
 ]) {
   requireText(recoveryDoc, fragment, `Recovery doc is missing ${fragment}.`);
@@ -128,10 +144,9 @@ assert.doesNotMatch(
 );
 
 const allowedSecretWorkflow = "supabase-standby-readiness.yml";
-const allowedRunnerLabelWorkflow = "supabase-standby-readiness.yml";
 const standbySecretContextPattern =
   /secrets\.NUTSNEWS_STANDBY_SUPABASE_(?:PROJECT_REF|URL|DB_URL|SERVICE_ROLE_KEY|ANON_KEY)\b/;
-const dedicatedRunnerLabelPattern = /\bsupabase-standby-ipv6\b/;
+const obsoleteRunnerLabelPattern = new RegExp(`\\b${obsoleteRunnerLabel}\\b`);
 
 for (const workflowFile of (await readdir(workflowDir)).filter((file) => file.endsWith(".yml")).sort()) {
   const text = await readFile(resolve(workflowDir, workflowFile), "utf8");
@@ -143,18 +158,7 @@ for (const workflowFile of (await readdir(workflowDir)).filter((file) => file.en
     );
   }
 
-  if (workflowFile !== allowedRunnerLabelWorkflow) {
-    assert.doesNotMatch(
-      text,
-      dedicatedRunnerLabelPattern,
-      `${workflowFile} must not target the protected standby IPv6 runner label.`,
-    );
-  }
-
-  if (workflowFile === allowedRunnerLabelWorkflow) {
-    const labelOccurrences = [...text.matchAll(new RegExp(dedicatedRunnerLabelPattern, "g"))].length;
-    assert.equal(labelOccurrences, 1, "The protected standby IPv6 runner label must appear exactly once.");
-  }
+  assert.doesNotMatch(text, obsoleteRunnerLabelPattern, `${workflowFile} must not target the retired standby self-hosted runner label.`);
 }
 
 console.log("Supabase standby readiness workflow guardrails passed.");
