@@ -37,7 +37,7 @@ jobs:
   readiness:
     name: Verify protected standby credential readiness
     needs: preflight
-    runs-on: [supabase-standby-ipv6]
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: supabase-standby
 
@@ -51,12 +51,6 @@ jobs:
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5
         with:
           node-version: 22
-
-      - name: Assert preinstalled PostgreSQL client
-        run: |
-          set -euo pipefail
-          command -v psql >/dev/null
-          psql --version
 
       - name: Validate protected existing production Supabase standby inventory
         env:
@@ -74,35 +68,80 @@ jobs:
       - name: Confirm direct existing production Supabase standby connectivity
         env:
           NUTSNEWS_STANDBY_SUPABASE_DB_URL: ${{ secrets.NUTSNEWS_STANDBY_SUPABASE_DB_URL }}
+          NUTSNEWS_STANDBY_PROBE_SSH_PRIVATE_KEY: ${{ secrets.NUTSNEWS_STANDBY_PROBE_SSH_PRIVATE_KEY }}
+          NUTSNEWS_STANDBY_PROBE_KNOWN_HOSTS: ${{ secrets.NUTSNEWS_STANDBY_PROBE_KNOWN_HOSTS }}
+          NUTSNEWS_STANDBY_PROBE_HOST: ${{ vars.NUTSNEWS_STANDBY_PROBE_HOST }}
+          NUTSNEWS_STANDBY_PROBE_USER: ${{ vars.NUTSNEWS_STANDBY_PROBE_USER }}
         run: |
           set -euo pipefail
-          result="$RUNNER_TEMP/nutsnews-standby-readiness.tsv"
-          psql --no-psqlrc --set=ON_ERROR_STOP=1 "$NUTSNEWS_STANDBY_SUPABASE_DB_URL" > "$result" <<'SQL'
-          \pset footer off
-          \pset format unaligned
-          \pset tuples_only on
-          begin read only;
-          select
-            'connected' as status,
-            current_database() = 'postgres' as expected_database,
-            current_setting('server_version_num')::int >= 150000 as supported_postgres,
-            pg_is_in_recovery() in (true, false) as recovery_function_available;
-          rollback;
-          SQL
 
-          if [[ "$(wc -l < "$result" | tr -d ' ')" != "1" ]]; then
-            echo "Unexpected standby connectivity metadata row count." >&2
+          for required_name in \
+            NUTSNEWS_STANDBY_SUPABASE_DB_URL \
+            NUTSNEWS_STANDBY_PROBE_SSH_PRIVATE_KEY \
+            NUTSNEWS_STANDBY_PROBE_KNOWN_HOSTS \
+            NUTSNEWS_STANDBY_PROBE_HOST \
+            NUTSNEWS_STANDBY_PROBE_USER
+          do
+            if [[ -z "${!required_name:-}" ]]; then
+              echo "${required_name} is required for the protected standby probe." >&2
+              exit 1
+            fi
+          done
+
+          if [[ ! "$NUTSNEWS_STANDBY_PROBE_HOST" =~ ^[A-Za-z0-9._:-]+$ ]]; then
+            echo "Protected standby probe host has an invalid shape." >&2
             exit 1
           fi
-          if ! grep -Eq '^connected\|t\|t\|t$' "$result"; then
-            echo "Direct standby database connectivity check did not return the expected safe metadata." >&2
+          if [[ ! "$NUTSNEWS_STANDBY_PROBE_USER" =~ ^[a-z_][a-z0-9_-]*[$]?$ ]]; then
+            echo "Protected standby probe user has an invalid shape." >&2
             exit 1
           fi
+
+          ssh_dir="$RUNNER_TEMP/nutsnews-standby-probe-ssh"
+          install -d -m 700 "$ssh_dir"
+          private_key_file="$ssh_dir/id_ed25519"
+          known_hosts_file="$ssh_dir/known_hosts"
+          umask 077
+          printf '%s\n' "$NUTSNEWS_STANDBY_PROBE_SSH_PRIVATE_KEY" > "$private_key_file"
+          printf '%s\n' "$NUTSNEWS_STANDBY_PROBE_KNOWN_HOSTS" > "$known_hosts_file"
+          chmod 600 "$private_key_file" "$known_hosts_file"
+
+          set +e
+          probe_response="$(
+            printf '%s' "$NUTSNEWS_STANDBY_SUPABASE_DB_URL" |
+              timeout 45s ssh \
+                -i "$private_key_file" \
+                -o BatchMode=yes \
+                -o IdentitiesOnly=yes \
+                -o PreferredAuthentications=publickey \
+                -o PasswordAuthentication=no \
+                -o NumberOfPasswordPrompts=0 \
+                -o StrictHostKeyChecking=yes \
+                -o UserKnownHostsFile="$known_hosts_file" \
+                -o ClearAllForwardings=yes \
+                -o RequestTTY=no \
+                -o ConnectTimeout=10 \
+                -o ConnectionAttempts=1 \
+                -o ServerAliveInterval=10 \
+                -o ServerAliveCountMax=2 \
+                "$NUTSNEWS_STANDBY_PROBE_USER@$NUTSNEWS_STANDBY_PROBE_HOST" \
+                2>/dev/null
+          )"
+          probe_status=$?
+          set -e
+
+          if [[ "$probe_status" -ne 0 || "$probe_response" != "READY" ]]; then
+            echo "Protected backend standby probe did not return READY." >&2
+            exit 1
+          fi
+
           {
-            echo "## Direct standby database connectivity"
+            echo "## Protected Supabase standby direct-connectivity probe"
             echo
-            echo "- Protected workflow reached the existing production Supabase database through the direct standby DB URL."
-            echo "- Query ran in a read-only transaction and returned only boolean metadata."
+            echo "- Preflight and readiness ran on GitHub-hosted \`ubuntu-latest\`."
+            echo "- Probe transport: restricted SSH forced command on the existing backend."
+            echo "- Protected backend probe returned the safe \`READY\` token."
+            echo "- GitHub did not execute SQL or invoke psql; the backend owns the fixed read-only query."
             echo "- Raw URLs, keys, database users, passwords, and row data were not printed."
             echo "- This readiness check does not approve failover; lag <= 30 seconds, parity, schema, sequence, writer-pause, and split-brain checks must pass first."
           } >> "$GITHUB_STEP_SUMMARY"
