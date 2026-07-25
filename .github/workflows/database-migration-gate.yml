@@ -13,6 +13,7 @@ on:
       - "scripts/production_migration_request.mjs"
       - "scripts/staging_fixtures.mjs"
       - "scripts/staging_migration_request.mjs"
+      - "scripts/supabase_standby_manifest.mjs"
       - "scripts/supabase_local.mjs"
       - "scripts/supabase_rls_regression.mjs"
       - "scripts/verify_migration_lock.mjs"
@@ -25,6 +26,7 @@ on:
       - "tests/runtime-readiness.test.mjs"
       - "tests/staging-fixtures.test.mjs"
       - "tests/staging-migration-request.test.mjs"
+      - "tests/supabase-standby-manifest.test.mjs"
       - ".github/workflows/database-migration-gate.yml"
   push:
     branches: [main]
@@ -38,6 +40,7 @@ on:
       - "scripts/production_migration_request.mjs"
       - "scripts/staging_fixtures.mjs"
       - "scripts/staging_migration_request.mjs"
+      - "scripts/supabase_standby_manifest.mjs"
       - "scripts/supabase_local.mjs"
       - "scripts/supabase_rls_regression.mjs"
       - "scripts/verify_migration_lock.mjs"
@@ -50,6 +53,7 @@ on:
       - "tests/runtime-readiness.test.mjs"
       - "tests/staging-fixtures.test.mjs"
       - "tests/staging-migration-request.test.mjs"
+      - "tests/supabase-standby-manifest.test.mjs"
       - ".github/workflows/database-migration-gate.yml"
   workflow_dispatch:
 
@@ -98,7 +102,10 @@ jobs:
           sudo apt-get install --yes postgresql-client
 
       - name: Validate migration naming and the compiled migration contract
-        run: node scripts/assert_migration_contract.mjs
+        run: |
+          set -euo pipefail
+          node scripts/assert_migration_contract.mjs
+          node scripts/supabase_standby_manifest.mjs
 
       - name: Reset a disposable database through the complete migration set
         run: |
@@ -133,6 +140,7 @@ jobs:
             tests/staging-fixtures.test.mjs \
             tests/staging-migration-request.test.mjs \
             tests/production-migration-request.test.mjs \
+            tests/supabase-standby-manifest.test.mjs \
             tests/runtime-readiness.test.mjs
 
       - name: Stop disposable Supabase services

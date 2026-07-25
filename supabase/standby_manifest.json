@@ -1,0 +1,480 @@
+{
+  "manifestVersion": 1,
+  "policy": "backend-postgres-primary-to-existing-production-supabase-standby",
+  "issueLinks": [
+    "https://github.com/ramideltoro/nutsnews/issues/223",
+    "https://github.com/ramideltoro/nutsnews/issues/497"
+  ],
+  "source": {
+    "migrationContract": "supabase/migrations",
+    "migrationHead": "20260717113000",
+    "migrationSourceFingerprint": "0dfeb77c31a75dee1a9ff65b2df54d788bcd9c04e79bef7801cc062210305202",
+    "migrationCount": 29
+  },
+  "safety": {
+    "primaryDatabase": "backend-postgres-primary-read-write",
+    "standbyTarget": "existing-production-supabase",
+    "existingProductionSupabaseProject": true,
+    "createNewSupabaseProject": false,
+    "createNutsnewsStandbyDatabase": false,
+    "appWorkerSupabaseWritesBeforeApprovedFailover": false,
+    "destructiveSupabaseRetirementBlockedUntilManifestExists": true,
+    "safeMetadataOnly": true,
+    "failoverRequiresAllGates": [
+      "standby-manifest-present",
+      "protected-standby-env-ready",
+      "lag-seconds-lte-30",
+      "table-parity-match",
+      "schema-fingerprint-match",
+      "sequence-safety-verified",
+      "primary-writers-paused",
+      "split-brain-absence-verified"
+    ]
+  },
+  "replication": {
+    "source": "backend-postgres",
+    "target": "existing-production-supabase",
+    "direction": "backend-postgres-to-existing-production-supabase",
+    "publicationPolicy": {
+      "rowReplicationContains": "base-tables-only",
+      "excludedRelationKinds": [
+        "view",
+        "materialized_view"
+      ],
+      "viewValidation": "schema-and-derived-query-parity-only"
+    },
+    "tables": [
+      {
+        "name": "public.admin_audit_events",
+        "primaryKey": [
+          "id"
+        ],
+        "replicaIdentity": {
+          "type": "primary_key",
+          "columns": [
+            "id"
+          ]
+        },
+        "rowReplication": true,
+        "sourceMigration": "20260716180000_create_admin_audit_events.sql",
+        "validation": [
+          "schema-fingerprint",
+          "table-row-count-parity",
+          "primary-key-sample-parity"
+        ]
+      },
+      {
+        "name": "public.ai_usage_runs",
+        "primaryKey": [
+          "id"
+        ],
+        "replicaIdentity": {
+          "type": "primary_key",
+          "columns": [
+            "id"
+          ]
+        },
+        "rowReplication": true,
+        "sourceMigration": "20260613000100_create_ai_usage_runs.sql",
+        "validation": [
+          "schema-fingerprint",
+          "table-row-count-parity",
+          "primary-key-sample-parity"
+        ]
+      },
+      {
+        "name": "public.article_ai_reviews",
+        "primaryKey": [
+          "id"
+        ],
+        "replicaIdentity": {
+          "type": "primary_key",
+          "columns": [
+            "id"
+          ]
+        },
+        "rowReplication": true,
+        "sourceMigration": "20260614000500_create_article_ai_reviews.sql",
+        "validation": [
+          "schema-fingerprint",
+          "table-row-count-parity",
+          "primary-key-sample-parity"
+        ]
+      },
+      {
+        "name": "public.article_engagement_daily",
+        "primaryKey": [
+          "event_date",
+          "event_type",
+          "article_id",
+          "source",
+          "category"
+        ],
+        "replicaIdentity": {
+          "type": "primary_key",
+          "columns": [
+            "event_date",
+            "event_type",
+            "article_id",
+            "source",
+            "category"
+          ]
+        },
+        "rowReplication": true,
+        "sourceMigration": "20260717113000_add_article_engagement_analytics.sql",
+        "validation": [
+          "schema-fingerprint",
+          "table-row-count-parity",
+          "primary-key-sample-parity"
+        ]
+      },
+      {
+        "name": "public.article_summaries",
+        "primaryKey": [
+          "id"
+        ],
+        "replicaIdentity": {
+          "type": "primary_key",
+          "columns": [
+            "id"
+          ]
+        },
+        "rowReplication": true,
+        "sourceMigration": "20260624170000_create_article_summaries.sql",
+        "validation": [
+          "schema-fingerprint",
+          "table-row-count-parity",
+          "primary-key-sample-parity"
+        ]
+      },
+      {
+        "name": "public.articles",
+        "primaryKey": [
+          "id"
+        ],
+        "replicaIdentity": {
+          "type": "primary_key",
+          "columns": [
+            "id"
+          ]
+        },
+        "rowReplication": true,
+        "sourceMigration": "20260607175726_create_articles_table.sql",
+        "validation": [
+          "schema-fingerprint",
+          "table-row-count-parity",
+          "primary-key-sample-parity"
+        ]
+      },
+      {
+        "name": "public.feed_health",
+        "primaryKey": [
+          "id"
+        ],
+        "replicaIdentity": {
+          "type": "primary_key",
+          "columns": [
+            "id"
+          ]
+        },
+        "rowReplication": true,
+        "sourceMigration": "20260614000600_create_feed_health.sql",
+        "validation": [
+          "schema-fingerprint",
+          "table-row-count-parity",
+          "primary-key-sample-parity"
+        ]
+      },
+      {
+        "name": "public.migration_schema_contract",
+        "primaryKey": [
+          "singleton"
+        ],
+        "replicaIdentity": {
+          "type": "primary_key",
+          "columns": [
+            "singleton"
+          ]
+        },
+        "rowReplication": true,
+        "sourceMigration": "20260713000000_add_migration_schema_contract.sql",
+        "validation": [
+          "schema-fingerprint",
+          "table-row-count-parity",
+          "primary-key-sample-parity"
+        ]
+      },
+      {
+        "name": "public.quota_usage_events",
+        "primaryKey": [
+          "id"
+        ],
+        "replicaIdentity": {
+          "type": "primary_key",
+          "columns": [
+            "id"
+          ]
+        },
+        "rowReplication": true,
+        "sourceMigration": "20260628014000_create_quota_usage_events.sql",
+        "validation": [
+          "schema-fingerprint",
+          "table-row-count-parity",
+          "primary-key-sample-parity"
+        ]
+      },
+      {
+        "name": "public.release_readiness",
+        "primaryKey": [
+          "singleton"
+        ],
+        "replicaIdentity": {
+          "type": "primary_key",
+          "columns": [
+            "singleton"
+          ]
+        },
+        "rowReplication": true,
+        "sourceMigration": "20260712170000_create_release_readiness.sql",
+        "validation": [
+          "schema-fingerprint",
+          "table-row-count-parity",
+          "primary-key-sample-parity"
+        ]
+      },
+      {
+        "name": "public.rss_feeds",
+        "primaryKey": [
+          "id"
+        ],
+        "replicaIdentity": {
+          "type": "primary_key",
+          "columns": [
+            "id"
+          ]
+        },
+        "rowReplication": true,
+        "sourceMigration": "20260614000600_create_feed_health.sql",
+        "validation": [
+          "schema-fingerprint",
+          "table-row-count-parity",
+          "primary-key-sample-parity"
+        ]
+      },
+      {
+        "name": "public.runtime_feature_flags",
+        "primaryKey": [
+          "key"
+        ],
+        "replicaIdentity": {
+          "type": "primary_key",
+          "columns": [
+            "key"
+          ]
+        },
+        "rowReplication": true,
+        "sourceMigration": "20260712160000_create_runtime_feature_flags.sql",
+        "validation": [
+          "schema-fingerprint",
+          "table-row-count-parity",
+          "primary-key-sample-parity"
+        ]
+      },
+      {
+        "name": "public.staging_fixture_runs",
+        "primaryKey": [
+          "namespace"
+        ],
+        "replicaIdentity": {
+          "type": "primary_key",
+          "columns": [
+            "namespace"
+          ]
+        },
+        "rowReplication": true,
+        "sourceMigration": "20260713000000_add_migration_schema_contract.sql",
+        "validation": [
+          "schema-fingerprint",
+          "table-row-count-parity",
+          "primary-key-sample-parity"
+        ]
+      },
+      {
+        "name": "public.staging_fixture_users",
+        "primaryKey": [
+          "namespace"
+        ],
+        "replicaIdentity": {
+          "type": "primary_key",
+          "columns": [
+            "namespace"
+          ]
+        },
+        "rowReplication": true,
+        "sourceMigration": "20260713000000_add_migration_schema_contract.sql",
+        "validation": [
+          "schema-fingerprint",
+          "table-row-count-parity",
+          "primary-key-sample-parity"
+        ]
+      },
+      {
+        "name": "public.worker_runs",
+        "primaryKey": [
+          "id"
+        ],
+        "replicaIdentity": {
+          "type": "primary_key",
+          "columns": [
+            "id"
+          ]
+        },
+        "rowReplication": true,
+        "sourceMigration": "20260614000400_create_worker_runs.sql",
+        "validation": [
+          "schema-fingerprint",
+          "table-row-count-parity",
+          "primary-key-sample-parity"
+        ]
+      }
+    ],
+    "excludedViews": [
+      {
+        "name": "public.ai_decision_version_report",
+        "kind": "view",
+        "rowReplication": false,
+        "sourceMigration": "20260717103000_add_ai_decision_versions.sql",
+        "validation": [
+          "schema-fingerprint",
+          "derived-query-parity"
+        ]
+      },
+      {
+        "name": "public.article_engagement_article_summary",
+        "kind": "view",
+        "rowReplication": false,
+        "sourceMigration": "20260717113000_add_article_engagement_analytics.sql",
+        "validation": [
+          "schema-fingerprint",
+          "derived-query-parity"
+        ]
+      },
+      {
+        "name": "public.article_engagement_source_category_summary",
+        "kind": "view",
+        "rowReplication": false,
+        "sourceMigration": "20260717113000_add_article_engagement_analytics.sql",
+        "validation": [
+          "schema-fingerprint",
+          "derived-query-parity"
+        ]
+      },
+      {
+        "name": "public.bad_feeds",
+        "kind": "view",
+        "rowReplication": false,
+        "sourceMigration": "20260614000600_create_feed_health.sql",
+        "validation": [
+          "schema-fingerprint",
+          "derived-query-parity"
+        ]
+      },
+      {
+        "name": "public.best_feeds",
+        "kind": "view",
+        "rowReplication": false,
+        "sourceMigration": "20260614000600_create_feed_health.sql",
+        "validation": [
+          "schema-fingerprint",
+          "derived-query-parity"
+        ]
+      },
+      {
+        "name": "public.feed_quality_scores",
+        "kind": "view",
+        "rowReplication": false,
+        "sourceMigration": "20260717093000_add_source_trust_tiers.sql",
+        "validation": [
+          "schema-fingerprint",
+          "derived-query-parity"
+        ]
+      },
+      {
+        "name": "public.public_feed_snapshot",
+        "kind": "materialized_view",
+        "rowReplication": false,
+        "sourceMigration": "20260615010500_create_public_feed_snapshot.sql",
+        "validation": [
+          "schema-fingerprint",
+          "derived-query-parity"
+        ]
+      }
+    ]
+  },
+  "sequences": {
+    "policy": "Before approved failover, every target sequence must be advanced beyond both the source last_value and the target table max(id); fail closed on missing, stale, or unvalidated sequence state.",
+    "items": [
+      {
+        "name": "public.ai_usage_runs_id_seq",
+        "table": "public.ai_usage_runs",
+        "column": "id",
+        "validation": [
+          "source-last-value-present",
+          "target-last-value-gte-source-last-value",
+          "target-next-value-gt-target-max-id"
+        ]
+      },
+      {
+        "name": "public.article_summaries_id_seq",
+        "table": "public.article_summaries",
+        "column": "id",
+        "validation": [
+          "source-last-value-present",
+          "target-last-value-gte-source-last-value",
+          "target-next-value-gt-target-max-id"
+        ]
+      },
+      {
+        "name": "public.feed_health_id_seq",
+        "table": "public.feed_health",
+        "column": "id",
+        "validation": [
+          "source-last-value-present",
+          "target-last-value-gte-source-last-value",
+          "target-next-value-gt-target-max-id"
+        ]
+      },
+      {
+        "name": "public.quota_usage_events_id_seq",
+        "table": "public.quota_usage_events",
+        "column": "id",
+        "validation": [
+          "source-last-value-present",
+          "target-last-value-gte-source-last-value",
+          "target-next-value-gt-target-max-id"
+        ]
+      },
+      {
+        "name": "public.rss_feeds_id_seq",
+        "table": "public.rss_feeds",
+        "column": "id",
+        "validation": [
+          "source-last-value-present",
+          "target-last-value-gte-source-last-value",
+          "target-next-value-gt-target-max-id"
+        ]
+      },
+      {
+        "name": "public.worker_runs_id_seq",
+        "table": "public.worker_runs",
+        "column": "id",
+        "validation": [
+          "source-last-value-present",
+          "target-last-value-gte-source-last-value",
+          "target-next-value-gt-target-max-id"
+        ]
+      }
+    ]
+  },
+  "schemaFingerprint": "9f8cffa694100f438abaddbf6e00db13ff969572e8c16fd4b8ee4afa5087088f"
+}
