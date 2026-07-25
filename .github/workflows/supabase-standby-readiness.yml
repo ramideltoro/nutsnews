@@ -37,7 +37,7 @@ jobs:
   readiness:
     name: Verify protected standby credential readiness
     needs: preflight
-    runs-on: ubuntu-latest
+    runs-on: [supabase-standby-ipv6]
     timeout-minutes: 15
     environment: supabase-standby
 
@@ -52,11 +52,11 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install PostgreSQL client
+      - name: Assert preinstalled PostgreSQL client
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --yes postgresql-client
+          command -v psql >/dev/null
+          psql --version
 
       - name: Validate protected existing production Supabase standby inventory
         env:
