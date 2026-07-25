@@ -16,6 +16,16 @@ const DEFAULT_SHARD_COUNT = 25;
 const DEFAULT_STALE_MINUTES = 180;
 const DEFAULT_SLOW_RUN_MS = 15000;
 const DAILY_WINDOW_DAYS = 7;
+const WORKER_UPLIFT_STAGES = [
+    "scheduler",
+    "fetcher",
+    "canonicalizer",
+    "enrichment",
+    "approval",
+    "translation",
+    "persistence",
+    "publication",
+] as const;
 
 const WORKER_RUN_SELECT_COLUMNS = [
     "id",
@@ -92,6 +102,78 @@ export type ShardHealthStatus =
     | "stale"
     | "no-feeds"
     | "missing";
+
+export type WorkerUpliftStageStatus =
+    | "healthy"
+    | "degraded"
+    | "failed"
+    | "stale"
+    | "unknown"
+    | "legacy_only"
+    | "rollback"
+    | "unavailable";
+
+export type WorkerUpliftOverallStatus =
+    | "healthy"
+    | "degraded"
+    | "stale"
+    | "unknown"
+    | "legacy_only"
+    | "rollback"
+    | "partial"
+    | "unavailable";
+
+export type WorkerUpliftActiveIngestionOwner =
+    | "legacy_shards"
+    | "coexistence"
+    | "worker_uplift"
+    | "rollback"
+    | "unknown";
+
+export type WorkerUpliftStageHealthRow = {
+    stage: string;
+    activeIngestionOwner: WorkerUpliftActiveIngestionOwner;
+    stageStatus: WorkerUpliftStageStatus;
+    staleStatus: "current" | "stale" | "unknown";
+    lastAttemptAt: string | null;
+    lastSuccessAt: string | null;
+    lastFailureAt: string | null;
+    consecutiveFailureCount: number;
+    throughputPerMinute: number | null;
+    latencyP50Ms: number | null;
+    latencyP95Ms: number | null;
+    retryCount: number;
+    dlqCount: number;
+    queueAgeSeconds: number | null;
+    activeConsumers: number | null;
+    deploymentVersion: string | null;
+    telemetryVersion: number | null;
+    projectionVersion: number | null;
+    updatedAt: string | null;
+    errorClass: string | null;
+    sanitizedErrorMessage: string | null;
+};
+
+export type WorkerUpliftHealthProjection = {
+    isAvailable: boolean;
+    schemaVersion: number;
+    source: string;
+    grafanaDependency: boolean;
+    activeIngestionOwner: WorkerUpliftActiveIngestionOwner;
+    cutoverState: string;
+    productionWritesEnabled: boolean;
+    overallStatus: WorkerUpliftOverallStatus;
+    stageRows: WorkerUpliftStageHealthRow[];
+    partialErrors: {
+        source: string;
+        errorClass: string;
+        redacted: boolean;
+    }[];
+    links: {
+        dashboardPath: string | null;
+        runbookPath: string | null;
+    };
+};
 
 export type ShardHealthRow = {
     shardIndex: number;
@@ -206,6 +288,7 @@ export type ShardHealthDashboardData = {
     generatedAt: string;
     staleAfterMinutes: number;
     slowRunMs: number;
+    workerUpliftHealth: WorkerUpliftHealthProjection;
     summary: ShardHealthSummary;
     shards: ShardHealthRow[];
     slowestShards: ShardHealthRow[];
@@ -235,6 +318,248 @@ function getRate(part: number, total: number) {
     }
 
     return Math.round((part / total) * 100);
+}
+
+function numberOrNull(value: unknown): number | null {
+    if (typeof value === "number" && Number.isFinite(value)) {
+        return value;
+    }
+
+    if (typeof value === "string" && value.trim()) {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    return null;
+}
+
+function numberOrZero(value: unknown) {
+    return numberOrNull(value) ?? 0;
+}
+
+function stringOrNull(value: unknown, maxLength = 256): string | null {
+    if (typeof value !== "string") {
+        return null;
+    }
+
+    const trimmed = value.trim();
+    return trimmed ? trimmed.slice(0, maxLength) : null;
+}
+
+function safeSourcePath(value: unknown) {
+    const path = stringOrNull(value, 240);
+
+    if (!path || path.includes("://") || path.includes("..")) {
+        return null;
+    }
+
+    return path.replace(/^\/+/, "");
+}
+
+function safeTelemetrySource(value: unknown) {
+    const source = stringOrNull(value, 160);
+
+    if (
+        !source ||
+        /:\/\/|@|amqp|rabbitmq|broker|secret|token|password|credential|authorization/i.test(
+            source,
+        )
+    ) {
+        return "redacted";
+    }
+
+    return source;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function workerUpliftOwner(
+    value: unknown,
+    fallback: WorkerUpliftActiveIngestionOwner = "unknown",
+): WorkerUpliftActiveIngestionOwner {
+    if (
+        value === "legacy_shards" ||
+        value === "coexistence" ||
+        value === "worker_uplift" ||
+        value === "rollback" ||
+        value === "unknown"
+    ) {
+        return value;
+    }
+
+    return fallback;
+}
+
+function workerUpliftStageStatus(value: unknown): WorkerUpliftStageStatus {
+    if (
+        value === "healthy" ||
+        value === "degraded" ||
+        value === "failed" ||
+        value === "stale" ||
+        value === "unknown" ||
+        value === "legacy_only" ||
+        value === "rollback"
+    ) {
+        return value;
+    }
+
+    return "unavailable";
+}
+
+function workerUpliftOverallStatus(value: unknown): WorkerUpliftOverallStatus {
+    if (
+        value === "healthy" ||
+        value === "degraded" ||
+        value === "stale" ||
+        value === "unknown" ||
+        value === "legacy_only" ||
+        value === "rollback" ||
+        value === "partial"
+    ) {
+        return value;
+    }
+
+    return "unavailable";
+}
+
+function workerUpliftStaleStatus(value: unknown): "current" | "stale" | "unknown" {
+    return value === "current" || value === "stale" ? value : "unknown";
+}
+
+function createWorkerUpliftStageUnavailable(
+    stage: string,
+    owner: WorkerUpliftActiveIngestionOwner,
+): WorkerUpliftStageHealthRow {
+    return {
+        stage,
+        activeIngestionOwner: owner,
+        stageStatus: "unavailable",
+        staleStatus: "unknown",
+        lastAttemptAt: null,
+        lastSuccessAt: null,
+        lastFailureAt: null,
+        consecutiveFailureCount: 0,
+        throughputPerMinute: null,
+        latencyP50Ms: null,
+        latencyP95Ms: null,
+        retryCount: 0,
+        dlqCount: 0,
+        queueAgeSeconds: null,
+        activeConsumers: null,
+        deploymentVersion: null,
+        telemetryVersion: null,
+        projectionVersion: null,
+        updatedAt: null,
+        errorClass: null,
+        sanitizedErrorMessage: null,
+    };
+}
+
+function unavailableWorkerUpliftHealth(): WorkerUpliftHealthProjection {
+    return {
+        isAvailable: false,
+        schemaVersion: 1,
+        source: "unavailable",
+        grafanaDependency: false,
+        activeIngestionOwner: "legacy_shards",
+        cutoverState: "unknown",
+        productionWritesEnabled: false,
+        overallStatus: "unavailable",
+        stageRows: WORKER_UPLIFT_STAGES.map((stage) =>
+            createWorkerUpliftStageUnavailable(stage, "legacy_shards"),
+        ),
+        partialErrors: [],
+        links: {
+            dashboardPath: null,
+            runbookPath: null,
+        },
+    };
+}
+
+function normalizeWorkerUpliftStageRow(
+    value: unknown,
+    fallbackOwner: WorkerUpliftActiveIngestionOwner,
+): WorkerUpliftStageHealthRow | null {
+    if (!isRecord(value)) {
+        return null;
+    }
+
+    const stage = stringOrNull(value.stage, 64);
+    if (!stage) {
+        return null;
+    }
+
+    return {
+        stage,
+        activeIngestionOwner: workerUpliftOwner(value.activeIngestionOwner, fallbackOwner),
+        stageStatus: workerUpliftStageStatus(value.stageStatus),
+        staleStatus: workerUpliftStaleStatus(value.staleStatus),
+        lastAttemptAt: stringOrNull(value.lastAttemptAt, 96),
+        lastSuccessAt: stringOrNull(value.lastSuccessAt, 96),
+        lastFailureAt: stringOrNull(value.lastFailureAt, 96),
+        consecutiveFailureCount: numberOrZero(value.consecutiveFailureCount),
+        throughputPerMinute: numberOrNull(value.throughputPerMinute),
+        latencyP50Ms: numberOrNull(value.latencyP50Ms),
+        latencyP95Ms: numberOrNull(value.latencyP95Ms),
+        retryCount: numberOrZero(value.retryCount),
+        dlqCount: numberOrZero(value.dlqCount),
+        queueAgeSeconds: numberOrNull(value.queueAgeSeconds),
+        activeConsumers: numberOrNull(value.activeConsumers),
+        deploymentVersion: stringOrNull(value.deploymentVersion, 128),
+        telemetryVersion: numberOrNull(value.telemetryVersion),
+        projectionVersion: numberOrNull(value.projectionVersion),
+        updatedAt: stringOrNull(value.updatedAt, 96),
+        errorClass: stringOrNull(value.errorClass, 128),
+        sanitizedErrorMessage: stringOrNull(value.sanitizedErrorMessage, 512),
+    };
+}
+
+function normalizeWorkerUpliftHealth(value: unknown): WorkerUpliftHealthProjection {
+    if (!isRecord(value)) {
+        return unavailableWorkerUpliftHealth();
+    }
+
+    const activeOwner = workerUpliftOwner(value.activeIngestionOwner);
+    const stageRows = Array.isArray(value.stageRows)
+        ? value.stageRows
+            .map((row) => normalizeWorkerUpliftStageRow(row, activeOwner))
+            .filter((row): row is WorkerUpliftStageHealthRow => Boolean(row))
+        : [];
+    const partialErrors = Array.isArray(value.partialErrors)
+        ? value.partialErrors.flatMap((error) => {
+            if (!isRecord(error)) {
+                return [];
+            }
+
+            return [
+                {
+                    source: safeTelemetrySource(error.source),
+                    errorClass: stringOrNull(error.errorClass, 120) ?? "unknown",
+                    redacted: error.redacted === true,
+                },
+            ];
+        })
+        : [];
+    const links = isRecord(value.links) ? value.links : {};
+
+    return {
+        isAvailable: true,
+        schemaVersion: numberOrZero(value.schemaVersion) || 1,
+        source: stringOrNull(value.source, 120) ?? "backend_postgres_durable_projection",
+        grafanaDependency: value.grafanaDependency === true,
+        activeIngestionOwner: activeOwner,
+        cutoverState: stringOrNull(value.cutoverState, 96) ?? "unknown",
+        productionWritesEnabled: value.productionWritesEnabled === true,
+        overallStatus: workerUpliftOverallStatus(value.overallStatus),
+        stageRows,
+        partialErrors,
+        links: {
+            dashboardPath: safeSourcePath(links.dashboardPath),
+            runbookPath: safeSourcePath(links.runbookPath),
+        },
+    };
 }
 
 function minutesSince(value: string | null, now: Date) {
@@ -712,6 +1037,7 @@ function buildSummary({
 
 type WorkerShardsDatabaseSnapshot = {
     workerRunRows: WorkerRunRow[];
+    workerUpliftHealth: WorkerUpliftHealthProjection;
 };
 
 type WorkerShardsDatabaseResult = {
@@ -719,10 +1045,6 @@ type WorkerShardsDatabaseResult = {
     rowCount?: number;
     generatedAt?: string;
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
 
 function requiredArrayField<T>(row: Record<string, unknown>, field: string): T[] {
     const value = row[field];
@@ -749,6 +1071,7 @@ function normalizeWorkerShardsDatabaseResult(
 
     return {
         workerRunRows: requiredArrayField<WorkerRunRow>(row, "workerRunRows"),
+        workerUpliftHealth: normalizeWorkerUpliftHealth(row.workerUpliftHealth),
     };
 }
 
@@ -781,6 +1104,7 @@ async function loadSupabaseWorkerShardsDatabaseSnapshot(
         rows: [
             {
                 workerRunRows,
+                workerUpliftHealth: unavailableWorkerUpliftHealth(),
             } as unknown as AdminDatabaseJsonObject,
         ],
         rowCount: 1,
@@ -847,7 +1171,7 @@ export async function getAdminShardHealthDashboardData(): Promise<ShardHealthDas
     );
 
     try {
-        const { workerRunRows: runs } = await loadWorkerShardsDatabaseSnapshot({
+        const { workerRunRows: runs, workerUpliftHealth } = await loadWorkerShardsDatabaseSnapshot({
             shardCount,
             staleAfterMinutes,
             slowRunMs,
@@ -882,6 +1206,7 @@ export async function getAdminShardHealthDashboardData(): Promise<ShardHealthDas
             generatedAt: new Date().toISOString(),
             staleAfterMinutes,
             slowRunMs,
+            workerUpliftHealth,
             summary,
             shards,
             slowestShards,
@@ -901,6 +1226,7 @@ export async function getAdminShardHealthDashboardData(): Promise<ShardHealthDas
             generatedAt: new Date().toISOString(),
             staleAfterMinutes,
             slowRunMs,
+            workerUpliftHealth: unavailableWorkerUpliftHealth(),
             summary: emptySummary(shardCount),
             shards,
             slowestShards: [],
