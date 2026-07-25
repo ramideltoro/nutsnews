@@ -105,20 +105,9 @@
   },
   "overrides": {
     "webpack": "5.108.0",
-    "@sentry/bundler-plugin-core": {
-      "glob": {
-        "minimatch": {
-          "brace-expansion": "5.0.7"
-        }
-      }
-    },
-    "@typescript-eslint/typescript-estree": {
-      "minimatch": {
-        "brace-expansion": "5.0.7"
-      }
-    },
+    "brace-expansion": "5.0.8",
     "fast-uri": "4.1.1",
-    "postcss": "8.5.16",
+    "postcss": "8.5.18",
     "sharp": "0.35.0",
     "tmp": "0.2.7",
     "uuid": "11.1.1"
