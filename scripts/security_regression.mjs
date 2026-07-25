@@ -393,6 +393,27 @@ async function testRedactionContracts() {
   assertIncludes(JSON.stringify(redacted), "[REDACTED]", "redacted output");
 }
 
+async function testGitleaksBaselineBoundary() {
+  const historicalSecretsStoreId = ["0d4e0e19", "3d414b9f", "8bcbca44", "c6af24f9"].join("");
+  const wikiBuild = read(".wiki-build/Home-Server-Local-AI-Provider.md");
+  const gitleaksIgnore = read(".gitleaksignore");
+  const actualFingerprints = gitleaksIgnore.trim().split(/\r?\n/);
+  const fingerprintPattern =
+    /^[a-f0-9]{40}:(?:\.wiki-build\/Home-Server-Local-AI-Provider\.md|docs\/HOME_SERVER_LOCAL_AI\.md):generic-api-key:\d+$/;
+
+  assertNotIncludes(wikiBuild, historicalSecretsStoreId, "home-server local AI wiki build");
+  assertIncludes(wikiBuild, "your-cloudflare-secrets-store-id", "home-server local AI wiki build");
+  assert.equal(actualFingerprints.length, 36, ".gitleaksignore must contain only reviewed historical findings");
+  assert.equal(new Set(actualFingerprints).size, 36, ".gitleaksignore must not contain duplicate fingerprints");
+  for (const fingerprint of actualFingerprints) {
+    assert.match(
+      fingerprint,
+      fingerprintPattern,
+      ".gitleaksignore must use exact finding fingerprints, not broad path/rule allowlists",
+    );
+  }
+}
+
 async function testCommandAndCiWiring() {
   const packageJson = JSON.parse(read("web/package.json"));
   const workflow = read(".github/workflows/web-ci.yml");
@@ -412,6 +433,7 @@ await testExternalUrlSafety();
 await testAdminFeedMutationUrlBoundary();
 await testAuthBoundaryContracts();
 await testRedactionContracts();
+await testGitleaksBaselineBoundary();
 await testCommandAndCiWiring();
 
 console.log("Focused security regression checks passed.");

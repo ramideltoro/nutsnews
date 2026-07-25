@@ -382,7 +382,7 @@ LOCAL_AI_API_KEY
 The secret is stored in Cloudflare Secrets Store:
 
 ```text
-Secrets Store ID: 0d4e0e193d414b9f8bcbca44c6af24f9
+Secrets Store ID: your-cloudflare-secrets-store-id
 Secret name: LOCAL_AI_API_KEY
 ```
 
@@ -397,7 +397,7 @@ From the Mac repo:
 ```bash
 cd /Users/ramideltoro/WebstormProjects/nutsnews2/worker
 
-export NUTSNEWS_SECRETS_STORE_ID="0d4e0e193d414b9f8bcbca44c6af24f9"
+export NUTSNEWS_SECRETS_STORE_ID="your-cloudflare-secrets-store-id"
 export ENABLE_LOCAL_AI_SECRET_BINDING="true"
 export AI_PROVIDER="local"
 export LOCAL_AI_URL="https://ai.nutsnews.com"
@@ -638,7 +638,7 @@ Update/create the Cloudflare secret:
 ```bash
 cd /Users/ramideltoro/WebstormProjects/nutsnews2/worker
 
-export NUTSNEWS_SECRETS_STORE_ID="0d4e0e193d414b9f8bcbca44c6af24f9"
+export NUTSNEWS_SECRETS_STORE_ID="your-cloudflare-secrets-store-id"
 
 npx wrangler secrets-store secret create "$NUTSNEWS_SECRETS_STORE_ID" \
   --name LOCAL_AI_API_KEY \
@@ -740,7 +740,7 @@ From the Mac:
 ```bash
 cd /Users/ramideltoro/WebstormProjects/nutsnews2/worker
 
-export NUTSNEWS_SECRETS_STORE_ID="0d4e0e193d414b9f8bcbca44c6af24f9"
+export NUTSNEWS_SECRETS_STORE_ID="your-cloudflare-secrets-store-id"
 unset ENABLE_LOCAL_AI_SECRET_BINDING
 export AI_PROVIDER="openai"
 unset LOCAL_AI_URL
