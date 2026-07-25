@@ -179,6 +179,19 @@ for (const requiredOsvPath of ["**/package.json", "**/package-lock.json", ".gith
 }
 assert.ok(hasTrigger(osvWorkflow, "schedule"), "OSV Scanner must keep scheduled full scans.");
 assert.ok(osvWorkflow.includes("scan-scheduled:"), "OSV Scanner must keep its non-PR full scan job.");
+assert.doesNotMatch(
+  osvWorkflow,
+  /google\/osv-scanner-action\/\.github\/workflows\/osv-scanner-reusable(?:-pr)?\.yml@/,
+  "OSV Scanner must not call the external reusable workflow under selected-actions and SHA-pinning controls.",
+);
+for (const requiredOsvAction of [
+  "google/osv-scanner-action/osv-scanner-action@8dc09193bb540e09b23da07ad7e30bd33bf87018",
+  "google/osv-scanner-action/osv-reporter-action@8dc09193bb540e09b23da07ad7e30bd33bf87018",
+]) {
+  assert.ok(osvWorkflow.includes(requiredOsvAction), `OSV Scanner must use the reviewed pinned action ${requiredOsvAction}.`);
+}
+assert.ok(osvWorkflow.includes("runs-on: ubuntu-latest"), "OSV Scanner must use local GitHub-hosted jobs.");
+assert.ok(osvWorkflow.includes("Upload to code scanning"), "OSV Scanner must keep SARIF upload.");
 
 const codeqlWorkflow = await readFile(resolve(workflowDir, "codeql.yml"), "utf8");
 const codeqlPullRequest = workflowTriggerBlock(codeqlWorkflow, "pull_request");
