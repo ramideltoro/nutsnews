@@ -156,6 +156,11 @@ function safeOperationBody(operation, { providerMode, limit, since }) {
         slowRunMs: 15000,
         dailyWindowDays: 1,
       };
+    case "load-admin-worker-uplift-health":
+      return {
+        ...base,
+        stageLimit: Math.min(8, limit),
+      };
     case "load-admin-rss-feed-health":
       return {
         ...base,

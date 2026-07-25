@@ -195,6 +195,7 @@ describe("admin database access", () => {
         "load-admin-translation-quality",
         "load-admin-guardrails",
         "load-admin-worker-shards",
+        "load-admin-worker-uplift-health",
         "load-admin-rss-feed-health",
         "load-admin-feed-management",
         "load-admin-audit-log",

@@ -313,6 +313,77 @@ function backendRowsSnapshot(row) {
   };
 }
 
+function workerUpliftHealthProjection() {
+  return {
+    schemaVersion: 1,
+    source: "backend_postgres_durable_projection",
+    grafanaDependency: false,
+    activeIngestionOwner: "coexistence",
+    cutoverState: "shadow",
+    productionWritesEnabled: false,
+    overallStatus: "degraded",
+    stageRows: [
+      {
+        stage: "scheduler",
+        activeIngestionOwner: "coexistence",
+        stageStatus: "healthy",
+        staleStatus: "current",
+        lastAttemptAt: "2026-07-22T11:59:00.000Z",
+        lastSuccessAt: "2026-07-22T11:59:00.000Z",
+        lastFailureAt: null,
+        consecutiveFailureCount: 0,
+        throughputPerMinute: 12.5,
+        latencyP50Ms: 120,
+        latencyP95Ms: 280,
+        retryCount: 0,
+        dlqCount: 0,
+        queueAgeSeconds: 12,
+        activeConsumers: 1,
+        deploymentVersion: "worker-uplift-fixture",
+        telemetryVersion: 1,
+        projectionVersion: 1,
+        updatedAt: "2026-07-22T12:00:00.000Z",
+        errorClass: null,
+        sanitizedErrorMessage: null,
+      },
+      {
+        stage: "enrichment",
+        activeIngestionOwner: "coexistence",
+        stageStatus: "degraded",
+        staleStatus: "stale",
+        lastAttemptAt: "2026-07-22T11:40:00.000Z",
+        lastSuccessAt: "2026-07-22T11:30:00.000Z",
+        lastFailureAt: "2026-07-22T11:45:00.000Z",
+        consecutiveFailureCount: 2,
+        throughputPerMinute: 1.5,
+        latencyP50Ms: 540,
+        latencyP95Ms: 1400,
+        retryCount: 7,
+        dlqCount: 1,
+        queueAgeSeconds: 900,
+        activeConsumers: 1,
+        deploymentVersion: "worker-uplift-fixture",
+        telemetryVersion: 1,
+        projectionVersion: 1,
+        updatedAt: "2026-07-22T12:00:00.000Z",
+        errorClass: "SyntheticOfflineE2E",
+        sanitizedErrorMessage: "Synthetic degraded stage for offline admin route coverage.",
+      },
+    ],
+    partialErrors: [
+      {
+        source: "worker_uplift_final.stage_health_projections",
+        errorClass: "SyntheticPartialTelemetry",
+        redacted: true,
+      },
+    ],
+    links: {
+      dashboardPath: "grafana/backend-metrics/dashboards.json",
+      runbookPath: "runbooks/WORKER_UPLIFT_RABBITMQ_METRICS.md",
+    },
+  };
+}
+
 function backendAdminReadResult(operation) {
   switch (operation) {
     case "load-admin-production-readiness":
@@ -366,7 +437,14 @@ function backendAdminReadResult(operation) {
         partialErrors: [],
       });
     case "load-admin-worker-shards":
-      return backendRowsSnapshot({ workerRunRows: [] });
+      return backendRowsSnapshot({
+        workerRunRows: [],
+        workerUpliftHealth: workerUpliftHealthProjection(),
+      });
+    case "load-admin-worker-uplift-health":
+      return backendRowsSnapshot({
+        workerUpliftHealth: workerUpliftHealthProjection(),
+      });
     case "load-admin-rss-feed-health":
       return backendRowsSnapshot({ rssFeedRows: [], feedHealthRows: [] });
     case "load-admin-feed-management":

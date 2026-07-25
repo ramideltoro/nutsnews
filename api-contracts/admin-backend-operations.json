@@ -214,7 +214,28 @@
       "responseShape": {
         "rows": "single dashboard snapshot row",
         "minimalRowFields": [
-          "workerRunRows"
+          "workerRunRows",
+          "workerUpliftHealth"
+        ]
+      }
+    },
+    {
+      "operation": "load-admin-worker-uplift-health",
+      "dashboardRoute": "/admin/shards",
+      "dashboardFile": "web/app/admin/(protected)/shards/page.tsx",
+      "loaderFile": "web/lib/adminShardHealth.ts",
+      "backendPath": "/api/app/db/load-admin-worker-uplift-health",
+      "method": "POST",
+      "classification": "read",
+      "safeRead": true,
+      "allowedProviderModes": [
+        "backend_postgres_shadow",
+        "backend_postgres_primary"
+      ],
+      "responseShape": {
+        "rows": "single dashboard snapshot row",
+        "minimalRowFields": [
+          "workerUpliftHealth"
         ]
       }
     },

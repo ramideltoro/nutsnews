@@ -93,13 +93,92 @@ function workerRunRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function workerShardSnapshot(workerRunRows = backendWorkerRows()) {
+function workerUpliftHealthProjection(overrides: Record<string, unknown> = {}) {
   return {
-    rows: [
+    schemaVersion: 1,
+    source: "backend_postgres_durable_projection",
+    grafanaDependency: false,
+    activeIngestionOwner: "coexistence",
+    cutoverState: "shadow",
+    productionWritesEnabled: false,
+    overallStatus: "degraded",
+    stageRows: [
       {
-        workerRunRows,
+        stage: "scheduler",
+        activeIngestionOwner: "coexistence",
+        stageStatus: "healthy",
+        staleStatus: "current",
+        lastAttemptAt: "2026-07-22T11:59:00.000Z",
+        lastSuccessAt: "2026-07-22T11:59:00.000Z",
+        lastFailureAt: null,
+        consecutiveFailureCount: 0,
+        throughputPerMinute: 12.5,
+        latencyP50Ms: 120,
+        latencyP95Ms: 280,
+        retryCount: 0,
+        dlqCount: 0,
+        queueAgeSeconds: 12,
+        activeConsumers: 1,
+        deploymentVersion: "worker-uplift-fixture",
+        telemetryVersion: 1,
+        projectionVersion: 1,
+        updatedAt: "2026-07-22T12:00:00.000Z",
+        errorClass: null,
+        sanitizedErrorMessage: null,
+      },
+      {
+        stage: "enrichment",
+        activeIngestionOwner: "coexistence",
+        stageStatus: "degraded",
+        staleStatus: "stale",
+        lastAttemptAt: "2026-07-22T11:40:00.000Z",
+        lastSuccessAt: "2026-07-22T11:30:00.000Z",
+        lastFailureAt: "2026-07-22T11:45:00.000Z",
+        consecutiveFailureCount: 2,
+        throughputPerMinute: 1.5,
+        latencyP50Ms: 540,
+        latencyP95Ms: 1400,
+        retryCount: 7,
+        dlqCount: 2,
+        queueAgeSeconds: 900,
+        activeConsumers: 1,
+        deploymentVersion: "worker-uplift-fixture",
+        telemetryVersion: 1,
+        projectionVersion: 1,
+        updatedAt: "2026-07-22T12:00:00.000Z",
+        errorClass: "SyntheticOfflineE2E",
+        sanitizedErrorMessage: "Synthetic degraded stage for admin route coverage.",
       },
     ],
+    partialErrors: [
+      {
+        source: "worker_uplift_final.stage_health_projections",
+        errorClass: "SyntheticPartialTelemetry",
+        redacted: true,
+      },
+    ],
+    links: {
+      dashboardPath: "grafana/backend-metrics/dashboards.json",
+      runbookPath: "runbooks/WORKER_UPLIFT_RABBITMQ_METRICS.md",
+    },
+    ...overrides,
+  };
+}
+
+function workerShardSnapshot(
+  workerRunRows = backendWorkerRows(),
+  workerUpliftHealth: Record<string, unknown> | null = workerUpliftHealthProjection(),
+) {
+  const row: Record<string, unknown> = {
+    workerRunRows,
+  };
+
+  if (workerUpliftHealth !== null) {
+    row.workerUpliftHealth = workerUpliftHealth;
+  }
+
+  return {
+    rows: [row],
     rowCount: 1,
     generatedAt: "2026-07-22T12:00:00.000Z",
   };
@@ -244,6 +323,29 @@ describe("admin worker shards data access", () => {
       status: "failed",
       errorMessage: "Feed fetch failed",
     });
+    expect(data.workerUpliftHealth).toMatchObject({
+      isAvailable: true,
+      grafanaDependency: false,
+      activeIngestionOwner: "coexistence",
+      cutoverState: "shadow",
+      productionWritesEnabled: false,
+      overallStatus: "degraded",
+      links: {
+        dashboardPath: "grafana/backend-metrics/dashboards.json",
+        runbookPath: "runbooks/WORKER_UPLIFT_RABBITMQ_METRICS.md",
+      },
+    });
+    expect(data.workerUpliftHealth.stageRows[1]).toMatchObject({
+      stage: "enrichment",
+      stageStatus: "degraded",
+      staleStatus: "stale",
+      throughputPerMinute: 1.5,
+      latencyP95Ms: 1400,
+      queueAgeSeconds: 900,
+      retryCount: 7,
+      dlqCount: 2,
+      deploymentVersion: "worker-uplift-fixture",
+    });
     expect(mocks.callBackendDatabaseOperation).toHaveBeenCalledWith(
       "load-admin-worker-shards",
       {
@@ -280,6 +382,118 @@ describe("admin worker shards data access", () => {
     });
     expect(data.shards.every((shard) => shard.status === "missing")).toBe(true);
     expect(data.recentRuns).toEqual([]);
+    expect(data.workerUpliftHealth.isAvailable).toBe(true);
+    expect(data.workerUpliftHealth.stageRows).toHaveLength(2);
+  });
+
+  it("keeps legacy-only backend worker shard responses usable while marking uplift projection unavailable", async () => {
+    mocks.getDatabaseProviderMode.mockReturnValue("backend_postgres_primary");
+    mocks.getRuntimeSafetyPolicy.mockReturnValue({
+      databaseProviderMode: "backend_postgres_primary",
+    });
+    mocks.callBackendDatabaseOperation.mockResolvedValue(
+      workerShardSnapshot([], null),
+    );
+
+    const { getAdminShardHealthDashboardData } = await import(
+      "@/lib/adminShardHealth"
+    );
+    const data = await getAdminShardHealthDashboardData();
+
+    expect(data.isConfigured).toBe(true);
+    expect(data.summary.missingShards).toBe(4);
+    expect(data.workerUpliftHealth).toMatchObject({
+      isAvailable: false,
+      activeIngestionOwner: "legacy_shards",
+      overallStatus: "unavailable",
+      productionWritesEnabled: false,
+    });
+    expect(data.workerUpliftHealth.stageRows.map((stage) => stage.stage)).toEqual([
+      "scheduler",
+      "fetcher",
+      "canonicalizer",
+      "enrichment",
+      "approval",
+      "translation",
+      "persistence",
+      "publication",
+    ]);
+    expect(
+      data.workerUpliftHealth.stageRows.every(
+        (stage) => stage.stageStatus === "unavailable",
+      ),
+    ).toBe(true);
+  });
+
+  it("normalizes rollback and partial telemetry without exposing broker or secret strings", async () => {
+    mocks.getDatabaseProviderMode.mockReturnValue("backend_postgres_primary");
+    mocks.getRuntimeSafetyPolicy.mockReturnValue({
+      databaseProviderMode: "backend_postgres_primary",
+    });
+    mocks.callBackendDatabaseOperation.mockResolvedValue(
+      workerShardSnapshot(
+        [],
+        workerUpliftHealthProjection({
+          activeIngestionOwner: "rollback",
+          cutoverState: "rollback",
+          productionWritesEnabled: false,
+          overallStatus: "partial",
+          partialErrors: [
+            {
+              source: "amqp://private-broker.internal/worker-uplift",
+              errorClass: "BrokerAuthError",
+              message: "server-only-secret-token",
+              redacted: false,
+            },
+          ],
+          links: {
+            dashboardPath: "https://grafana.example.invalid/d/broker",
+            runbookPath: "../secrets/runbook.md",
+          },
+          stageRows: [
+            {
+              stage: "publication",
+              stageStatus: "rollback",
+              staleStatus: "current",
+              dlqCount: 1,
+              retryCount: 3,
+              queueAgeSeconds: 60,
+              deploymentVersion: "rollback-fixture",
+            },
+          ],
+        }),
+      ),
+    );
+
+    const { getAdminShardHealthDashboardData } = await import(
+      "@/lib/adminShardHealth"
+    );
+    const data = await getAdminShardHealthDashboardData();
+    const serialized = JSON.stringify(data.workerUpliftHealth);
+
+    expect(data.workerUpliftHealth).toMatchObject({
+      activeIngestionOwner: "rollback",
+      overallStatus: "partial",
+      links: {
+        dashboardPath: null,
+        runbookPath: null,
+      },
+    });
+    expect(data.workerUpliftHealth.partialErrors).toEqual([
+      {
+        source: "redacted",
+        errorClass: "BrokerAuthError",
+        redacted: false,
+      },
+    ]);
+    expect(data.workerUpliftHealth.stageRows[0]).toMatchObject({
+      stage: "publication",
+      activeIngestionOwner: "rollback",
+      stageStatus: "rollback",
+      dlqCount: 1,
+      deploymentVersion: "rollback-fixture",
+    });
+    expect(serialized).not.toMatch(/amqp|private-broker|server-only-secret-token/);
   });
 
   it("surfaces backend API setup failures without falling back to Supabase env copy", async () => {

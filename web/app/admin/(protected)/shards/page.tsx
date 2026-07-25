@@ -6,6 +6,10 @@ import {
     type RecentShardRun,
     type ShardHealthRow,
     type ShardHealthStatus,
+    type WorkerUpliftActiveIngestionOwner,
+    type WorkerUpliftHealthProjection,
+    type WorkerUpliftOverallStatus,
+    type WorkerUpliftStageStatus,
     type WorkerHealthDailyPoint,
     getAdminShardHealthDashboardData,
 } from "@/lib/adminShardHealth";
@@ -35,6 +39,40 @@ function formatDuration(value: number) {
     }
 
     return `${(value / 1000).toFixed(1)}s`;
+}
+
+function formatOptionalNumber(value: number | null, suffix = "") {
+    if (value === null) {
+        return "—";
+    }
+
+    return `${formatNumber(value)}${suffix}`;
+}
+
+function formatThroughput(value: number | null) {
+    if (value === null) {
+        return "—";
+    }
+
+    return `${new Intl.NumberFormat("en-US", {
+        maximumFractionDigits: 1,
+    }).format(value)}/min`;
+}
+
+function formatQueueAge(value: number | null) {
+    if (value === null) {
+        return "—";
+    }
+
+    if (value < 60) {
+        return `${formatNumber(value)}s`;
+    }
+
+    if (value < 3600) {
+        return `${formatNumber(Math.round(value / 60))}m`;
+    }
+
+    return `${(value / 3600).toFixed(1)}h`;
 }
 
 function formatDateTime(value: string | null) {
@@ -67,6 +105,70 @@ function statusClasses(status: ShardHealthStatus) {
     }
 
     return "border-neutral-300/20 bg-neutral-400/10 text-neutral-100";
+}
+
+function workerUpliftStatusClasses(
+    status: WorkerUpliftStageStatus | WorkerUpliftOverallStatus,
+) {
+    if (status === "healthy") {
+        return "border-emerald-300/25 bg-emerald-400/10 text-emerald-100";
+    }
+
+    if (status === "degraded" || status === "partial" || status === "stale") {
+        return "border-orange-300/25 bg-orange-400/10 text-orange-100";
+    }
+
+    if (status === "failed") {
+        return "border-red-300/35 bg-red-500/15 text-red-100";
+    }
+
+    if (status === "rollback") {
+        return "border-sky-300/25 bg-sky-400/10 text-sky-100";
+    }
+
+    if (status === "legacy_only") {
+        return "border-violet-300/25 bg-violet-400/10 text-violet-100";
+    }
+
+    return "border-neutral-300/20 bg-neutral-400/10 text-neutral-100";
+}
+
+function workerUpliftStatusLabel(
+    status: WorkerUpliftStageStatus | WorkerUpliftOverallStatus,
+) {
+    const labels: Record<WorkerUpliftStageStatus | WorkerUpliftOverallStatus, string> = {
+        degraded: "Degraded",
+        failed: "Failed",
+        healthy: "Healthy",
+        legacy_only: "Legacy Only",
+        partial: "Partial",
+        rollback: "Rollback",
+        stale: "Stale",
+        unavailable: "Unavailable",
+        unknown: "Unknown",
+    };
+
+    return labels[status];
+}
+
+function activeOwnerLabel(owner: WorkerUpliftActiveIngestionOwner) {
+    const labels: Record<WorkerUpliftActiveIngestionOwner, string> = {
+        coexistence: "Coexistence",
+        legacy_shards: "Legacy Shards",
+        rollback: "Rollback",
+        unknown: "Unknown",
+        worker_uplift: "Worker Uplift",
+    };
+
+    return labels[owner];
+}
+
+function sourcePathHref(path: string | null) {
+    if (!path) {
+        return null;
+    }
+
+    return `https://github.com/ramideltoro/nutsnews-backend/blob/main/${path}`;
 }
 
 function StatusPill({
@@ -142,6 +244,7 @@ function Section({
 
 function QuickNav() {
     const links = [
+        ["Pipeline", "#worker-uplift-pipeline"],
         ["Fleet", "#fleet-health"],
         ["Errors", "#error-counts"],
         ["Ingestion", "#ingestion-summary"],
@@ -168,6 +271,195 @@ function QuickNav() {
                 ))}
             </div>
         </nav>
+    );
+}
+
+function WorkerUpliftStatusPill({
+                                    status,
+                                    label = workerUpliftStatusLabel(status),
+                                }: {
+    status: WorkerUpliftStageStatus | WorkerUpliftOverallStatus;
+    label?: string;
+}) {
+    return (
+        <span
+            className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${workerUpliftStatusClasses(
+                status,
+            )}`}
+        >
+      {label}
+    </span>
+    );
+}
+
+function WorkerUpliftPipelineSection({
+                                         health,
+                                     }: {
+    health: WorkerUpliftHealthProjection;
+}) {
+    const blockedStages = health.stageRows.filter(
+        (stage) =>
+            stage.stageStatus === "failed" ||
+            stage.stageStatus === "degraded" ||
+            stage.dlqCount > 0,
+    );
+    const staleStages = health.stageRows.filter(
+        (stage) => stage.stageStatus === "stale" || stage.staleStatus === "stale",
+    );
+    const totalRetries = health.stageRows.reduce(
+        (sum, stage) => sum + stage.retryCount,
+        0,
+    );
+    const totalDlq = health.stageRows.reduce((sum, stage) => sum + stage.dlqCount, 0);
+    const maxQueueAge = health.stageRows.reduce<number | null>((max, stage) => {
+        if (stage.queueAgeSeconds === null) {
+            return max;
+        }
+
+        return max === null ? stage.queueAgeSeconds : Math.max(max, stage.queueAgeSeconds);
+    }, null);
+    const dashboardHref = sourcePathHref(health.links.dashboardPath);
+    const runbookHref = sourcePathHref(health.links.runbookPath);
+
+    return (
+        <Section
+            id="worker-uplift-pipeline"
+            eyebrow="Worker Uplift"
+            title="RabbitMQ Pipeline Health"
+            description="Backend durable projection of uplift stages, shown beside legacy shard evidence during migration."
+        >
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+                <MetricCard
+                    label="Owner"
+                    value={activeOwnerLabel(health.activeIngestionOwner)}
+                    helper={`Cutover state: ${health.cutoverState}`}
+                />
+                <MetricCard
+                    label="Overall"
+                    value={workerUpliftStatusLabel(health.overallStatus)}
+                    helper={`Projection v${formatNumber(health.schemaVersion)}`}
+                />
+                <MetricCard
+                    label="Blocked Stages"
+                    value={formatNumber(blockedStages.length)}
+                    helper="Failed, degraded, or non-empty DLQ."
+                />
+                <MetricCard
+                    label="DLQ"
+                    value={formatNumber(totalDlq)}
+                    helper={`${formatNumber(totalRetries)} retries recorded.`}
+                />
+                <MetricCard
+                    label="Queue Age"
+                    value={formatQueueAge(maxQueueAge)}
+                    helper={`${formatNumber(staleStages.length)} stale stages.`}
+                />
+                <MetricCard
+                    label="Writes"
+                    value={health.productionWritesEnabled ? "Enabled" : "Shadow"}
+                    helper={health.isAvailable ? "Backend projection available." : "Projection unavailable."}
+                />
+            </div>
+
+            {!health.isAvailable ? (
+                <div className="mt-4 rounded-[1.35rem] border border-neutral-300/20 bg-neutral-400/10 p-4 text-sm leading-6 text-neutral-100/75">
+                    Worker-uplift projection is not available from this backend response.
+                </div>
+            ) : null}
+
+            {health.partialErrors.length > 0 ? (
+                <div className="mt-4 rounded-[1.35rem] border border-orange-300/25 bg-orange-400/10 p-4 text-sm leading-6 text-orange-100/80">
+                    Partial telemetry:{" "}
+                    {health.partialErrors
+                        .map((error) => `${error.source} ${error.errorClass}`)
+                        .join(", ")}
+                </div>
+            ) : null}
+
+            <div className="mt-4 overflow-hidden rounded-[1.35rem] border border-amber-300/15">
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-amber-300/10 text-left text-sm">
+                        <thead className="bg-black/40 text-[10px] uppercase tracking-[0.16em] text-amber-300/75">
+                        <tr>
+                            <th className="px-4 py-3 font-black">Stage</th>
+                            <th className="px-4 py-3 font-black">Status</th>
+                            <th className="px-4 py-3 font-black">Owner</th>
+                            <th className="px-4 py-3 font-black">Last Success</th>
+                            <th className="px-4 py-3 font-black">Throughput</th>
+                            <th className="px-4 py-3 font-black">P95</th>
+                            <th className="px-4 py-3 font-black">Queue Age</th>
+                            <th className="px-4 py-3 font-black">Retries</th>
+                            <th className="px-4 py-3 font-black">DLQ</th>
+                            <th className="px-4 py-3 font-black">Consumers</th>
+                            <th className="px-4 py-3 font-black">Version</th>
+                            <th className="px-4 py-3 font-black">Links</th>
+                        </tr>
+                        </thead>
+
+                        <tbody className="divide-y divide-amber-300/10 bg-black/20">
+                        {health.stageRows.map((stage) => (
+                            <tr key={stage.stage}>
+                                <td className="whitespace-nowrap px-4 py-3 font-black text-amber-50">
+                                    {stage.stage}
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-3">
+                                    <WorkerUpliftStatusPill status={stage.stageStatus} />
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
+                                    {activeOwnerLabel(stage.activeIngestionOwner)}
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
+                                    {formatDateTime(stage.lastSuccessAt)}
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
+                                    {formatThroughput(stage.throughputPerMinute)}
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
+                                    {formatOptionalNumber(stage.latencyP95Ms, "ms")}
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
+                                    {formatQueueAge(stage.queueAgeSeconds)}
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-3 text-orange-100/80">
+                                    {formatNumber(stage.retryCount)}
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-3 text-red-100/80">
+                                    {formatNumber(stage.dlqCount)}
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-3 text-amber-100/75">
+                                    {formatOptionalNumber(stage.activeConsumers)}
+                                </td>
+                                <td className="max-w-[14rem] truncate px-4 py-3 font-mono text-xs text-amber-100/70">
+                                    {stage.deploymentVersion || "—"}
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-3">
+                                    <div className="flex gap-2">
+                                        {dashboardHref ? (
+                                            <a
+                                                href={dashboardHref}
+                                                className="rounded-full border border-amber-300/20 bg-black/30 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-100 transition hover:border-amber-300/50 hover:bg-amber-400/10"
+                                            >
+                                                Dashboard
+                                            </a>
+                                        ) : null}
+                                        {runbookHref ? (
+                                            <a
+                                                href={runbookHref}
+                                                className="rounded-full border border-amber-300/20 bg-black/30 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-100 transition hover:border-amber-300/50 hover:bg-amber-400/10"
+                                            >
+                                                Runbook
+                                            </a>
+                                        ) : null}
+                                        {!dashboardHref && !runbookHref ? "—" : null}
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </Section>
     );
 }
 
@@ -753,6 +1045,10 @@ export default async function AdminShardsPage() {
                         </p>
                     </section>
                 ) : null}
+
+                <div className="mb-5">
+                    <WorkerUpliftPipelineSection health={dashboardData.workerUpliftHealth} />
+                </div>
 
                 <section
                     id="fleet-health"
