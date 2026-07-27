@@ -3,7 +3,9 @@
   "policy": "backend-postgres-primary-to-existing-production-supabase-standby",
   "issueLinks": [
     "https://github.com/ramideltoro/nutsnews/issues/223",
-    "https://github.com/ramideltoro/nutsnews/issues/497"
+    "https://github.com/ramideltoro/nutsnews/issues/497",
+    "https://github.com/ramideltoro/nutsnews/issues/505",
+    "https://github.com/ramideltoro/nutsnews/issues/506"
   ],
   "source": {
     "migrationContract": "supabase/migrations",
@@ -19,6 +21,11 @@
     "createNutsnewsStandbyDatabase": false,
     "appWorkerSupabaseWritesBeforeApprovedFailover": false,
     "destructiveSupabaseRetirementBlockedUntilManifestExists": true,
+    "destructiveSupabaseRetirementRequiresOwnerApprovalAfterStandbyAcceptance": true,
+    "standbyAcceptanceEvidenceIssue": "https://github.com/ramideltoro/nutsnews/issues/505",
+    "standbyCleanupPolicyIssue": "https://github.com/ramideltoro/nutsnews/issues/506",
+    "standbyCredentialsAndSyncResourcesRetained": true,
+    "obsoleteMigrationCleanupOnlyAfterStandbyAcceptance": true,
     "safeMetadataOnly": true,
     "failoverRequiresAllGates": [
       "standby-manifest-present",
@@ -476,5 +483,5 @@
       }
     ]
   },
-  "schemaFingerprint": "9f8cffa694100f438abaddbf6e00db13ff969572e8c16fd4b8ee4afa5087088f"
+  "schemaFingerprint": "0fcb034d7f0cb814ab4d0cb1e81e5c685ffb920f4db4c9fc7e7c98e0ad4a8bc0"
 }
