@@ -467,6 +467,8 @@ export async function buildExpectedStandbyManifest(root = resolve(import.meta.di
     issueLinks: [
       "https://github.com/ramideltoro/nutsnews/issues/223",
       "https://github.com/ramideltoro/nutsnews/issues/497",
+      "https://github.com/ramideltoro/nutsnews/issues/505",
+      "https://github.com/ramideltoro/nutsnews/issues/506",
     ],
     source: {
       migrationContract: "supabase/migrations",
@@ -482,6 +484,11 @@ export async function buildExpectedStandbyManifest(root = resolve(import.meta.di
       createNutsnewsStandbyDatabase: false,
       appWorkerSupabaseWritesBeforeApprovedFailover: false,
       destructiveSupabaseRetirementBlockedUntilManifestExists: true,
+      destructiveSupabaseRetirementRequiresOwnerApprovalAfterStandbyAcceptance: true,
+      standbyAcceptanceEvidenceIssue: "https://github.com/ramideltoro/nutsnews/issues/505",
+      standbyCleanupPolicyIssue: "https://github.com/ramideltoro/nutsnews/issues/506",
+      standbyCredentialsAndSyncResourcesRetained: true,
+      obsoleteMigrationCleanupOnlyAfterStandbyAcceptance: true,
       safeMetadataOnly: true,
       failoverRequiresAllGates: REQUIRED_FAILOVER_GATES,
     },
@@ -550,6 +557,21 @@ function assertManifestSafety(manifest) {
   }
   if (manifest.safety?.destructiveSupabaseRetirementBlockedUntilManifestExists !== true) {
     throw new SupabaseStandbyManifestError("Standby manifest must block destructive Supabase retirement work until this manifest exists.");
+  }
+  if (manifest.safety?.destructiveSupabaseRetirementRequiresOwnerApprovalAfterStandbyAcceptance !== true) {
+    throw new SupabaseStandbyManifestError("Standby manifest must require owner approval before destructive Supabase retirement after standby acceptance.");
+  }
+  if (manifest.safety?.standbyAcceptanceEvidenceIssue !== "https://github.com/ramideltoro/nutsnews/issues/505") {
+    throw new SupabaseStandbyManifestError("Standby manifest must link the #505 standby acceptance evidence.");
+  }
+  if (manifest.safety?.standbyCleanupPolicyIssue !== "https://github.com/ramideltoro/nutsnews/issues/506") {
+    throw new SupabaseStandbyManifestError("Standby manifest must link the #506 cleanup retention policy.");
+  }
+  if (manifest.safety?.standbyCredentialsAndSyncResourcesRetained !== true) {
+    throw new SupabaseStandbyManifestError("Standby manifest must retain standby credentials and sync resources.");
+  }
+  if (manifest.safety?.obsoleteMigrationCleanupOnlyAfterStandbyAcceptance !== true) {
+    throw new SupabaseStandbyManifestError("Standby manifest must limit cleanup to obsolete migration resources after standby acceptance.");
   }
   assertArrayEqual(manifest.safety?.failoverRequiresAllGates ?? [], REQUIRED_FAILOVER_GATES, "Failover gate list");
 }
