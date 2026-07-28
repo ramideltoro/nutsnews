@@ -117,7 +117,7 @@ async function fetchJson(fetchImpl, url, init, label) {
 async function readArtifactEvidenceJson(fetchImpl, { token, artifactId }) {
   const response = await fetchImpl(
     `https://api.github.com/repos/${infraRepository}/actions/artifacts/${encodeURIComponent(artifactId)}/zip`,
-    { headers: githubHeaders(token, "application/zip") },
+    { headers: githubHeaders(token) },
   );
   if (!response.ok) throw new Error(`Staging qualification artifact download returned HTTP ${response.status}`);
   const archive = Buffer.from(await response.arrayBuffer());
