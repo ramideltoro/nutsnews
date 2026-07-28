@@ -9,6 +9,10 @@ const workflowDir = resolve(root, ".github/workflows");
 const containerWorkflow = await readFile(resolve(workflowDir, "container-image.yml"), "utf8");
 const databaseWorkflow = await readFile(resolve(workflowDir, "database-migration-gate.yml"), "utf8");
 const vercelRecoveryWorkflow = await readFile(resolve(workflowDir, "vercel-production-release.yml"), "utf8");
+const stagingEvidenceVerifier = await readFile(
+  resolve(root, "scripts/staging_qualification_admin_backend_evidence.mjs"),
+  "utf8",
+);
 const inventory = await readFile(resolve(root, ".github/deployment/workflow-check-inventory.md"), "utf8");
 const recoveryRunbook = await readFile(resolve(root, ".github/deployment/environments-secrets-recovery.md"), "utf8");
 
@@ -128,6 +132,16 @@ requireText(
   vercelRecoveryWorkflow,
   "NUTSNEWS_INFRA_STAGING_TOKEN is required to verify staging qualification admin backend evidence",
   "Vercel production recovery must require the infra staging token for release evidence verification.",
+);
+requireText(
+  stagingEvidenceVerifier,
+  'accept = "application/vnd.github+json"',
+  "Staging qualification artifact downloads must use GitHub's supported API media type.",
+);
+assert.doesNotMatch(
+  stagingEvidenceVerifier,
+  /application\/zip/,
+  "Staging qualification artifact downloads must not request the unsupported application/zip media type.",
 );
 requireText(
   vercelRecoveryWorkflow,
