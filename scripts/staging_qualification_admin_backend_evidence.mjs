@@ -142,8 +142,10 @@ async function readArtifactEvidenceJson(fetchImpl, { token, artifactId }) {
       .split(/\r?\n/)
       .map((entry) => entry.trim())
       .filter(Boolean);
-    const evidenceEntry = entries.find((entry) => entry === "staging-qualification.json" || entry.endsWith("/staging-qualification.json"));
-    if (!evidenceEntry) throw new Error("Staging qualification artifact is missing staging-qualification.json");
+    const evidenceEntry = "qualification-evidence/app/staging-qualification.json";
+    if (!entries.includes(evidenceEntry)) {
+      throw new Error(`Staging qualification artifact is missing ${evidenceEntry}`);
+    }
     return JSON.parse(execFileSync("unzip", ["-p", archivePath, evidenceEntry], { encoding: "utf8" }));
   } finally {
     await rm(temporary, { recursive: true, force: true });

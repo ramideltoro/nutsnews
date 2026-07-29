@@ -172,6 +172,16 @@ for (const required of [
   );
 }
 requireText(
+  stagingEvidenceVerifier,
+  'const evidenceEntry = "qualification-evidence/app/staging-qualification.json";',
+  "Staging qualification verification must select the qualified app report rather than a same-named wrapper.",
+);
+requireText(
+  stagingEvidenceVerifier,
+  "entries.includes(evidenceEntry)",
+  "Staging qualification verification must fail closed when the canonical app report is absent.",
+);
+requireText(
   vercelRecoveryWorkflow,
   "vps_staging_admin_backend_smoke_result",
   "Vercel production recovery evidence must record the staging admin backend smoke result.",
