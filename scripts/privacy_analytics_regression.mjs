@@ -21,7 +21,7 @@ const runtimeAnalytics = read("web/app/components/RuntimeAnalytics.tsx");
 const analyticsConsent = read("web/lib/analyticsConsent.ts");
 const engagementAnalytics = read("web/lib/engagementAnalytics.ts");
 const consentControls = read("web/app/privacy/AnalyticsConsentControls.tsx");
-const privacyPolicy = read("web/app/privacy/LocalizedPrivacyPolicyPage.tsx");
+const privacyPolicy = read("web/app/privacy/ios/LocalizedPrivacyPolicyPage.tsx");
 const packageJson = JSON.parse(read("web/package.json"));
 
 for (const fragment of [

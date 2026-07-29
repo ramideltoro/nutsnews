@@ -23,7 +23,9 @@ const auditedPages: AuditedPage[] = [
   { name: 'Home', path: '/' },
   { name: 'Saved', path: '/saved' },
   { name: 'About', path: '/about' },
-  { name: 'Privacy', path: '/privacy' },
+  { name: 'Privacy selector', path: '/privacy' },
+  { name: 'Android privacy', path: '/privacy/android' },
+  { name: 'iOS privacy', path: '/privacy/ios' },
   { name: 'Contact', path: '/contact' },
 ];
 

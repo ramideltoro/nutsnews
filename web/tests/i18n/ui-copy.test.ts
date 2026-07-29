@@ -11,7 +11,7 @@ import { footerCopyByLanguage } from "@/app/components/SiteFooter";
 import { settingsCopyByLanguage } from "@/app/components/ThemeSwitcher";
 import { formCopyByLanguage } from "@/app/contact/ContactForm";
 import { contactCopyByLanguage } from "@/app/contact/LocalizedContactPage";
-import { privacyCopyByLanguage } from "@/app/privacy/LocalizedPrivacyPolicyPage";
+import { privacyCopyByLanguage } from "@/app/privacy/ios/LocalizedPrivacyPolicyPage";
 import { savedStoriesCopyByLanguage } from "@/app/saved/SavedStoriesPage";
 import { themeInitScript } from "@/lib/themeBootstrap";
 import {

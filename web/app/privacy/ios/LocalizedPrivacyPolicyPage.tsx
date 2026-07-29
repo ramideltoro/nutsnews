@@ -3,12 +3,12 @@
 import Link from "next/link";
 
 import { type LanguageCode } from "@/lib/languages";
-import { SiteFooter } from "../components/SiteFooter";
-import { useSelectedLanguage } from "../components/useSelectedLanguage";
+import { SiteFooter } from "../../components/SiteFooter";
+import { useSelectedLanguage } from "../../components/useSelectedLanguage";
 import {
   AnalyticsConsentControls,
   type AnalyticsConsentControlCopy,
-} from "./AnalyticsConsentControls";
+} from "../AnalyticsConsentControls";
 
 type PolicySectionCopy = {
   id: string;

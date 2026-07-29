@@ -3,7 +3,8 @@ import { existsSync, readFileSync } from 'node:fs';
 
 const requiredFiles = [
   'web/app/privacy/page.tsx',
-  'web/app/privacy/LocalizedPrivacyPolicyPage.tsx',
+  'web/app/privacy/ios/page.tsx',
+  'web/app/privacy/ios/LocalizedPrivacyPolicyPage.tsx',
   'web/app/contact/page.tsx',
   'web/app/contact/ContactForm.tsx',
 ];
@@ -19,7 +20,7 @@ function includesAny(file, values) {
   return values.some((value) => text.includes(value.toLowerCase()));
 }
 
-if (!includesAny('web/app/privacy/LocalizedPrivacyPolicyPage.tsx', ['privacy', 'data', 'contact'])) {
+if (!includesAny('web/app/privacy/ios/LocalizedPrivacyPolicyPage.tsx', ['privacy', 'data', 'contact'])) {
   failures.push('Privacy policy page does not appear to contain privacy/data/contact wording.');
 }
 if (!includesAny('web/app/contact/ContactForm.tsx', ['email', 'message', 'turnstile'])) {

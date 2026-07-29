@@ -117,8 +117,8 @@ test.describe('public visual regression snapshots', () => {
       window.localStorage.setItem(languageStorageKey, 'fr');
     }, LANGUAGE_STORAGE_KEY);
 
-    const response = await page.goto('/privacy', { waitUntil: 'networkidle' });
-    expect(response?.ok(), `Expected /privacy to load, got ${response?.status() ?? 'no response'}`).toBeTruthy();
+    const response = await page.goto('/privacy/ios', { waitUntil: 'networkidle' });
+    expect(response?.ok(), `Expected /privacy/ios to load, got ${response?.status() ?? 'no response'}`).toBeTruthy();
     await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
     await expect(page.locator('main')).toContainText(/Politique de confidentialité|Confidentialité/i);
     await expect(page).toHaveScreenshot('desktop-privacy-fr.png', { fullPage: true });
