@@ -143,6 +143,18 @@ assert.doesNotMatch(
   /application\/zip/,
   "Staging qualification artifact downloads must not request the unsupported application/zip media type.",
 );
+for (const required of [
+  'redirect: "manual"',
+  '".blob.core.windows.net"',
+  '".actions.githubusercontent.com"',
+  'redirect: "error"',
+]) {
+  requireText(
+    stagingEvidenceVerifier,
+    required,
+    `Staging qualification artifact downloads must enforce the signed redirect boundary: ${required}`,
+  );
+}
 requireText(
   vercelRecoveryWorkflow,
   "vps_staging_admin_backend_smoke_result",

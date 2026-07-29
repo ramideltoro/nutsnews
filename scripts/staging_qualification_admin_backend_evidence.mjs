@@ -115,10 +115,27 @@ async function fetchJson(fetchImpl, url, init, label) {
 }
 
 async function readArtifactEvidenceJson(fetchImpl, { token, artifactId }) {
-  const response = await fetchImpl(
+  const redirectResponse = await fetchImpl(
     `https://api.github.com/repos/${infraRepository}/actions/artifacts/${encodeURIComponent(artifactId)}/zip`,
-    { headers: githubHeaders(token) },
+    { headers: githubHeaders(token), redirect: "manual" },
   );
+  if (redirectResponse.status !== 302) {
+    throw new Error(`Staging qualification artifact API returned HTTP ${redirectResponse.status}`);
+  }
+  const location = clean(redirectResponse.headers.get("location"));
+  let signedArchiveUrl;
+  try {
+    signedArchiveUrl = new URL(location);
+  } catch {
+    throw new Error("Staging qualification artifact API returned an invalid redirect");
+  }
+  const allowedSignedHost =
+    signedArchiveUrl.hostname.endsWith(".blob.core.windows.net")
+    || signedArchiveUrl.hostname.endsWith(".actions.githubusercontent.com");
+  if (signedArchiveUrl.protocol !== "https:" || !allowedSignedHost) {
+    throw new Error("Staging qualification artifact API returned an untrusted redirect");
+  }
+  const response = await fetchImpl(signedArchiveUrl, { redirect: "error" });
   if (!response.ok) throw new Error(`Staging qualification artifact download returned HTTP ${response.status}`);
   const archive = Buffer.from(await response.arrayBuffer());
   const temporary = await mkdtemp(path.join(os.tmpdir(), "nutsnews-staging-qualification-artifact-"));
