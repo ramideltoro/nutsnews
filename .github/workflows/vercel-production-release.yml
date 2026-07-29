@@ -134,7 +134,7 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: Export current Vercel smoke helper
+      - name: Export current Vercel release helpers
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -146,23 +146,32 @@ jobs:
           const repo = process.env.GITHUB_REPOSITORY ?? "";
           const sha = process.env.GITHUB_SHA ?? "";
           const token = process.env.GITHUB_TOKEN ?? "";
-          const outputPath = `${process.env.RUNNER_TEMP}/dual_target_web_smoke.mjs`;
-          const response = await fetch(
-            `https://api.github.com/repos/${repo}/contents/scripts/dual_target_web_smoke.mjs?ref=${sha}`,
-            {
-              headers: {
-                Accept: "application/vnd.github.raw",
-                Authorization: `Bearer ${token}`,
-                "X-GitHub-Api-Version": "2022-11-28",
+          const helpers = [
+            ["scripts/dual_target_web_smoke.mjs", `${process.env.RUNNER_TEMP}/dual_target_web_smoke.mjs`],
+            [
+              "scripts/staging_qualification_admin_backend_evidence.mjs",
+              `${process.env.RUNNER_TEMP}/staging_qualification_admin_backend_evidence.mjs`,
+            ],
+          ];
+          for (const [sourcePath, outputPath] of helpers) {
+            const response = await fetch(
+              `https://api.github.com/repos/${repo}/contents/${sourcePath}?ref=${sha}`,
+              {
+                headers: {
+                  Accept: "application/vnd.github.raw",
+                  Authorization: `Bearer ${token}`,
+                  "X-GitHub-Api-Version": "2022-11-28",
+                },
               },
-            },
-          );
-          if (!response.ok) {
-            throw new Error(`Could not export current smoke helper: HTTP ${response.status}`);
+            );
+            if (!response.ok) {
+              throw new Error(`Could not export current release helper ${sourcePath}: HTTP ${response.status}`);
+            }
+            writeFileSync(outputPath, await response.text(), "utf8");
           }
-          writeFileSync(outputPath, await response.text(), "utf8");
           NODE
           node --check "$RUNNER_TEMP/dual_target_web_smoke.mjs"
+          node --check "$RUNNER_TEMP/staging_qualification_admin_backend_evidence.mjs"
 
       - name: Verify VPS staging admin backend operation evidence
         id: staging_admin_backend_evidence
@@ -172,7 +181,7 @@ jobs:
           NUTSNEWS_INFRA_STAGING_TOKEN: ${{ secrets.NUTSNEWS_INFRA_STAGING_TOKEN }}
         run: |
           set -euo pipefail
-          node scripts/staging_qualification_admin_backend_evidence.mjs
+          node "$RUNNER_TEMP/staging_qualification_admin_backend_evidence.mjs"
 
       - name: Stage remote Vercel production candidate
         id: stage

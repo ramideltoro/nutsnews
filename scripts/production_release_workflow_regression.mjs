@@ -130,6 +130,21 @@ requireText(
 );
 requireText(
   vercelRecoveryWorkflow,
+  '`${process.env.RUNNER_TEMP}/staging_qualification_admin_backend_evidence.mjs`',
+  "Vercel production recovery must export the reviewed staging evidence verifier outside the exact app checkout.",
+);
+requireText(
+  vercelRecoveryWorkflow,
+  'node "$RUNNER_TEMP/staging_qualification_admin_backend_evidence.mjs"',
+  "Vercel production recovery must execute the reviewed staging evidence verifier.",
+);
+assert.doesNotMatch(
+  vercelRecoveryWorkflow,
+  /node scripts\/staging_qualification_admin_backend_evidence\.mjs/,
+  "Vercel production recovery must not execute the staging evidence verifier from the exact app checkout.",
+);
+requireText(
+  vercelRecoveryWorkflow,
   "NUTSNEWS_INFRA_STAGING_TOKEN is required to verify staging qualification admin backend evidence",
   "Vercel production recovery must require the infra staging token for release evidence verification.",
 );
