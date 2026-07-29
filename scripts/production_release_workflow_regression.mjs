@@ -144,15 +144,16 @@ assert.doesNotMatch(
   "Staging qualification artifact downloads must not request the unsupported application/zip media type.",
 );
 for (const required of [
-  'redirect: "manual"',
-  '".blob.core.windows.net"',
-  '".actions.githubusercontent.com"',
-  'redirect: "error"',
+  'execFileSync(\n      "gh"',
+  "GH_TOKEN: token",
+  'GH_PROMPT_DISABLED: "true"',
+  'stdio: ["ignore", "pipe", "ignore"]',
+  "maxBuffer: 16 * 1024 * 1024",
 ]) {
   requireText(
     stagingEvidenceVerifier,
     required,
-    `Staging qualification artifact downloads must enforce the signed redirect boundary: ${required}`,
+    `Staging qualification artifact downloads must enforce the isolated gh API boundary: ${required}`,
   );
 }
 requireText(
