@@ -3,12 +3,16 @@ import { expect, test, type Page, type Response } from '@playwright/test';
 const LANGUAGE_STORAGE_KEY = 'nutsnews.web.language';
 const THEME_STORAGE_KEY = 'nutsnews.web.theme';
 
-const publicRoutes = [
+const publicFooterRoutes = [
   { name: 'Apps', path: '/apps', expectedText: /NutsNews for iPhone is here\./i },
   { name: 'About', path: '/about', expectedText: /About NutsNews/i },
   { name: 'Contact', path: '/contact', expectedText: /Send a message/i },
   { name: 'Privacy', path: '/privacy', expectedText: /Choose your privacy policy/i },
-  { name: 'iOS Privacy', path: '/privacy/ios', expectedText: /NutsNews Privacy Policy/i },
+] as const;
+
+const privacyPolicyRoutes = [
+  { path: '/privacy/android', expectedText: /NutsNews Android Privacy Policy/i },
+  { path: '/privacy/ios', expectedText: /NutsNews Privacy Policy/i },
 ] as const;
 
 const themeIds = [
@@ -398,15 +402,24 @@ test.describe('Deployed UI smoke regression', () => {
     await openHomeWithCards(page);
   });
 
-  test('public footer pages load: Apps, About, Contact, Privacy', async ({ page }) => {
+  test('public footer pages and platform privacy policies load', async ({ page }) => {
     await openHomeWithCards(page);
 
-    for (const route of publicRoutes) {
+    for (const route of publicFooterRoutes) {
       await expect(page.locator('footer').getByRole('link', { name: route.name, exact: true })).toHaveAttribute(
         'href',
         route.path,
       );
 
+      const response = await page.goto(route.path, { waitUntil: 'domcontentloaded' });
+      expect(
+        response?.ok(),
+        `Expected ${route.path} to load from the deployed target, got ${response?.status() ?? 'no response'}.`,
+      ).toBeTruthy();
+      await expect(page.locator('main')).toContainText(route.expectedText, { timeout: 20_000 });
+    }
+
+    for (const route of privacyPolicyRoutes) {
       const response = await page.goto(route.path, { waitUntil: 'domcontentloaded' });
       expect(
         response?.ok(),
