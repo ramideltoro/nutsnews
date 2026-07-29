@@ -1159,7 +1159,7 @@ async function runBrowserChecks() {
   });
 
   await clickFooterLink("Privacy", "/privacy", /\/privacy$/);
-  await expect(page.locator("main").getByText(/Privacy Policy|NutsNews Privacy Policy/i).first()).toBeVisible({
+  await expect(page.locator("main").getByRole("heading", { name: "Choose your privacy policy" })).toBeVisible({
     timeout: footerNavigationTimeoutMs,
   });
 

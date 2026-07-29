@@ -39,7 +39,7 @@ const articleFeed = read("web/app/components/ArticleFeed.tsx");
 const adminLib = read("web/lib/adminArticleEngagement.ts");
 const adminPage = read("web/app/admin/(protected)/engagement/page.tsx");
 const adminHome = read("web/app/admin/(protected)/page.tsx");
-const privacyPolicy = read("web/app/privacy/LocalizedPrivacyPolicyPage.tsx");
+const privacyPolicy = read("web/app/privacy/ios/LocalizedPrivacyPolicyPage.tsx");
 const packageJson = read("web/package.json");
 
 for (const expected of [
@@ -145,7 +145,7 @@ for (const expected of [
   "raw URLs, article titles, referrers, IP addresses, user agents, cookies, or visitor identifiers",
   "NutsNews does not define custom analytics events for likes, saved stories, searches, personal profiles, or cross-device tracking.",
 ]) {
-  assertIncludes(privacyPolicy, expected, "web/app/privacy/LocalizedPrivacyPolicyPage.tsx");
+  assertIncludes(privacyPolicy, expected, "web/app/privacy/ios/LocalizedPrivacyPolicyPage.tsx");
 }
 
 assertIncludes(

@@ -1022,68 +1022,106 @@ body {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-.site-footer-modern__mobile-menu {
-  position: relative;
+.mobile-site-navigation {
+  position: fixed;
+  top: max(0.75rem, env(safe-area-inset-top));
+  left: max(0.75rem, env(safe-area-inset-left));
+  z-index: 1000;
   display: none;
 }
 
-.footer-menu-icon {
+.mobile-site-navigation__toggle {
+  height: 2.75rem;
+  width: 2.75rem;
+  background: color-mix(in srgb, var(--theme-surface-strong) 88%, transparent);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.5), 0 0 28px var(--theme-glow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.mobile-site-navigation__toggle:focus-visible {
+  outline: 2px solid var(--theme-accent);
+  outline-offset: 3px;
+}
+
+.mobile-site-navigation__icon {
+  position: relative;
+  z-index: 1;
   display: grid;
   align-content: center;
   justify-items: center;
   gap: 0.18rem;
+  height: 1.2rem;
+  width: 1.2rem;
 }
 
-.footer-menu-icon__line {
+.mobile-site-navigation__icon-line {
   display: block;
-  width: 0.92rem;
+  width: 1.05rem;
   height: 0.1rem;
   border-radius: 9999px;
   background: currentColor;
   transition: opacity 160ms ease, transform 160ms ease;
 }
 
-.footer-menu-icon--open .footer-menu-icon__line:nth-child(1) {
+.mobile-site-navigation__icon--open .mobile-site-navigation__icon-line:nth-child(1) {
   transform: translateY(0.28rem) rotate(45deg);
 }
 
-.footer-menu-icon--open .footer-menu-icon__line:nth-child(2) {
+.mobile-site-navigation__icon--open .mobile-site-navigation__icon-line:nth-child(2) {
   opacity: 0;
 }
 
-.footer-menu-icon--open .footer-menu-icon__line:nth-child(3) {
+.mobile-site-navigation__icon--open .mobile-site-navigation__icon-line:nth-child(3) {
   transform: translateY(-0.28rem) rotate(-45deg);
 }
 
-.site-footer-modern__mobile-panel {
+.mobile-site-navigation__panel {
   position: absolute;
-  right: 0;
-  bottom: calc(100% + 0.58rem);
+  top: calc(100% + 0.65rem);
+  left: 0;
   display: grid;
-  width: min(15.5rem, calc(100vw - 1.5rem));
-  gap: 0.18rem;
+  width: min(18rem, calc(100vw - 1.5rem));
+  max-height: calc(100dvh - 5.75rem);
+  gap: 0.25rem;
+  overflow-y: auto;
   border: 1px solid var(--theme-border);
-  border-radius: 0.8rem;
-  background: var(--theme-surface);
-  padding: 0.42rem;
-  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.5), 0 0 30px var(--theme-glow-soft);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--theme-surface) 96%, black);
+  padding: 0.5rem;
+  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.64), 0 0 38px var(--theme-glow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(24px);
 }
 
-.site-footer-modern__mobile-link {
-  border-radius: 0.58rem;
+.mobile-site-navigation__link {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-radius: 0.72rem;
   color: var(--theme-heading);
-  font-size: 0.78rem;
-  font-weight: 850;
+  font-size: 0.86rem;
+  font-weight: 900;
   line-height: 1.2;
-  padding: 0.72rem 0.82rem;
+  padding: 0.78rem 0.9rem;
   text-decoration: none;
-  transition: background 160ms ease, color 160ms ease;
+  transition: background 160ms ease, color 160ms ease, transform 160ms ease;
 }
 
-.site-footer-modern__mobile-link:hover,
-.site-footer-modern__mobile-link:focus-visible {
+.mobile-site-navigation__link span {
+  color: var(--theme-accent-soft);
+  font-size: 1rem;
+}
+
+.mobile-site-navigation__link:hover,
+.mobile-site-navigation__link:focus-visible {
   background: var(--theme-glow-soft);
   color: var(--theme-accent-soft);
+  transform: translateX(2px);
+}
+
+.mobile-site-navigation__link:focus-visible {
+  outline: 2px solid var(--theme-accent);
+  outline-offset: -2px;
 }
 
 .site-footer-modern__link {
@@ -1124,16 +1162,16 @@ body {
 }
 
 @media (max-width: 719px) {
+  .mobile-site-navigation {
+    display: block;
+  }
+
   .site-footer-modern__top-row {
     justify-content: center;
   }
 
   .site-footer-modern__nav {
     display: none;
-  }
-
-  .site-footer-modern__mobile-menu {
-    display: block;
   }
 
   .site-footer-modern__copyright {
@@ -1260,7 +1298,7 @@ body {
 .public-themed-page > section,
 .public-themed-page > article,
 .public-themed-page > nav,
-.public-themed-page > div:not(.site-footer-modern) {
+.public-themed-page > div:not(.site-footer-modern):not(.mobile-site-navigation) {
   position: relative;
   z-index: 1;
 }

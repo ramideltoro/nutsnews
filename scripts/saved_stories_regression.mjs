@@ -31,8 +31,8 @@ const savedPage = read("web/app/saved/SavedStoriesPage.tsx");
 const savedRoute = read("web/app/saved/page.tsx");
 const articleFeed = read("web/app/components/ArticleFeed.tsx");
 const siteFooter = read("web/app/components/SiteFooter.tsx");
-const privacyPolicy = read("web/app/privacy/LocalizedPrivacyPolicyPage.tsx");
-const privacyRoute = read("web/app/privacy/page.tsx");
+const privacyPolicy = read("web/app/privacy/ios/LocalizedPrivacyPolicyPage.tsx");
+const privacyRoute = read("web/app/privacy/ios/page.tsx");
 const componentTests = read("web/tests/component/public-ui.test.tsx");
 const i18nTests = read("web/tests/i18n/ui-copy.test.ts");
 const packageJson = JSON.parse(read("web/package.json"));
@@ -79,7 +79,7 @@ for (const fragment of [
 }
 
 for (const fragment of [
-  "href=\"/saved\"",
+  'href: "/saved"',
   "saved: \"Saved\"",
 ]) {
   assertIncludes(siteFooter, fragment, "footer saved link");

@@ -107,7 +107,7 @@ async function openSettingsPanel(page: Page) {
   return panel;
 }
 
-async function openFooterMenu(page: Page) {
+async function openMobileMenu(page: Page) {
   const toggle = page.getByTestId('nutsnews-footer-menu');
   const panel = page.getByTestId('nutsnews-footer-menu-panel');
 
@@ -139,7 +139,7 @@ async function openFooterMenu(page: Page) {
 }
 
 test.describe('Public reader smoke flows', () => {
-  test('mobile footer routes move into the hamburger menu', async ({ page }) => {
+  test('mobile footer routes move into the top-left hamburger menu', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openHomeWithArticles(page);
 
@@ -149,12 +149,55 @@ test.describe('Public reader smoke flows', () => {
     const menuToggle = page.getByTestId('nutsnews-footer-menu');
     await expect(menuToggle).toBeVisible();
     await expect(menuToggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(menuToggle).toHaveAttribute('aria-controls', 'nutsnews-mobile-navigation-panel');
 
-    const menuPanel = await openFooterMenu(page);
+    const toggleBox = await menuToggle.boundingBox();
+    expect(toggleBox?.x ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(24);
+    expect(toggleBox?.y ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(24);
+
+    let menuPanel = await openMobileMenu(page);
     await expect(menuToggle).toHaveAttribute('aria-expanded', 'true');
 
     for (const route of mobileFooterRoutes) {
       await expect(menuPanel.getByRole('link', { name: route.name, exact: true })).toHaveAttribute('href', route.path);
+    }
+
+    await menuToggle.focus();
+    await page.keyboard.press('Escape');
+    await expect(menuPanel).toBeHidden();
+    await expect(menuToggle).toBeFocused();
+
+    menuPanel = await openMobileMenu(page);
+    await page.mouse.click(370, 400);
+    await expect(menuPanel).toBeHidden();
+
+    menuPanel = await openMobileMenu(page);
+    await menuToggle.focus();
+    await page.keyboard.press('Tab');
+    await expect(menuPanel.getByRole('link', { name: 'Apps', exact: true })).toBeFocused();
+
+    await menuPanel.getByRole('link', { name: 'About', exact: true }).click();
+    await expect(page).toHaveURL(/\/about$/);
+    await expect(page.getByTestId('nutsnews-footer-menu-panel')).toHaveCount(0);
+
+    const privacyResponse = await page.goto('/privacy', { waitUntil: 'domcontentloaded' });
+    expect(privacyResponse?.ok(), `Expected /privacy to load, got ${privacyResponse?.status() ?? 'no response'}`).toBeTruthy();
+    const publicPageToggleBox = await page.getByTestId('nutsnews-footer-menu').boundingBox();
+    expect(publicPageToggleBox?.x ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(24);
+    expect(publicPageToggleBox?.y ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(24);
+  });
+
+  test('desktop footer keeps all navigation links and hides the mobile menu', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    const response = await page.goto('/privacy', { waitUntil: 'domcontentloaded' });
+    expect(response?.ok(), `Expected /privacy to load, got ${response?.status() ?? 'no response'}`).toBeTruthy();
+
+    const footerNavigation = page.locator('footer .site-footer-modern__nav');
+    await expect(footerNavigation).toBeVisible();
+    await expect(page.getByTestId('nutsnews-footer-menu')).toBeHidden();
+
+    for (const route of mobileFooterRoutes) {
+      await expect(footerNavigation.getByRole('link', { name: route.name, exact: true })).toHaveAttribute('href', route.path);
     }
   });
 
@@ -248,10 +291,31 @@ test.describe('Public reader smoke flows', () => {
       .toBe(false);
   });
 
-  test('privacy and about pages render', async ({ page }) => {
+  test('privacy selector, Android policy, iOS policy, and about pages render', async ({ page }) => {
     const privacyResponse = await page.goto('/privacy', { waitUntil: 'domcontentloaded' });
     expect(privacyResponse?.ok(), `Expected /privacy to load, got ${privacyResponse?.status() ?? 'no response'}`).toBeTruthy();
-    await expect(page.locator('main')).toContainText(/Privacy Policy|NutsNews Privacy Policy/i);
+    await expect(page.getByRole('heading', { name: 'Choose your privacy policy' })).toBeVisible();
+    await expect(page.getByTestId('android-privacy-choice')).toHaveAttribute(
+      'href',
+      'https://www.nutsnews.com/privacy/android',
+    );
+    await expect(page.getByTestId('ios-privacy-choice')).toHaveAttribute('href', '/privacy/ios');
+
+    const androidPrivacyResponse = await page.goto('/privacy/android', { waitUntil: 'domcontentloaded' });
+    expect(
+      androidPrivacyResponse?.ok(),
+      `Expected /privacy/android to load, got ${androidPrivacyResponse?.status() ?? 'no response'}`,
+    ).toBeTruthy();
+    await expect(page.getByRole('heading', { name: 'NutsNews Android Privacy Policy' })).toBeVisible();
+
+    const iosPrivacyResponse = await page.goto('/privacy/ios', { waitUntil: 'domcontentloaded' });
+    expect(
+      iosPrivacyResponse?.ok(),
+      `Expected /privacy/ios to load, got ${iosPrivacyResponse?.status() ?? 'no response'}`,
+    ).toBeTruthy();
+    await expect(page.getByRole('heading', { name: 'NutsNews Privacy Policy' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Information the iOS app does not request' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Contact' })).toBeVisible();
 
     const aboutResponse = await page.goto('/about', { waitUntil: 'domcontentloaded' });
     expect(aboutResponse?.ok(), `Expected /about to load, got ${aboutResponse?.status() ?? 'no response'}`).toBeTruthy();

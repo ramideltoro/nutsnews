@@ -19,6 +19,7 @@ import {
 import type { Article } from "@/lib/articles";
 import { DEFAULT_LANGUAGE_CODE, type LanguageCode } from "@/lib/languages";
 import { formatPublisherName, getPublisherAttribution } from "@/lib/publisherAttribution";
+import { MobileSiteNavigation } from "./MobileSiteNavigation";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { OptimizedArticleImage } from "./OptimizedArticleImage";
 import { useSelectedLanguage } from "./useSelectedLanguage";
@@ -325,27 +326,6 @@ function SearchIcon({ className = "" }: { className?: string }) {
       <circle cx="11" cy="11" r="7" />
       <path d="m20 20-3.5-3.5" />
     </svg>
-  );
-}
-
-function MenuIcon({
-  className = "",
-  isOpen,
-}: {
-  className?: string;
-  isOpen: boolean;
-}) {
-  return (
-    <span
-      aria-hidden="true"
-      className={`${className} footer-menu-icon ${
-        isOpen ? "footer-menu-icon--open" : ""
-      }`}
-    >
-      <span className="footer-menu-icon__line" />
-      <span className="footer-menu-icon__line" />
-      <span className="footer-menu-icon__line" />
-    </span>
   );
 }
 
@@ -745,7 +725,6 @@ export function SiteFooter() {
   const pathname = usePathname();
   const router = useRouter();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSearchButtonAnimating, setIsSearchButtonAnimating] = useState(false);
   const [isHomeButtonAnimating, setIsHomeButtonAnimating] = useState(false);
   const footerNavLinks = [
@@ -755,24 +734,6 @@ export function SiteFooter() {
     { href: "/contact", label: copy.contact },
     { href: "/privacy", label: copy.privacy },
   ];
-
-  useEffect(() => {
-    if (!isMenuOpen) {
-      return;
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setIsMenuOpen(false);
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isMenuOpen]);
 
   function pulseHomeButton() {
     setIsHomeButtonAnimating(false);
@@ -807,7 +768,15 @@ export function SiteFooter() {
   }
 
   return (
-    <footer className="site-footer-modern">
+    <>
+      <MobileSiteNavigation
+        links={footerNavLinks}
+        navigationLabel={copy.shortcuts}
+        openLabel={copy.openMenu}
+        closeLabel={copy.closeMenu}
+      />
+
+      <footer className="site-footer-modern">
       <div className="site-footer-modern__inner">
         <div className="site-footer-modern__top-row">
           <div
@@ -839,44 +808,6 @@ export function SiteFooter() {
               <span className="footer-icon-button__halo" />
               <SearchIcon className="footer-icon-button__icon" />
             </button>
-
-            <div className="site-footer-modern__mobile-menu">
-              <button
-                type="button"
-                data-testid="nutsnews-footer-menu"
-                className="footer-icon-button footer-icon-button--menu"
-                aria-label={isMenuOpen ? copy.closeMenu : copy.openMenu}
-                aria-expanded={isMenuOpen}
-                aria-controls="nutsnews-footer-menu-panel"
-                onClick={() => setIsMenuOpen((current) => !current)}
-              >
-                <span className="footer-icon-button__halo" />
-                <MenuIcon
-                  className="footer-icon-button__icon"
-                  isOpen={isMenuOpen}
-                />
-              </button>
-
-              {isMenuOpen ? (
-                <nav
-                  id="nutsnews-footer-menu-panel"
-                  data-testid="nutsnews-footer-menu-panel"
-                  aria-label={copy.footerNav}
-                  className="site-footer-modern__mobile-panel"
-                >
-                  {footerNavLinks.map((link) => (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      className="site-footer-modern__mobile-link"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      {link.label}
-                    </Link>
-                  ))}
-                </nav>
-              ) : null}
-            </div>
 
             <ThemeSwitcher />
           </div>
@@ -1013,7 +944,8 @@ export function SiteFooter() {
             animation: none;
           }
         }
-      `}</style>
-    </footer>
+        `}</style>
+      </footer>
+    </>
   );
 }

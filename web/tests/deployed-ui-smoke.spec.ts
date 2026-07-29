@@ -7,7 +7,8 @@ const publicRoutes = [
   { name: 'Apps', path: '/apps', expectedText: /NutsNews for iPhone is here\./i },
   { name: 'About', path: '/about', expectedText: /About NutsNews/i },
   { name: 'Contact', path: '/contact', expectedText: /Send a message/i },
-  { name: 'Privacy', path: '/privacy', expectedText: /NutsNews Privacy Policy/i },
+  { name: 'Privacy', path: '/privacy', expectedText: /Choose your privacy policy/i },
+  { name: 'iOS Privacy', path: '/privacy/ios', expectedText: /NutsNews Privacy Policy/i },
 ] as const;
 
 const themeIds = [

@@ -32,6 +32,8 @@ const sitemap = await fetchText(`${BASE_URL}/sitemap.xml`);
 assertIncludes(sitemap.text, '<urlset', 'sitemap.xml');
 assertIncludes(sitemap.text, `${BASE_URL}/`, 'sitemap.xml');
 assertIncludes(sitemap.text, `${BASE_URL}/privacy`, 'sitemap.xml');
+assertIncludes(sitemap.text, `${BASE_URL}/privacy/android`, 'sitemap.xml');
+assertIncludes(sitemap.text, `${BASE_URL}/privacy/ios`, 'sitemap.xml');
 assertIncludes(sitemap.text, `${BASE_URL}/contact`, 'sitemap.xml');
 
 const urlCount = (sitemap.text.match(/<url>/g) || []).length;

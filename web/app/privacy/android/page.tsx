@@ -178,7 +178,7 @@ export default function AndroidPrivacyPolicyPage() {
               Contact NutsNews
             </Link>
             <Link
-              href="/privacy"
+              href="/privacy/ios"
               className="inline-flex rounded-full border border-neutral-500/40 bg-neutral-900/70 px-5 py-3 text-sm font-black text-neutral-200 transition hover:border-amber-200/60 hover:text-amber-100"
             >
               Website and iOS policy

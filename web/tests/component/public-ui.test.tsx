@@ -486,18 +486,22 @@ describe("HeroTagline", () => {
 });
 
 describe("SiteFooter", () => {
-  test("opens the mobile menu with the footer navigation routes", async () => {
+  test("supports keyboard, outside-click, and link-selection closing in the mobile menu", async () => {
     const user = userEvent.setup();
 
     render(<SiteFooter />);
 
     const menuToggle = screen.getByTestId("nutsnews-footer-menu");
     expect(menuToggle).toHaveAttribute("aria-expanded", "false");
+    expect(menuToggle).toHaveAttribute(
+      "aria-controls",
+      "nutsnews-mobile-navigation-panel",
+    );
 
     await user.click(menuToggle);
 
     expect(menuToggle).toHaveAttribute("aria-expanded", "true");
-    const menuPanel = screen.getByTestId("nutsnews-footer-menu-panel");
+    let menuPanel = screen.getByTestId("nutsnews-footer-menu-panel");
 
     expect(within(menuPanel).getByRole("link", { name: "Apps" })).toHaveAttribute("href", "/apps");
     expect(within(menuPanel).getByRole("link", { name: "Saved" })).toHaveAttribute("href", "/saved");
@@ -505,10 +509,33 @@ describe("SiteFooter", () => {
     expect(within(menuPanel).getByRole("link", { name: "Contact" })).toHaveAttribute("href", "/contact");
     expect(within(menuPanel).getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "/privacy");
 
+    menuToggle.focus();
+    await user.tab();
+    expect(within(menuPanel).getByRole("link", { name: "Apps" })).toHaveFocus();
+
     await user.keyboard("{Escape}");
 
     await waitFor(() => {
       expect(screen.queryByTestId("nutsnews-footer-menu-panel")).not.toBeInTheDocument();
+    });
+    expect(menuToggle).toHaveFocus();
+
+    await user.click(menuToggle);
+    menuPanel = screen.getByTestId("nutsnews-footer-menu-panel");
+    await user.click(document.body);
+    await waitFor(() => {
+      expect(menuPanel).not.toBeInTheDocument();
+    });
+
+    await user.click(menuToggle);
+    menuPanel = screen.getByTestId("nutsnews-footer-menu-panel");
+    const privacyLink = within(menuPanel).getByRole("link", { name: "Privacy" });
+    privacyLink.addEventListener("click", (event) => event.preventDefault(), {
+      once: true,
+    });
+    await user.click(privacyLink);
+    await waitFor(() => {
+      expect(menuPanel).not.toBeInTheDocument();
     });
   });
 
