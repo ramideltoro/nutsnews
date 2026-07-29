@@ -178,6 +178,7 @@ jobs:
         if: ${{ env.RELEASE_KIND == 'release' }}
         shell: bash
         env:
+          NUTSNEWS_ADMIN_BACKEND_OPERATION_CONTRACT: ${{ github.workspace }}/api-contracts/admin-backend-operations.json
           NUTSNEWS_INFRA_STAGING_TOKEN: ${{ secrets.NUTSNEWS_INFRA_STAGING_TOKEN }}
         run: |
           set -euo pipefail

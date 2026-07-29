@@ -138,6 +138,11 @@ requireText(
   'node "$RUNNER_TEMP/staging_qualification_admin_backend_evidence.mjs"',
   "Vercel production recovery must execute the reviewed staging evidence verifier.",
 );
+requireText(
+  vercelRecoveryWorkflow,
+  "NUTSNEWS_ADMIN_BACKEND_OPERATION_CONTRACT: ${{ github.workspace }}/api-contracts/admin-backend-operations.json",
+  "Vercel production recovery must bind the reviewed verifier to the exact app contract checkout.",
+);
 assert.doesNotMatch(
   vercelRecoveryWorkflow,
   /node scripts\/staging_qualification_admin_backend_evidence\.mjs/,
@@ -180,6 +185,11 @@ requireText(
   stagingEvidenceVerifier,
   "entries.includes(evidenceEntry)",
   "Staging qualification verification must fail closed when the canonical app report is absent.",
+);
+requireText(
+  stagingEvidenceVerifier,
+  "process.env.NUTSNEWS_ADMIN_BACKEND_OPERATION_CONTRACT || defaultContractPath",
+  "Staging qualification verification must accept the workflow-bound app contract path.",
 );
 requireText(
   vercelRecoveryWorkflow,

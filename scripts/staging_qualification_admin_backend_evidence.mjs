@@ -198,6 +198,7 @@ async function main() {
     stagingDeploymentId: process.env.VPS_STAGING_DEPLOYMENT_ID || process.env.NUTSNEWS_STAGING_DEPLOYMENT_ID,
     expectedSourceCommit: process.env.SOURCE_COMMIT || process.env.NUTSNEWS_EXPECTED_SOURCE_COMMIT,
     expectedBuildId: process.env.BUILD_ID || process.env.NUTSNEWS_EXPECTED_BUILD_ID,
+    contractPath: process.env.NUTSNEWS_ADMIN_BACKEND_OPERATION_CONTRACT || defaultContractPath,
   });
 
   if (process.env.GITHUB_OUTPUT) {
