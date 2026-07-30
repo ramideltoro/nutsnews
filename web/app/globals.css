@@ -1143,6 +1143,10 @@ body {
   animation-delay: 140ms;
 }
 
+.mobile-site-navigation__link:nth-child(6) {
+  animation-delay: 175ms;
+}
+
 .mobile-site-navigation__link-label {
   grid-column: 2;
   white-space: nowrap;

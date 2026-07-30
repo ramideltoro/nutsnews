@@ -11,6 +11,7 @@ const mobileFooterRoutes = [
   { name: 'About', path: '/about' },
   { name: 'Contact', path: '/contact' },
   { name: 'Privacy', path: '/privacy' },
+  { name: 'Wiki', path: 'https://wiki.nutsnews.com/simple/' },
 ];
 
 type ArticlesResponse = {

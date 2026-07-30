@@ -26,6 +26,7 @@ import { useSelectedLanguage } from "./useSelectedLanguage";
 
 const COPYRIGHT_YEAR = 2026;
 const FOOTER_HOME_TRANSITION_KEY = "nutsnews.footerHomeTransition";
+const NUTSNEWS_WIKI_URL = "https://wiki.nutsnews.com/simple/";
 
 type SearchResponse = {
   articles: Article[];
@@ -64,6 +65,7 @@ export const footerCopyByLanguage: Record<
     about: string;
     contact: string;
     privacy: string;
+    wiki: string;
     rights: string;
   }
 > = {
@@ -94,6 +96,7 @@ export const footerCopyByLanguage: Record<
     about: "About",
     contact: "Contact",
     privacy: "Privacy",
+    wiki: "Wiki",
     rights: "All Rights Reserved.",
   },
   fr: {
@@ -123,6 +126,7 @@ export const footerCopyByLanguage: Record<
     about: "À propos",
     contact: "Contact",
     privacy: "Confidentialité",
+    wiki: "Wiki",
     rights: "Tous droits réservés.",
   },
   ja: {
@@ -151,6 +155,7 @@ export const footerCopyByLanguage: Record<
     about: "概要",
     contact: "お問い合わせ",
     privacy: "プライバシー",
+    wiki: "Wiki",
     rights: "All Rights Reserved.",
   },
 
@@ -181,6 +186,7 @@ export const footerCopyByLanguage: Record<
     about: "Über uns",
     contact: "Kontakt",
     privacy: "Datenschutz",
+    wiki: "Wiki",
     rights: "Alle Rechte vorbehalten.",
   },
   de: {
@@ -210,6 +216,7 @@ export const footerCopyByLanguage: Record<
     about: "Über uns",
     contact: "Kontakt",
     privacy: "Datenschutz",
+    wiki: "Wiki",
     rights: "Alle Rechte vorbehalten.",
   },
   el: {
@@ -239,6 +246,7 @@ export const footerCopyByLanguage: Record<
     about: "Σχετικά",
     contact: "Επικοινωνία",
     privacy: "Απόρρητο",
+    wiki: "Wiki",
     rights: "Με επιφύλαξη παντός δικαιώματος.",
   },
 };
@@ -733,6 +741,7 @@ export function SiteFooter() {
     { href: "/about", label: copy.about },
     { href: "/contact", label: copy.contact },
     { href: "/privacy", label: copy.privacy },
+    { href: NUTSNEWS_WIKI_URL, label: copy.wiki },
   ];
 
   function pulseHomeButton() {
