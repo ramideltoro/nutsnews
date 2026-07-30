@@ -508,6 +508,10 @@ describe("SiteFooter", () => {
     expect(within(menuPanel).getByRole("link", { name: "About" })).toHaveAttribute("href", "/about");
     expect(within(menuPanel).getByRole("link", { name: "Contact" })).toHaveAttribute("href", "/contact");
     expect(within(menuPanel).getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "/privacy");
+    expect(within(menuPanel).getByRole("link", { name: "Wiki" })).toHaveAttribute(
+      "href",
+      "https://wiki.nutsnews.com/simple/",
+    );
 
     menuToggle.focus();
     await user.tab();
