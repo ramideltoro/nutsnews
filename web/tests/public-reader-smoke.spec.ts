@@ -140,7 +140,7 @@ async function openMobileMenu(page: Page) {
 
 test.describe('Public reader smoke flows', () => {
   test('mobile footer routes move into the top-left hamburger menu', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize({ width: 320, height: 568 });
     await openHomeWithArticles(page);
 
     const footer = page.locator('footer');
@@ -157,9 +157,23 @@ test.describe('Public reader smoke flows', () => {
 
     let menuPanel = await openMobileMenu(page);
     await expect(menuToggle).toHaveAttribute('aria-expanded', 'true');
+    await menuPanel.evaluate(async (element) => {
+      await Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished));
+    });
+
+    const panelBox = await menuPanel.boundingBox();
+    expect(panelBox).not.toBeNull();
+    expect(Math.abs((panelBox?.x ?? 0) + (panelBox?.width ?? 0) / 2 - 160)).toBeLessThanOrEqual(1);
+    expect(Math.abs((panelBox?.y ?? 0) + (panelBox?.height ?? 0) / 2 - 284)).toBeLessThanOrEqual(1);
 
     for (const route of mobileFooterRoutes) {
-      await expect(menuPanel.getByRole('link', { name: route.name, exact: true })).toHaveAttribute('href', route.path);
+      const menuLink = menuPanel.getByRole('link', { name: route.name, exact: true });
+      await expect(menuLink).toHaveAttribute('href', route.path);
+      await expect(menuLink).toBeVisible();
+
+      const labelBox = await menuLink.locator('.mobile-site-navigation__link-label').boundingBox();
+      expect(labelBox).not.toBeNull();
+      expect(Math.abs((labelBox?.x ?? 0) + (labelBox?.width ?? 0) / 2 - 160)).toBeLessThanOrEqual(1);
     }
 
     await menuToggle.focus();
@@ -168,7 +182,7 @@ test.describe('Public reader smoke flows', () => {
     await expect(menuToggle).toBeFocused();
 
     menuPanel = await openMobileMenu(page);
-    await page.mouse.click(370, 400);
+    await page.mouse.click(310, 450);
     await expect(menuPanel).toBeHidden();
 
     menuPanel = await openMobileMenu(page);
