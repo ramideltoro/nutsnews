@@ -1,0 +1,278 @@
+name: Request Automatic NutsNews Production Release
+run-name: Automatic production release from Container Image ${{ github.event.workflow_run.id }}
+
+on: # zizmor: ignore[dangerous-triggers] the job accepts only a successful same-repository main push and validates immutable metadata from that exact run before using the staging-only dispatch token.
+  workflow_run:
+    workflows:
+      - Container Image
+    types:
+      - completed
+
+permissions:
+  actions: read # Required to download exact-run Container Image metadata.
+  contents: read # Required for the trusted default-branch workflow context.
+
+concurrency:
+  group: nutsnews-automatic-production-release
+  cancel-in-progress: false
+
+jobs:
+  request-staging:
+    name: Request protected staging qualification and production promotion
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: automatic-release
+
+    steps:
+      - name: Download exact automatic release metadata with retries
+        env:
+          ARTIFACT_DIR: ${{ runner.temp }}/nutsnews-automatic-production-release
+          ARTIFACT_NAME: nutsnews-automatic-production-release
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$ARTIFACT_DIR"
+          artifact_zip="${RUNNER_TEMP}/${ARTIFACT_NAME}.zip"
+          artifacts_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_WORKFLOW_RUN_ID}/artifacts?per_page=100"
+          archive_url=""
+
+          for attempt in 1 2 3 4 5; do
+            if artifacts_json="$(curl -fsSL \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "$artifacts_url")"; then
+              artifact_count="$(jq --arg name "$ARTIFACT_NAME" '[.artifacts[] | select(.name == $name and (.expired | not))] | length' <<<"$artifacts_json")"
+              if [[ "$artifact_count" == "1" ]]; then
+                archive_url="$(jq -r --arg name "$ARTIFACT_NAME" '.artifacts[] | select(.name == $name and (.expired | not)) | .archive_download_url' <<<"$artifacts_json")"
+                break
+              fi
+              if [[ "$artifact_count" != "0" || "$attempt" == "5" ]]; then
+                echo "Expected exactly one unexpired ${ARTIFACT_NAME} artifact for run ${SOURCE_WORKFLOW_RUN_ID}; found ${artifact_count}." >&2
+                exit 1
+              fi
+            fi
+            delay_seconds="$((attempt * 10))"
+            echo "Release artifact lookup failed or was not visible on attempt ${attempt}/5; retrying in ${delay_seconds}s." >&2
+            sleep "$delay_seconds"
+          done
+
+          if [[ -z "$archive_url" ]]; then
+            echo "Could not resolve ${ARTIFACT_NAME} for run ${SOURCE_WORKFLOW_RUN_ID}." >&2
+            exit 1
+          fi
+
+          for attempt in 1 2 3 4 5; do
+            if curl -fsSL \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "$archive_url" \
+              -o "$artifact_zip"; then
+              unzip -q "$artifact_zip" -d "$ARTIFACT_DIR"
+              test -s "$ARTIFACT_DIR/metadata.json"
+              exit 0
+            fi
+            delay_seconds="$((attempt * 10))"
+            echo "Release artifact download failed on attempt ${attempt}/5; retrying in ${delay_seconds}s." >&2
+            sleep "$delay_seconds"
+          done
+
+          echo "Could not download ${ARTIFACT_NAME} for run ${SOURCE_WORKFLOW_RUN_ID} after retries." >&2
+          exit 1
+
+      - name: Validate metadata belongs to the completed main build
+        id: candidate
+        env:
+          METADATA_PATH: ${{ runner.temp }}/nutsnews-automatic-production-release/metadata.json
+          SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha }}
+          SOURCE_WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE'
+          import crypto from "node:crypto";
+          import { appendFileSync, readFileSync } from "node:fs";
+
+          const sourceCommit = process.env.SOURCE_COMMIT ?? "";
+          const sourceWorkflowRunId = process.env.SOURCE_WORKFLOW_RUN_ID ?? "";
+          const metadataPath = process.env.METADATA_PATH ?? "";
+          const release = JSON.parse(readFileSync(metadataPath, "utf8"));
+          const imageRepository = "ghcr.io/ramideltoro/nutsnews";
+          const expectedMetadataKeys = [
+            "build_id",
+            "image",
+            "image_digest",
+            "image_repository",
+            "image_tag",
+            "migration_head",
+            "schema_version",
+            "source_commit",
+            "source_repository",
+            "source_workflow_run_id",
+            "supabase_project_ref",
+          ];
+
+          if (!/^[0-9a-f]{40}$/.test(sourceCommit)) {
+            throw new Error("The completed Container Image run did not provide a full main commit SHA.");
+          }
+          if (!/^[1-9][0-9]{0,19}$/.test(sourceWorkflowRunId)) {
+            throw new Error("The completed Container Image run did not provide a trusted run ID.");
+          }
+          if (Object.keys(release).sort().join("\n") !== expectedMetadataKeys.sort().join("\n")) {
+            throw new Error("Automatic release metadata contains unexpected fields.");
+          }
+          if (release.source_commit !== sourceCommit || release.source_workflow_run_id !== sourceWorkflowRunId) {
+            throw new Error("Automatic release metadata does not match the completed Container Image run.");
+          }
+          if (release.source_repository !== "ramideltoro/nutsnews") {
+            throw new Error("Automatic release metadata must be emitted by ramideltoro/nutsnews.");
+          }
+          if (release.image_repository !== imageRepository || release.image_tag !== sourceCommit) {
+            throw new Error("Automatic release metadata must use the expected repository and full-commit image tag.");
+          }
+          if (!/^sha256:[0-9a-f]{64}$/.test(release.image_digest ?? "")) {
+            throw new Error("Automatic release metadata must contain an immutable sha256 image digest.");
+          }
+          if (release.image !== `${imageRepository}@${release.image_digest}`) {
+            throw new Error("Automatic release metadata image reference must match its immutable digest.");
+          }
+          if (
+            !/^[1-9][0-9]{0,19}-[1-9][0-9]{0,5}$/.test(release.build_id ?? "") ||
+            release.build_id.split("-", 1)[0] !== sourceWorkflowRunId
+          ) {
+            throw new Error("Automatic release metadata has an invalid build identity.");
+          }
+          if (!/^[0-9]{14}$/.test(release.schema_version ?? "")) {
+            throw new Error("Automatic release metadata must contain the rollback-compatible schema marker.");
+          }
+          if (!/^[0-9]{14}$/.test(release.migration_head ?? "")) {
+            throw new Error("Automatic release metadata must contain the repository migration head.");
+          }
+          if (!/^[a-z0-9]{20}$/.test(release.supabase_project_ref ?? "")) {
+            throw new Error("Automatic release metadata must contain the production Supabase project reference.");
+          }
+
+          const candidate = {
+            schema_version: release.schema_version,
+            migration_head: release.migration_head,
+            supabase_project_ref: release.supabase_project_ref,
+            source_repository: release.source_repository,
+            source_commit: release.source_commit,
+            image_repository: release.image_repository,
+            image_digest: release.image_digest,
+            build_id: release.build_id,
+            source_workflow_run_id: release.source_workflow_run_id,
+          };
+          const deploymentId = `stg-${crypto
+            .createHash("sha256")
+            .update(JSON.stringify(candidate, Object.keys(candidate).sort()))
+            .digest("hex")
+            .slice(0, 24)}`;
+          const lines = [
+            `candidate_json=${JSON.stringify(candidate)}`,
+            `deployment_id=${deploymentId}`,
+            `source_commit=${candidate.source_commit}`,
+            `image_digest=${candidate.image_digest}`,
+            `build_id=${candidate.build_id}`,
+            `schema_version=${candidate.schema_version}`,
+            `migration_head=${candidate.migration_head}`,
+            `supabase_project_ref=${candidate.supabase_project_ref}`,
+          ];
+          appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join("\n")}\n`, "utf8");
+          NODE
+
+      - name: Dispatch exact candidate to the protected release chain
+        env:
+          NUTSNEWS_INFRA_STAGING_TOKEN: ${{ secrets.NUTSNEWS_INFRA_STAGING_TOKEN }}
+          CANDIDATE_JSON: ${{ steps.candidate.outputs.candidate_json }}
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE'
+          const token = process.env.NUTSNEWS_INFRA_STAGING_TOKEN ?? "";
+          const candidate = JSON.parse(process.env.CANDIDATE_JSON ?? "{}");
+          const expectedKeys = [
+            "schema_version",
+            "migration_head",
+            "supabase_project_ref",
+            "source_repository",
+            "source_commit",
+            "image_repository",
+            "image_digest",
+            "build_id",
+            "source_workflow_run_id",
+          ];
+
+          if (!token) {
+            throw new Error("NUTSNEWS_INFRA_STAGING_TOKEN is required for automatic production releases.");
+          }
+          if (Object.keys(candidate).sort().join("\n") !== expectedKeys.sort().join("\n")) {
+            throw new Error("Refusing to dispatch an automatic release candidate with unexpected fields.");
+          }
+          if (
+            candidate.source_repository !== "ramideltoro/nutsnews" ||
+            candidate.image_repository !== "ghcr.io/ramideltoro/nutsnews" ||
+            !/^[0-9a-f]{40}$/.test(candidate.source_commit ?? "") ||
+            !/^sha256:[0-9a-f]{64}$/.test(candidate.image_digest ?? "") ||
+            !/^[1-9][0-9]{0,19}-[1-9][0-9]{0,5}$/.test(candidate.build_id ?? "") ||
+            !/^[1-9][0-9]{0,19}$/.test(candidate.source_workflow_run_id ?? "") ||
+            candidate.build_id.split("-", 1)[0] !== candidate.source_workflow_run_id ||
+            !/^[0-9]{14}$/.test(candidate.schema_version ?? "") ||
+            !/^[0-9]{14}$/.test(candidate.migration_head ?? "") ||
+            !/^[a-z0-9]{20}$/.test(candidate.supabase_project_ref ?? "")
+          ) {
+            throw new Error("Refusing to dispatch an incomplete or incompatible automatic release candidate.");
+          }
+
+          const response = await fetch("https://api.github.com/repos/ramideltoro/nutsnews-infra/dispatches", {
+            method: "POST",
+            headers: {
+              Accept: "application/vnd.github+json",
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+              "X-GitHub-Api-Version": "2022-11-28",
+            },
+            body: JSON.stringify({
+              event_type: "nutsnews-staging-release",
+              client_payload: candidate,
+            }),
+          });
+
+          if (response.status !== 204) {
+            throw new Error(`Automatic production release dispatch returned HTTP ${response.status}.`);
+          }
+          console.log(`Requested protected release chain for ${candidate.source_commit}.`);
+          NODE
+
+      - name: Summarize automatic production release handoff
+        env:
+          SOURCE_COMMIT: ${{ steps.candidate.outputs.source_commit }}
+          IMAGE_DIGEST: ${{ steps.candidate.outputs.image_digest }}
+          BUILD_ID: ${{ steps.candidate.outputs.build_id }}
+          SCHEMA_VERSION: ${{ steps.candidate.outputs.schema_version }}
+          MIGRATION_HEAD: ${{ steps.candidate.outputs.migration_head }}
+          SUPABASE_PROJECT_REF: ${{ steps.candidate.outputs.supabase_project_ref }}
+          DEPLOYMENT_ID: ${{ steps.candidate.outputs.deployment_id }}
+        run: |
+          {
+            echo "## Automatic NutsNews production release"
+            echo
+            echo "- Source commit: \`${SOURCE_COMMIT}\`"
+            echo "- Staging deployment ID: \`${DEPLOYMENT_ID}\`"
+            echo "- Immutable image: \`ghcr.io/ramideltoro/nutsnews@${IMAGE_DIGEST}\`"
+            echo "- Build ID: \`${BUILD_ID}\`"
+            echo "- Migration head: \`${MIGRATION_HEAD}\`"
+            echo "- Rollback-compatible schema: \`${SCHEMA_VERSION}\`"
+            echo "- Production Supabase project ref: \`${SUPABASE_PROJECT_REF}\`"
+            echo "- Protected release chain: accepted"
+            echo
+            echo "The infra chain will deploy VPS staging, run qualification, apply VPS production, deploy Vercel production, and roll back VPS automatically if Vercel promotion fails."
+          } >> "$GITHUB_STEP_SUMMARY"

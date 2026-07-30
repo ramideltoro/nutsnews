@@ -1,14 +1,34 @@
-# Retired Pre-Merge Deployment Gate Contract
+# Historical Pre-Merge Deployment Gate And Current Main Release Contract
 
-This document preserves the historical PR deployment pipeline contract for recovery reference. The default PR path no longer runs these stages from `container-image.yml`; retained deployment validation must be manual or explicit release-only.
+This document preserves the historical PR deployment pipeline contract for recovery reference and records the current post-merge release boundary. The default PR path no longer runs deployment stages from `container-image.yml`; branch protection remains lean, while every successful trusted `main` build now dispatches the exact immutable candidate into the staged qualification and protected production promotion chain.
 
 For maintainer setup, target URLs, secrets, protected-target authentication, reruns, stale PR heads, rollback, and manual recovery paths, see [Deployment Environments, Secrets, And Recovery Runbook](./environments-secrets-recovery.md).
 
-## Scope
+## Current Automatic Main Release
 
-The PR candidate is the only release unit. Every deployment stage must deploy the same immutable candidate identity, and every UI test stage must verify that the live target reports that same identity.
+The current release order is:
 
-Merge to `main` is a handoff after `Merge Gate` has passed. A merge to `main` must not trigger deployment work.
+```text
+Merge Gate passes
+maintainer or GitHub native auto-merge updates main
+Container Image builds, smoke-tests, and publishes an immutable image
+Request Automatic NutsNews Production Release validates exact-run metadata
+infra deploys VPS staging
+infra runs staging browser and admin-backend qualification
+infra applies the qualified image to VPS production
+app deploys, smokes, and promotes the same source commit to Vercel production
+infra rolls VPS back automatically if the Vercel production stage fails
+```
+
+The automatic handoff accepts only a successful `Container Image` run whose event is a same-repository push, whose branch is `main`, and whose metadata matches the triggering workflow ID and commit. It has no production credentials. Its only write capability is the staging-only cross-repository dispatch token; production secrets remain behind the downstream infra and app production environments.
+
+Production schema compatibility is checked before promotion. Database migration workflows remain separately protected and are not made automatic by this release trigger.
+
+## Historical Scope
+
+The historical PR contract treated the PR candidate as the only release unit. Every deployment stage deployed the same immutable candidate identity, and every UI test stage verified that the live target reported that same identity.
+
+That retired contract performed deployment work before the merge. The current contract moves the staged release after a successful `main` image build while retaining the immutable identity and qualification requirements.
 
 ## Required Stage Order
 
@@ -161,13 +181,13 @@ The stage uses the same `node ../scripts/run_deployed_ui_smoke_with_evidence.mjs
 
 ## Merge And Main Behavior
 
-Ordinary PRs no longer run deployment stages before merge into `main`. Merge remains a maintainer handoff by default: the maintainer merges the PR only after GitHub shows `Merge Gate` and any other required checks green for the current PR head. The legacy `Release candidate` check is no longer a required status for ordinary PR merges.
+Ordinary PRs do not deploy before merge. The maintainer merges only after GitHub shows `Merge Gate` and any other required checks green for the current PR head. The legacy `Release candidate` check is not a direct branch-protection status for ordinary PR merges.
 
 GitHub native auto-merge may be enabled on a PR, but it must rely only on the required branch-protection checks and GitHub's current-head enforcement. The repo must not add a custom workflow, PAT, deploy key, or GitHub App token that pushes to `main` or merges the PR after deployments pass.
 
-Branch protection must block merge until `Merge Gate` passes for the current PR head. Strict up-to-date required status checks remain enabled. The configured pull-request rule continues to enforce the repo's solo-maintainer review policy. After merge, `main` may run audits, metadata checks, and reporting, but it must not deploy VPS staging, Vercel staging, Vercel production, or VPS production.
+Branch protection must block merge until `Merge Gate` passes for the current PR head, with strict up-to-date required checks enabled. After merge, `Container Image` builds and validates the exact `main` commit. Only successful image publication may trigger `automatic-production-release.yml`, which dispatches that immutable candidate to the existing protected staging and production chain.
 
-The merge handoff records that `main` now points at a candidate that passed `Merge Gate`. It is not a deployment trigger.
+The automatic deployment workflow must never push or merge `main`, accept fork workflow runs, deploy a mutable branch ref, skip staging qualification, or attach production credentials before the downstream protected environments.
 
 ## Required Merge Check
 
@@ -187,4 +207,4 @@ Every evidence file must reference the current live PR head SHA, build ID, workf
 
 The check summary must list the stage order, target URLs, deployment IDs, result, and GitHub artifact links for every retained deploy and UI smoke evidence artifact.
 
-The release-candidate validation path runs `scripts/pre_merge_deployment_workflow_order_regression.mjs` so changes to job order, `needs` relationships, shared UI smoke commands, production-stage prerequisites, final-gate evidence inputs, or post-main deployment trigger inventory fail before merge.
+The release workflow regression path verifies that exactly one reviewed post-main automatic handoff exists, that it consumes only exact-run `Container Image` metadata, and that manual recovery and dispatch-only production workflows cannot bypass the staged qualification chain.

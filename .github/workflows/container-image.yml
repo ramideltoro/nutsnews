@@ -5,6 +5,8 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions: {}
+
 concurrency:
   group: container-image-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
@@ -20,6 +22,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
+        with:
+          persist-credentials: false
 
       - name: Use Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5
@@ -317,7 +321,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
-      packages: write
+      packages: write # Required to publish the immutable release image to GHCR.
     outputs:
       digest: ${{ steps.publish.outputs.digest }}
       image: ghcr.io/ramideltoro/nutsnews@${{ steps.publish.outputs.digest }}
@@ -327,6 +331,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
+        with:
+          persist-credentials: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3
@@ -355,6 +361,78 @@ jobs:
           provenance: mode=max
           sbom: true
 
+      - name: Write automatic production release metadata
+        env:
+          IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
+          PRODUCTION_SUPABASE_PROJECT_REF: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF }}
+          RELEASE_METADATA_PATH: ${{ runner.temp }}/nutsnews-automatic-production-release/metadata.json
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE'
+          import { mkdirSync, writeFileSync } from "node:fs";
+          import { dirname } from "node:path";
+          import { getMigrationContract, readApplicationMigrationContract } from "./scripts/migration_contract.mjs";
+
+          const digest = process.env.IMAGE_DIGEST ?? "";
+          const sourceCommit = process.env.GITHUB_SHA ?? "";
+          const sourceWorkflowRunId = process.env.GITHUB_RUN_ID ?? "";
+          const buildId = `${process.env.GITHUB_RUN_ID ?? ""}-${process.env.GITHUB_RUN_ATTEMPT ?? ""}`;
+          const productionSupabaseProjectRef = process.env.PRODUCTION_SUPABASE_PROJECT_REF ?? "";
+          const metadataPath = process.env.RELEASE_METADATA_PATH ?? "";
+
+          if (!/^[0-9a-f]{40}$/.test(sourceCommit)) {
+            throw new Error("GITHUB_SHA must be a full commit SHA before release metadata is written.");
+          }
+          if (!/^sha256:[0-9a-f]{64}$/.test(digest)) {
+            throw new Error("Published image digest must be an immutable sha256 digest.");
+          }
+          if (!/^[1-9][0-9]{0,19}$/.test(sourceWorkflowRunId) || !/^[1-9][0-9]{0,19}-[1-9][0-9]{0,5}$/.test(buildId)) {
+            throw new Error("Automatic release metadata requires a valid source workflow run and build ID.");
+          }
+          if (buildId.split("-", 1)[0] !== sourceWorkflowRunId || !metadataPath) {
+            throw new Error("Automatic release metadata must belong to this workflow run and use a private output path.");
+          }
+          if (!/^[a-z0-9]{20}$/.test(productionSupabaseProjectRef)) {
+            throw new Error("Automatic release metadata requires the production Supabase project reference.");
+          }
+
+          const [migrationContract, applicationContract] = await Promise.all([
+            getMigrationContract(),
+            readApplicationMigrationContract(),
+          ]);
+          if (migrationContract.head !== applicationContract.migrationHead) {
+            throw new Error("Automatic release metadata requires matching repository and application migration heads.");
+          }
+
+          const imageRepository = "ghcr.io/ramideltoro/nutsnews";
+          const release = {
+            source_repository: "ramideltoro/nutsnews",
+            source_commit: sourceCommit,
+            source_workflow_run_id: sourceWorkflowRunId,
+            build_id: buildId,
+            image_repository: imageRepository,
+            image_tag: sourceCommit,
+            image_digest: digest,
+            image: `${imageRepository}@${digest}`,
+            migration_head: migrationContract.head,
+            schema_version: applicationContract.legacyVersion,
+            supabase_project_ref: productionSupabaseProjectRef,
+          };
+
+          mkdirSync(dirname(metadataPath), { recursive: true });
+          writeFileSync(metadataPath, `${JSON.stringify(release, null, 2)}\n`, "utf8");
+          NODE
+
+      - name: Upload automatic production release metadata
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: nutsnews-automatic-production-release
+          path: ${{ runner.temp }}/nutsnews-automatic-production-release/metadata.json
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: false
+
       - name: Summarize immutable image
         env:
           IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
@@ -365,5 +443,6 @@ jobs:
             echo "Source commit: \`${GITHUB_SHA}\`"
             echo "Build ID: \`${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}\`"
             echo "Immutable image: \`ghcr.io/ramideltoro/nutsnews@${IMAGE_DIGEST}\`"
-            echo "Deployment role: archive only; deployment validation is manual or explicit release-only."
+            echo "Deployment role: automatic production release candidate."
+            echo "A successful main build publishes exact-candidate metadata for protected staging qualification and coupled VPS/Vercel production promotion."
           } >> "$GITHUB_STEP_SUMMARY"

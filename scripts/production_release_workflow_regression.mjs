@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const workflowDir = resolve(root, ".github/workflows");
+const automaticReleaseWorkflow = await readFile(resolve(workflowDir, "automatic-production-release.yml"), "utf8");
 const containerWorkflow = await readFile(resolve(workflowDir, "container-image.yml"), "utf8");
 const databaseWorkflow = await readFile(resolve(workflowDir, "database-migration-gate.yml"), "utf8");
 const vercelRecoveryWorkflow = await readFile(resolve(workflowDir, "vercel-production-release.yml"), "utf8");
@@ -45,7 +46,7 @@ function workflowJob(text, name) {
 }
 
 function triggerBlock(workflowText) {
-  return workflowText.match(/(?:^|\n)on:\n([\s\S]*?)(?=\n[a-zA-Z_][A-Za-z0-9_-]*:|$)/)?.[1] ?? "";
+  return workflowText.match(/(?:^|\n)on:[^\n]*\n([\s\S]*?)(?=\n[a-zA-Z_][A-Za-z0-9_-]*:|$)/)?.[1] ?? "";
 }
 
 function hasAutomaticPostMainDeploymentTrigger(workflowName, workflowText) {
@@ -85,12 +86,103 @@ requireText(publish, "needs: [build-test]", "Image publishing must depend only o
 requireText(publish, "packages: write", "Image publishing must retain package write permission.");
 requireText(publish, "ghcr.io/ramideltoro/nutsnews:${{ github.sha }}", "Image publishing must tag with the full source commit.");
 requireText(publish, "push: true", "Image publishing must push the immutable image.");
-requireText(publish, "Deployment role: archive only; deployment validation is manual or explicit release-only.", "Image summary must not describe PR deployments.");
+requireText(publish, "Write automatic production release metadata", "Image publishing must write exact-run automatic release metadata.");
+requireText(publish, "name: nutsnews-automatic-production-release", "Image publishing must retain automatic release metadata.");
+requireText(publish, "source_workflow_run_id: sourceWorkflowRunId", "Release metadata must bind to the Container Image run.");
+requireText(publish, "image_digest: digest", "Release metadata must contain the immutable image digest.");
+requireText(publish, "migration_head: migrationContract.head", "Release metadata must contain the repository migration head.");
+requireText(publish, "schema_version: applicationContract.legacyVersion", "Release metadata must contain the application schema marker.");
+requireText(publish, "supabase_project_ref: productionSupabaseProjectRef", "Release metadata must contain the production project ref.");
+requireText(publish, "Deployment role: automatic production release candidate.", "Image summary must describe the automatic release handoff.");
+
+requireText(
+  automaticReleaseWorkflow,
+  "name: Request Automatic NutsNews Production Release",
+  "The automatic release workflow must have a stable reader-facing name.",
+);
+requireText(automaticReleaseWorkflow, "workflow_run:", "Automatic release must start only after a trusted workflow completes.");
+requireText(
+  automaticReleaseWorkflow,
+  "workflows:\n      - Container Image",
+  "Automatic release must trust only Container Image completion.",
+);
+requireText(
+  automaticReleaseWorkflow,
+  "github.event.workflow_run.conclusion == 'success'",
+  "Automatic release must require successful image build completion.",
+);
+requireText(
+  automaticReleaseWorkflow,
+  "github.event.workflow_run.event == 'push'",
+  "Automatic release must reject manual and pull-request Container Image runs.",
+);
+requireText(
+  automaticReleaseWorkflow,
+  "github.event.workflow_run.head_branch == 'main'",
+  "Automatic release must require the main branch.",
+);
+requireText(
+  automaticReleaseWorkflow,
+  "github.event.workflow_run.head_repository.full_name == github.repository",
+  "Automatic release must reject another repository's workflow run.",
+);
+requireText(automaticReleaseWorkflow, "actions: read", "Automatic release needs only read access to Actions artifacts.");
+requireText(automaticReleaseWorkflow, "contents: read", "Automatic release must keep repository contents read-only.");
+requireText(
+  automaticReleaseWorkflow,
+  "environment: automatic-release",
+  "Automatic handoff must run only from the protected default-branch release environment.",
+);
+assert.doesNotMatch(
+  automaticReleaseWorkflow,
+  /^\s+environment:\s+(?:Production|production-vps)\b/m,
+  "Automatic handoff must not attach a production environment before staging qualification.",
+);
+assert.doesNotMatch(
+  automaticReleaseWorkflow,
+  /^\s+workflow_dispatch:/m,
+  "Automatic handoff must not expose a manual trigger that bypasses its exact-run checks.",
+);
+requireText(
+  automaticReleaseWorkflow,
+  "SOURCE_WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}",
+  "Automatic release metadata must come from the triggering Container Image run.",
+);
+requireText(
+  automaticReleaseWorkflow,
+  "SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha }}",
+  "Automatic release metadata must match the triggering main commit.",
+);
+requireText(
+  automaticReleaseWorkflow,
+  "Object.keys(release).sort().join",
+  "Automatic release must reject unexpected metadata fields.",
+);
+requireText(
+  automaticReleaseWorkflow,
+  "NUTSNEWS_INFRA_STAGING_TOKEN",
+  "Automatic release must use only the staging dispatch token for its cross-repository handoff.",
+);
+requireText(
+  automaticReleaseWorkflow,
+  'event_type: "nutsnews-staging-release"',
+  "Automatic release must enter the existing staging qualification chain.",
+);
+requireText(
+  automaticReleaseWorkflow,
+  "The infra chain will deploy VPS staging, run qualification, apply VPS production, deploy Vercel production, and roll back VPS automatically if Vercel promotion fails.",
+  "Automatic release summary must describe the complete protected release chain.",
+);
 
 requireText(inventory, "`container-image.yml` | default-branch/manual", "Inventory must classify Container Image outside PR-required checks.");
-requireText(inventory, "Ordinary PRs no longer enter the container/release workflow", "Inventory must document the removed PR container path.");
+requireText(inventory, "`automatic-production-release.yml` | automatic release", "Inventory must classify the dedicated automatic release workflow.");
+requireText(inventory, "Ordinary PRs do not enter this workflow", "Inventory must document the removed PR container path.");
 requireText(inventory, "`database-migration-gate.yml` | PR-required", "Inventory must classify Database Migration Gate as the database PR check.");
-requireText(recoveryRunbook, "Normal PR merges do not deploy", "Recovery docs must document the new non-deploying merge behavior.");
+requireText(
+  recoveryRunbook,
+  "Every successful same-repository merge to `main` now enters the automatic production release chain",
+  "Deployment docs must document the automatic main release behavior.",
+);
 requireText(databaseWorkflow, "name: Database Migration Gate", "Database workflow must have a stable check name.");
 requireText(databaseWorkflow, "pull_request:", "Database workflow must still run for migration PRs.");
 requireText(databaseWorkflow, "paths:", "Database workflow must be path-filtered.");
@@ -105,53 +197,63 @@ requireText(databaseWorkflow, "tests/production-migration-request.test.mjs", "Da
 
 requireText(
   vercelRecoveryWorkflow,
+  "name: Deploy Vercel Production Release",
+  "Vercel production must be named as the protected release stage.",
+);
+requireText(
+  vercelRecoveryWorkflow,
+  "This workflow accepts only repository_dispatch requests from the protected infra release/recovery chain.",
+  "Vercel production must document its protected infra dispatch boundary.",
+);
+requireText(
+  vercelRecoveryWorkflow,
   "NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS",
-  "Vercel production recovery must expose secondary Vercel target configuration.",
+  "Vercel production release must expose secondary Vercel target configuration.",
 );
 requireText(
   vercelRecoveryWorkflow,
   "RELEASE_KIND: ${{ github.event.client_payload.release_kind || 'release' }}",
-  "Vercel production recovery must default omitted release_kind payloads to release.",
+  "Vercel production release must default omitted release_kind payloads to release.",
 );
 requireText(
   vercelRecoveryWorkflow,
   "NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES",
-  "Vercel production recovery must require an explicit flag before checking failover aliases.",
+  "Vercel production release must require an explicit flag before checking failover aliases.",
 );
 requireText(
   vercelRecoveryWorkflow,
   "NUTSNEWS_VERCEL_FAILOVER_PRODUCTION_ALIASES",
-  "Vercel production recovery must name controlled failover aliases separately from secondary targets.",
+  "Vercel production release must name controlled failover aliases separately from secondary targets.",
 );
 requireText(
   vercelRecoveryWorkflow,
   "staging_qualification_admin_backend_evidence.mjs",
-  "Vercel production recovery must verify staging admin backend operation evidence before staging Vercel.",
+  "Vercel production release must verify staging admin backend operation evidence before staging Vercel.",
 );
 requireText(
   vercelRecoveryWorkflow,
   '`${process.env.RUNNER_TEMP}/staging_qualification_admin_backend_evidence.mjs`',
-  "Vercel production recovery must export the reviewed staging evidence verifier outside the exact app checkout.",
+  "Vercel production release must export the reviewed staging evidence verifier outside the exact app checkout.",
 );
 requireText(
   vercelRecoveryWorkflow,
   'node "$RUNNER_TEMP/staging_qualification_admin_backend_evidence.mjs"',
-  "Vercel production recovery must execute the reviewed staging evidence verifier.",
+  "Vercel production release must execute the reviewed staging evidence verifier.",
 );
 requireText(
   vercelRecoveryWorkflow,
   "NUTSNEWS_ADMIN_BACKEND_OPERATION_CONTRACT: ${{ github.workspace }}/api-contracts/admin-backend-operations.json",
-  "Vercel production recovery must bind the reviewed verifier to the exact app contract checkout.",
+  "Vercel production release must bind the reviewed verifier to the exact app contract checkout.",
 );
 assert.doesNotMatch(
   vercelRecoveryWorkflow,
   /node scripts\/staging_qualification_admin_backend_evidence\.mjs/,
-  "Vercel production recovery must not execute the staging evidence verifier from the exact app checkout.",
+  "Vercel production release must not execute the staging evidence verifier from the exact app checkout.",
 );
 requireText(
   vercelRecoveryWorkflow,
   "NUTSNEWS_INFRA_STAGING_TOKEN is required to verify staging qualification admin backend evidence",
-  "Vercel production recovery must require the infra staging token for release evidence verification.",
+  "Vercel production release must require the infra staging token for release evidence verification.",
 );
 requireText(
   stagingEvidenceVerifier,
@@ -194,22 +296,22 @@ requireText(
 requireText(
   vercelRecoveryWorkflow,
   "vps_staging_admin_backend_smoke_result",
-  "Vercel production recovery evidence must record the staging admin backend smoke result.",
+  "Vercel production release evidence must record the staging admin backend smoke result.",
 );
 requireText(
   vercelRecoveryWorkflow,
   "Run Vercel production admin backend operation smoke",
-  "Vercel production recovery must run admin backend smoke before promotion when backend primary is active.",
+  "Vercel production release must run admin backend smoke before promotion when backend primary is active.",
 );
 requireText(
   vercelRecoveryWorkflow,
   "npm run smoke:admin-backend-operations",
-  "Vercel production recovery must use the canonical admin backend operation smoke command.",
+  "Vercel production release must use the canonical admin backend operation smoke command.",
 );
 requireText(
   vercelRecoveryWorkflow,
   "vercel_admin_backend_smoke_result",
-  "Vercel production recovery evidence must record the Vercel admin backend smoke result.",
+  "Vercel production release evidence must record the Vercel admin backend smoke result.",
 );
 assert(
   vercelRecoveryWorkflow.indexOf("Run staged Vercel qualification smoke")
@@ -226,11 +328,11 @@ requireText(
 assert.doesNotMatch(
   vercelRecoveryWorkflow,
   /"https:\/\/www\.nutsnews\.com\/healthz"|"https:\/\/nutsnews\.com\/healthz"/,
-  "Vercel production recovery must not hard-code apex/www health checks as normal validation targets.",
+  "Vercel production release must not hard-code apex/www health checks as normal validation targets.",
 );
 
 const workflowNames = (await readdir(workflowDir)).filter((name) => name.endsWith(".yml")).sort();
-const unexpectedPostMainDeploymentTriggers = [];
+const automaticPostMainDeploymentTriggers = [];
 const customMainMergeWorkflows = [];
 for (const workflowName of workflowNames) {
   const workflowText = await readFile(resolve(workflowDir, workflowName), "utf8");
@@ -238,11 +340,15 @@ for (const workflowName of workflowNames) {
     customMainMergeWorkflows.push(workflowName);
   }
   if (hasAutomaticPostMainDeploymentTrigger(workflowName, workflowText)) {
-    unexpectedPostMainDeploymentTriggers.push(workflowName);
+    automaticPostMainDeploymentTriggers.push(workflowName);
   }
 }
 
 assert.deepEqual(customMainMergeWorkflows, [], "Merge handoff must use maintainer merge or GitHub native auto-merge, not a custom workflow that pushes or merges to main.");
-assert.deepEqual(unexpectedPostMainDeploymentTriggers, [], "Deployment/recovery workflows must not run automatically after main pushes.");
+assert.deepEqual(
+  automaticPostMainDeploymentTriggers,
+  ["automatic-production-release.yml"],
+  "Exactly one reviewed workflow must own automatic deployment after a successful main build.",
+);
 
 console.log("Production release workflow regression passed.");
