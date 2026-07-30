@@ -8,6 +8,10 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const docPath = ".github/deployment/environments-secrets-recovery.md";
 const doc = await readFile(resolve(root, docPath), "utf8");
 const containerWorkflow = await readFile(resolve(root, ".github/workflows/container-image.yml"), "utf8");
+const automaticReleaseWorkflow = await readFile(
+  resolve(root, ".github/workflows/automatic-production-release.yml"),
+  "utf8",
+);
 
 const removedContainerJobs = [
   "trusted-pr-deployment-eligibility",
@@ -28,10 +32,22 @@ function requireText(text, fragment, message) {
   assert.ok(text.includes(fragment), message);
 }
 
-requireText(doc, "Normal PR merges do not deploy", `${docPath} must document that ordinary PRs do not deploy.`);
-requireText(doc, "manual or explicit release-only", `${docPath} must keep deployment validation out of default PR checks.`);
+requireText(
+  doc,
+  "Every successful same-repository merge to `main` now enters the automatic production release chain",
+  `${docPath} must document automatic deployment after main merges.`,
+);
+requireText(
+  doc,
+  "Production database migrations remain separately protected",
+  `${docPath} must preserve the protected production migration boundary.`,
+);
 requireText(doc, "`Merge Gate`", `${docPath} must name the required merge check.`);
-requireText(doc, "`Release candidate` is no longer required", `${docPath} must document that Release candidate is no longer required.`);
+requireText(
+  doc,
+  "`Release candidate` is not a direct branch-protection check",
+  `${docPath} must document that Release candidate is not directly required.`,
+);
 assert.doesNotMatch(doc, /Container Image` pull-request workflow/, `${docPath} must not describe Container Image as a pull-request deployment workflow.`);
 
 for (const job of removedContainerJobs) {
@@ -39,8 +55,25 @@ for (const job of removedContainerJobs) {
 }
 assert.doesNotMatch(containerWorkflow, /^\s+pull_request:/m, ".github/workflows/container-image.yml must not run on pull_request.");
 assert.doesNotMatch(containerWorkflow, /^\s+environment:\s+Production\b/m, ".github/workflows/container-image.yml must not invoke Production.");
+requireText(
+  automaticReleaseWorkflow,
+  "workflows:\n      - Container Image",
+  "Automatic production release must trust only Container Image workflow completion.",
+);
+requireText(
+  automaticReleaseWorkflow,
+  "github.event.workflow_run.head_branch == 'main'",
+  "Automatic production release must require the main branch.",
+);
+requireText(
+  automaticReleaseWorkflow,
+  "github.event.workflow_run.head_repository.full_name == github.repository",
+  "Automatic production release must reject workflow runs from another repository.",
+);
 
 for (const fragment of [
+  "`automatic-release`",
+  "`staging-recovery`",
   "`staging-supabase`",
   "`production-supabase`",
   "`supabase-standby`",
@@ -79,7 +112,7 @@ assert.doesNotMatch(
 for (const fragment of [
   "`NUTSNEWS_VPS_STAGING_URL`",
   "https://staging.nutsnews.com/",
-  "`deploy-vercel-staging.outputs.target_url`",
+  "`automatic-production-release.yml`",
   "`NUTSNEWS_VERCEL_SECONDARY_PRODUCTION_URLS`",
   "`NUTSNEWS_VERIFY_VERCEL_FAILOVER_ALIASES`",
   "`NUTSNEWS_VERCEL_FAILOVER_PRODUCTION_ALIASES`",
@@ -118,10 +151,10 @@ for (const fragment of [
 }
 
 for (const fragment of [
-  "explicit deployment or recovery stage fails",
-  "`nutsnews-premerge-deploy-pr-<pr_number>`",
-  "`pr-<pr_number>-<source_commit>-<target_type>`",
-  "same stale-source and idempotency discipline",
+  "automatic handoff fails",
+  "self-consistent build ID, digest, and metadata artifact",
+  "same reviewed source commit and immutable image identity",
+  "Never substitute metadata from one workflow run into another",
 ]) {
   requireText(doc, fragment, `${docPath} must document rerun and stale-source recovery ${fragment}.`);
 }
@@ -151,8 +184,9 @@ for (const fragment of [
 }
 
 for (const fragment of [
-  "A `main` merge is not a deployment trigger",
-  "Do not add a custom workflow that pushes to `main`, merges the PR, or deploys from `main` after merge.",
+  "only its successful same-repository `main` push may activate `automatic-production-release.yml`",
+  "No workflow may push or merge into `main`",
+  "Automatic deployment begins only after GitHub has completed the merge",
 ]) {
   requireText(doc, fragment, `${docPath} must document merge handoff rule ${fragment}.`);
 }

@@ -63,6 +63,7 @@ jobs:
     name: Request manual VPS staging recovery
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    environment: staging-recovery
 
     steps:
       - name: Mask staging recovery token
@@ -195,7 +196,7 @@ jobs:
           {
             echo "## Manual VPS staging recovery dispatch"
             echo
-            echo "This workflow is an operator recovery path only. Normal PR merges do not deploy staging or production."
+            echo "This workflow is an operator recovery path only. Normal releases use \`automatic-production-release.yml\` after a successful immutable \`main\` image build."
             echo
             echo "- Operator reason: \`${OPERATOR_REASON}\`"
             echo "- Requested validation TTL: \`${VALIDATION_TTL_HOURS}h\` (operator commitment; infra candidate payload remains strict)"

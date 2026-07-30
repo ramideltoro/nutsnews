@@ -13,9 +13,10 @@ const allowedClassifications = new Set([
   "PR-required",
   "optional PR",
   "default-branch/manual",
+  "automatic release",
   "scheduled/operational",
   "manual recovery",
-  "dispatch-only recovery",
+  "dispatch-only release",
   "deprecated post-main work",
 ]);
 
@@ -26,7 +27,7 @@ function workflowTriggerBlock(workflow, trigger) {
 
 function hasMainPush(workflow) {
   const push = workflowTriggerBlock(workflow, "push");
-  return /branches:\\s*\\[(?:"main"|main)\\]/.test(push) || /branches:\\s*\\n\\s*-\\s*main\\b/.test(push);
+  return /branches:\s*\[(?:"main"|main)\]/.test(push) || /branches:\s*\n\s*-\s*main\b/.test(push);
 }
 
 function hasTrigger(workflow, trigger) {
@@ -48,8 +49,8 @@ assert.ok(inventory.includes("issue #333"), "Inventory must reference branch pro
 assert.ok(inventory.includes("`Merge Gate`"), "Inventory must name the required branch-protection check.");
 assert.ok(inventory.includes("`Release candidate` is no longer a direct branch-protection check"), "Inventory must document removing the Release candidate aggregate check from branch protection.");
 assert.ok(
-  inventory.includes("No deployment work is hidden inside a workflow classified as an existing check."),
-  "Inventory must state that deployment work is not hidden inside existing checks.",
+  inventory.includes("No deployment work is hidden inside a PR-required check."),
+  "Inventory must state that deployment work is not hidden inside PR-required checks.",
 );
 assert.ok(inventory.includes("## PR Pipeline Budget"), "Inventory must document the PR pipeline budget policy.");
 assert.ok(
@@ -62,10 +63,15 @@ assert.equal(
   0,
   "Post-main deployment workflows must be removed or rewired behind recovery paths.",
 );
+assert.equal(
+  rows.get("automatic-production-release.yml")?.classification,
+  "automatic release",
+  "Automatic Production Release must be the dedicated post-main release workflow.",
+);
 assert.match(
   rows.get("container-image.yml")?.reason ?? "",
-  /main pushes or operator dispatches.*Ordinary PRs no longer enter the container\/release workflow/,
-  "Container Image inventory row must document that ordinary PRs no longer run it.",
+  /main pushes.*Ordinary PRs do not enter this workflow/,
+  "Container Image inventory row must document that ordinary PRs do not run it.",
 );
 assert.equal(
   rows.get("lighthouse-ci.yml")?.classification,
@@ -335,6 +341,15 @@ for (const workflow of workflowFiles) {
     assert.ok(mainPush || workflowDispatch, `${workflow} is default-branch/manual but has no main push or manual trigger.`);
   }
 
+  if (row.classification === "automatic release") {
+    assert.ok(workflowRun, `${workflow} is automatic release but has no workflow_run trigger.`);
+    assert.ok(!pullRequest, `${workflow} is automatic release but runs on pull_request.`);
+    assert.ok(!mainPush, `${workflow} is automatic release but runs directly on main push.`);
+    assert.ok(!deploymentStatus, `${workflow} is automatic release but listens to deployment_status.`);
+    assert.ok(!repositoryDispatch, `${workflow} is automatic release but listens to repository_dispatch.`);
+    assert.ok(!workflowDispatch, `${workflow} is automatic release but exposes a manual trigger.`);
+  }
+
   if (row.classification === "scheduled/operational") {
     assert.ok(!pullRequest, `${workflow} is scheduled/operational but still has a pull_request trigger.`);
     assert.ok(!mainPush, `${workflow} is scheduled/operational but still runs after main pushes.`);
@@ -350,12 +365,12 @@ for (const workflow of workflowFiles) {
     assert.ok(!mainPush, `${workflow} is manual recovery but runs after main pushes.`);
   }
 
-  if (row.classification === "dispatch-only recovery") {
-    assert.ok(repositoryDispatch, `${workflow} is dispatch-only recovery but has no repository_dispatch trigger.`);
-    assert.ok(!workflowDispatch, `${workflow} is dispatch-only recovery but exposes workflow_dispatch.`);
-    assert.ok(!pullRequest, `${workflow} is dispatch-only recovery but runs on pull_request.`);
-    assert.ok(!mainPush, `${workflow} is dispatch-only recovery but runs after main pushes.`);
-    assert.ok(!workflowRun, `${workflow} is dispatch-only recovery but listens to workflow_run.`);
+  if (row.classification === "dispatch-only release") {
+    assert.ok(repositoryDispatch, `${workflow} is dispatch-only release but has no repository_dispatch trigger.`);
+    assert.ok(!workflowDispatch, `${workflow} is dispatch-only release but exposes workflow_dispatch.`);
+    assert.ok(!pullRequest, `${workflow} is dispatch-only release but runs on pull_request.`);
+    assert.ok(!mainPush, `${workflow} is dispatch-only release but runs directly after main pushes.`);
+    assert.ok(!workflowRun, `${workflow} is dispatch-only release but listens to workflow_run.`);
   }
 
   if (row.classification === "deprecated post-main work") {
@@ -366,10 +381,13 @@ for (const workflow of workflowFiles) {
     );
   }
 
-  assert.ok(
-    !mainPush || pullRequest,
-    `${workflow} runs after main pushes without a PR trigger; remove the main push trigger or make it a non-deployment PR workflow.`,
-  );
+  if (mainPush && !pullRequest) {
+    assert.equal(
+      row.classification,
+      "default-branch/manual",
+      `${workflow} runs from main without a PR trigger but is not classified as default-branch/manual.`,
+    );
+  }
 }
 
 console.log("Workflow check inventory regression passed.");

@@ -2,15 +2,16 @@
 
 This inventory supports issue #309 and the branch protection update in issue #333. Branch protection should require the lean `Merge Gate` check for ordinary PR merges.
 
-No deployment work is hidden inside a workflow classified as an existing check. Workflows that mutate environments, purge production cache, sync protected provider secrets, or dispatch deployments are classified as manual recovery or deprecated post-main work instead of PR-required checks.
+No deployment work is hidden inside a PR-required check. The dedicated automatic release workflow starts only after the trusted `Container Image` workflow succeeds for a same-repository `main` push, validates immutable metadata from that exact run, and then enters the existing staged qualification and protected promotion chain.
 
 ## Classification Rules
 
 - PR-required: must run before merge for relevant PRs, either directly or through the final `Pre-merge deployment gate`.
 - optional PR: can run for PR or preview feedback but is not a required release blocker.
 - scheduled/operational: monitors live production, repository posture, or reporting state and may remain scheduled, tag-based, or manual because it is not a deployment stage.
+- automatic release: runs only after a successful trusted default-branch artifact workflow and dispatches the exact immutable candidate through staging qualification and protected production promotion.
 - manual recovery: protected operator workflow for data, token, cache, or recovery work; never a hidden merge check.
-- dispatch-only recovery: repository dispatch workflow accepted only from a protected recovery chain; never a hidden merge check and never triggered by `main`.
+- dispatch-only release: repository dispatch workflow accepted only from the protected infra release/recovery chain; never a hidden merge check and never triggered directly by `main`.
 
 ## PR Pipeline Budget
 
@@ -29,12 +30,13 @@ Manual recovery and dispatch-only release workflows are outside this budget beca
 | `admin-access-denied-contract.yml` | PR-required | Verifies the protected admin access-denied contract before merge. | No deployment. |
 | `api-contracts.yml` | PR-required | Verifies API, route, sitemap, robots, and runtime compatibility before merge. | No deployment. |
 | `app-store-docs-check.yml` | PR-required | Blocks regressions to public support/privacy docs only when App Store documentation inputs change. | No deployment. |
+| `automatic-production-release.yml` | automatic release | Accepts only a successful same-repository `Container Image` run from `main`, validates metadata from that exact workflow run, and dispatches the immutable candidate to the protected infra chain. | Automatically deploys VPS staging, requires staging qualification, then promotes VPS and Vercel production through the existing protected release workflows. |
 | `cloudflare-cache-config.yml` | PR-required | Runs deterministic cache observability config and public cache policy regressions for cache-related changes before merge. | No deployment. |
 | `cloudflare-cache-observability.yml` | scheduled/operational | Runs scheduled or manually requested live Cloudflare/VPS-primary cache policy probes and uploads observability artifacts. | No deployment. |
 | `cloudflare-production-cache-purge-regression.yml` | PR-required | Guards the production cache purge workflow contract before purge automation changes merge. | No deployment. |
 | `cloudflare-production-cache-purge.yml` | manual recovery | Typed operator workflow for manual production cache purge recovery; it no longer reacts to deployment statuses after merge. | Mutates production cache only on manual dispatch. |
 | `codeql.yml` | PR-required | Runs CodeQL for source, script, workflow, and security-config PRs while keeping default-branch and scheduled security reporting. | No deployment. |
-| `container-image.yml` | default-branch/manual | Builds, smoke-tests, and publishes immutable images only from main pushes or operator dispatches. Ordinary PRs no longer enter the container/release workflow, and database migration validation lives in `database-migration-gate.yml`. | No ordinary PR deployment. Main image publish remains artifact work. |
+| `container-image.yml` | default-branch/manual | Builds, smoke-tests, and publishes immutable images plus exact-candidate release metadata from main pushes; operator dispatch remains build-only. Ordinary PRs do not enter this workflow, and database migration validation lives in `database-migration-gate.yml`. | Successful main image publication feeds `automatic-production-release.yml`; manual runs do not publish or deploy. |
 | `database-migration-gate.yml` | PR-required | Runs Supabase migration naming, reset, drift, lock, RLS, fixture, and migration request checks only for database-related changes. | No deployment. |
 | `db-size-warning.yml` | scheduled/operational | Reports production database growth from protected production credentials on a schedule or operator request. | No deployment. |
 | `dependency-review.yml` | PR-required | Blocks vulnerable dependency changes before merge. | No deployment. |
@@ -73,13 +75,13 @@ Manual recovery and dispatch-only release workflows are outside this budget beca
 | `translation-coverage.yml` | scheduled/operational | Reports live translation coverage from production data; strict release translation checks run in the PR release candidate. | No deployment. |
 | `vercel-backend-token-sync.yml` | manual recovery | Protected operator workflow that syncs backend API token material into Vercel production. | Mutates protected provider configuration. |
 | `vercel-preview-smoke.yml` | optional PR | Runs against Vercel preview deployment statuses or manual preview URLs; shared target-agnostic UI smoke evidence replaces it for required deployment gates. | No production deployment. |
-| `vercel-production-release.yml` | dispatch-only recovery | Dispatch-only Vercel production recovery path accepted from the protected infra chain; normal PR releases use the pre-merge Vercel production deploy job. | Deploys Vercel production only from protected repository dispatch. |
+| `vercel-production-release.yml` | dispatch-only release | Deploys or rolls back Vercel production only after a protected repository dispatch from the infra release/recovery chain. | The automatic main release reaches this workflow only after staging qualification and successful VPS production apply. |
 | `visual-regression.yml` | PR-required | Runs Playwright visual regression only for high-risk UI, CSS, public asset, or visual snapshot changes before merge. | No deployment. |
 | `web-ci.yml` | default-branch/manual | Keeps the Web CI command set available for default-branch and operator-triggered validation after PR coverage moved to `Merge Gate`. | No deployment. |
 | `web-offline-e2e.yml` | PR-required | Runs offline end-to-end coverage before web changes merge. | No deployment. |
 
 ## Branch Protection Hand-Off
 
-The main ruleset must require `Merge Gate` for the current PR head. `Release candidate` is no longer a direct branch-protection check, and strict required status checks must stay enabled so a stale PR head cannot merge. Scheduled/operational, default-branch/manual, manual recovery, and dispatch-only recovery workflows must not be direct merge checks.
+The main ruleset must require `Merge Gate` for the current PR head. `Release candidate` is no longer a direct branch-protection check, and strict required status checks must stay enabled so a stale PR head cannot merge. Scheduled/operational, default-branch/manual, automatic release, manual recovery, and dispatch-only release workflows must not be direct merge checks.
 
-Automatic post-main deployment workflows have been removed or rewired behind manual/dispatch-only recovery paths.
+Every successful same-repository `main` merge now enters the automatic release chain after its immutable image build succeeds. The chain remains fail-closed: exact-run metadata validation, staging identity checks, browser qualification, schema compatibility, protected VPS apply, Vercel staged smoke, production promotion, and rollback-on-Vercel-failure all remain enforced.

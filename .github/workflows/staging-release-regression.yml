@@ -1,9 +1,10 @@
-name: Pre-Merge Release Workflow Regression
+name: Automatic Release Workflow Regression
 
 on:
   pull_request:
     branches: [main]
     paths:
+      - ".github/workflows/automatic-production-release.yml"
       - ".github/workflows/container-image.yml"
       - ".github/workflows/database-migration-gate.yml"
       - ".github/workflows/staging-release.yml"
@@ -11,13 +12,19 @@ on:
       - ".github/workflows/vercel-backend-token-sync.yml"
       - ".github/workflows/vercel-production-release.yml"
       - ".github/deployment/pre-merge-deployment-gate-contract.md"
+      - ".github/deployment/environments-secrets-recovery.md"
       - ".github/deployment/staging-active-use-runbook.md"
+      - ".github/deployment/workflow-check-inventory.md"
       - "scripts/dual_target_web_smoke.mjs"
       - "scripts/production_release_workflow_regression.mjs"
+      - "scripts/environments_secrets_recovery_doc_regression.mjs"
+      - "scripts/pre_merge_deployment_workflow_order_regression.mjs"
       - "scripts/staging_active_use_contract_regression.mjs"
+      - "scripts/workflow_check_inventory_regression.mjs"
   push:
     branches: [main]
     paths:
+      - ".github/workflows/automatic-production-release.yml"
       - ".github/workflows/container-image.yml"
       - ".github/workflows/database-migration-gate.yml"
       - ".github/workflows/staging-release.yml"
@@ -25,10 +32,15 @@ on:
       - ".github/workflows/vercel-backend-token-sync.yml"
       - ".github/workflows/vercel-production-release.yml"
       - ".github/deployment/pre-merge-deployment-gate-contract.md"
+      - ".github/deployment/environments-secrets-recovery.md"
       - ".github/deployment/staging-active-use-runbook.md"
+      - ".github/deployment/workflow-check-inventory.md"
       - "scripts/dual_target_web_smoke.mjs"
       - "scripts/production_release_workflow_regression.mjs"
+      - "scripts/environments_secrets_recovery_doc_regression.mjs"
+      - "scripts/pre_merge_deployment_workflow_order_regression.mjs"
       - "scripts/staging_active_use_contract_regression.mjs"
+      - "scripts/workflow_check_inventory_regression.mjs"
 
 permissions:
   contents: read
@@ -39,20 +51,25 @@ concurrency:
 
 jobs:
   regression:
-    name: Verify pre-merge release automation
+    name: Verify automatic release automation
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
+        with:
+          persist-credentials: false
 
       - name: Use Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5
         with:
           node-version: 22
 
-      - name: Run pre-merge release workflow regression
+      - name: Run automatic release workflow regression
         run: |
           node scripts/production_release_workflow_regression.mjs
+          node scripts/environments_secrets_recovery_doc_regression.mjs
+          node scripts/pre_merge_deployment_workflow_order_regression.mjs
           node scripts/staging_active_use_contract_regression.mjs
+          node scripts/workflow_check_inventory_regression.mjs
