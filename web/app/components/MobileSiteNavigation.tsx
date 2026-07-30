@@ -70,41 +70,57 @@ export function MobileSiteNavigation({
   }, [isOpen]);
 
   return (
-    <div ref={rootRef} className="mobile-site-navigation">
-      <button
-        ref={toggleRef}
-        type="button"
-        data-testid="nutsnews-footer-menu"
-        className="footer-icon-button mobile-site-navigation__toggle"
-        aria-label={isOpen ? closeLabel : openLabel}
-        aria-expanded={isOpen}
-        aria-controls="nutsnews-mobile-navigation-panel"
-        onClick={() => setIsOpen((current) => !current)}
-      >
-        <span className="footer-icon-button__halo" />
-        <MenuIcon isOpen={isOpen} />
-      </button>
-
+    <div className="mobile-site-navigation">
       {isOpen ? (
-        <nav
-          id="nutsnews-mobile-navigation-panel"
-          data-testid="nutsnews-footer-menu-panel"
-          aria-label={navigationLabel}
-          className="mobile-site-navigation__panel"
-        >
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="mobile-site-navigation__link"
-              onClick={() => setIsOpen(false)}
-            >
-              {link.label}
-              <span aria-hidden="true">→</span>
-            </Link>
-          ))}
-        </nav>
+        <span
+          aria-hidden="true"
+          className="mobile-site-navigation__backdrop"
+        />
       ) : null}
+
+      <div ref={rootRef} className="mobile-site-navigation__content">
+        <button
+          ref={toggleRef}
+          type="button"
+          data-testid="nutsnews-footer-menu"
+          className="footer-icon-button mobile-site-navigation__toggle"
+          aria-label={isOpen ? closeLabel : openLabel}
+          aria-expanded={isOpen}
+          aria-controls="nutsnews-mobile-navigation-panel"
+          onClick={() => setIsOpen((current) => !current)}
+        >
+          <span className="footer-icon-button__halo" />
+          <MenuIcon isOpen={isOpen} />
+        </button>
+
+        {isOpen ? (
+          <nav
+            id="nutsnews-mobile-navigation-panel"
+            data-testid="nutsnews-footer-menu-panel"
+            aria-label={navigationLabel}
+            className="mobile-site-navigation__panel"
+          >
+            {links.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="mobile-site-navigation__link"
+                onClick={() => setIsOpen(false)}
+              >
+                <span className="mobile-site-navigation__link-label">
+                  {link.label}
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="mobile-site-navigation__link-arrow"
+                >
+                  →
+                </span>
+              </Link>
+            ))}
+          </nav>
+        ) : null}
+      </div>
     </div>
   );
 }
