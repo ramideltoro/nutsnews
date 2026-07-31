@@ -6,6 +6,7 @@ import {
   EXPECTED_STAGES,
   assertVercelDeploymentIdentity,
   classifyLivePhaseError,
+  extractVercelProjectId,
   parsePipelineProjection,
   selectVercelProductionAuthRecords,
   validateEvidence,
@@ -183,6 +184,23 @@ test("rejects mismatched Vercel production deployment identity", () => {
     () => assertVercelDeploymentIdentity(deployment, expected),
     /vercel_deployment_identity_mismatch/,
   );
+});
+
+test("accepts current and legacy Vercel project identifier fields", () => {
+  assert.equal(
+    extractVercelProjectId({ project: { id: "prj_Current123" } }),
+    "prj_Current123",
+  );
+  assert.equal(extractVercelProjectId({ projectId: "prj_Legacy123" }), "prj_Legacy123");
+  assert.throws(
+    () =>
+      extractVercelProjectId({
+        projectId: "prj_First",
+        project: { id: "prj_Second" },
+      }),
+    /vercel_project_identity_mismatch/,
+  );
+  assert.throws(() => extractVercelProjectId({}), /vercel_project_identity_missing/);
 });
 
 test("selects exactly one current Production auth and allowlist record", () => {

@@ -388,7 +388,7 @@ async function verifyVercelDeployment({
     deploymentUrl,
     sourceCommit,
   });
-  return requirePattern(deployment?.projectId, /^prj_[A-Za-z0-9]+$/, "vercel_project_id");
+  return extractVercelProjectId(deployment);
 }
 
 export function assertVercelDeploymentIdentity(
@@ -408,6 +408,20 @@ export function assertVercelDeploymentIdentity(
   ) {
     throw new Error("vercel_deployment_identity_mismatch");
   }
+}
+
+export function extractVercelProjectId(deployment) {
+  const projectIds = [deployment?.projectId, deployment?.project?.id].filter(
+    (value) => typeof value === "string" && /^prj_[A-Za-z0-9]+$/.test(value),
+  );
+  const uniqueProjectIds = [...new Set(projectIds)];
+  if (uniqueProjectIds.length === 0) {
+    throw new Error("vercel_project_identity_missing");
+  }
+  if (uniqueProjectIds.length !== 1) {
+    throw new Error("vercel_project_identity_mismatch");
+  }
+  return uniqueProjectIds[0];
 }
 
 function looksLikeEncryptedEnvelope(value) {
