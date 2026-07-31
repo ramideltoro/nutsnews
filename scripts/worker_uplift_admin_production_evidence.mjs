@@ -291,6 +291,14 @@ export function validateEvidence(evidence) {
   ) {
     throw new Error("redaction evidence is incomplete");
   }
+  requirePattern(
+    evidence.workflow?.evidence_tool_commit,
+    /^[0-9a-f]{40}$/,
+    "workflow.evidence_tool_commit",
+  );
+  if (evidence.workflow?.evidence_tool_repository !== "ramideltoro/nutsnews") {
+    throw new Error("evidence tool repository is invalid");
+  }
 
   assertSafePublicValue(evidence, "evidence");
   return evidence;
@@ -477,6 +485,11 @@ export async function runLiveEvidence(environment = process.env) {
   const vercelToken = requireNonEmptyString(environment.VERCEL_TOKEN, "VERCEL_TOKEN");
   const vercelOrgId = requireNonEmptyString(environment.VERCEL_ORG_ID, "VERCEL_ORG_ID");
   const outputPath = requireNonEmptyString(environment.EVIDENCE_PATH, "EVIDENCE_PATH");
+  const evidenceToolCommit = requirePattern(
+    environment.EVIDENCE_TOOL_COMMIT,
+    /^[0-9a-f]{40}$/,
+    "EVIDENCE_TOOL_COMMIT",
+  );
 
   await verifyVercelDeployment({
     deploymentId,
@@ -609,6 +622,8 @@ export async function runLiveEvidence(environment = process.env) {
         private_endpoints_retained: false,
       },
       workflow: {
+        evidence_tool_repository: sourceRepository,
+        evidence_tool_commit: evidenceToolCommit,
         run_id: requirePattern(environment.GITHUB_RUN_ID, /^[1-9][0-9]*$/, "GITHUB_RUN_ID"),
         run_attempt: requirePattern(
           environment.GITHUB_RUN_ATTEMPT,

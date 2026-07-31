@@ -9,13 +9,16 @@ or legacy-worker authority.
 
 The `Worker-Uplift Authenticated Production Admin Evidence` workflow is a
 manual, protected, read-only check. Its exact inputs identify the source
-commit, build, and Vercel production deployment being evaluated. Before opening
-the admin route, the workflow checks that Vercel reports the supplied release
-counterpart deployment as `READY`, production-targeted, and bound to that source
-commit. It separately reads only the public source, build, runtime environment,
-and deployment-target fields from the canonical `/api/runtime-config` response.
-The canonical production runtime must identify the same source and build and
-must remain `production-vps`; the response body is not retained.
+commit, build, and Vercel production deployment being evaluated. The workflow
+checks out its evidence tooling from the immutable workflow-dispatch commit,
+records that commit separately, and never substitutes it for the deployed
+candidate identity. Before opening the admin route, the workflow checks that
+Vercel reports the supplied release counterpart deployment as `READY`,
+production-targeted, and bound to the candidate source commit. It separately
+reads only the public source, build, runtime environment, and deployment-target
+fields from the canonical `/api/runtime-config` response. The canonical
+production runtime must identify the same candidate source and build and must
+remain `production-vps`; the response body is not retained.
 
 The workflow creates a five-minute Auth.js session from the existing
 production authentication secret and a dedicated admin evidence identity held
@@ -43,8 +46,10 @@ confirm_read_only=verify-authenticated-admin-read-only
 ```
 
 Dispatch only after the production release artifact and provider API agree on
-all candidate identifiers. The workflow uses the `Production` GitHub
-environment. It does not require routine reviewer approval when that
+all candidate identifiers. Dispatch the workflow from the reviewed `main`
+revision that owns the evidence contract; the artifact records that tooling
+commit independently from the candidate. The workflow uses the `Production`
+GitHub environment. It does not require routine reviewer approval when that
 environment has approval disabled; do not weaken environment protections to
 run it.
 
@@ -59,6 +64,8 @@ The artifact
 - the ephemeral authorized session receives the admin shards page;
 - the canonical production runtime and immutable release counterpart identify
   the exact same source commit and build;
+- the evidence artifact identifies the immutable source commit of the tooling
+  that collected and validated it;
 - the page shows `Legacy Shards` as owner and `Shadow` as write policy;
 - all eight uplift stages are present in contract order;
 - all seven main-queue services show at least one consumer and an immutable

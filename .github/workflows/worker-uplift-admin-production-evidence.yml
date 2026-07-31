@@ -49,6 +49,7 @@ jobs:
       VERCEL_DEPLOYMENT_URL: ${{ inputs.deployment_url }}
       TARGET_ORIGIN: ${{ inputs.target_origin }}
       CONFIRM_READ_ONLY: ${{ inputs.confirm_read_only }}
+      EVIDENCE_TOOL_COMMIT: ${{ github.sha }}
       AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
       NUTSNEWS_ADMIN_EVIDENCE_EMAIL: ${{ secrets.NUTSNEWS_ADMIN_EVIDENCE_EMAIL }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -89,10 +90,10 @@ jobs:
             exit 1
           fi
 
-      - name: Checkout exact deployed app source
+      - name: Checkout immutable evidence tool source
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
         with:
-          ref: ${{ inputs.source_commit }}
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Set up Node.js
