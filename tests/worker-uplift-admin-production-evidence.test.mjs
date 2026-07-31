@@ -6,6 +6,7 @@ import {
   EXPECTED_STAGES,
   assertVercelDeploymentIdentity,
   classifyLivePhaseError,
+  classifyReadPhaseError,
   extractVercelProjectId,
   parsePipelineProjection,
   selectVercelProductionAuthRecords,
@@ -137,6 +138,23 @@ test("classifies live browser phase failures without retaining private detail", 
   assert.equal(
     classifyLivePhaseError("authorized_projection", new Error("private response body")).message,
     "authorized_projection_failed",
+  );
+});
+
+test("classifies provider read failures without retaining private detail", () => {
+  assert.equal(
+    classifyReadPhaseError(
+      "provider_runtime_auth",
+      new Error("vercel_environment_detail_http_403"),
+    ).message,
+    "provider_runtime_auth_vercel_environment_detail_http_403",
+  );
+  assert.equal(
+    classifyReadPhaseError(
+      "provider_runtime_auth",
+      new Error("private provider response body"),
+    ).message,
+    "provider_runtime_auth_error",
   );
 });
 
