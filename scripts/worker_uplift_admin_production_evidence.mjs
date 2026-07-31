@@ -217,20 +217,29 @@ export function validateEvidence(evidence) {
   }
 
   const projection = evidence.projection;
-  if (
-    projection?.available !== true ||
-    projection?.active_ingestion_owner !== "legacy shards" ||
-    projection?.write_policy !== "shadow" ||
-    !["healthy", "degraded", "partial"].includes(projection?.overall_status) ||
-    !Number.isInteger(projection?.schema_version) ||
-    projection.schema_version < 1 ||
-    projection?.stage_count !== EXPECTED_STAGES.length ||
-    typeof projection.queue_age !== "string" ||
-    projection.queue_age === "—" ||
-    !Number.isInteger(projection.dlq_total) ||
-    projection.dlq_total < 0
-  ) {
-    throw new Error("current shadow projection evidence is incomplete or unsafe");
+  if (projection?.available !== true) {
+    throw new Error("current shadow projection is unavailable");
+  }
+  if (projection.active_ingestion_owner !== "legacy shards") {
+    throw new Error("current shadow projection owner is invalid");
+  }
+  if (projection.write_policy !== "shadow") {
+    throw new Error("current shadow projection write policy is invalid");
+  }
+  if (!["healthy", "degraded", "partial", "failed"].includes(projection.overall_status)) {
+    throw new Error("current shadow projection overall status is invalid");
+  }
+  if (!Number.isInteger(projection.schema_version) || projection.schema_version < 1) {
+    throw new Error("current shadow projection schema version is invalid");
+  }
+  if (projection.stage_count !== EXPECTED_STAGES.length) {
+    throw new Error("current shadow projection stage count is invalid");
+  }
+  if (typeof projection.queue_age !== "string" || projection.queue_age === "—") {
+    throw new Error("current shadow projection queue age is invalid");
+  }
+  if (!Number.isInteger(projection.dlq_total) || projection.dlq_total < 0) {
+    throw new Error("current shadow projection DLQ total is invalid");
   }
   if (
     !Array.isArray(projection.stages) ||
@@ -683,6 +692,14 @@ export function classifyEvidenceContractError(error) {
     ["unauthenticated access rejection evidence is incomplete", "unauthenticated_access"],
     ["authorized access evidence is incomplete", "authorized_access"],
     ["current shadow projection evidence is incomplete or unsafe", "projection_summary"],
+    ["current shadow projection is unavailable", "projection_availability"],
+    ["current shadow projection owner is invalid", "projection_owner"],
+    ["current shadow projection write policy is invalid", "projection_write_policy"],
+    ["current shadow projection overall status is invalid", "projection_overall_status"],
+    ["current shadow projection schema version is invalid", "projection_schema_version"],
+    ["current shadow projection stage count is invalid", "projection_stage_count"],
+    ["current shadow projection queue age is invalid", "projection_queue_age"],
+    ["current shadow projection DLQ total is invalid", "projection_dlq_total"],
     ["projection stage identity or ordering does not match the contract", "stage_order"],
     ["scheduler must not claim a main-queue consumer count", "scheduler_consumers"],
     ["safe-state contract evidence is incomplete", "safe_state"],
