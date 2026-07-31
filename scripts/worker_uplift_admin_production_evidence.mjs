@@ -651,6 +651,25 @@ export function classifyLivePhaseError(phase, error) {
   return new Error(`${phase}_${suffix}`);
 }
 
+export function classifyReadPhaseError(phase, error) {
+  const safeDetail =
+    error instanceof Error && /^[a-z0-9_]+$/i.test(error.message)
+      ? error.message
+      : "error";
+  return new Error(`${phase}_${safeDetail}`);
+}
+
+async function runReadPhase(phase, operation) {
+  process.stdout.write(`Evidence read phase started: ${phase}\n`);
+  try {
+    const result = await operation();
+    process.stdout.write(`Evidence read phase passed: ${phase}\n`);
+    return result;
+  } catch (error) {
+    throw classifyReadPhaseError(phase, error);
+  }
+}
+
 export async function runLiveEvidence(environment = process.env) {
   const sourceRepository = environment.GITHUB_REPOSITORY || "ramideltoro/nutsnews";
   if (sourceRepository !== "ramideltoro/nutsnews") {
@@ -693,24 +712,30 @@ export async function runLiveEvidence(environment = process.env) {
     "EVIDENCE_TOOL_COMMIT",
   );
 
-  const vercelProjectId = await verifyVercelDeployment({
-    deploymentId,
-    deploymentUrl,
-    sourceCommit,
-    vercelToken,
-    vercelOrgId,
-  });
-  const { authSecret } = await fetchVercelProductionAuthInputs({
-    projectId: vercelProjectId,
-    teamId: vercelOrgId,
-    token: vercelToken,
-    evidenceIdentity: adminEvidenceIdentity,
-  });
-  const canonicalRuntimeTarget = await verifyCanonicalRuntime({
-    targetOrigin,
-    sourceCommit,
-    buildId,
-  });
+  const vercelProjectId = await runReadPhase("provider_deployment_identity", () =>
+    verifyVercelDeployment({
+      deploymentId,
+      deploymentUrl,
+      sourceCommit,
+      vercelToken,
+      vercelOrgId,
+    }),
+  );
+  const { authSecret } = await runReadPhase("provider_runtime_auth", () =>
+    fetchVercelProductionAuthInputs({
+      projectId: vercelProjectId,
+      teamId: vercelOrgId,
+      token: vercelToken,
+      evidenceIdentity: adminEvidenceIdentity,
+    }),
+  );
+  const canonicalRuntimeTarget = await runReadPhase("canonical_runtime_identity", () =>
+    verifyCanonicalRuntime({
+      targetOrigin,
+      sourceCommit,
+      buildId,
+    }),
+  );
 
   const requireFromWeb = createRequire(WEB_PACKAGE_JSON);
   const { chromium } = requireFromWeb("@playwright/test");
