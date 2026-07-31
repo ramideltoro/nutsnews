@@ -81,12 +81,13 @@ The artifact
   pass; and
 - no disallowed request method or guarded mutation is observed.
 
-This access-evidence pass accepts a current overall status of `Healthy`,
-`Degraded`, `Partial`, or `Failed`; it proves that the protected surface
-faithfully exposes current health, not that the candidate is ready for
-production. Stale, unknown, legacy-only, rollback, or unavailable stage
-telemetry still fails closed. Production-readiness decisions evaluate the
-recorded health separately.
+The overall status is validated against the backend projection's complete
+enum, including legacy-only and rollback states. This workflow proves that the
+protected surface faithfully exposes current health, not that the candidate is
+ready for production. Stale, unknown, legacy-only, rollback, or unavailable
+stage telemetry still fails closed, as do missing consumer, queue-age, or
+candidate fields. Production-readiness decisions evaluate the recorded health
+separately.
 
 Validate a downloaded artifact with:
 
