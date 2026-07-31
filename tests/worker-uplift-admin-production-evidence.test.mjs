@@ -7,8 +7,10 @@ import {
   assertVercelDeploymentIdentity,
   classifyLivePhaseError,
   parsePipelineProjection,
+  selectVercelProductionAuthRecords,
   validateEvidence,
   validateSafeStateContracts,
+  validateVercelProductionAuthInputs,
 } from "../scripts/worker_uplift_admin_production_evidence.mjs";
 
 function liveProjectionFixture() {
@@ -68,6 +70,8 @@ function passingEvidence() {
         status: 200,
         final_path: "/admin/shards",
         identity_source: "github_protected_environment",
+        auth_runtime_source: "vercel_production_environment",
+        allowlist_source: "vercel_production_environment",
         session_retained: false,
       },
     },
@@ -181,6 +185,101 @@ test("rejects mismatched Vercel production deployment identity", () => {
   );
 });
 
+test("selects exactly one current Production auth and allowlist record", () => {
+  const selected = selectVercelProductionAuthRecords({
+    envs: [
+      { id: "env-auth", key: "AUTH_SECRET", target: "production", type: "encrypted" },
+      {
+        id: "env-admins",
+        key: "ADMIN_EMAILS",
+        target: ["preview", "production"],
+        type: "encrypted",
+      },
+      { id: "env-preview", key: "AUTH_SECRET", target: ["preview"], type: "encrypted" },
+    ],
+  });
+  assert.equal(selected.AUTH_SECRET.id, "env-auth");
+  assert.equal(selected.ADMIN_EMAILS.id, "env-admins");
+});
+
+test("rejects missing or duplicate Production auth records", () => {
+  assert.throws(
+    () =>
+      selectVercelProductionAuthRecords({
+        envs: [{ id: "env-auth", key: "AUTH_SECRET", target: ["production"] }],
+      }),
+    /vercel_production_auth_record_missing/,
+  );
+  assert.throws(
+    () =>
+      selectVercelProductionAuthRecords({
+        envs: [
+          { id: "env-auth-a", key: "AUTH_SECRET", target: ["production"] },
+          { id: "env-auth-b", key: "AUTH_SECRET", target: ["production"] },
+          { id: "env-admins", key: "ADMIN_EMAILS", target: ["production"] },
+        ],
+      }),
+    /vercel_production_auth_record_duplicate/,
+  );
+});
+
+test("validates decrypted Production auth inputs and allowlist membership", () => {
+  assert.deepEqual(
+    validateVercelProductionAuthInputs({
+      authSecretRecord: {
+        type: "encrypted",
+        decrypted: true,
+        value: "s".repeat(64),
+      },
+      adminEmailsRecord: {
+        type: "encrypted",
+        decrypted: true,
+        value: "admin@example.com, second@example.com",
+      },
+      evidenceIdentity: "ADMIN@example.com",
+    }),
+    { authSecret: "s".repeat(64) },
+  );
+});
+
+test("rejects ciphertext, invalid secrets, and identities outside the Production allowlist", () => {
+  const validAdmins = {
+    type: "encrypted",
+    decrypted: true,
+    value: "admin@example.com",
+  };
+  for (const authSecretRecord of [
+    { type: "encrypted", decrypted: false, value: "s".repeat(64) },
+    {
+      type: "encrypted",
+      decrypted: true,
+      value: JSON.stringify({ ciphertext: "fixture" }),
+    },
+    { type: "encrypted", decrypted: true, value: "too-short" },
+  ]) {
+    assert.throws(() =>
+      validateVercelProductionAuthInputs({
+        authSecretRecord,
+        adminEmailsRecord: validAdmins,
+        evidenceIdentity: "admin@example.com",
+      }),
+    );
+  }
+  assert.throws(
+    () =>
+      validateVercelProductionAuthInputs({
+        authSecretRecord: {
+          type: "encrypted",
+          decrypted: true,
+          value: "s".repeat(64),
+        },
+        adminEmailsRecord: validAdmins,
+        evidenceIdentity: "different@example.com",
+      }),
+    /admin_evidence_identity_not_allowlisted/,
+  );
+});
+
 test("rejects missing unauthenticated access control proof", () => {
   const evidence = passingEvidence();
   evidence.access.unauthenticated.result = "allowed";
@@ -257,6 +356,7 @@ test("protected workflow is manual, read-only, exact-source, and artifact-backed
   assert.doesNotMatch(workflow, /contents:\s*write/);
   assert.doesNotMatch(workflow, /ref:\s*\$\{\{\s*inputs\.source_commit\s*\}\}/);
   assert.doesNotMatch(workflow, /\b(?:POST|PUT|PATCH|DELETE)\b/);
+  assert.doesNotMatch(workflow, /^\s*AUTH_SECRET:/m);
   assert.doesNotMatch(workflow, /pull_request:/);
   assert.doesNotMatch(workflow, /push:/);
 

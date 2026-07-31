@@ -20,13 +20,17 @@ fields from the canonical `/api/runtime-config` response. The canonical
 production runtime must identify the same candidate source and build and must
 remain `production-vps`; the response body is not retained.
 
-The workflow creates a five-minute Auth.js session from the existing
-production authentication secret and a dedicated admin evidence identity held
-as the `NUTSNEWS_ADMIN_EVIDENCE_EMAIL` Production environment secret. The
-identity, session, cookie, credentials, response payloads, and private
-endpoints are never written to the artifact. The browser blocks every request
-method except `GET` and `HEAD`, performs no clicks, and closes the session when
-the check ends.
+The workflow creates a five-minute Auth.js session from the deployed runtime's
+current Vercel Production `AUTH_SECRET`. It uses the existing protected Vercel
+read credential to retrieve that value and the current `ADMIN_EMAILS` allowlist
+through the documented per-variable API, verifies that the dedicated
+`NUTSNEWS_ADMIN_EVIDENCE_EMAIL` Production environment identity is allowlisted,
+and retains neither value. This avoids a second, potentially stale auth-secret
+copy in GitHub. The artifact records only the value-free Vercel Production
+source classification. The identity, allowlist, session, cookie, credentials,
+response payloads, and private endpoints are never written to the artifact.
+The browser blocks every request method except `GET` and `HEAD`, performs no
+clicks, and closes the session when the check ends.
 
 The workflow also opens the same route without a session and requires the
 initial redirect and final `/admin/login` page. Existing Google authentication,
@@ -62,6 +66,8 @@ The artifact
 - unauthenticated access receives the protected redirect and ends at the login
   page;
 - the ephemeral authorized session receives the admin shards page;
+- the session secret and allowlist come from the current Vercel Production
+  environment and are used only in memory;
 - the canonical production runtime and immutable release counterpart identify
   the exact same source commit and build;
 - the evidence artifact identifies the immutable source commit of the tooling
