@@ -10,9 +10,12 @@ or legacy-worker authority.
 The `Worker-Uplift Authenticated Production Admin Evidence` workflow is a
 manual, protected, read-only check. Its exact inputs identify the source
 commit, build, and Vercel production deployment being evaluated. Before opening
-the admin route, the workflow checks that Vercel reports the supplied
-deployment as `READY`, production-targeted, bound to that source commit, and
-serving the canonical production alias.
+the admin route, the workflow checks that Vercel reports the supplied release
+counterpart deployment as `READY`, production-targeted, and bound to that source
+commit. It separately reads only the public source, build, runtime environment,
+and deployment-target fields from the canonical `/api/runtime-config` response.
+The canonical production runtime must identify the same source and build and
+must remain `production-vps`; the response body is not retained.
 
 The workflow creates a five-minute Auth.js session from the existing
 production authentication secret and a dedicated admin evidence identity held
@@ -54,6 +57,8 @@ The artifact
 - unauthenticated access receives the protected redirect and ends at the login
   page;
 - the ephemeral authorized session receives the admin shards page;
+- the canonical production runtime and immutable release counterpart identify
+  the exact same source commit and build;
 - the page shows `Legacy Shards` as owner and `Shadow` as write policy;
 - all eight uplift stages are present in contract order;
 - all seven main-queue services show at least one consumer and an immutable

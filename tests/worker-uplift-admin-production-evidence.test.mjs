@@ -47,10 +47,13 @@ function passingEvidence() {
       source_repository: "ramideltoro/nutsnews",
       source_commit: "a".repeat(40),
       build_id: "30572714730-1",
-      deployment_id: "dpl_Example123",
-      deployment_url: "https://nutsnews-example.vercel.app",
-      deployment_target: "production",
-      provider_verification: "pass",
+      canonical_origin: "https://www.nutsnews.com",
+      canonical_runtime_target: "production-vps",
+      canonical_runtime_verification: "pass",
+      release_deployment_id: "dpl_Example123",
+      release_deployment_url: "https://nutsnews-example.vercel.app",
+      release_deployment_target: "production",
+      release_provider_verification: "pass",
     },
     access: {
       unauthenticated: {

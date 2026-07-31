@@ -171,12 +171,19 @@ export function validateEvidence(evidence) {
   const candidate = evidence.candidate;
   requirePattern(candidate?.source_commit, /^[0-9a-f]{40}$/, "candidate.source_commit");
   requirePattern(candidate?.build_id, /^[1-9][0-9]{0,19}-[1-9][0-9]{0,5}$/, "candidate.build_id");
-  requirePattern(candidate?.deployment_id, /^dpl_[A-Za-z0-9]+$/, "candidate.deployment_id");
-  normalizeOrigin(candidate?.deployment_url, "candidate.deployment_url");
+  requirePattern(
+    candidate?.release_deployment_id,
+    /^dpl_[A-Za-z0-9]+$/,
+    "candidate.release_deployment_id",
+  );
+  normalizeOrigin(candidate?.release_deployment_url, "candidate.release_deployment_url");
   if (
     candidate?.source_repository !== "ramideltoro/nutsnews" ||
-    candidate?.deployment_target !== "production" ||
-    candidate?.provider_verification !== "pass"
+    candidate?.canonical_origin !== "https://www.nutsnews.com" ||
+    candidate?.canonical_runtime_target !== "production-vps" ||
+    candidate?.canonical_runtime_verification !== "pass" ||
+    candidate?.release_deployment_target !== "production" ||
+    candidate?.release_provider_verification !== "pass"
   ) {
     throw new Error("candidate identity is not an exact verified production deployment");
   }
@@ -358,17 +365,37 @@ async function verifyVercelDeployment({
   }
   const deployment = await response.json();
   const requestedHost = new URL(deploymentUrl).hostname;
-  const aliases = Array.isArray(deployment.alias) ? deployment.alias : [];
   if (
     deployment.uid !== deploymentId ||
     deployment.readyState !== "READY" ||
     deployment.target !== "production" ||
     deployment.url !== requestedHost ||
-    deployment.meta?.githubCommitSha !== sourceCommit ||
-    !aliases.includes("www.nutsnews.com")
+    deployment.meta?.githubCommitSha !== sourceCommit
   ) {
     throw new Error("vercel_deployment_identity_mismatch");
   }
+}
+
+async function verifyCanonicalRuntime({ targetOrigin, sourceCommit, buildId }) {
+  const response = await fetch(`${targetOrigin}/api/runtime-config`, {
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`canonical_runtime_verification_http_${response.status}`);
+  }
+  const runtime = await response.json();
+  if (
+    runtime?.sourceCommit !== sourceCommit ||
+    runtime?.buildId !== buildId ||
+    runtime?.deploymentTarget !== "production-vps" ||
+    runtime?.runtimeEnv !== "production"
+  ) {
+    throw new Error("canonical_runtime_identity_mismatch");
+  }
+  return runtime.deploymentTarget;
 }
 
 async function collectPipelineSection(page) {
@@ -444,6 +471,11 @@ export async function runLiveEvidence(environment = process.env) {
     vercelToken,
     vercelOrgId,
   });
+  const canonicalRuntimeTarget = await verifyCanonicalRuntime({
+    targetOrigin,
+    sourceCommit,
+    buildId,
+  });
 
   const requireFromWeb = createRequire(WEB_PACKAGE_JSON);
   const { chromium } = requireFromWeb("@playwright/test");
@@ -516,10 +548,13 @@ export async function runLiveEvidence(environment = process.env) {
         source_repository: sourceRepository,
         source_commit: sourceCommit,
         build_id: buildId,
-        deployment_id: deploymentId,
-        deployment_url: deploymentUrl,
-        deployment_target: "production",
-        provider_verification: "pass",
+        canonical_origin: targetOrigin,
+        canonical_runtime_target: canonicalRuntimeTarget,
+        canonical_runtime_verification: "pass",
+        release_deployment_id: deploymentId,
+        release_deployment_url: deploymentUrl,
+        release_deployment_target: "production",
+        release_provider_verification: "pass",
       },
       access: {
         unauthenticated: {
