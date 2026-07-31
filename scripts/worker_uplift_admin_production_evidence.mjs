@@ -364,13 +364,27 @@ async function verifyVercelDeployment({
     throw new Error(`vercel_deployment_verification_http_${response.status}`);
   }
   const deployment = await response.json();
+  assertVercelDeploymentIdentity(deployment, {
+    deploymentId,
+    deploymentUrl,
+    sourceCommit,
+  });
+}
+
+export function assertVercelDeploymentIdentity(
+  deployment,
+  { deploymentId, deploymentUrl, sourceCommit },
+) {
   const requestedHost = new URL(deploymentUrl).hostname;
+  const providerIds = [deployment?.id, deployment?.uid].filter(
+    (value) => typeof value === "string" && value.length > 0,
+  );
   if (
-    deployment.uid !== deploymentId ||
-    deployment.readyState !== "READY" ||
-    deployment.target !== "production" ||
-    deployment.url !== requestedHost ||
-    deployment.meta?.githubCommitSha !== sourceCommit
+    !providerIds.includes(deploymentId) ||
+    deployment?.readyState !== "READY" ||
+    deployment?.target !== "production" ||
+    deployment?.url !== requestedHost ||
+    deployment?.meta?.githubCommitSha !== sourceCommit
   ) {
     throw new Error("vercel_deployment_identity_mismatch");
   }

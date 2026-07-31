@@ -4,6 +4,7 @@ import test from "node:test";
 
 import {
   EXPECTED_STAGES,
+  assertVercelDeploymentIdentity,
   parsePipelineProjection,
   validateEvidence,
   validateSafeStateContracts,
@@ -109,6 +110,52 @@ test("parses the live shadow projection and all eight stage identities", () => {
 
 test("accepts complete redacted read-only evidence", () => {
   assert.equal(validateEvidence(passingEvidence()).result, "pass");
+});
+
+test("accepts current and legacy Vercel deployment identifier fields", () => {
+  const expected = {
+    deploymentId: "dpl_Example123",
+    deploymentUrl: "https://nutsnews-example.vercel.app",
+    sourceCommit: "a".repeat(40),
+  };
+  const common = {
+    readyState: "READY",
+    target: "production",
+    url: "nutsnews-example.vercel.app",
+    meta: { githubCommitSha: "a".repeat(40) },
+  };
+  assert.doesNotThrow(() =>
+    assertVercelDeploymentIdentity({ ...common, id: "dpl_Example123" }, expected),
+  );
+  assert.doesNotThrow(() =>
+    assertVercelDeploymentIdentity({ ...common, uid: "dpl_Example123" }, expected),
+  );
+});
+
+test("rejects mismatched Vercel production deployment identity", () => {
+  const expected = {
+    deploymentId: "dpl_Example123",
+    deploymentUrl: "https://nutsnews-example.vercel.app",
+    sourceCommit: "a".repeat(40),
+  };
+  const deployment = {
+    id: "dpl_Different",
+    readyState: "READY",
+    target: "production",
+    url: "nutsnews-example.vercel.app",
+    meta: { githubCommitSha: "a".repeat(40) },
+  };
+  assert.throws(
+    () => assertVercelDeploymentIdentity(deployment, expected),
+    /vercel_deployment_identity_mismatch/,
+  );
+
+  deployment.id = "dpl_Example123";
+  deployment.meta.githubCommitSha = "b".repeat(40);
+  assert.throws(
+    () => assertVercelDeploymentIdentity(deployment, expected),
+    /vercel_deployment_identity_mismatch/,
+  );
 });
 
 test("rejects missing unauthenticated access control proof", () => {
