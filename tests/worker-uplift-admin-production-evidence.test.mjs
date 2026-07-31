@@ -122,10 +122,20 @@ test("accepts complete redacted read-only evidence", () => {
   assert.equal(validateEvidence(passingEvidence()).result, "pass");
 });
 
-test("accepts a current failed overall status as displayed health evidence", () => {
-  const evidence = passingEvidence();
-  evidence.projection.overall_status = "failed";
-  assert.equal(validateEvidence(evidence).projection.overall_status, "failed");
+test("accepts every backend overall status before enforcing current stage evidence", () => {
+  for (const status of [
+    "healthy",
+    "degraded",
+    "stale",
+    "unknown",
+    "legacy only",
+    "rollback",
+    "partial",
+  ]) {
+    const evidence = passingEvidence();
+    evidence.projection.overall_status = status;
+    assert.equal(validateEvidence(evidence).projection.overall_status, status);
+  }
 });
 
 test("classifies each invalid projection summary field independently", () => {
@@ -133,7 +143,7 @@ test("classifies each invalid projection summary field independently", () => {
     ["available", false, /projection is unavailable/],
     ["active_ingestion_owner", "unknown", /projection owner is invalid/],
     ["write_policy", "enabled", /write policy is invalid/],
-    ["overall_status", "unknown", /overall status is invalid/],
+    ["overall_status", "not-a-status", /overall status is invalid/],
     ["schema_version", null, /schema version is invalid/],
     ["stage_count", 0, /stage count is invalid/],
     ["queue_age", "—", /queue age is invalid/],

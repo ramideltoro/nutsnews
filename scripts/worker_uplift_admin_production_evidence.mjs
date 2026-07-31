@@ -35,6 +35,15 @@ const ALLOWED_STAGE_STATUSES = new Set([
   "rollback",
   "unavailable",
 ]);
+const ALLOWED_OVERALL_STATUSES = new Set([
+  "healthy",
+  "degraded",
+  "stale",
+  "unknown",
+  "legacy only",
+  "rollback",
+  "partial",
+]);
 const ALLOWED_OWNERS = new Set([
   "legacy shards",
   "coexistence",
@@ -226,7 +235,7 @@ export function validateEvidence(evidence) {
   if (projection.write_policy !== "shadow") {
     throw new Error("current shadow projection write policy is invalid");
   }
-  if (!["healthy", "degraded", "partial", "failed"].includes(projection.overall_status)) {
+  if (!ALLOWED_OVERALL_STATUSES.has(projection.overall_status)) {
     throw new Error("current shadow projection overall status is invalid");
   }
   if (!Number.isInteger(projection.schema_version) || projection.schema_version < 1) {
