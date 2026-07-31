@@ -57,6 +57,8 @@ const criticalTranslatedPaths = [
   { map: "contactForm", path: ["emailLabel"] },
   { map: "contactForm", path: ["turnstileUnavailable"] },
   { map: "contactPage", path: ["title"] },
+  { map: "contactPage", path: ["contactTitle"] },
+  { map: "contactPage", path: ["contactBody"] },
   { map: "contactPage", path: ["backButton"] },
   { map: "footer", path: ["searchTitle"] },
   { map: "footer", path: ["emptyTitle"] },

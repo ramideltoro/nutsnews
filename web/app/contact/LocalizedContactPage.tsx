@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { NUTSNEWS_CONTACT_EMAIL } from "@/lib/contactDetails";
 import { type LanguageCode } from "@/lib/languages";
 import { SiteFooter } from "../components/SiteFooter";
 import { useSelectedLanguage } from "../components/useSelectedLanguage";
@@ -13,6 +14,9 @@ export const contactCopyByLanguage: Record<
     eyebrow: string;
     title: string;
     intro: string;
+    contactTitle: string;
+    contactBody: string;
+    emailLabel: string;
     backTitle: string;
     backBody: string;
     backButton: string;
@@ -23,6 +27,10 @@ export const contactCopyByLanguage: Record<
     title: "Send a message",
     intro:
       "Share feedback, report a site issue, suggest an uplifting source, or send a publisher correction, attribution concern, or source removal request. The message will be sent directly to the NutsNews inbox.",
+    contactTitle: "Contact us",
+    contactBody:
+      "For questions, feedback, corrections, attribution concerns, or source removal requests, email NutsNews directly.",
+    emailLabel: "Email",
     backTitle: "Back to the feed",
     backBody:
       "Continue browsing positive stories while your message is on its way.",
@@ -33,6 +41,10 @@ export const contactCopyByLanguage: Record<
     title: "Envoyer un message",
     intro:
       "Partagez un commentaire, signalez un problème du site, suggérez une source positive ou envoyez une correction d’éditeur, une question d’attribution ou une demande de retrait de source. Le message sera envoyé directement à la boîte de réception NutsNews.",
+    contactTitle: "Nous contacter",
+    contactBody:
+      "Pour toute question, commentaire, correction, question d’attribution ou demande de retrait d’une source, écrivez directement à NutsNews.",
+    emailLabel: "E-mail",
     backTitle: "Retour au fil",
     backBody:
       "Continuez à parcourir des histoires positives pendant que votre message est en route.",
@@ -43,6 +55,10 @@ export const contactCopyByLanguage: Record<
     title: "メッセージを送る",
     intro:
       "フィードバック、サイトの問題、前向きなニュースソースの提案、出版社の訂正、出典表示の相談、ソース削除の依頼を送れます。内容はNutsNewsの受信箱へ直接届きます。",
+    contactTitle: "お問い合わせ",
+    contactBody:
+      "質問、フィードバック、訂正、出典表示に関するご相談、ソース削除のご依頼は、NutsNewsへ直接メールしてください。",
+    emailLabel: "メール",
     backTitle: "フィードに戻る",
     backBody:
       "メッセージを送っている間も、ポジティブなストーリーを続けて読めます。",
@@ -54,6 +70,10 @@ export const contactCopyByLanguage: Record<
     title: "Eine Nachricht senden",
     intro:
       "Teile Feedback, melde ein Problem auf der Website, schlage eine positive Quelle vor oder sende eine Verlagskorrektur, einen Hinweis zur Attribution oder eine Anfrage zur Quellenentfernung. Die Nachricht geht direkt an den NutsNews-Posteingang.",
+    contactTitle: "Kontakt",
+    contactBody:
+      "Für Fragen, Feedback, Korrekturen, Hinweise zur Attribution oder Anfragen zur Quellenentfernung kannst du NutsNews direkt per E-Mail kontaktieren.",
+    emailLabel: "E-Mail",
     backTitle: "Zurück zum Feed",
     backBody:
       "Stöbere weiter in positiven Geschichten, während deine Nachricht unterwegs ist.",
@@ -64,6 +84,10 @@ export const contactCopyByLanguage: Record<
     title: "Eine Nachricht senden",
     intro:
       "Teile Feedback, melde ein Problem auf der Website, schlage eine positive Quelle vor oder sende eine Verlagskorrektur, einen Hinweis zur Attribution oder eine Anfrage zur Quellenentfernung. Die Nachricht geht direkt an den NutsNews-Posteingang.",
+    contactTitle: "Kontakt",
+    contactBody:
+      "Für Fragen, Feedback, Korrekturen, Hinweise zur Attribution oder Anfragen zur Quellenentfernung kannst du NutsNews direkt per E-Mail kontaktieren.",
+    emailLabel: "E-Mail",
     backTitle: "Zurück zum Feed",
     backBody:
       "Stöbere weiter in positiven Geschichten, während deine Nachricht unterwegs ist.",
@@ -74,6 +98,10 @@ export const contactCopyByLanguage: Record<
     title: "Στείλτε ένα μήνυμα",
     intro:
       "Μοιραστείτε σχόλια, αναφέρετε πρόβλημα στον ιστότοπο, προτείνετε θετική πηγή ή στείλτε διόρθωση εκδότη, ζήτημα απόδοσης ή αίτημα αφαίρεσης πηγής. Το μήνυμα θα σταλεί απευθείας στα εισερχόμενα του NutsNews.",
+    contactTitle: "Επικοινωνήστε μαζί μας",
+    contactBody:
+      "Για ερωτήσεις, σχόλια, διορθώσεις, ζητήματα απόδοσης ή αιτήματα αφαίρεσης πηγής, στείλτε email απευθείας στο NutsNews.",
+    emailLabel: "Email",
     backTitle: "Πίσω στη ροή",
     backBody:
       "Συνεχίστε να διαβάζετε θετικές ιστορίες όσο το μήνυμά σας είναι καθ’ οδόν.",
@@ -108,6 +136,32 @@ export function LocalizedContactPage() {
               {copy.intro}
             </p>
           </div>
+        </section>
+
+        <section
+          aria-labelledby="nutsnews-contact-information"
+          className="mt-6 rounded-[1.75rem] border border-amber-300/20 bg-gradient-to-br from-neutral-950 via-neutral-900 to-amber-950/25 p-5 shadow-xl shadow-amber-950/15"
+        >
+          <h2
+            id="nutsnews-contact-information"
+            className="text-2xl font-black tracking-tight text-amber-100"
+          >
+            {copy.contactTitle}
+          </h2>
+          <p className="mt-3 text-sm leading-7 text-neutral-300">
+            {copy.contactBody}
+          </p>
+          <address className="mt-5 not-italic">
+            <span className="block text-xs font-bold uppercase tracking-[0.18em] text-amber-300">
+              {copy.emailLabel}
+            </span>
+            <a
+              href={`mailto:${NUTSNEWS_CONTACT_EMAIL}`}
+              className="mt-2 inline-flex break-all rounded-full border border-amber-300/30 bg-amber-400/15 px-5 py-3 text-sm font-black text-amber-100 transition hover:border-amber-200/70 hover:bg-amber-300 hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-300"
+            >
+              {NUTSNEWS_CONTACT_EMAIL}
+            </a>
+          </address>
         </section>
 
         <ContactForm />

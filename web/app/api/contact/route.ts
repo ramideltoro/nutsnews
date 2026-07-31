@@ -6,7 +6,7 @@ import { RuntimeSafetyError, assertExternalSideEffect } from "@/lib/runtimeSafet
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const DEFAULT_TO_EMAIL = "rami.deltoro@gmail.com";
+const DEFAULT_TO_EMAIL = "rami.deltoro@nutsnews.com";
 const DEFAULT_FROM_EMAIL = "NutsNews Contact <onboarding@resend.dev>";
 
 const MAX_REQUEST_BYTES = 8_192;

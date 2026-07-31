@@ -8,8 +8,10 @@ import { SiteFooter } from "@/app/components/SiteFooter";
 import { ThemeSwitcher } from "@/app/components/ThemeSwitcher";
 import { LocalizedArticleDetail } from "@/app/articles/[id]/LocalizedArticleDetail";
 import { ContactForm } from "@/app/contact/ContactForm";
+import { LocalizedContactPage } from "@/app/contact/LocalizedContactPage";
 import { SavedStoriesPage } from "@/app/saved/SavedStoriesPage";
 import type { Article } from "@/lib/articles";
+import { NUTSNEWS_CONTACT_EMAIL } from "@/lib/contactDetails";
 import { LANGUAGE_CHANGE_EVENT, LANGUAGE_STORAGE_KEY } from "@/lib/languages";
 import { SAVED_STORIES_STORAGE_KEY } from "@/lib/savedStories";
 
@@ -609,5 +611,18 @@ describe("ContactForm", () => {
         ).length,
       ).toBeGreaterThan(0),
     );
+  });
+});
+
+describe("LocalizedContactPage", () => {
+  test("shows the dedicated public contact email without relying on the form", () => {
+    render(<LocalizedContactPage />);
+
+    expect(
+      screen.getByRole("heading", { name: "Contact us" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: NUTSNEWS_CONTACT_EMAIL }),
+    ).toHaveAttribute("href", `mailto:${NUTSNEWS_CONTACT_EMAIL}`);
   });
 });
