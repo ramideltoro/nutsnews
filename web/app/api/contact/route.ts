@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { BYPASS_CACHE_HEADERS } from "@/lib/cacheHeaders";
 import { recordQuotaUsageEvent } from "@/lib/quotaUsage";
 import { RuntimeSafetyError, assertExternalSideEffect } from "@/lib/runtimeSafety";
-import { NUTSNEWS_CONTACT_EMAIL } from "@/lib/contactDetails";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const DEFAULT_TO_EMAIL = NUTSNEWS_CONTACT_EMAIL;
+const DEFAULT_TO_EMAIL = "rami.deltoro@nutsnews.com";
 const DEFAULT_FROM_EMAIL = "NutsNews Contact <onboarding@resend.dev>";
 
 const MAX_REQUEST_BYTES = 8_192;
