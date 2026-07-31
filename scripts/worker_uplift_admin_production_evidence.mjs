@@ -660,10 +660,10 @@ export function classifyReadPhaseError(phase, error) {
 }
 
 async function runReadPhase(phase, operation) {
-  process.stdout.write(`Evidence read phase started: ${phase}\n`);
+  process.stdout.write(`Evidence phase started: ${phase}\n`);
   try {
     const result = await operation();
-    process.stdout.write(`Evidence read phase passed: ${phase}\n`);
+    process.stdout.write(`Evidence phase passed: ${phase}\n`);
     return result;
   } catch (error) {
     throw classifyReadPhaseError(phase, error);
@@ -740,7 +740,9 @@ export async function runLiveEvidence(environment = process.env) {
   const requireFromWeb = createRequire(WEB_PACKAGE_JSON);
   const { chromium } = requireFromWeb("@playwright/test");
   const { encode } = requireFromWeb("@auth/core/jwt");
-  const browser = await chromium.launch({ headless: true });
+  const browser = await runReadPhase("browser_launch", () =>
+    chromium.launch({ headless: true }),
+  );
   const observedDisallowedRequests = [];
   try {
     const unauthenticated = await browser.newContext();
@@ -764,30 +766,35 @@ export async function runLiveEvidence(environment = process.env) {
     if (initialUnauthorizedStatus !== 307 || unauthenticatedFinalPath !== "/admin/login") {
       throw new Error("unauthenticated_access_not_rejected");
     }
+    process.stdout.write("Evidence phase passed: unauthenticated_access\n");
 
     const cookieName = "__Secure-authjs.session-token";
-    const sessionValue = await encode({
-      token: {
-        email: adminEvidenceIdentity,
-        sub: "worker-uplift-read-only-evidence",
-      },
-      secret: authSecret,
-      salt: cookieName,
-      maxAge: 300,
-    });
+    const sessionValue = await runReadPhase("authorized_session_construction", () =>
+      encode({
+        token: {
+          email: adminEvidenceIdentity,
+          sub: "worker-uplift-read-only-evidence",
+        },
+        secret: authSecret,
+        salt: cookieName,
+        maxAge: 300,
+      }),
+    );
     const authenticated = await browser.newContext();
-    await authenticated.addCookies([
-      {
-        name: cookieName,
-        value: sessionValue,
-        domain: "www.nutsnews.com",
-        path: "/",
-        httpOnly: true,
-        secure: true,
-        sameSite: "Lax",
-        expires: Math.floor(Date.now() / 1000) + 300,
-      },
-    ]);
+    await runReadPhase("authorized_session_installation", () =>
+      authenticated.addCookies([
+        {
+          name: cookieName,
+          value: sessionValue,
+          domain: "www.nutsnews.com",
+          path: "/",
+          httpOnly: true,
+          secure: true,
+          sameSite: "Lax",
+          expires: Math.floor(Date.now() / 1000) + 300,
+        },
+      ]),
+    );
     await authenticated.route("**/*", async (route) => {
       const method = route.request().method().toUpperCase();
       if (!ALLOWED_METHODS.has(method)) {
@@ -811,13 +818,17 @@ export async function runLiveEvidence(environment = process.env) {
     if (authorizedStatus !== 200 || authorizedFinalPath !== "/admin/shards") {
       throw new Error("authorized_access_rejected");
     }
+    process.stdout.write("Evidence phase passed: authorized_access\n");
     let rawProjection;
     try {
       rawProjection = await collectPipelineSection(authenticatedPage);
     } catch (error) {
       throw classifyLivePhaseError("authorized_projection", error);
     }
-    const projection = parsePipelineProjection(rawProjection);
+    process.stdout.write("Evidence phase passed: authorized_projection_collection\n");
+    const projection = await runReadPhase("projection_contract", () =>
+      parsePipelineProjection(rawProjection),
+    );
     await authenticated.close();
 
     const evidence = {
@@ -859,7 +870,9 @@ export async function runLiveEvidence(environment = process.env) {
         },
       },
       projection,
-      safe_state_contracts: validateSafeStateContracts(),
+      safe_state_contracts: await runReadPhase("safe_state_contracts", () =>
+        validateSafeStateContracts(),
+      ),
       safety: {
         allowed_http_methods: ["GET", "HEAD"],
         observed_disallowed_requests: observedDisallowedRequests.length,
@@ -887,11 +900,13 @@ export async function runLiveEvidence(environment = process.env) {
         ),
       },
     };
-    validateEvidence(evidence);
-    await mkdir(dirname(outputPath), { recursive: true });
-    await writeFile(outputPath, `${JSON.stringify(evidence, null, 2)}\n`, {
-      encoding: "utf8",
-      mode: 0o600,
+    await runReadPhase("evidence_contract", () => validateEvidence(evidence));
+    await runReadPhase("evidence_artifact_write", async () => {
+      await mkdir(dirname(outputPath), { recursive: true });
+      await writeFile(outputPath, `${JSON.stringify(evidence, null, 2)}\n`, {
+        encoding: "utf8",
+        mode: 0o600,
+      });
     });
     return evidence;
   } finally {
