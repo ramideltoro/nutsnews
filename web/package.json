@@ -63,6 +63,7 @@
     "test:admin-guardrails-cloudflare-forecast": "node ../scripts/admin_guardrails_cloudflare_forecast_regression.mjs",
     "test:admin-production-readiness": "node ../scripts/admin_production_readiness_regression.mjs",
     "test:admin-worker-uplift-pipeline": "node ../scripts/admin_worker_uplift_pipeline_regression.mjs",
+    "test:admin-worker-uplift-production-evidence": "node --test ../tests/worker-uplift-admin-production-evidence.test.mjs",
     "test:admin-failover": "node ../scripts/admin_failover_dashboard_regression.mjs",
     "test:admin-home-server": "node ../scripts/admin_home_server_regression.mjs",
     "test:admin-readiness-actions-token": "node ../scripts/admin_readiness_actions_token_contract.mjs",
