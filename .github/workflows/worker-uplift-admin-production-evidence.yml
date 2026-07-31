@@ -50,7 +50,6 @@ jobs:
       TARGET_ORIGIN: ${{ inputs.target_origin }}
       CONFIRM_READ_ONLY: ${{ inputs.confirm_read_only }}
       EVIDENCE_TOOL_COMMIT: ${{ github.sha }}
-      AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
       NUTSNEWS_ADMIN_EVIDENCE_EMAIL: ${{ secrets.NUTSNEWS_ADMIN_EVIDENCE_EMAIL }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -85,7 +84,7 @@ jobs:
             echo "The exact read-only confirmation is required." >&2
             exit 1
           fi
-          if [[ -z "$AUTH_SECRET" || -z "$NUTSNEWS_ADMIN_EVIDENCE_EMAIL" || -z "$VERCEL_TOKEN" || -z "$VERCEL_ORG_ID" ]]; then
+          if [[ -z "$NUTSNEWS_ADMIN_EVIDENCE_EMAIL" || -z "$VERCEL_TOKEN" || -z "$VERCEL_ORG_ID" ]]; then
             echo "Protected production evidence credentials are incomplete." >&2
             exit 1
           fi

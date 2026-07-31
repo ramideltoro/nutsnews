@@ -42,6 +42,15 @@ const ALLOWED_OWNERS = new Set([
   "rollback",
   "unknown",
 ]);
+const VERCEL_SECRET_TYPES = new Set(["encrypted", "secret", "sensitive"]);
+const ENCRYPTED_ENVELOPE_KEYS = new Set([
+  "encrypted",
+  "ciphertext",
+  "encryptedvalue",
+  "vsmvalue",
+  "keyid",
+]);
+const EMAIL_PATTERN = /^[^@\s,]+@[^@\s,]+\.[^@\s,]+$/;
 const FORBIDDEN_VALUE_PATTERNS = [
   /(?:^|[^a-z])(?:token|secret|password|cookie|authorization)(?:$|[^a-z])/i,
   /(?:amqp|postgres(?:ql)?|redis):\/\//i,
@@ -200,6 +209,8 @@ export function validateEvidence(evidence) {
     evidence.access.authorized.status !== 200 ||
     evidence.access.authorized.final_path !== "/admin/shards" ||
     evidence.access.authorized.identity_source !== "github_protected_environment" ||
+    evidence.access.authorized.auth_runtime_source !== "vercel_production_environment" ||
+    evidence.access.authorized.allowlist_source !== "vercel_production_environment" ||
     evidence.access.authorized.session_retained !== false
   ) {
     throw new Error("authorized access evidence is incomplete");
@@ -377,6 +388,7 @@ async function verifyVercelDeployment({
     deploymentUrl,
     sourceCommit,
   });
+  return requirePattern(deployment?.projectId, /^prj_[A-Za-z0-9]+$/, "vercel_project_id");
 }
 
 export function assertVercelDeploymentIdentity(
@@ -396,6 +408,177 @@ export function assertVercelDeploymentIdentity(
   ) {
     throw new Error("vercel_deployment_identity_mismatch");
   }
+}
+
+function looksLikeEncryptedEnvelope(value) {
+  if (typeof value !== "string" || !value.trimStart().startsWith("{")) {
+    return false;
+  }
+  try {
+    const parsed = JSON.parse(value);
+    return (
+      parsed !== null &&
+      typeof parsed === "object" &&
+      !Array.isArray(parsed) &&
+      Object.keys(parsed).some((key) => ENCRYPTED_ENVELOPE_KEYS.has(key.toLowerCase()))
+    );
+  } catch {
+    return false;
+  }
+}
+
+function vercelEnvironmentRecords(payload) {
+  const records = Array.isArray(payload)
+    ? payload
+    : payload && typeof payload === "object"
+      ? (payload.envs ?? payload.data)
+      : null;
+  if (!Array.isArray(records) || !records.every((record) => record && typeof record === "object")) {
+    throw new Error("vercel_environment_list_invalid");
+  }
+  return records;
+}
+
+function targetsProduction(record) {
+  const targets = typeof record.target === "string" ? [record.target] : record.target;
+  return Array.isArray(targets) && targets.includes("production");
+}
+
+export function selectVercelProductionAuthRecords(payload) {
+  const requiredKeys = ["AUTH_SECRET", "ADMIN_EMAILS"];
+  const selected = new Map();
+  for (const record of vercelEnvironmentRecords(payload)) {
+    if (!requiredKeys.includes(record.key) || !targetsProduction(record)) {
+      continue;
+    }
+    if (selected.has(record.key)) {
+      throw new Error("vercel_production_auth_record_duplicate");
+    }
+    if (typeof record.id !== "string" || record.id.trim() === "") {
+      throw new Error("vercel_production_auth_record_id_missing");
+    }
+    selected.set(record.key, record);
+  }
+  if (!requiredKeys.every((key) => selected.has(key))) {
+    throw new Error("vercel_production_auth_record_missing");
+  }
+  return Object.fromEntries(selected);
+}
+
+function requireDecryptedVercelValue(record, key) {
+  if (!record || typeof record !== "object") {
+    throw new Error("vercel_production_auth_detail_invalid");
+  }
+  if (typeof record.value !== "string" || record.value.trim() === "") {
+    throw new Error("vercel_production_auth_value_missing");
+  }
+  if (
+    record.decrypted === false ||
+    (VERCEL_SECRET_TYPES.has(String(record.type ?? "").toLowerCase()) &&
+      record.decrypted !== true)
+  ) {
+    throw new Error("vercel_production_auth_value_not_decrypted");
+  }
+  if (
+    record.value.includes("\n") ||
+    record.value.includes("\r") ||
+    looksLikeEncryptedEnvelope(record.value)
+  ) {
+    throw new Error("vercel_production_auth_value_unsafe");
+  }
+  if (key === "AUTH_SECRET" && (record.value.length < 32 || record.value.length > 512)) {
+    throw new Error("vercel_production_auth_secret_invalid");
+  }
+  return record.value;
+}
+
+export function validateVercelProductionAuthInputs({
+  authSecretRecord,
+  adminEmailsRecord,
+  evidenceIdentity,
+}) {
+  const normalizedIdentity = requireNonEmptyString(
+    evidenceIdentity,
+    "NUTSNEWS_ADMIN_EVIDENCE_EMAIL",
+  ).toLowerCase();
+  if (!EMAIL_PATTERN.test(normalizedIdentity)) {
+    throw new Error("admin_evidence_identity_invalid");
+  }
+  const authSecret = requireDecryptedVercelValue(authSecretRecord, "AUTH_SECRET");
+  const adminEmails = requireDecryptedVercelValue(adminEmailsRecord, "ADMIN_EMAILS")
+    .split(",")
+    .map((entry) => entry.trim().toLowerCase());
+  if (adminEmails.length === 0 || adminEmails.some((entry) => !EMAIL_PATTERN.test(entry))) {
+    throw new Error("vercel_production_admin_allowlist_invalid");
+  }
+  if (!adminEmails.includes(normalizedIdentity)) {
+    throw new Error("admin_evidence_identity_not_allowlisted");
+  }
+  return { authSecret };
+}
+
+async function fetchVercelJson(url, token, errorPrefix) {
+  let response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+    });
+  } catch {
+    throw new Error(`${errorPrefix}_request_failed`);
+  }
+  if (!response.ok) {
+    throw new Error(`${errorPrefix}_http_${response.status}`);
+  }
+  try {
+    return await response.json();
+  } catch {
+    throw new Error(`${errorPrefix}_response_invalid`);
+  }
+}
+
+async function fetchVercelProductionAuthInputs({
+  projectId,
+  teamId,
+  token,
+  evidenceIdentity,
+}) {
+  const projectPath = encodeURIComponent(projectId);
+  const teamQuery = `teamId=${encodeURIComponent(teamId)}`;
+  const metadata = await fetchVercelJson(
+    `https://api.vercel.com/v10/projects/${projectPath}/env?${teamQuery}&source=worker-uplift-admin-evidence`,
+    token,
+    "vercel_environment_list",
+  );
+  const selected = selectVercelProductionAuthRecords(metadata);
+  const details = await Promise.all(
+    ["AUTH_SECRET", "ADMIN_EMAILS"].map(async (key) => {
+      const record = selected[key];
+      const detail = await fetchVercelJson(
+        `https://api.vercel.com/v1/projects/${projectPath}/env/${encodeURIComponent(record.id)}?${teamQuery}`,
+        token,
+        "vercel_environment_detail",
+      );
+      if (!detail || typeof detail !== "object" || Array.isArray(detail)) {
+        throw new Error("vercel_production_auth_detail_invalid");
+      }
+      return [
+        key,
+        {
+          ...detail,
+          type: detail.type ?? record.type,
+        },
+      ];
+    }),
+  );
+  const detailByKey = Object.fromEntries(details);
+  return validateVercelProductionAuthInputs({
+    authSecretRecord: detailByKey.AUTH_SECRET,
+    adminEmailsRecord: detailByKey.ADMIN_EMAILS,
+    evidenceIdentity,
+  });
 }
 
 async function verifyCanonicalRuntime({ targetOrigin, sourceCommit, buildId }) {
@@ -483,7 +666,6 @@ export async function runLiveEvidence(environment = process.env) {
     throw new Error("read-only confirmation is missing");
   }
 
-  const authSecret = requireNonEmptyString(environment.AUTH_SECRET, "AUTH_SECRET");
   const adminEvidenceIdentity = requireNonEmptyString(
     environment.NUTSNEWS_ADMIN_EVIDENCE_EMAIL,
     "NUTSNEWS_ADMIN_EVIDENCE_EMAIL",
@@ -497,12 +679,18 @@ export async function runLiveEvidence(environment = process.env) {
     "EVIDENCE_TOOL_COMMIT",
   );
 
-  await verifyVercelDeployment({
+  const vercelProjectId = await verifyVercelDeployment({
     deploymentId,
     deploymentUrl,
     sourceCommit,
     vercelToken,
     vercelOrgId,
+  });
+  const { authSecret } = await fetchVercelProductionAuthInputs({
+    projectId: vercelProjectId,
+    teamId: vercelOrgId,
+    token: vercelToken,
+    evidenceIdentity: adminEvidenceIdentity,
   });
   const canonicalRuntimeTarget = await verifyCanonicalRuntime({
     targetOrigin,
@@ -626,6 +814,8 @@ export async function runLiveEvidence(environment = process.env) {
           status: authorizedStatus,
           final_path: authorizedFinalPath,
           identity_source: "github_protected_environment",
+          auth_runtime_source: "vercel_production_environment",
+          allowlist_source: "vercel_production_environment",
           session_retained: false,
         },
       },
