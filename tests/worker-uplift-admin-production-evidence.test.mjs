@@ -89,6 +89,8 @@ function passingEvidence() {
       private_endpoints_retained: false,
     },
     workflow: {
+      evidence_tool_repository: "ramideltoro/nutsnews",
+      evidence_tool_commit: "b".repeat(40),
       run_id: "30580000000",
       run_attempt: "1",
     },
@@ -110,6 +112,12 @@ test("parses the live shadow projection and all eight stage identities", () => {
 
 test("accepts complete redacted read-only evidence", () => {
   assert.equal(validateEvidence(passingEvidence()).result, "pass");
+});
+
+test("rejects evidence without an immutable tooling revision", () => {
+  const evidence = passingEvidence();
+  delete evidence.workflow.evidence_tool_commit;
+  assert.throws(() => validateEvidence(evidence), /workflow\.evidence_tool_commit/);
 });
 
 test("accepts current and legacy Vercel deployment identifier fields", () => {
@@ -221,7 +229,8 @@ test("protected workflow is manual, read-only, exact-source, and artifact-backed
   for (const token of [
     "environment: Production",
     "permissions:\n  contents: read",
-    "ref: ${{ inputs.source_commit }}",
+    "EVIDENCE_TOOL_COMMIT: ${{ github.sha }}",
+    "ref: ${{ github.sha }}",
     "confirm_read_only:",
     "verify-authenticated-admin-read-only",
     "node scripts/worker_uplift_admin_production_evidence.mjs",
@@ -231,6 +240,7 @@ test("protected workflow is manual, read-only, exact-source, and artifact-backed
     assert.ok(workflow.includes(token), `missing workflow guard: ${token}`);
   }
   assert.doesNotMatch(workflow, /contents:\s*write/);
+  assert.doesNotMatch(workflow, /ref:\s*\$\{\{\s*inputs\.source_commit\s*\}\}/);
   assert.doesNotMatch(workflow, /\b(?:POST|PUT|PATCH|DELETE)\b/);
   assert.doesNotMatch(workflow, /pull_request:/);
   assert.doesNotMatch(workflow, /push:/);
