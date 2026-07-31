@@ -122,6 +122,30 @@ test("accepts complete redacted read-only evidence", () => {
   assert.equal(validateEvidence(passingEvidence()).result, "pass");
 });
 
+test("accepts a current failed overall status as displayed health evidence", () => {
+  const evidence = passingEvidence();
+  evidence.projection.overall_status = "failed";
+  assert.equal(validateEvidence(evidence).projection.overall_status, "failed");
+});
+
+test("classifies each invalid projection summary field independently", () => {
+  const cases = [
+    ["available", false, /projection is unavailable/],
+    ["active_ingestion_owner", "unknown", /projection owner is invalid/],
+    ["write_policy", "enabled", /write policy is invalid/],
+    ["overall_status", "unknown", /overall status is invalid/],
+    ["schema_version", null, /schema version is invalid/],
+    ["stage_count", 0, /stage count is invalid/],
+    ["queue_age", "—", /queue age is invalid/],
+    ["dlq_total", null, /DLQ total is invalid/],
+  ];
+  for (const [field, value, expected] of cases) {
+    const evidence = passingEvidence();
+    evidence.projection[field] = value;
+    assert.throws(() => validateEvidence(evidence), expected);
+  }
+});
+
 test("rejects evidence without an immutable tooling revision", () => {
   const evidence = passingEvidence();
   delete evidence.workflow.evidence_tool_commit;
