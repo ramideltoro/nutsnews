@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   EXPECTED_STAGES,
   assertVercelDeploymentIdentity,
+  classifyLivePhaseError,
   parsePipelineProjection,
   validateEvidence,
   validateSafeStateContracts,
@@ -118,6 +119,20 @@ test("rejects evidence without an immutable tooling revision", () => {
   const evidence = passingEvidence();
   delete evidence.workflow.evidence_tool_commit;
   assert.throws(() => validateEvidence(evidence), /workflow\.evidence_tool_commit/);
+});
+
+test("classifies live browser phase failures without retaining private detail", () => {
+  const timeout = Object.assign(new Error("private endpoint detail"), {
+    name: "TimeoutError",
+  });
+  assert.equal(
+    classifyLivePhaseError("authorized_navigation", timeout).message,
+    "authorized_navigation_timeout",
+  );
+  assert.equal(
+    classifyLivePhaseError("authorized_projection", new Error("private response body")).message,
+    "authorized_projection_failed",
+  );
 });
 
 test("accepts current and legacy Vercel deployment identifier fields", () => {

@@ -448,6 +448,12 @@ async function collectPipelineSection(page) {
   });
 }
 
+export function classifyLivePhaseError(phase, error) {
+  const errorName = error?.name ?? error?.constructor?.name ?? "";
+  const suffix = /^TimeoutError/.test(errorName) ? "timeout" : "failed";
+  return new Error(`${phase}_${suffix}`);
+}
+
 export async function runLiveEvidence(environment = process.env) {
   const sourceRepository = environment.GITHUB_REPOSITORY || "ramideltoro/nutsnews";
   if (sourceRepository !== "ramideltoro/nutsnews") {
@@ -519,11 +525,18 @@ export async function runLiveEvidence(environment = process.env) {
         initialUnauthorizedStatus = response.status();
       }
     });
-    await unauthenticatedPage.goto(`${targetOrigin}/admin/shards`, {
-      waitUntil: "domcontentloaded",
-    });
+    try {
+      await unauthenticatedPage.goto(`${targetOrigin}/admin/shards`, {
+        waitUntil: "domcontentloaded",
+      });
+    } catch (error) {
+      throw classifyLivePhaseError("unauthenticated_navigation", error);
+    }
     const unauthenticatedFinalPath = new URL(unauthenticatedPage.url()).pathname;
     await unauthenticated.close();
+    if (initialUnauthorizedStatus !== 307 || unauthenticatedFinalPath !== "/admin/login") {
+      throw new Error("unauthenticated_access_not_rejected");
+    }
 
     const cookieName = "__Secure-authjs.session-token";
     const sessionValue = await encode({
@@ -558,12 +571,25 @@ export async function runLiveEvidence(environment = process.env) {
       await route.continue();
     });
     const authenticatedPage = await authenticated.newPage();
-    const response = await authenticatedPage.goto(`${targetOrigin}/admin/shards`, {
-      waitUntil: "domcontentloaded",
-    });
+    let response;
+    try {
+      response = await authenticatedPage.goto(`${targetOrigin}/admin/shards`, {
+        waitUntil: "domcontentloaded",
+      });
+    } catch (error) {
+      throw classifyLivePhaseError("authorized_navigation", error);
+    }
     const authorizedStatus = response?.status() ?? 0;
     const authorizedFinalPath = new URL(authenticatedPage.url()).pathname;
-    const rawProjection = await collectPipelineSection(authenticatedPage);
+    if (authorizedStatus !== 200 || authorizedFinalPath !== "/admin/shards") {
+      throw new Error("authorized_access_rejected");
+    }
+    let rawProjection;
+    try {
+      rawProjection = await collectPipelineSection(authenticatedPage);
+    } catch (error) {
+      throw classifyLivePhaseError("authorized_projection", error);
+    }
     const projection = parsePipelineProjection(rawProjection);
     await authenticated.close();
 
