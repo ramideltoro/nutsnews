@@ -28,26 +28,6 @@ on:
         description: Type verify-authenticated-admin-read-only
         required: true
         type: string
-  pull_request:
-    paths:
-      - .github/workflows/worker-uplift-admin-production-evidence.yml
-      - docs/WORKER_UPLIFT_ADMIN_PRODUCTION_EVIDENCE.md
-      - scripts/worker_uplift_admin_production_evidence.mjs
-      - scripts/validate_worker_uplift_admin_production_evidence.mjs
-      - tests/worker-uplift-admin-production-evidence.test.mjs
-      - web/package.json
-      - web/package-lock.json
-  push:
-    branches:
-      - main
-    paths:
-      - .github/workflows/worker-uplift-admin-production-evidence.yml
-      - docs/WORKER_UPLIFT_ADMIN_PRODUCTION_EVIDENCE.md
-      - scripts/worker_uplift_admin_production_evidence.mjs
-      - scripts/validate_worker_uplift_admin_production_evidence.mjs
-      - tests/worker-uplift-admin-production-evidence.test.mjs
-      - web/package.json
-      - web/package-lock.json
 
 permissions:
   contents: read
@@ -57,31 +37,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  contract:
-    name: Validate evidence contract
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
-        with:
-          persist-credentials: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5
-        with:
-          node-version: 26
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-
-      - name: Test read-only evidence contract
-        working-directory: web
-        run: npm run test:admin-worker-uplift-production-evidence
-
   live:
     name: Verify authenticated production admin status
-    if: ${{ github.event_name == 'workflow_dispatch' }}
-    needs: contract
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: Production

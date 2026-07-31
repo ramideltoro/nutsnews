@@ -171,7 +171,6 @@ test("protected workflow is manual, read-only, exact-source, and artifact-backed
   for (const token of [
     "environment: Production",
     "permissions:\n  contents: read",
-    "if: ${{ github.event_name == 'workflow_dispatch' }}",
     "ref: ${{ inputs.source_commit }}",
     "confirm_read_only:",
     "verify-authenticated-admin-read-only",
@@ -183,4 +182,18 @@ test("protected workflow is manual, read-only, exact-source, and artifact-backed
   }
   assert.doesNotMatch(workflow, /contents:\s*write/);
   assert.doesNotMatch(workflow, /\b(?:POST|PUT|PATCH|DELETE)\b/);
+  assert.doesNotMatch(workflow, /pull_request:/);
+  assert.doesNotMatch(workflow, /push:/);
+
+  const contractWorkflow = readFileSync(
+    new URL(
+      "../.github/workflows/worker-uplift-admin-production-evidence-contract.yml",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  assert.match(contractWorkflow, /pull_request:/);
+  assert.match(contractWorkflow, /push:/);
+  assert.match(contractWorkflow, /test:admin-worker-uplift-production-evidence/);
+  assert.doesNotMatch(contractWorkflow, /environment:\s*Production/);
 });
