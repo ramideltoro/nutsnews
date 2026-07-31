@@ -89,6 +89,10 @@ stage telemetry still fails closed, as do missing consumer, queue-age, or
 candidate fields. Production-readiness decisions evaluate the recorded health
 separately.
 
+The aggregate queue-age card may render `—` when no queued message has an age.
+That placeholder is retained as display evidence; it does not relax the
+per-stage consumer, current-status, deployment-version, or queue checks.
+
 Validate a downloaded artifact with:
 
 ```bash
