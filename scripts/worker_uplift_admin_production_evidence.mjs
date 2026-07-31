@@ -651,7 +651,65 @@ export function classifyLivePhaseError(phase, error) {
   return new Error(`${phase}_${suffix}`);
 }
 
+export function classifyEvidenceContractError(error) {
+  const message = error instanceof Error ? error.message : "";
+  const stage = EXPECTED_STAGES.find((name) => message.endsWith(` ${name}`));
+  if (message.startsWith("unexpected stage status for ")) {
+    return `stage_status_${stage ?? "invalid"}`;
+  }
+  if (message.startsWith("unexpected stage owner for ")) {
+    return `stage_owner_${stage ?? "invalid"}`;
+  }
+  if (message.startsWith("stage telemetry is invalid for ")) {
+    return `stage_telemetry_${stage ?? "invalid"}`;
+  }
+  if (message.startsWith("stage telemetry is not current for ")) {
+    return `stage_not_current_${stage ?? "invalid"}`;
+  }
+  if (message.startsWith("candidate identity is missing for ")) {
+    return `stage_candidate_${stage ?? "invalid"}`;
+  }
+  if (message.startsWith("main queue has zero or unknown consumers for ")) {
+    return `stage_consumers_${stage ?? "invalid"}`;
+  }
+  if (message.startsWith("main queue age is missing for ")) {
+    return `stage_queue_age_${stage ?? "invalid"}`;
+  }
+  const fixedClassifications = [
+    ["evidence must be an object", "document_invalid"],
+    ["evidence must be a passing schema version 1 document", "document_result"],
+    ["checked_at must be an ISO-8601 timestamp", "checked_at"],
+    ["candidate identity is not an exact verified production deployment", "candidate_identity"],
+    ["unauthenticated access rejection evidence is incomplete", "unauthenticated_access"],
+    ["authorized access evidence is incomplete", "authorized_access"],
+    ["current shadow projection evidence is incomplete or unsafe", "projection_summary"],
+    ["projection stage identity or ordering does not match the contract", "stage_order"],
+    ["scheduler must not claim a main-queue consumer count", "scheduler_consumers"],
+    ["safe-state contract evidence is incomplete", "safe_state"],
+    ["read-only safety evidence is incomplete", "read_only_safety"],
+    ["redaction evidence is incomplete", "redaction"],
+    ["evidence tool repository is invalid", "tool_repository"],
+  ];
+  const fixed = fixedClassifications.find(([prefix]) => message.startsWith(prefix));
+  if (fixed) {
+    return fixed[1];
+  }
+  if (
+    message.includes("forbidden evidence field") ||
+    message.includes("forbidden private or personal value")
+  ) {
+    return "private_value";
+  }
+  if (message.startsWith("workflow.evidence_tool_commit")) {
+    return "tool_commit";
+  }
+  return "invalid";
+}
+
 export function classifyReadPhaseError(phase, error) {
+  if (phase === "evidence_contract") {
+    return new Error(`${phase}_${classifyEvidenceContractError(error)}`);
+  }
   const safeDetail =
     error instanceof Error && /^[a-z0-9_]+$/i.test(error.message)
       ? error.message

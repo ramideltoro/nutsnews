@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   EXPECTED_STAGES,
   assertVercelDeploymentIdentity,
+  classifyEvidenceContractError,
   classifyLivePhaseError,
   classifyReadPhaseError,
   extractVercelProjectId,
@@ -155,6 +156,32 @@ test("classifies provider read failures without retaining private detail", () =>
       new Error("private provider response body"),
     ).message,
     "provider_runtime_auth_error",
+  );
+});
+
+test("classifies evidence contract failures with fixed value-free codes", () => {
+  assert.equal(
+    classifyEvidenceContractError(
+      new Error("main queue has zero or unknown consumers for publication"),
+    ),
+    "stage_consumers_publication",
+  );
+  assert.equal(
+    classifyEvidenceContractError(
+      new Error("current shadow projection evidence is incomplete or unsafe"),
+    ),
+    "projection_summary",
+  );
+  assert.equal(
+    classifyEvidenceContractError(new Error("private response payload detail")),
+    "invalid",
+  );
+  assert.equal(
+    classifyReadPhaseError(
+      "evidence_contract",
+      new Error("stage telemetry is not current for approval"),
+    ).message,
+    "evidence_contract_stage_not_current_approval",
   );
 });
 
