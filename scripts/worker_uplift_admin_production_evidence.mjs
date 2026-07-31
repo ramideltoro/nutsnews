@@ -244,7 +244,7 @@ export function validateEvidence(evidence) {
   if (projection.stage_count !== EXPECTED_STAGES.length) {
     throw new Error("current shadow projection stage count is invalid");
   }
-  if (typeof projection.queue_age !== "string" || projection.queue_age === "—") {
+  if (typeof projection.queue_age !== "string" || projection.queue_age.trim() === "") {
     throw new Error("current shadow projection queue age is invalid");
   }
   if (!Number.isInteger(projection.dlq_total) || projection.dlq_total < 0) {

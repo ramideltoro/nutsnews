@@ -138,6 +138,12 @@ test("accepts every backend overall status before enforcing current stage eviden
   }
 });
 
+test("accepts the aggregate empty-queue age placeholder", () => {
+  const evidence = passingEvidence();
+  evidence.projection.queue_age = "—";
+  assert.equal(validateEvidence(evidence).projection.queue_age, "—");
+});
+
 test("classifies each invalid projection summary field independently", () => {
   const cases = [
     ["available", false, /projection is unavailable/],
@@ -146,7 +152,7 @@ test("classifies each invalid projection summary field independently", () => {
     ["overall_status", "not-a-status", /overall status is invalid/],
     ["schema_version", null, /schema version is invalid/],
     ["stage_count", 0, /stage count is invalid/],
-    ["queue_age", "—", /queue age is invalid/],
+    ["queue_age", "", /queue age is invalid/],
     ["dlq_total", null, /DLQ total is invalid/],
   ];
   for (const [field, value, expected] of cases) {
