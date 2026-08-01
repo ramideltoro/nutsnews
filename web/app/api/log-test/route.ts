@@ -4,8 +4,6 @@ import { BYPASS_CACHE_HEADERS } from "@/lib/cacheHeaders";
 import { logInfo, logWarn } from "@/lib/logger";
 import { RuntimeSafetyError, assertProductionOperation } from "@/lib/runtimeSafety";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 export async function GET() {
     try {

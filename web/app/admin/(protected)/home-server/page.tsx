@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { connection } from "next/server";
 import { auth, signOut } from "@/auth";
 import { formatAdminDateTime } from "@/lib/adminTime";
 import {
@@ -13,8 +14,6 @@ export const metadata = {
   title: "Home Server | NutsNews Admin",
 };
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("en-US").format(Math.round(value));
@@ -460,6 +459,7 @@ function ErrorPanel({ message, isConfigured }: { message: string; isConfigured: 
 }
 
 export default async function HomeServerPage() {
+  await connection();
   const session = await auth();
   const data = await getAdminHomeServerDashboardData();
   const stats = data.stats;

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 
 import { auth, signOut } from "@/auth";
 import { isAllowedAdminEmail } from "@/lib/adminAuth";
@@ -26,8 +27,6 @@ export const metadata = {
   title: "Failover | NutsNews Admin",
 };
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 type FailoverPageProps = {
   searchParams?: Promise<{
@@ -802,6 +801,7 @@ NUTSNEWS_FAILOVER_CLOUDFLARE_DASHBOARD_URL=<optional Cloudflare DNS page>`}
 }
 
 export default async function AdminFailoverPage({ searchParams }: FailoverPageProps) {
+  await connection();
   const session = await auth();
   const data = await getAdminFailoverDashboardData();
   const status = data.status;

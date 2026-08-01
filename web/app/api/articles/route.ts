@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 
 import {
   CURSOR_PAGE_SIZE,
-  getPublishedArticlesByCursor,
   PAGE_SIZE,
   type PublishedArticlesResult,
   type FeedDegradationStatus,
@@ -10,18 +9,20 @@ import {
 import {
   createMaintenanceHomeFeedPayload,
   getEdgeFeedSnapshotPage,
-  getHomeFeedDataWithEdgeFallback,
   getPublishedArticlesWithEdgeFallback,
 } from "@/lib/edgeFeedSnapshot";
 import { normalizeLanguageCode } from "@/lib/languages";
 import {
-  ARTICLE_API_CACHE_HEADERS,
+  getPublicCacheHeaders,
   BYPASS_CACHE_HEADERS,
-  PUBLIC_CDN_S_MAXAGE_SECONDS,
 } from "@/lib/cacheHeaders";
+import { PUBLIC_FEED_CACHE_TAG } from "@/lib/cacheTags";
 import { logError, logInfoSampled, logWarn } from "@/lib/logger";
-
-export const revalidate = 900;
+import {
+  getCachedHomeFeedData,
+  getCachedPublishedArticles,
+  getCachedPublishedArticlesByCursor,
+} from "@/lib/publicCachedData";
 
 const MAX_SAFE_OFFSET_PAGE = 1000;
 
@@ -42,7 +43,7 @@ function buildArticleApiHeaders({
         : "fallback";
 
   const headers: Record<string, string> = {
-    ...ARTICLE_API_CACHE_HEADERS,
+    ...getPublicCacheHeaders("public-feed", { cacheTags: [PUBLIC_FEED_CACHE_TAG] }),
     "X-NutsNews-Article-Page-Size": String(PAGE_SIZE),
     "X-NutsNews-Article-Pagination": paginationMode,
     "X-NutsNews-Article-Fields": "card",
@@ -91,6 +92,16 @@ function parsePage(value: string | null) {
   return Math.min(Math.floor(parsedPage), MAX_SAFE_OFFSET_PAGE);
 }
 
+function shouldBypassCacheForStagingQualification(searchParams: URLSearchParams) {
+  const qualification = searchParams.get("qualification")?.trim();
+
+  return (
+    process.env.NUTSNEWS_RUNTIME_ENV === "staging" &&
+    typeof qualification === "string" &&
+    /^nutsnews-test-[a-z0-9-]+$/i.test(qualification)
+  );
+}
+
 export async function GET(request: Request) {
   const startedAt = Date.now();
   const { searchParams } = new URL(request.url);
@@ -101,6 +112,8 @@ export async function GET(request: Request) {
   const homeMode = searchParams.get("home") === "1";
   const languageCode = normalizeLanguageCode(searchParams.get("lang"));
   const paginationMode = homeMode ? "home" : cursor ? "cursor" : "offset";
+  const bypassCacheForQualification =
+    shouldBypassCacheForStagingQualification(searchParams);
 
   try {
     const responsePageSize = homeMode
@@ -109,10 +122,12 @@ export async function GET(request: Request) {
         ? CURSOR_PAGE_SIZE
         : PAGE_SIZE;
     const result = homeMode
-      ? await getHomeFeedDataWithEdgeFallback(languageCode)
+      ? await getCachedHomeFeedData(languageCode)
       : cursor
-        ? await getPublishedArticlesByCursor(cursor, category, languageCode)
-        : await getPublishedArticlesWithEdgeFallback(page, category, languageCode);
+        ? await getCachedPublishedArticlesByCursor(cursor, category, languageCode)
+        : bypassCacheForQualification
+          ? await getPublishedArticlesWithEdgeFallback(page, category, languageCode)
+          : await getCachedPublishedArticles(page, category, languageCode);
 
     await logInfoSampled(
       "api.articles.request_completed",
@@ -128,6 +143,7 @@ export async function GET(request: Request) {
         pageSize: responsePageSize,
         category: category ?? "all",
         languageCode,
+        bypassCacheForQualification,
         articleCount: result.articles.length,
         nextPage: result.nextPage,
         hasNextCursor: Boolean(result.nextCursor),
@@ -143,11 +159,6 @@ export async function GET(request: Request) {
           paginationMode,
           languageCode,
         }),
-        ...(homeMode
-          ? {
-              "X-NutsNews-Cache-Policy": `public-home-feed-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`,
-            }
-          : {}),
       },
     });
   } catch (error) {
@@ -231,14 +242,11 @@ export async function GET(request: Request) {
 
       return NextResponse.json(result, {
         status: 200,
-        headers: {
-          ...buildArticleApiHeaders({
-            result,
-            paginationMode,
-            languageCode,
-          }),
-          "X-NutsNews-Cache-Policy": `public-home-feed-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`,
-        },
+        headers: buildArticleApiHeaders({
+          result,
+          paginationMode,
+          languageCode,
+        }),
       });
     }
 

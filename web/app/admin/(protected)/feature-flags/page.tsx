@@ -1,13 +1,13 @@
+import { connection } from "next/server";
 import { getRuntimeFeatureFlags } from "@/lib/runtimeFeatureFlags";
 
 export const metadata = {
   title: "Runtime feature flags | NutsNews Admin",
 };
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 export default async function FeatureFlagsPage() {
+  await connection();
   const flags = await getRuntimeFeatureFlags();
 
   return (

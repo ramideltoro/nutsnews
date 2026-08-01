@@ -4,12 +4,26 @@ on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: Type purge-production-cache to manually purge the production Cloudflare cache.
+        description: Type purge-production-cache to confirm a targeted purge, or purge-everything-production for break glass.
         required: true
         type: string
       reason:
         description: Why are you manually purging the production Cloudflare cache?
         required: true
+        type: string
+      mode:
+        description: Prefer tags; full-zone purge is break-glass only.
+        required: true
+        default: tags
+        type: choice
+        options:
+          - tags
+          - urls
+          - everything
+      targets:
+        description: Comma-separated allowlisted tags or production HTTPS URLs (unused for everything).
+        required: false
+        default: site-shell
         type: string
       dry_run:
         description: Validate configuration without calling Cloudflare
@@ -36,8 +50,12 @@ jobs:
         env:
           CONFIRMATION: ${{ github.event.inputs.confirmation }}
         run: |
-          if [ "$CONFIRMATION" != "purge-production-cache" ]; then
-            echo "Manual Cloudflare production cache purge requires typed confirmation purge-production-cache." >&2
+          if [[ "${{ github.event.inputs.mode }}" == "everything" && "$CONFIRMATION" != "purge-everything-production" ]]; then
+            echo "Full-zone purge requires typed confirmation purge-everything-production." >&2
+            exit 1
+          fi
+          if [[ "${{ github.event.inputs.mode }}" != "everything" && "$CONFIRMATION" != "purge-production-cache" ]]; then
+            echo "Targeted cache purge requires typed confirmation purge-production-cache." >&2
             exit 1
           fi
 
@@ -49,7 +67,7 @@ jobs:
         with:
           node-version: 22
 
-      - name: Purge everything from Cloudflare cache
+      - name: Purge selected Cloudflare cache targets
         env:
           NUTSNEWS_RUNTIME_ENV: production
           NUTSNEWS_SIDE_EFFECTS_MODE: live
@@ -60,7 +78,10 @@ jobs:
           NUTSNEWS_PUBLIC_SUPABASE_URL: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_URL }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-          CLOUDFLARE_PURGE_EVERYTHING: 'true'
+          CLOUDFLARE_PURGE_EVERYTHING: ${{ github.event.inputs.mode == 'everything' && 'true' || 'false' }}
+          CLOUDFLARE_PURGE_CONFIRMATION: ${{ github.event.inputs.confirmation }}
+          CLOUDFLARE_PURGE_TAGS: ${{ github.event.inputs.mode == 'tags' && github.event.inputs.targets || '' }}
+          CLOUDFLARE_PURGE_URLS: ${{ github.event.inputs.mode == 'urls' && github.event.inputs.targets || '' }}
           CLOUDFLARE_PURGE_DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
           DEPLOYMENT_ENVIRONMENT: manual
           DEPLOYMENT_STATE: manual
@@ -76,5 +97,7 @@ jobs:
             echo "This workflow is an operator recovery path only. Normal PR deployments are validated before merge by \`Pre-merge deployment gate\` and do not trigger this workflow automatically."
             echo
             echo "- Dry run: \`${{ github.event.inputs.dry_run || 'false' }}\`"
+            echo "- Mode: \`${{ github.event.inputs.mode }}\`"
+            echo "- Targets: \`${{ github.event.inputs.targets || 'full zone' }}\`"
             echo "- Reason: ${{ github.event.inputs.reason }}"
           } >> "$GITHUB_STEP_SUMMARY"

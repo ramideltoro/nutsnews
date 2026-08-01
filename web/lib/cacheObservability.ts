@@ -7,6 +7,8 @@ type CacheObservabilityRouteConfig = {
   label: string;
   path: string;
   discoverArticleFromApi?: boolean;
+  discoverArticleApiFromApi?: boolean;
+  requireCloudflareCacheable?: boolean;
   method?: "GET" | "HEAD";
   expectedStatuses: number[];
   expectedPolicy: string;
@@ -307,12 +309,14 @@ function evaluateRoute({
 
   if (!cfStatus) {
     if (urlUsesCloudflareFrontedHost(url)) {
-      warnings.push("cf-cache-status was not observed for a Cloudflare-fronted host. Public edge caching is ambiguous.");
+      const finding = "cf-cache-status was not observed for a Cloudflare-fronted host. Public edge caching is ambiguous.";
+      if (route.requireCloudflareCacheable) failures.push(finding);
+      else warnings.push(finding);
     }
   } else if (!allowedCloudflareStatuses().has(normalizedCfStatus)) {
     warnings.push(`Unexpected Cloudflare cache status observed: ${cfStatus}.`);
-  } else if (route.key === "articles-api" && ["BYPASS", "DYNAMIC"].includes(normalizedCfStatus)) {
-    failures.push(`/api/articles returned non-cache Cloudflare status: ${cfStatus}.`);
+  } else if (route.requireCloudflareCacheable && !hasCacheableCloudflareStatus) {
+    failures.push(`${route.path} returned non-cache Cloudflare status: ${cfStatus}.`);
   } else if (!hasCacheableCloudflareStatus) {
     warnings.push(`Cloudflare returned ${cfStatus}; app cache headers matched, but public edge caching was not confirmed for this route.`);
   }
@@ -348,9 +352,11 @@ export async function getCacheObservabilityDashboardData({
     let resolvedPath = route.path;
 
     try {
-      if (route.discoverArticleFromApi) {
+      if (route.discoverArticleFromApi || route.discoverArticleApiFromApi) {
         discoveredArticlePath = await discoverArticlePath(normalizedBaseUrl, articlePath);
-        resolvedPath = discoveredArticlePath;
+        resolvedPath = route.discoverArticleApiFromApi
+          ? discoveredArticlePath.replace("/articles/", "/api/articles/")
+          : discoveredArticlePath;
       }
 
       const url = toUrl(normalizedBaseUrl, resolvedPath);

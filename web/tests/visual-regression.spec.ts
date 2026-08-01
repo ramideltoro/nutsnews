@@ -62,6 +62,11 @@ test.beforeEach(async ({ context }) => {
 test.describe('public visual regression snapshots', () => {
   test('homepage is stable on desktop and mobile', async ({ page }, testInfo) => {
     await openHomeWithArticles(page);
+    await expect(page.getByTestId('nutsnews-save-story-button').first()).toBeVisible({ timeout: 15_000 });
+    if (testInfo.project.name === 'mobile') {
+      await expect(page.getByTestId('nutsnews-footer-menu')).toBeVisible({ timeout: 15_000 });
+    }
+    await hideNextDevelopmentChrome(page);
     await maskVolatileText(page);
     await page.evaluate(() => window.scrollTo(0, 0));
     await expect(page).toHaveScreenshot(snapshotName(testInfo.project.name, 'homepage.png'));
@@ -145,6 +150,12 @@ async function openHomeWithArticles(page: Page) {
   expect(response?.ok(), `Expected homepage to load, got ${response?.status() ?? 'no response'}`).toBeTruthy();
   await expect(page.getByTestId('nutsnews-article-feed')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(FIRST_ARTICLE_TITLE).first()).toBeVisible();
+}
+
+async function hideNextDevelopmentChrome(page: Page) {
+  await page.addStyleTag({
+    content: 'nextjs-portal { display: none !important; }',
+  });
 }
 
 async function openSettingsPanel(page: Page) {

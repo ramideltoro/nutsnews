@@ -1,215 +1,189 @@
 {
   "$schema": "https://nutsnews.com/schemas/cache-observability.schema.json",
-  "version": 1,
-  "description": "Expected public cache policy for Cloudflare/VPS-primary observability checks with Vercel kept as the secondary recovery target.",
+  "version": 2,
+  "description": "Expected cache policy for every public route class protected by the coordinated NutsNews cache design.",
   "defaultBaseUrl": "https://www.nutsnews.com",
   "defaults": {
     "timeoutMs": 15000,
     "sampleCount": 2,
     "sampleDelayMs": 1500,
-    "userAgent": "NutsNews-Cache-Observability/1.0 (+https://www.nutsnews.com)",
-    "requiredHeaders": [
-      "cache-control",
-      "x-nutsnews-cache-policy"
-    ],
-    "forbiddenCacheControlTokens": [
-      "no-store",
-      "private"
-    ],
-    "allowedCloudflareStatuses": [
-      "HIT",
-      "MISS",
-      "EXPIRED",
-      "REVALIDATED",
-      "STALE",
-      "UPDATING",
-      "BYPASS",
-      "DYNAMIC"
-    ],
-    "visibleCdnControlHeaders": [
-      "cdn-cache-control",
-      "cloudflare-cdn-cache-control",
-      "vercel-cdn-cache-control"
-    ],
-    "hiddenAfterCdnHeaders": [
-      "cloudflare-cdn-cache-control",
-      "vercel-cdn-cache-control"
-    ],
-    "cloudflareFrontedHosts": [
-      "nutsnews.com",
-      "www.nutsnews.com"
-    ],
-    "originOnlyHosts": [
-      "vps.nutsnews.com"
-    ]
+    "userAgent": "NutsNews-Cache-Observability/2.0 (+https://www.nutsnews.com)",
+    "requiredHeaders": ["cache-control", "x-nutsnews-cache-policy"],
+    "forbiddenCacheControlTokens": ["no-store", "private"],
+    "allowedCloudflareStatuses": ["HIT", "MISS", "EXPIRED", "REVALIDATED", "STALE", "UPDATING", "BYPASS", "DYNAMIC"],
+    "visibleCdnControlHeaders": ["cdn-cache-control", "cloudflare-cdn-cache-control", "vercel-cdn-cache-control"],
+    "hiddenAfterCdnHeaders": ["cloudflare-cdn-cache-control", "vercel-cdn-cache-control"],
+    "cloudflareFrontedHosts": ["nutsnews.com", "www.nutsnews.com"],
+    "originOnlyHosts": ["vps.nutsnews.com"]
   },
   "routes": [
     {
       "key": "homepage",
       "label": "Homepage",
       "path": "/",
-      "expectedStatuses": [
-        200
-      ],
-      "expectedPolicy": "public-home-cache-3600s",
-      "expectedCacheIncludes": [
-        "public"
-      ],
-      "expectedCdnIncludes": [
-        "s-maxage=3600"
-      ],
-      "description": "Primary reader landing page. Must stay CDN-cacheable to protect VPS primary, Vercel fallback, and Supabase.",
-      "method": "HEAD"
+      "method": "HEAD",
+      "expectedStatuses": [200],
+      "expectedPolicy": "public-feed-cache-7200s",
+      "expectedCacheIncludes": ["public"],
+      "expectedCdnIncludes": ["s-maxage=7200", "stale-if-error=604800"],
+      "requireCloudflareCacheable": true
+    },
+    {
+      "key": "articles-api",
+      "label": "Articles API",
+      "path": "/api/articles?page=0&lang=en",
+      "method": "GET",
+      "expectedStatuses": [200],
+      "expectedPolicy": "public-feed-cache-7200s",
+      "expectedCacheIncludes": ["public"],
+      "expectedCdnIncludes": ["s-maxage=7200", "stale-if-error=604800"],
+      "requiredHeaders": ["cache-control", "x-nutsnews-cache-policy", "x-nutsnews-article-data-source", "x-nutsnews-feed-snapshot"],
+      "requireCloudflareCacheable": true
+    },
+    {
+      "key": "home-feed-api",
+      "label": "Home feed API",
+      "path": "/api/home-feed?lang=en",
+      "method": "GET",
+      "expectedStatuses": [200],
+      "expectedPolicy": "public-feed-cache-7200s",
+      "expectedCacheIncludes": ["public"],
+      "expectedCdnIncludes": ["s-maxage=7200"],
+      "requireCloudflareCacheable": true
+    },
+    {
+      "key": "search-api",
+      "label": "Search API",
+      "path": "/api/search?q=good%20news&page=0&limit=20&lang=en&utm_source=cache-audit",
+      "method": "GET",
+      "expectedStatuses": [200],
+      "expectedPolicy": "public-search-cache-21600s",
+      "expectedCacheIncludes": ["public"],
+      "expectedCdnIncludes": ["s-maxage=21600"],
+      "requireCloudflareCacheable": true
     },
     {
       "key": "article-page",
       "label": "Article page",
       "path": "/articles/__discovered__",
       "discoverArticleFromApi": true,
-      "expectedStatuses": [
-        200
-      ],
-      "expectedPolicy": "public-article-cache-3600s",
-      "expectedCacheIncludes": [
-        "public"
-      ],
-      "expectedCdnIncludes": [
-        "s-maxage=3600"
-      ],
-      "description": "A live article detail page discovered from /api/articles.",
       "method": "HEAD",
-      "allowBrowserNoStoreWhenCloudflareHit": true
+      "expectedStatuses": [200],
+      "expectedPolicy": "public-article-cache-2592000s",
+      "expectedCacheIncludes": ["public"],
+      "expectedCdnIncludes": ["s-maxage=2592000"],
+      "requireCloudflareCacheable": true
     },
     {
-      "key": "articles-api",
-      "label": "Articles API",
-      "path": "/api/articles?limit=1",
-      "expectedStatuses": [
-        200
-      ],
-      "expectedPolicy": "public-api-cache-3600s",
-      "expectedCacheIncludes": [
-        "public"
-      ],
-      "expectedCdnIncludes": [
-        "s-maxage=3600"
-      ],
-      "requiredHeaders": [
-        "cache-control",
-        "x-nutsnews-cache-policy",
-        "x-nutsnews-article-data-source",
-        "x-nutsnews-feed-snapshot"
-      ],
-      "description": "Public feed API. This is the highest-priority regression alert because non-cacheable API responses can increase Supabase pressure.",
-      "method": "GET"
+      "key": "article-api",
+      "label": "Article detail API",
+      "path": "/api/articles/__discovered__",
+      "discoverArticleApiFromApi": true,
+      "method": "GET",
+      "expectedStatuses": [200],
+      "expectedPolicy": "public-article-cache-2592000s",
+      "expectedCacheIncludes": ["public"],
+      "expectedCdnIncludes": ["s-maxage=2592000"],
+      "requireCloudflareCacheable": true
     },
     {
       "key": "sitemap",
-      "label": "Sitemap",
+      "label": "Root sitemap",
       "path": "/sitemap.xml",
-      "expectedStatuses": [
-        200
-      ],
-      "expectedPolicy": "public-sitemap-cache-3600s",
-      "expectedCacheIncludes": [
-        "public"
-      ],
-      "expectedCdnIncludes": [
-        "s-maxage=3600"
-      ],
-      "description": "Search-engine sitemap. Should be cacheable longer than normal reader pages.",
-      "method": "HEAD"
+      "method": "HEAD",
+      "expectedStatuses": [200],
+      "expectedPolicy": "public-sitemap-cache-7200s",
+      "expectedCacheIncludes": ["public"],
+      "expectedCdnIncludes": ["s-maxage=7200"],
+      "requireCloudflareCacheable": true
     },
     {
       "key": "sitemap-index",
       "label": "Sitemap index",
       "path": "/sitemap-index.xml",
-      "expectedStatuses": [
-        200
-      ],
-      "expectedPolicy": "public-sitemap-index-cache-3600s",
-      "expectedCacheIncludes": [
-        "public"
-      ],
-      "expectedCdnIncludes": [
-        "s-maxage=3600"
-      ],
-      "description": "Search-engine sitemap index that advertises the root sitemap and article sitemap shards.",
-      "method": "HEAD"
+      "method": "HEAD",
+      "expectedStatuses": [200],
+      "expectedPolicy": "public-sitemap-cache-7200s",
+      "expectedCacheIncludes": ["public"],
+      "expectedCdnIncludes": ["s-maxage=7200"],
+      "requireCloudflareCacheable": true
     },
     {
       "key": "article-sitemap",
       "label": "Article sitemap shard",
       "path": "/articles/sitemap/0.xml",
-      "expectedStatuses": [
-        200
-      ],
-      "expectedPolicy": "public-article-sitemap-cache-3600s",
-      "expectedCacheIncludes": [
-        "public"
-      ],
-      "expectedCdnIncludes": [
-        "s-maxage=3600"
-      ],
-      "description": "First article sitemap shard. Should stay cacheable and fast as the archive grows.",
-      "method": "HEAD"
+      "method": "HEAD",
+      "expectedStatuses": [200],
+      "expectedPolicy": "public-sitemap-cache-7200s",
+      "expectedCacheIncludes": ["public"],
+      "expectedCdnIncludes": ["s-maxage=7200"],
+      "requireCloudflareCacheable": true
     },
     {
-      "key": "robots",
-      "label": "Robots",
-      "path": "/robots.txt",
-      "expectedStatuses": [
-        200
-      ],
-      "expectedPolicy": "public-robots-cache-3600s",
-      "expectedCacheIncludes": [
-        "public"
-      ],
-      "expectedCdnIncludes": [
-        "s-maxage=3600"
-      ],
-      "description": "Search crawler policy file. Should be cacheable longer than normal reader pages.",
-      "method": "HEAD"
+      "key": "about",
+      "label": "About page",
+      "path": "/about?utm_source=cache-audit",
+      "method": "HEAD",
+      "expectedStatuses": [200],
+      "expectedPolicy": "public-static-page-cache-2592000s",
+      "expectedCacheIncludes": ["public"],
+      "expectedCdnIncludes": ["s-maxage=2592000"],
+      "requireCloudflareCacheable": true
     },
     {
-      "key": "icon",
-      "label": "Icon asset",
-      "path": "/icon.png",
-      "expectedStatuses": [
-        200
-      ],
-      "expectedPolicy": "public-static-asset-cache-immutable",
-      "expectedCacheIncludes": [
-        "public",
-        "max-age=31536000",
-        "immutable"
-      ],
-      "expectedCdnIncludes": [
-        "max-age=31536000",
-        "immutable"
-      ],
-      "description": "Static app icon. Should be immutable at the CDN edge.",
-      "method": "HEAD"
+      "key": "contact",
+      "label": "Contact page",
+      "path": "/contact",
+      "method": "HEAD",
+      "expectedStatuses": [200],
+      "expectedPolicy": "public-static-page-cache-2592000s",
+      "expectedCacheIncludes": ["public"],
+      "expectedCdnIncludes": ["s-maxage=2592000"],
+      "requireCloudflareCacheable": true
     },
     {
-      "key": "apple-icon",
-      "label": "Apple icon asset",
-      "path": "/apple-icon.png",
-      "expectedStatuses": [
-        200
-      ],
-      "expectedPolicy": "public-static-asset-cache-immutable",
-      "expectedCacheIncludes": [
-        "public",
-        "max-age=31536000",
-        "immutable"
-      ],
-      "expectedCdnIncludes": [
-        "max-age=31536000",
-        "immutable"
-      ],
-      "description": "Static Apple touch icon. Should be immutable at the CDN edge.",
-      "method": "HEAD"
+      "key": "apps",
+      "label": "Apps page",
+      "path": "/apps",
+      "method": "HEAD",
+      "expectedStatuses": [200],
+      "expectedPolicy": "public-static-page-cache-2592000s",
+      "expectedCacheIncludes": ["public"],
+      "expectedCdnIncludes": ["s-maxage=2592000"],
+      "requireCloudflareCacheable": true
+    },
+    {
+      "key": "saved",
+      "label": "Saved page",
+      "path": "/saved",
+      "method": "HEAD",
+      "expectedStatuses": [200],
+      "expectedPolicy": "public-static-page-cache-2592000s",
+      "expectedCacheIncludes": ["public"],
+      "expectedCdnIncludes": ["s-maxage=2592000"],
+      "requireCloudflareCacheable": true
+    },
+    {
+      "key": "privacy",
+      "label": "Privacy page",
+      "path": "/privacy/ios",
+      "method": "HEAD",
+      "expectedStatuses": [200],
+      "expectedPolicy": "public-static-page-cache-2592000s",
+      "expectedCacheIncludes": ["public"],
+      "expectedCdnIncludes": ["s-maxage=2592000"],
+      "requireCloudflareCacheable": true
+    },
+    {
+      "key": "optimized-image",
+      "label": "Next.js optimized image",
+      "path": "/_next/image?url=%2Ficon.png&w=96&q=75",
+      "method": "GET",
+      "expectedStatuses": [200],
+      "expectedPolicy": "public-article-cache-2592000s",
+      "expectedCacheIncludes": ["public"],
+      "expectedCdnIncludes": ["s-maxage=2592000"],
+      "requireCloudflareCacheable": true
     }
   ]
 }

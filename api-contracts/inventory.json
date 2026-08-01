@@ -328,6 +328,41 @@
       "testFile": "scripts/api_contract_compatibility_regression.mjs"
     },
     {
+      "id": "internal-cache-revalidation",
+      "method": ["POST"],
+      "path": "/api/internal/cache/revalidate",
+      "routeFile": "web/app/api/internal/cache/revalidate/route.ts",
+      "request": {
+        "headers": {
+          "Content-Type": "application/json",
+          "X-NutsNews-Timestamp": "required Unix timestamp in seconds within the configured clock-skew window",
+          "X-NutsNews-Request-Id": "required unique request identifier",
+          "X-NutsNews-Signature": "required lowercase hexadecimal HMAC-SHA256 signature, optionally prefixed by sha256="
+        },
+        "body": {
+          "tags": "required non-empty array containing only public-feed, site-shell, or article:<safe-id> tags"
+        }
+      },
+      "auth": "internal; timestamped HMAC authentication and replay rejection are required",
+      "successStatus": [200],
+      "successResponseShape": {
+        "contentType": "application/json",
+        "requiredKeys": ["revalidated", "requestId", "tags"],
+        "revalidated": true,
+        "requestId": "string",
+        "tags": "string[]"
+      },
+      "errorStatuses": [400, 401, 409, 503],
+      "errorShape": {
+        "requiredKeys": ["error"],
+        "error": "string"
+      },
+      "pagination": "none",
+      "cache": "bypass/no-store on every response",
+      "iosCallSites": [],
+      "testFile": "scripts/api_contract_compatibility_regression.mjs"
+    },
+    {
       "id": "log-test",
       "method": ["GET"],
       "path": "/api/log-test",

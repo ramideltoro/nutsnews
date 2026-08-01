@@ -72,9 +72,10 @@ describe("localized article detail API", () => {
       requested_language_code: "fr",
       translation_available: true,
     });
-    expect(response.headers.get("cache-control")).toContain("s-maxage=300");
-    expect(response.headers.get("cdn-cache-control")).toContain("s-maxage=3600");
-    expect(response.headers.get("x-nutsnews-cache-policy")).toBe("public-api-cache-3600s");
+    expect(response.headers.get("cache-control")).toBe("public, max-age=0, must-revalidate");
+    expect(response.headers.get("cdn-cache-control")).toContain("s-maxage=2592000");
+    expect(response.headers.get("x-nutsnews-cache-policy")).toBe("public-article-cache-2592000s");
+    expect(response.headers.get("cache-tag")).toBe("article:detail-1");
     expect(response.headers.get("x-nutsnews-article-fields")).toBe("detail");
     expect(response.headers.get("x-nutsnews-article-language")).toBe("fr");
     expect(response.headers.get("x-nutsnews-article-resolved-language")).toBe("fr");

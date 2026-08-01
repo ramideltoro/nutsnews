@@ -6,8 +6,6 @@ import { evaluateRuntimeReadiness } from "@/lib/runtimeReadiness";
 import { getDatabaseProviderMode } from "@/lib/runtimeSafety";
 import { getSupabase } from "@/lib/supabase";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 async function readSchemaContract() {
   const backendPrimary = getDatabaseProviderMode() === "backend_postgres_primary";

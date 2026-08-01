@@ -230,14 +230,12 @@ describe("public readiness synthetic contract", () => {
 });
 
 describe("legacy liveness compatibility contract", () => {
-  it("keeps healthz static and cacheable while exposing the same safe identity", async () => {
-    const { GET, dynamic, revalidate } = await import("@/app/healthz/route");
+  it("keeps healthz cacheable while exposing the same safe identity", async () => {
+    const { GET } = await import("@/app/healthz/route");
 
     const response = GET();
     const body = (await response.json()) as Record<string, unknown>;
 
-    expect(dynamic).toBe("force-static");
-    expect(revalidate).toBe(3600);
     expect(body).toEqual({
       ok: true,
       service: "nutsnews-web",
@@ -248,7 +246,7 @@ describe("legacy liveness compatibility contract", () => {
     expect(response.headers.get("cache-control")).toContain("public");
     expect(response.headers.get("cache-control")).not.toContain("no-store");
     expect(response.headers.get("x-nutsnews-cache-policy")).toBe(
-      "public-healthz-cache-60s",
+      "public-health-cache-60s",
     );
   });
 });

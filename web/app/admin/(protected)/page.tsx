@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { headers } from "next/headers";
+import { connection } from "next/server";
 import { auth, signOut } from "@/auth";
 import { RuntimeIdentityBanner } from "./RuntimeIdentityBanner";
 import { buildAdminRuntimeIdentityViewModel } from "@/lib/adminRuntimeIdentity";
@@ -98,6 +99,7 @@ function SectionHeader({
 }
 
 export default async function AdminPage() {
+  await connection();
   const session = await auth();
   const requestHeaders = await headers();
   const identity = buildAdminRuntimeIdentityViewModel({

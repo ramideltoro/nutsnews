@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { connection } from "next/server";
 import { formatAdminDateLabel, formatAdminDateTime } from "@/lib/adminTime";
 import { auth, signOut } from "@/auth";
 import {
@@ -14,8 +15,6 @@ export const metadata = {
     title: "AI Usage | NutsNews Admin",
 };
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 function formatCurrency(value: number) {
     return new Intl.NumberFormat("en-US", {
@@ -668,6 +667,7 @@ function LatestWorkerRunsSection({ runs }: { runs: AiUsageLatestRun[] }) {
 }
 
 export default async function AdminAiUsagePage() {
+    await connection();
     const session = await auth();
     const dashboardData = await getAdminAiUsageDashboardData();
     const latestModel = dashboardData.latestRuns[0]?.openAiModel ?? "No runs yet";

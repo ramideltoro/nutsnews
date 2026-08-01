@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { connection } from "next/server";
 
 import {
   getAdminProductionReadinessDashboardData,
@@ -124,6 +125,7 @@ function SignalCard({ signal }: { signal: ProductionReadinessSignal }) {
 }
 
 export default async function ProductionReadinessPage() {
+  await connection();
   const data = await getAdminProductionReadinessDashboardData();
 
   return (

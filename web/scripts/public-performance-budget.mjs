@@ -319,6 +319,7 @@ function validateLighthouseConfig(root, expected) {
 
 async function validateImageOptimizer(root, expected) {
   const nextConfig = await fs.readFile(path.join(root, "next.config.ts"), "utf8");
+  const cacheHeaders = await fs.readFile(path.join(root, "lib", "cacheHeaders.ts"), "utf8");
   const problems = [];
 
   for (const format of expected.formats || []) {
@@ -361,7 +362,9 @@ async function validateImageOptimizer(root, expected) {
     }
   }
 
-  assertIncludes(nextConfig, "PUBLIC_PAGE_CACHE_CONTROL", "next.config.ts public page cache policy");
+  assertIncludes(nextConfig, "getPublicCacheHeaders", "next.config.ts canonical public cache helper");
+  assertIncludes(cacheHeaders, "export const PUBLIC_CACHE_POLICIES", "canonical public cache policy registry");
+  assertIncludes(cacheHeaders, '"public-article"', "canonical public article cache policy");
   assertIncludes(nextConfig, "source: \"/articles/:path*\"", "next.config.ts article cache policy");
 
   return problems;

@@ -5,8 +5,6 @@ import {
   getArticleSitemapUrl,
 } from "@/lib/sitemapConfig";
 
-export const revalidate = 3600;
-export const dynamic = "force-dynamic";
 
 function escapeXml(value: string) {
   return value

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
   class MockRuntimeSafetyError extends Error {
@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => {
     assertExternalSideEffect: vi.fn(),
     assertOAuthCallback: vi.fn(),
     createMaintenanceHomeFeedPayload: vi.fn(),
+    getCachedPublishedArticles: vi.fn(),
     getEdgeFeedSnapshotPage: vi.fn(),
     getHomeFeedDataWithEdgeFallback: vi.fn(),
     getPublishedArticlesByCursor: vi.fn(),
@@ -61,6 +62,13 @@ vi.mock("@/lib/edgeFeedSnapshot", () => ({
   getEdgeFeedSnapshotPage: mocks.getEdgeFeedSnapshotPage,
   getHomeFeedDataWithEdgeFallback: mocks.getHomeFeedDataWithEdgeFallback,
   getPublishedArticlesWithEdgeFallback: mocks.getPublishedArticlesWithEdgeFallback,
+}));
+
+vi.mock("@/lib/publicCachedData", () => ({
+  getCachedHomeFeedData: mocks.getHomeFeedDataWithEdgeFallback,
+  getCachedPublishedArticles: mocks.getCachedPublishedArticles,
+  getCachedPublishedArticlesByCursor: mocks.getPublishedArticlesByCursor,
+  getCachedSearchResults: mocks.searchPublishedArticles,
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -166,6 +174,7 @@ beforeEach(() => {
   mocks.createMaintenanceHomeFeedPayload.mockImplementation(() => maintenanceHomeFeedResult());
   mocks.getEdgeFeedSnapshotPage.mockResolvedValue(null);
   mocks.getHomeFeedDataWithEdgeFallback.mockResolvedValue(homeFeedResult());
+  mocks.getCachedPublishedArticles.mockResolvedValue(publicArticlesResult());
   mocks.getPublishedArticlesByCursor.mockResolvedValue(publicArticlesResult({ nextCursor: null }));
   mocks.getPublishedArticlesWithEdgeFallback.mockResolvedValue(publicArticlesResult());
   mocks.getRuntimePublicConfig.mockReturnValue({
@@ -188,6 +197,10 @@ beforeEach(() => {
   });
 });
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 describe("public article route handlers", () => {
   it("returns article list shape with explicit public cache headers", async () => {
     const { GET } = await import("@/app/api/articles/route");
@@ -203,16 +216,18 @@ describe("public article route handlers", () => {
       dataSource: "public_feed_snapshot",
       languageCode: "en",
     });
-    expect(response.headers.get("cache-control")).toContain("s-maxage=300");
-    expect(response.headers.get("cdn-cache-control")).toContain("s-maxage=3600");
-    expect(response.headers.get("x-nutsnews-cache-policy")).toBe("public-api-cache-3600s");
+    expect(response.headers.get("cache-control")).toBe("public, max-age=0, must-revalidate");
+    expect(response.headers.get("cdn-cache-control")).toContain("s-maxage=7200");
+    expect(response.headers.get("cdn-cache-control")).toContain("stale-if-error=604800");
+    expect(response.headers.get("x-nutsnews-cache-policy")).toBe("public-feed-cache-7200s");
+    expect(response.headers.get("cache-tag")).toBe("public-feed");
     expect(response.headers.get("x-nutsnews-article-pagination")).toBe("offset");
     expect(response.headers.get("x-nutsnews-article-language")).toBe("fr");
-    expect(mocks.getPublishedArticlesWithEdgeFallback).toHaveBeenCalledWith(2, null, "fr");
+    expect(mocks.getCachedPublishedArticles).toHaveBeenCalledWith(2, null, "fr");
   });
 
   it("normalizes malformed article params and falls back to no-store on upstream failure", async () => {
-    mocks.getPublishedArticlesWithEdgeFallback.mockRejectedValueOnce(new Error("fixture failure"));
+    mocks.getCachedPublishedArticles.mockRejectedValueOnce(new Error("fixture failure"));
 
     const { GET } = await import("@/app/api/articles/route");
     const response = await GET(request("https://www.nutsnews.com/api/articles?page=-10&lang=zz"));
@@ -227,7 +242,7 @@ describe("public article route handlers", () => {
     });
     expect(response.headers.get("cache-control")).toBe("no-store, max-age=0");
     expect(response.headers.get("x-nutsnews-cache-policy")).toBe("bypass-cache");
-    expect(mocks.getPublishedArticlesWithEdgeFallback).toHaveBeenCalledWith(0, null, "en");
+    expect(mocks.getCachedPublishedArticles).toHaveBeenCalledWith(0, null, "en");
   });
 
   it("returns localized edge fallback articles after an upstream article read failure", async () => {
@@ -239,7 +254,7 @@ describe("public article route handlers", () => {
       requested_language_code: "fr",
       translation_available: true,
     };
-    mocks.getPublishedArticlesWithEdgeFallback.mockRejectedValueOnce(new Error("fixture outage"));
+    mocks.getCachedPublishedArticles.mockRejectedValueOnce(new Error("fixture outage"));
     mocks.getEdgeFeedSnapshotPage.mockResolvedValueOnce(
       publicArticlesResult({
         articles: [localizedEdgeArticle],
@@ -283,6 +298,21 @@ describe("public article route handlers", () => {
     });
   });
 
+  it("bypasses the application cache for a valid isolated staging qualification", async () => {
+    vi.stubEnv("NUTSNEWS_RUNTIME_ENV", "staging");
+
+    const { GET } = await import("@/app/api/articles/route");
+    const response = await GET(
+      request(
+        "https://staging.nutsnews.com/api/articles?page=0&lang=en&qualification=nutsnews-test-run-123",
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.getPublishedArticlesWithEdgeFallback).toHaveBeenCalledWith(0, null, "en");
+    expect(mocks.getCachedPublishedArticles).not.toHaveBeenCalled();
+  });
+
   it("returns home-feed shape with the home-feed cache policy", async () => {
     const { GET } = await import("@/app/api/home-feed/route");
 
@@ -294,8 +324,8 @@ describe("public article route handlers", () => {
       articles: [expect.objectContaining({ id: "article-1" })],
       sections: [{ id: "community", articles: [expect.objectContaining({ id: "article-1" })] }],
     });
-    expect(response.headers.get("cache-control")).toContain("s-maxage=300");
-    expect(response.headers.get("x-nutsnews-cache-policy")).toBe("public-home-feed-cache-3600s");
+    expect(response.headers.get("cache-control")).toBe("public, max-age=0, must-revalidate");
+    expect(response.headers.get("x-nutsnews-cache-policy")).toBe("public-feed-cache-7200s");
     expect(response.headers.get("x-nutsnews-article-language")).toBe("fr");
     expect(response.headers.get("x-nutsnews-article-data-source")).toBe("public_feed_snapshot");
     expect(response.headers.get("x-nutsnews-feed-snapshot")).toBe("hit");
@@ -319,7 +349,7 @@ describe("public article route handlers", () => {
         reason: "home_feed_exception",
       },
     });
-    expect(response.headers.get("x-nutsnews-cache-policy")).toBe("public-home-feed-cache-3600s");
+    expect(response.headers.get("x-nutsnews-cache-policy")).toBe("public-feed-cache-7200s");
     expect(response.headers.get("x-nutsnews-degradation-mode")).toBe("maintenance");
     expect(response.headers.get("x-nutsnews-degradation-reason")).toBe("home_feed_exception");
   });
@@ -351,9 +381,9 @@ describe("public search route handler", () => {
       pageSize: 20,
       languageCode: "en",
     });
-    expect(response.headers.get("cache-control")).toContain("max-age=30");
-    expect(response.headers.get("cdn-cache-control")).toContain("max-age=60");
-    expect(response.headers.get("x-nutsnews-cache-policy")).toBe("public-search-cache-60s");
+    expect(response.headers.get("cache-control")).toBe("public, max-age=0, must-revalidate");
+    expect(response.headers.get("cdn-cache-control")).toContain("s-maxage=21600");
+    expect(response.headers.get("x-nutsnews-cache-policy")).toBe("public-search-cache-21600s");
     expect(mocks.searchPublishedArticles).toHaveBeenCalledWith("kind news", 0, 20, "en");
   });
 

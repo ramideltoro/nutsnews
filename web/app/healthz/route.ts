@@ -1,5 +1,3 @@
-export const dynamic = "force-static";
-export const revalidate = 3600;
 
 function identityValue(fallback: string, ...values: Array<string | undefined>) {
   for (const value of values) {
@@ -44,11 +42,7 @@ export function GET() {
     },
     {
       headers: {
-        "Cache-Control": "public, max-age=0, must-revalidate",
-        "CDN-Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
-        "Cloudflare-CDN-Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
-        "Vercel-CDN-Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
-        "X-NutsNews-Cache-Policy": "public-healthz-cache-60s",
+        ...getPublicCacheHeaders("public-health"),
         "X-NutsNews-Source-Commit": sourceCommit,
         "X-NutsNews-Build-Id": buildId,
         "X-NutsNews-Deployment-Target": deploymentTarget,
@@ -56,3 +50,4 @@ export function GET() {
     },
   );
 }
+import { getPublicCacheHeaders } from "@/lib/cacheHeaders";

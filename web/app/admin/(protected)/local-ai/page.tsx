@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { connection } from "next/server";
 import { auth, signOut } from "@/auth";
 import { formatAdminDateLabel, formatAdminDateTime } from "@/lib/adminTime";
 import {
@@ -15,8 +16,6 @@ export const metadata = {
   title: "Local AI | NutsNews Admin",
 };
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("en-US").format(Math.round(value));
@@ -499,6 +498,7 @@ AI_PROVIDER_FALLBACK_TO_OPENAI=true`}
 }
 
 export default async function LocalAiAdminPage() {
+  await connection();
   const session = await auth();
   const data = await getAdminLocalAiDashboardData();
 
