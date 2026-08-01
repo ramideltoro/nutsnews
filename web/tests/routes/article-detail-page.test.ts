@@ -73,7 +73,6 @@ describe("article detail static rendering", () => {
       { id: "detail-1" },
       { id: "detail-2" },
     ]);
-    expect(pageModule.revalidate).toBe(3600);
     expect(mocks.getRecentArticleSitemapItems).toHaveBeenCalledWith(100);
   });
 

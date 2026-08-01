@@ -1,13 +1,12 @@
 import Link from "next/link";
 import { headers } from "next/headers";
+import { connection } from "next/server";
 import { getCacheObservabilityDashboardData } from "@/lib/cacheObservability";
 
 export const metadata = {
   title: "Cache Observability | NutsNews Admin",
 };
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 function formatPercent(value: number | null) {
   if (typeof value !== "number") {
@@ -78,6 +77,7 @@ async function getDefaultBaseUrl() {
 }
 
 export default async function CacheObservabilityPage() {
+  await connection();
   const data = await getCacheObservabilityDashboardData({
     baseUrl: await getDefaultBaseUrl(),
     articlePath: process.env.NUTSNEWS_CACHE_ARTICLE_PATH,

@@ -1,16 +1,17 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { auth } from "@/auth";
 import { isAllowedAdminEmail } from "@/lib/adminAuth";
 import { assertSyntheticTestUser } from "@/lib/runtimeSafety";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
-export default async function ProtectedAdminLayout({
+async function ProtectedAdminRequest({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  await connection();
   let allowTestBypass = false;
   if (process.env.NUTSNEWS_ADMIN_TEST_AUTH_BYPASS === "true") {
     try {
@@ -37,4 +38,16 @@ export default async function ProtectedAdminLayout({
   }
 
   return <>{children}</>;
+}
+
+export default function ProtectedAdminLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <Suspense fallback={null}>
+      <ProtectedAdminRequest>{children}</ProtectedAdminRequest>
+    </Suspense>
+  );
 }

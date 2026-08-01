@@ -5,7 +5,6 @@ import { getArticleById, getRecentArticleSitemapItems, SITE_URL } from "@/lib/ar
 import { getPublisherAttribution } from "@/lib/publisherAttribution";
 import { LocalizedArticleDetail } from "./LocalizedArticleDetail";
 
-export const revalidate = 3600;
 
 type ArticlePageProps = {
   params: Promise<{
@@ -15,7 +14,14 @@ type ArticlePageProps = {
 
 export async function generateStaticParams() {
   const articles = await getRecentArticleSitemapItems(100);
-  return articles.map((article) => ({ id: article.id }));
+  const params = articles.map((article) => ({ id: article.id }));
+
+  // Cache Components validates at least one static parameter during builds.
+  // The all-zero UUID is never a published article and safely renders 404 when
+  // an offline CI build cannot reach the article store.
+  return params.length > 0
+    ? params
+    : [{ id: "00000000-0000-4000-8000-000000000000" }];
 }
 
 export async function generateMetadata({

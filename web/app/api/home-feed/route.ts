@@ -1,18 +1,14 @@
 import { NextResponse } from "next/server";
 
-import {
-  ARTICLE_API_CACHE_HEADERS,
-  PUBLIC_CDN_S_MAXAGE_SECONDS,
-} from "@/lib/cacheHeaders";
+import { getPublicCacheHeaders } from "@/lib/cacheHeaders";
+import { PUBLIC_FEED_CACHE_TAG } from "@/lib/cacheTags";
 import {
   createMaintenanceHomeFeedPayload,
-  getHomeFeedDataWithEdgeFallback,
 } from "@/lib/edgeFeedSnapshot";
 import type { FeedDegradationStatus, HomeFeedPayload } from "@/lib/articles";
 import { normalizeLanguageCode } from "@/lib/languages";
 import { logError, logInfoSampled, logWarn } from "@/lib/logger";
-
-export const revalidate = 900;
+import { getCachedHomeFeedData } from "@/lib/publicCachedData";
 
 function buildHomeFeedHeaders(result: HomeFeedPayload, languageCode: string) {
   const feedSnapshotStatus =
@@ -23,8 +19,7 @@ function buildHomeFeedHeaders(result: HomeFeedPayload, languageCode: string) {
         : "fallback";
 
   const headers: Record<string, string> = {
-    ...ARTICLE_API_CACHE_HEADERS,
-    "X-NutsNews-Cache-Policy": `public-home-feed-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`,
+    ...getPublicCacheHeaders("public-feed", { cacheTags: [PUBLIC_FEED_CACHE_TAG] }),
     "X-NutsNews-Article-Language": languageCode,
     "X-NutsNews-Article-Data-Source": result.dataSource,
     "X-NutsNews-Feed-Snapshot": feedSnapshotStatus,
@@ -62,7 +57,7 @@ export async function GET(request: Request) {
   const languageCode = normalizeLanguageCode(searchParams.get("lang"));
 
   try {
-    const result = await getHomeFeedDataWithEdgeFallback(languageCode);
+    const result = await getCachedHomeFeedData(languageCode);
 
     await logInfoSampled("api.home_feed.request_completed", "Home feed API request completed", {
       route: "/api/home-feed",

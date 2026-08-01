@@ -41,7 +41,10 @@ jobs:
       - name: Validate production release request
         shell: bash
         env:
+          CLOUDFLARE_CACHE_PURGE_API_TOKEN: ${{ secrets.CLOUDFLARE_CACHE_PURGE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
           NUTSNEWS_BACKEND_API_TOKEN: ${{ secrets.NUTSNEWS_BACKEND_API_TOKEN }}
+          NUTSNEWS_CACHE_REVALIDATION_SECRET: ${{ secrets.NUTSNEWS_CACHE_REVALIDATION_SECRET }}
           NUTSNEWS_INFRA_STAGING_TOKEN: ${{ secrets.NUTSNEWS_INFRA_STAGING_TOKEN }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
@@ -119,6 +122,14 @@ jobs:
             echo "VERCEL_TOKEN, VERCEL_ORG_ID, and VERCEL_PROJECT_ID secrets are required." >&2
             exit 1
           fi
+          if [[ ${#NUTSNEWS_CACHE_REVALIDATION_SECRET} -lt 32 ]]; then
+            echo "NUTSNEWS_CACHE_REVALIDATION_SECRET must be a Production environment secret with at least 32 characters." >&2
+            exit 1
+          fi
+          if [[ -z "$CLOUDFLARE_CACHE_PURGE_API_TOKEN" || ! "$CLOUDFLARE_ZONE_ID" =~ ^[0-9a-f]{32}$ ]]; then
+            echo "CLOUDFLARE_CACHE_PURGE_API_TOKEN and a valid CLOUDFLARE_ZONE_ID are required for editorial cache invalidation." >&2
+            exit 1
+          fi
           echo "RELEASE_KIND=$release_kind" >> "$GITHUB_ENV"
 
       - name: Checkout exact app source commit
@@ -193,6 +204,9 @@ jobs:
           NUTSNEWS_DEPLOYMENT_TARGET: vercel-production
           NUTSNEWS_SOURCE_COMMIT: ${{ env.SOURCE_COMMIT }}
           NUTSNEWS_BACKEND_API_TOKEN: ${{ secrets.NUTSNEWS_BACKEND_API_TOKEN }}
+          NUTSNEWS_CACHE_REVALIDATION_SECRET: ${{ secrets.NUTSNEWS_CACHE_REVALIDATION_SECRET }}
+          CLOUDFLARE_CACHE_PURGE_API_TOKEN: ${{ secrets.CLOUDFLARE_CACHE_PURGE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
           NEXT_PUBLIC_NUTSNEWS_BUILD_ID: ${{ env.BUILD_ID }}
           NEXT_PUBLIC_NUTSNEWS_SOURCE_COMMIT: ${{ env.SOURCE_COMMIT }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -233,6 +247,9 @@ jobs:
             --env "NUTSNEWS_DATABASE_PROVIDER_MODE=$DATABASE_PROVIDER_MODE"
             --env "NUTSNEWS_DEPLOYMENT_TARGET=vercel-production"
             --env "NUTSNEWS_PRODUCTION_WRITES_PAUSED=$PRODUCTION_WRITES_PAUSED"
+            --env "NUTSNEWS_CACHE_REVALIDATION_SECRET=$NUTSNEWS_CACHE_REVALIDATION_SECRET"
+            --env "CLOUDFLARE_CACHE_PURGE_API_TOKEN=$CLOUDFLARE_CACHE_PURGE_API_TOKEN"
+            --env "CLOUDFLARE_ZONE_ID=$CLOUDFLARE_ZONE_ID"
             --env "NUTSNEWS_SOURCE_COMMIT=$SOURCE_COMMIT"
             --env "NEXT_PUBLIC_NUTSNEWS_BUILD_ID=$BUILD_ID"
             --env "NEXT_PUBLIC_NUTSNEWS_SOURCE_COMMIT=$SOURCE_COMMIT"
@@ -478,6 +495,24 @@ jobs:
           console.log(`Verified Vercel secondary targets: ${secondaryTargets.join(", ")}`);
           console.log(`Verified Vercel failover aliases: ${failoverAliases.length > 0 ? failoverAliases.join(", ") : "not requested"}`);
           NODE
+
+      - name: Purge deployed site shell from Cloudflare
+        env:
+          NUTSNEWS_RUNTIME_ENV: production
+          NUTSNEWS_SIDE_EFFECTS_MODE: live
+          NUTSNEWS_DATA_ENVIRONMENT: production
+          NUTSNEWS_SUPABASE_CREDENTIALS_ENV: production
+          NUTSNEWS_SUPABASE_PROJECT_REF: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF }}
+          NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF }}
+          NUTSNEWS_PUBLIC_SUPABASE_URL: ${{ vars.NUTSNEWS_PRODUCTION_SUPABASE_URL }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          CLOUDFLARE_PURGE_TAGS: site-shell
+          CLOUDFLARE_PURGE_EVERYTHING: 'false'
+          DEPLOYMENT_ENVIRONMENT: production
+          DEPLOYMENT_STATE: promoted
+          DEPLOYMENT_URL: ${{ steps.stage.outputs.staged_deployment_url }}
+        run: node scripts/cloudflare_purge_cache.mjs
 
       - name: Summarize Vercel production deployment
         shell: bash

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { connection } from "next/server";
 import {
   type ArticleEngagementArticleRow,
   type ArticleEngagementRollupRow,
@@ -11,8 +12,6 @@ export const metadata = {
   title: "Article Engagement | NutsNews Admin",
 };
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("en-US").format(Math.round(value));
@@ -282,6 +281,7 @@ function ArticleList({
 }
 
 export default async function AdminEngagementPage() {
+  await connection();
   const data = await getAdminArticleEngagementDashboardData();
   const summary = data.summary;
 

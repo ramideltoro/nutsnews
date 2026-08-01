@@ -63,6 +63,13 @@ vi.mock("@/lib/edgeFeedSnapshot", () => ({
   getPublishedArticlesWithEdgeFallback: mocks.getPublishedArticlesWithEdgeFallback,
 }));
 
+vi.mock("@/lib/publicCachedData", () => ({
+  getCachedHomeFeedData: mocks.getHomeFeedDataWithEdgeFallback,
+  getCachedPublishedArticles: mocks.getPublishedArticlesWithEdgeFallback,
+  getCachedPublishedArticlesByCursor: mocks.getPublishedArticlesByCursor,
+  getCachedSearchResults: mocks.searchPublishedArticles,
+}));
+
 vi.mock("@/lib/logger", () => ({
   logError: mocks.logError,
   logInfoSampled: mocks.logInfoSampled,
@@ -203,9 +210,11 @@ describe("public article route handlers", () => {
       dataSource: "public_feed_snapshot",
       languageCode: "en",
     });
-    expect(response.headers.get("cache-control")).toContain("s-maxage=300");
-    expect(response.headers.get("cdn-cache-control")).toContain("s-maxage=3600");
-    expect(response.headers.get("x-nutsnews-cache-policy")).toBe("public-api-cache-3600s");
+    expect(response.headers.get("cache-control")).toBe("public, max-age=0, must-revalidate");
+    expect(response.headers.get("cdn-cache-control")).toContain("s-maxage=7200");
+    expect(response.headers.get("cdn-cache-control")).toContain("stale-if-error=604800");
+    expect(response.headers.get("x-nutsnews-cache-policy")).toBe("public-feed-cache-7200s");
+    expect(response.headers.get("cache-tag")).toBe("public-feed");
     expect(response.headers.get("x-nutsnews-article-pagination")).toBe("offset");
     expect(response.headers.get("x-nutsnews-article-language")).toBe("fr");
     expect(mocks.getPublishedArticlesWithEdgeFallback).toHaveBeenCalledWith(2, null, "fr");
@@ -294,8 +303,8 @@ describe("public article route handlers", () => {
       articles: [expect.objectContaining({ id: "article-1" })],
       sections: [{ id: "community", articles: [expect.objectContaining({ id: "article-1" })] }],
     });
-    expect(response.headers.get("cache-control")).toContain("s-maxage=300");
-    expect(response.headers.get("x-nutsnews-cache-policy")).toBe("public-home-feed-cache-3600s");
+    expect(response.headers.get("cache-control")).toBe("public, max-age=0, must-revalidate");
+    expect(response.headers.get("x-nutsnews-cache-policy")).toBe("public-feed-cache-7200s");
     expect(response.headers.get("x-nutsnews-article-language")).toBe("fr");
     expect(response.headers.get("x-nutsnews-article-data-source")).toBe("public_feed_snapshot");
     expect(response.headers.get("x-nutsnews-feed-snapshot")).toBe("hit");
@@ -319,7 +328,7 @@ describe("public article route handlers", () => {
         reason: "home_feed_exception",
       },
     });
-    expect(response.headers.get("x-nutsnews-cache-policy")).toBe("public-home-feed-cache-3600s");
+    expect(response.headers.get("x-nutsnews-cache-policy")).toBe("public-feed-cache-7200s");
     expect(response.headers.get("x-nutsnews-degradation-mode")).toBe("maintenance");
     expect(response.headers.get("x-nutsnews-degradation-reason")).toBe("home_feed_exception");
   });
@@ -351,9 +360,9 @@ describe("public search route handler", () => {
       pageSize: 20,
       languageCode: "en",
     });
-    expect(response.headers.get("cache-control")).toContain("max-age=30");
-    expect(response.headers.get("cdn-cache-control")).toContain("max-age=60");
-    expect(response.headers.get("x-nutsnews-cache-policy")).toBe("public-search-cache-60s");
+    expect(response.headers.get("cache-control")).toBe("public, max-age=0, must-revalidate");
+    expect(response.headers.get("cdn-cache-control")).toContain("s-maxage=21600");
+    expect(response.headers.get("x-nutsnews-cache-policy")).toBe("public-search-cache-21600s");
     expect(mocks.searchPublishedArticles).toHaveBeenCalledWith("kind news", 0, 20, "en");
   });
 

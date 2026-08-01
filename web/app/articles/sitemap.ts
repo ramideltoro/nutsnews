@@ -10,8 +10,6 @@ import {
   parseArticleSitemapShardId,
 } from "@/lib/sitemapConfig";
 
-export const revalidate = 3600;
-export const dynamic = "force-dynamic";
 
 type ArticleSitemapProps = {
   id: Promise<string>;
@@ -23,7 +21,12 @@ function getSitemapDate(value?: string | null) {
 
 export async function generateSitemaps() {
   const articleCount = await getPublishedArticleSitemapCount();
-  return getArticleSitemapShardIds(articleCount).map((id) => ({ id }));
+  const shardIds = getArticleSitemapShardIds(articleCount);
+
+  // Cache Components requires one build-time metadata parameter even when an
+  // offline build cannot count published rows. Shard zero is valid and emits
+  // an empty sitemap until the data source is reachable.
+  return (shardIds.length > 0 ? shardIds : [0]).map((id) => ({ id }));
 }
 
 export default async function sitemap({

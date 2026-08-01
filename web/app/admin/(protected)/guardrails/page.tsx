@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { connection } from "next/server";
 
 import {
   type GuardrailMetric,
@@ -9,8 +10,6 @@ export const metadata = {
   title: "Free-Tier Guardrails | NutsNews Admin",
 };
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 function formatNumber(value: number | null) {
   if (value === null) {
@@ -231,6 +230,7 @@ function SummaryCard({ label, value, helper }: { label: string; value: string; h
 }
 
 export default async function GuardrailsPage() {
+  await connection();
   const data = await getAdminCostGuardrailsDashboardData();
 
   return (

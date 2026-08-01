@@ -5,8 +5,6 @@ import {
   recordArticleEngagementEvent,
 } from "@/lib/articleEngagement";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 const MAX_REQUEST_BYTES = 2_048;
 const MAX_SOURCE_LENGTH = 160;

@@ -2,13 +2,12 @@ import { NextResponse } from "next/server";
 
 import { getArticleById, type Article } from "@/lib/articles";
 import {
-  ARTICLE_API_CACHE_HEADERS,
   BYPASS_CACHE_HEADERS,
+  getPublicCacheHeaders,
 } from "@/lib/cacheHeaders";
+import { articleCacheTag } from "@/lib/cacheTags";
 import { normalizeLanguageCode } from "@/lib/languages";
 import { logError, logInfoSampled } from "@/lib/logger";
-
-export const revalidate = 900;
 
 type ArticleDetailRouteContext = {
   params: Promise<{
@@ -16,9 +15,11 @@ type ArticleDetailRouteContext = {
   }>;
 };
 
-function buildArticleDetailHeaders(article: Article, languageCode: string) {
+function buildArticleDetailHeaders(articleId: string, article: Article, languageCode: string) {
   return {
-    ...ARTICLE_API_CACHE_HEADERS,
+    ...getPublicCacheHeaders("public-article", {
+      cacheTags: [articleCacheTag(articleId)],
+    }),
     "X-NutsNews-Article-Fields": "detail",
     "X-NutsNews-Article-Language": languageCode,
     "X-NutsNews-Article-Resolved-Language": article.language_code ?? "en",
@@ -72,7 +73,7 @@ export async function GET(request: Request, { params }: ArticleDetailRouteContex
     );
 
     return NextResponse.json(article, {
-      headers: buildArticleDetailHeaders(article, languageCode),
+      headers: buildArticleDetailHeaders(articleId, article, languageCode),
     });
   } catch (error) {
     await logError(

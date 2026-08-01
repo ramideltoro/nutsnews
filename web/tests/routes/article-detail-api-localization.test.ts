@@ -13,7 +13,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 
 vi.mock("next/cache", () => ({
-  unstable_cache: (operation: unknown) => operation,
+  cacheLife: vi.fn(),
+  cacheTag: vi.fn(),
 }));
 
 vi.mock("@/lib/backendDatabase", () => ({

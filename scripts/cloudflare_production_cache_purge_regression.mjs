@@ -41,7 +41,9 @@ try {
   assertIncludes(purgeWorkflow, 'Validate manual purge confirmation', 'cloudflare-production-cache-purge.yml');
   assertIncludes(purgeWorkflow, 'CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}', 'cloudflare-production-cache-purge.yml');
   assertIncludes(purgeWorkflow, 'CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}', 'cloudflare-production-cache-purge.yml');
-  assertIncludes(purgeWorkflow, 'CLOUDFLARE_PURGE_EVERYTHING: \'true\'', 'cloudflare-production-cache-purge.yml');
+  assertIncludes(purgeWorkflow, 'mode:', 'cloudflare-production-cache-purge.yml');
+  assertIncludes(purgeWorkflow, 'targets:', 'cloudflare-production-cache-purge.yml');
+  assertIncludes(purgeWorkflow, 'purge-everything-production', 'cloudflare-production-cache-purge.yml');
   assertIncludes(purgeWorkflow, 'node scripts/cloudflare_purge_cache.mjs', 'cloudflare-production-cache-purge.yml');
   assert(!/deployment_status:/m.test(purgeWorkflow), 'Production purge workflow must not run automatically from deployment_status events.');
   assert(!/^\s+push:/m.test(purgeWorkflow), 'Production purge workflow must not run directly on push.');
@@ -52,7 +54,12 @@ try {
   const purgeScript = read('scripts/cloudflare_purge_cache.mjs');
   assertIncludes(purgeScript, 'CLOUDFLARE_API_TOKEN', 'cloudflare_purge_cache.mjs');
   assertIncludes(purgeScript, 'CLOUDFLARE_ZONE_ID', 'cloudflare_purge_cache.mjs');
-  assertIncludes(purgeScript, 'purge_everything: true', 'cloudflare_purge_cache.mjs');
+  assertIncludes(purgeScript, "const ALLOWED_FIXED_TAGS = new Set(['public-feed', 'site-shell'])", 'cloudflare_purge_cache.mjs');
+  assertIncludes(purgeScript, 'ARTICLE_TAG_PATTERN', 'cloudflare_purge_cache.mjs');
+  assertIncludes(purgeScript, 'requestBody = { tags: purgeTags }', 'cloudflare_purge_cache.mjs');
+  assertIncludes(purgeScript, 'requestBody = { files: purgeUrls }', 'cloudflare_purge_cache.mjs');
+  assertIncludes(purgeScript, 'requestBody = { purge_everything: true }', 'cloudflare_purge_cache.mjs');
+  assertIncludes(purgeScript, "breakGlassConfirmation !== 'purge-everything-production'", 'cloudflare_purge_cache.mjs');
   assertIncludes(purgeScript, '/purge_cache', 'cloudflare_purge_cache.mjs');
   assertIncludes(purgeScript, "method: 'POST'", 'cloudflare_purge_cache.mjs');
   assertIncludes(purgeScript, 'Authorization: `Bearer ${apiToken}`', 'cloudflare_purge_cache.mjs');

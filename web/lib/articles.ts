@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { unstable_cache } from "next/cache";
+import { cacheLife, cacheTag } from "next/cache";
 import {
   dedupeArticlesByIdentity,
   getArticleIdentityKey,
@@ -22,6 +22,7 @@ import {
   ROOT_SITEMAP_RECENT_ARTICLE_LIMIT,
   getArticleSitemapRange,
 } from "@/lib/sitemapConfig";
+import { articleCacheTag, PUBLIC_FEED_CACHE_TAG } from "@/lib/cacheTags";
 
 export const PAGE_SIZE = 5;
 export const CURSOR_PAGE_SIZE = 15;
@@ -44,7 +45,7 @@ const SITEMAP_BACKEND_FETCH_OPTIONS = {
   cache: "force-cache" as const,
   next: {
     revalidate: 3600,
-    tags: ["sitemap"],
+    tags: [PUBLIC_FEED_CACHE_TAG],
   },
 };
 
@@ -1024,7 +1025,7 @@ export async function getPublishedArticlesByCursor(
 }
 
 
-export async function searchPublishedArticles(
+async function loadPublishedArticlesForSearch(
   searchQuery: string,
   page = 0,
   pageSize = SEARCH_PAGE_SIZE,
@@ -1091,6 +1092,23 @@ export async function searchPublishedArticles(
     pageSize: safePageSize,
     languageCode,
   };
+}
+
+export async function searchPublishedArticles(
+  searchQuery: string,
+  page = 0,
+  pageSize = SEARCH_PAGE_SIZE,
+  requestedLanguageCode?: string | null,
+): Promise<SearchArticlesResult> {
+  "use cache";
+  cacheLife({ stale: 300, revalidate: 21_600, expire: 86_400 });
+  cacheTag(PUBLIC_FEED_CACHE_TAG);
+  return loadPublishedArticlesForSearch(
+    searchQuery,
+    page,
+    pageSize,
+    requestedLanguageCode,
+  );
 }
 
 export async function getPublishedCategories(limit = 1000) {
@@ -1161,7 +1179,10 @@ export async function getPublishedCategories(limit = 1000) {
   return Array.from(categories).sort((a, b) => a.localeCompare(b));
 }
 
-const getCachedArticleById = unstable_cache(async (id: string, requestedLanguageCode?: string | null) => {
+async function getCachedArticleById(id: string, requestedLanguageCode?: string | null) {
+  "use cache";
+  cacheLife({ stale: 300, revalidate: 2_592_000, expire: 7_776_000 });
+  cacheTag(articleCacheTag(id));
   const languageCode = normalizeLanguageCode(requestedLanguageCode);
 
   if (isBackendPostgresPrimary()) {
@@ -1198,9 +1219,7 @@ const getCachedArticleById = unstable_cache(async (id: string, requestedLanguage
 
   const [article] = await applyArticleSummaries([data as Article], languageCode);
   return article ?? null;
-}, ["published-article-by-id"], {
-  revalidate: 3600,
-});
+}
 
 export const getArticleById = cache(getCachedArticleById);
 
