@@ -1,7 +1,8 @@
 # Worker-Uplift Authenticated Production Admin Evidence
 
 This procedure verifies that an authorized operator can read the worker-uplift
-shadow projection on the deployed production admin surface. It does not grant
+projection on the deployed production admin surface in either the pre-cutover
+`shadow` state or the protected `cutover_active` state. It does not grant
 or exercise administrative mutation, production-write, cutover, DNS/failover,
 or legacy-worker authority.
 
@@ -46,6 +47,7 @@ build_id=<container workflow run>-<attempt>
 deployment_id=<Vercel deployment id>
 deployment_url=https://<immutable deployment hostname>
 target_origin=https://www.nutsnews.com
+expected_state=shadow|cutover_active
 confirm_read_only=verify-authenticated-admin-read-only
 ```
 
@@ -72,7 +74,8 @@ The artifact
   the exact same source commit and build;
 - the evidence artifact identifies the immutable source commit of the tooling
   that collected and validated it;
-- the page shows `Legacy Shards` as owner and `Shadow` as write policy;
+- the page exactly matches the dispatched state: `Legacy Shards`/`Shadow` for
+  `shadow`, or `Worker Uplift`/`Production` for `cutover_active`;
 - all eight uplift stages are present in contract order;
 - all seven main-queue services show at least one consumer and an immutable
   deployment version;
@@ -109,11 +112,12 @@ content, or response bodies.
 
 A login redirect for the authorized session, an unavailable projection, a
 stale projection, a missing stage/version, a zero or unknown main-queue
-consumer count, non-shadow writes, a deployment mismatch, or a redaction
+consumer count, an owner/write-policy mismatch, a deployment mismatch, or a redaction
 failure makes the evidence workflow fail. Investigate through existing
 read-only status workflows. Recovery or deployment actions remain separate
 protected operations and require their own authorized workflow and scope.
 
-This readiness evidence does not authorize cutover. Legacy shard ingestion
-remains the production owner and worker-uplift production writes remain
-disabled.
+This evidence workflow is read-only and does not authorize or perform cutover,
+rollback, DNS/failover changes, legacy-worker changes, or production writes.
+The selected expected state is an assertion against already-authorized deployed
+state, never a request to change that state.

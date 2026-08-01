@@ -16,22 +16,22 @@ import {
   validateVercelProductionAuthInputs,
 } from "../scripts/worker_uplift_admin_production_evidence.mjs";
 
-function liveProjectionFixture() {
+function liveProjectionFixture({ owner = "Legacy Shards", writes = "Shadow" } = {}) {
   return {
     available: true,
     projectionVersion: "Projection v1",
     metrics: [
-      { label: "Owner", value: "Legacy Shards" },
+      { label: "Owner", value: owner },
       { label: "Overall", value: "Healthy" },
       { label: "Blocked Stages", value: "0" },
       { label: "DLQ", value: "0" },
       { label: "Queue Age", value: "5s" },
-      { label: "Writes", value: "Shadow" },
+      { label: "Writes", value: writes },
     ],
     rows: EXPECTED_STAGES.map((stage, index) => [
       stage,
       "Healthy",
-      "Legacy Shards",
+      owner,
       "Not retained",
       "1/min",
       "10ms",
@@ -50,6 +50,7 @@ function passingEvidence() {
     schema_version: 1,
     result: "pass",
     checked_at: "2026-07-30T20:00:00.000Z",
+    expected_state: "shadow",
     candidate: {
       source_repository: "ramideltoro/nutsnews",
       source_commit: "a".repeat(40),
@@ -120,6 +121,26 @@ test("parses the live shadow projection and all eight stage identities", () => {
 
 test("accepts complete redacted read-only evidence", () => {
   assert.equal(validateEvidence(passingEvidence()).result, "pass");
+});
+
+test("accepts the exact cutover-active owner and production write policy", () => {
+  const evidence = passingEvidence();
+  evidence.expected_state = "cutover_active";
+  evidence.projection = parsePipelineProjection(
+    liveProjectionFixture({ owner: "Worker Uplift", writes: "Production" }),
+    "cutover_active",
+  );
+  assert.equal(validateEvidence(evidence).projection.active_ingestion_owner, "worker uplift");
+});
+
+test("fails closed when the displayed projection does not match the expected state", () => {
+  assert.throws(
+    () => parsePipelineProjection(liveProjectionFixture(), "cutover_active"),
+    /displayed ingestion owner/,
+  );
+  const evidence = passingEvidence();
+  evidence.expected_state = "cutover_active";
+  assert.throws(() => validateEvidence(evidence), /projection owner is invalid/);
 });
 
 test("accepts every backend overall status before enforcing current stage evidence", () => {
@@ -389,10 +410,10 @@ test("rejects missing unauthenticated access control proof", () => {
   assert.throws(() => validateEvidence(evidence), /unauthenticated access rejection/);
 });
 
-test("rejects uplift production writes", () => {
+test("rejects a write policy outside the exact expected state", () => {
   const fixture = liveProjectionFixture();
   fixture.metrics.find((entry) => entry.label === "Writes").value = "Enabled";
-  assert.throws(() => parsePipelineProjection(fixture), /production writes are not disabled/);
+  assert.throws(() => parsePipelineProjection(fixture), /write policy does not match/);
 });
 
 test("rejects zero consumers on a main queue", () => {
