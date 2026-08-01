@@ -1401,6 +1401,11 @@ async function testReadinessContract() {
       },
     },
     "@/lib/cacheHeaders": cacheHeadersMock,
+    "@/lib/backendDatabase": {
+      async callBackendDatabaseOperation() {
+        throw new Error("readiness route must use its evaluator-provided dependency reader");
+      },
+    },
     "@/lib/runtimeReadiness": {
       async evaluateRuntimeReadiness() {
         readinessCalls += 1;
@@ -1417,6 +1422,11 @@ async function testReadinessContract() {
           expectedImageDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           configGeneration: `config-generation-${readinessCalls}`,
         };
+      },
+    },
+    "@/lib/runtimeSafety": {
+      getDatabaseProviderMode() {
+        return "supabase_primary";
       },
     },
     "@/lib/supabase": {
@@ -1441,12 +1451,17 @@ async function testReadinessContract() {
   );
   assert.deepEqual(await responseJson(response), {
     ok: false,
+    ready: false,
     service: "nutsnews-web",
     runtimeEnv: "staging",
     sideEffectsMode: "disabled",
     databaseProviderMode: "supabase_primary",
     productionWritesPaused: false,
     code: "staging_production_project_rejected",
+    sourceCommit: "source-commit",
+    buildId: "build-id",
+    deploymentTarget: "vps-staging",
+    configGeneration: "config-generation-1",
   });
 
   const secondResponse = await readinessRoute.GET(

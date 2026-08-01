@@ -79,6 +79,8 @@ Manual recovery and dispatch-only release workflows are outside this budget beca
 | `visual-regression.yml` | PR-required | Runs Playwright visual regression only for high-risk UI, CSS, public asset, or visual snapshot changes before merge. | No deployment. |
 | `web-ci.yml` | default-branch/manual | Keeps the Web CI command set available for default-branch and operator-triggered validation after PR coverage moved to `Merge Gate`. | No deployment. |
 | `web-offline-e2e.yml` | PR-required | Runs offline end-to-end coverage before web changes merge. | No deployment. |
+| `worker-uplift-admin-production-evidence-contract.yml` | PR-required | Validates the bounded, read-only authenticated admin evidence contract when its workflow, scripts, tests, documentation, or exact web dependencies change. | No deployment and no production mutation. |
+| `worker-uplift-admin-production-evidence.yml` | scheduled/operational | Runs only on protected operator dispatch to collect sanitized, read-only worker-uplift production admin evidence for an exact immutable deployment. | Reads protected production status without changing deployment, ownership, ingestion, or database state. |
 
 ## Branch Protection Hand-Off
 
