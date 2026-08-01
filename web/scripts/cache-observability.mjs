@@ -272,8 +272,8 @@ function validateConfig(config) {
       failures.push(`Route ${route.key || "<unknown>"} must include expectedStatuses.`);
     }
 
-    if (route.key === "articles-api" && route.expectedPolicy !== "public-api-cache-3600s") {
-      failures.push("The articles API must keep expectedPolicy=public-api-cache-3600s.");
+    if (route.requireCloudflareCacheable !== true) {
+      failures.push(`Route ${route.key || "<unknown>"} must explicitly require Cloudflare cacheability.`);
     }
 
     if (route.discoverArticleFromApi && route.key !== "article-page") {
@@ -379,12 +379,14 @@ function evaluateRoute({ route, samples, resolvedPath, url, config, requiredHead
 
   if (cfStatuses.length === 0) {
     if (urlUsesCloudflareFrontedHost(config, url)) {
-      warnings.push("cf-cache-status was not observed for a Cloudflare-fronted host. Public edge caching is ambiguous.");
+      const finding = "cf-cache-status was not observed for a Cloudflare-fronted host. Public edge caching is ambiguous.";
+      if (route.requireCloudflareCacheable) failures.push(finding);
+      else warnings.push(finding);
     }
   } else if (cfStatuses.some((status) => !allowedCloudflareStatuses(config).has(status))) {
     warnings.push(`Unexpected Cloudflare cache status observed: ${cfStatuses.join(", ")}.`);
-  } else if (route.key === "articles-api" && cfStatuses.every((status) => status === "BYPASS" || status === "DYNAMIC")) {
-    failures.push(`/api/articles returned only non-cache statuses: ${cfStatuses.join(", ")}.`);
+  } else if (route.requireCloudflareCacheable && !hasCacheableCloudflareObservation) {
+    failures.push(`${route.path} returned only non-cache Cloudflare statuses: ${cfStatuses.join(", ")}.`);
   } else if (!hasCacheableCloudflareObservation) {
     warnings.push(`Cloudflare returned ${cfStatuses.join(", ")}; app cache headers matched, but public edge caching was not confirmed for this route.`);
   } else if (cloudflareHitRate !== null && cloudflareHitRate === 0) {
@@ -476,14 +478,16 @@ async function runLiveAudit({ config, baseUrl, articlePath }) {
   for (const route of config.routes) {
     let resolvedPath = route.path;
 
-    if (route.discoverArticleFromApi) {
+    if (route.discoverArticleFromApi || route.discoverArticleApiFromApi) {
       try {
         discoveredArticlePath = await discoverArticlePath({
           baseUrl,
           config,
           articlePath,
         });
-        resolvedPath = discoveredArticlePath;
+        resolvedPath = route.discoverArticleApiFromApi
+          ? discoveredArticlePath.replace("/articles/", "/api/articles/")
+          : discoveredArticlePath;
       } catch (error) {
         routeResults.push({
           key: route.key,

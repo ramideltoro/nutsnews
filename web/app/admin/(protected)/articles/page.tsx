@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { connection } from "next/server";
 import { auth, signOut } from "@/auth";
 import {
   type AiDecisionVersionReportRow,
@@ -18,8 +19,6 @@ export const metadata = {
   title: "Article Reviews | NutsNews Admin",
 };
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 type AdminArticlesPageProps = {
   searchParams?: Promise<ArticleReviewSearchParams> | ArticleReviewSearchParams;
@@ -961,6 +960,7 @@ function ReviewSqlSection({ data }: { data: ArticleReviewDashboardData }) {
 export default async function AdminArticlesPage({
   searchParams = {},
 }: AdminArticlesPageProps) {
+  await connection();
   const session = await auth();
   const resolvedSearchParams = await searchParams;
   const filters: ArticleReviewFilters =

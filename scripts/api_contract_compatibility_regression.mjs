@@ -334,6 +334,37 @@ const cacheHeadersMock = {
     "X-NutsNews-Cache-Issue": "7",
   },
   PUBLIC_CDN_S_MAXAGE_SECONDS: 3600,
+  getPublicCacheHeaders(policyName, options = {}) {
+    const edgeSeconds = policyName === "public-search"
+      ? 21600
+      : policyName === "public-article" || policyName === "public-static-page"
+        ? 2592000
+        : policyName === "public-health"
+          ? 60
+          : 7200;
+    const headers = {
+      "Cache-Control": "public, max-age=0, must-revalidate",
+      "CDN-Cache-Control": `public, s-maxage=${edgeSeconds}, stale-while-revalidate=300, stale-if-error=604800`,
+      "Cloudflare-CDN-Cache-Control": `public, s-maxage=${edgeSeconds}, stale-while-revalidate=300, stale-if-error=604800`,
+      "Vercel-CDN-Cache-Control": `public, s-maxage=${edgeSeconds}, stale-while-revalidate=300, stale-if-error=604800`,
+      "X-NutsNews-Cache-Policy": `${policyName}-cache-${edgeSeconds}s`,
+      "X-NutsNews-Cache-Issue": "221",
+    };
+    if (options.cacheTags?.length) headers["Cache-Tag"] = options.cacheTags.join(",");
+    return headers;
+  },
+  getNoStoreCacheHeaders(policy = "bypass-cache") {
+    return { ...cacheHeadersMock.BYPASS_CACHE_HEADERS, "X-NutsNews-Cache-Policy": policy };
+  },
+  toNextHeaderEntries(headers) {
+    return Object.entries(headers).map(([key, value]) => ({ key, value }));
+  },
+};
+
+const cacheTagsMock = {
+  PUBLIC_FEED_CACHE_TAG: "public-feed",
+  SITE_SHELL_CACHE_TAG: "site-shell",
+  articleCacheTag: (id) => `article:${id}`,
 };
 
 const languagesMock = {
@@ -408,28 +439,36 @@ function maintenanceHomeFeed(languageCode = "en") {
 }
 
 function loadArticlesRoute(overrides = {}) {
+  const articles = {
+    CURSOR_PAGE_SIZE: 15,
+    PAGE_SIZE: 5,
+    getPublishedArticlesByCursor: async () => articleResult(),
+    ...overrides.articles,
+  };
+  const edgeFeedSnapshot = {
+    createMaintenanceHomeFeedPayload: (languageCode) =>
+      maintenanceHomeFeed(languageCode),
+    getEdgeFeedSnapshotPage: async () => null,
+    getHomeFeedDataWithEdgeFallback: async (languageCode) => ({
+      ...articleResult({ languageCode, nextPage: null, nextCursor: "home-next-cursor" }),
+      sections: homeSections(languageCode),
+    }),
+    getPublishedArticlesWithEdgeFallback: async (_page, _category, languageCode) =>
+      articleResult({ languageCode }),
+    ...overrides.edgeFeedSnapshot,
+  };
   return loadModule("web/app/api/articles/route.ts", {
     "next/server": nextServerMock(),
-    "@/lib/articles": {
-      CURSOR_PAGE_SIZE: 15,
-      PAGE_SIZE: 5,
-      getPublishedArticlesByCursor: async () => articleResult(),
-      ...overrides.articles,
-    },
-    "@/lib/edgeFeedSnapshot": {
-      createMaintenanceHomeFeedPayload: (languageCode) =>
-        maintenanceHomeFeed(languageCode),
-      getEdgeFeedSnapshotPage: async () => null,
-      getHomeFeedDataWithEdgeFallback: async (languageCode) => ({
-        ...articleResult({ languageCode, nextPage: null, nextCursor: "home-next-cursor" }),
-        sections: homeSections(languageCode),
-      }),
-      getPublishedArticlesWithEdgeFallback: async (_page, _category, languageCode) =>
-        articleResult({ languageCode }),
-      ...overrides.edgeFeedSnapshot,
+    "@/lib/articles": articles,
+    "@/lib/edgeFeedSnapshot": edgeFeedSnapshot,
+    "@/lib/publicCachedData": {
+      getCachedHomeFeedData: edgeFeedSnapshot.getHomeFeedDataWithEdgeFallback,
+      getCachedPublishedArticles: edgeFeedSnapshot.getPublishedArticlesWithEdgeFallback,
+      getCachedPublishedArticlesByCursor: articles.getPublishedArticlesByCursor,
     },
     "@/lib/languages": languagesMock,
     "@/lib/cacheHeaders": cacheHeadersMock,
+    "@/lib/cacheTags": cacheTagsMock,
     "@/lib/logger": loggerMock,
   });
 }
@@ -498,7 +537,7 @@ function testInventoryCompleteness() {
   const inventory = readJson("api-contracts/inventory.json");
   assert.equal(inventory.schemaVersion, 1, "API inventory schema version must be explicit");
   assert(Array.isArray(inventory.endpoints), "API inventory endpoints must be an array");
-  assert.equal(inventory.endpoints.length, 18, "API inventory must include every supported custom response endpoint");
+  assert.equal(inventory.endpoints.length, 19, "API inventory must include every supported custom response endpoint");
 
   const inventoryFiles = inventory.endpoints.map((endpoint) => endpoint.routeFile).sort();
   assert.equal(new Set(inventoryFiles).size, inventoryFiles.length, "API inventory route files must be unique");
@@ -617,7 +656,8 @@ async function testArticlesContract() {
   assert.equal(offsetResponse.headers.get("x-nutsnews-article-data-source"), "public_feed_snapshot");
   assert.equal(offsetResponse.headers.get("x-nutsnews-feed-snapshot"), "hit");
   assert.equal(offsetResponse.headers.get("x-nutsnews-edge-snapshot-version"), "2");
-  assert.match(offsetResponse.headers.get("cache-control") ?? "", /s-maxage=300/);
+  assert.match(offsetResponse.headers.get("cache-control") ?? "", /must-revalidate/);
+  assert.match(offsetResponse.headers.get("cdn-cache-control") ?? "", /s-maxage=7200/);
   const offsetPayload = await responseJson(offsetResponse);
   assertArticlePayloadContract(offsetPayload, "/api/articles offset");
   assert.equal(offsetPayload.nextPage, 4, "Offset pagination must retain numeric nextPage for iOS");
@@ -654,7 +694,7 @@ async function testArticlesContract() {
   );
   assertStatus(homeResponse, 200, "/api/articles home");
   assert.equal(homeResponse.headers.get("x-nutsnews-article-pagination"), "home");
-  assert.match(homeResponse.headers.get("x-nutsnews-cache-policy") ?? "", /public-home-feed-cache/);
+  assert.match(homeResponse.headers.get("x-nutsnews-cache-policy") ?? "", /public-feed-cache/);
   const homePayload = await responseJson(homeResponse);
   assertArticlePayloadContract(homePayload, "/api/articles home payload");
   assertRequiredKeys(homePayload, ["sections"], "/api/articles home payload");
@@ -761,13 +801,20 @@ async function testArticlesContract() {
 
 async function testHomeFeedContract() {
   const calls = [];
-  const homeRoute = loadModule("web/app/api/home-feed/route.ts", {
+  const loadHomeFeedRoute = (getCachedHomeFeedData) => loadModule("web/app/api/home-feed/route.ts", {
     "next/server": nextServerMock(),
     "@/lib/cacheHeaders": cacheHeadersMock,
+    "@/lib/cacheTags": cacheTagsMock,
     "@/lib/edgeFeedSnapshot": {
       createMaintenanceHomeFeedPayload: (languageCode) =>
         maintenanceHomeFeed(languageCode),
-      async getHomeFeedDataWithEdgeFallback(languageCode) {
+    },
+    "@/lib/publicCachedData": { getCachedHomeFeedData },
+    "@/lib/languages": languagesMock,
+    "@/lib/logger": loggerMock,
+  });
+  const homeRoute = loadHomeFeedRoute(
+    async (languageCode) => {
         calls.push(languageCode);
         return {
           ...articleResult({
@@ -778,38 +825,28 @@ async function testHomeFeedContract() {
           }),
           sections: homeSections(languageCode),
         };
-      },
     },
-    "@/lib/languages": languagesMock,
-    "@/lib/logger": loggerMock,
-  });
+  );
   assertMethodExports(homeRoute, ["GET"], "/api/home-feed");
   const response = await homeRoute.GET(new Request("https://www.nutsnews.com/api/home-feed?lang=ja"));
   assertStatus(response, 200, "/api/home-feed");
-  assert.match(response.headers.get("cache-control") ?? "", /s-maxage=300/);
-  assert.match(response.headers.get("x-nutsnews-cache-policy") ?? "", /public-home-feed-cache/);
+  assert.match(response.headers.get("cache-control") ?? "", /must-revalidate/);
+  assert.match(response.headers.get("cdn-cache-control") ?? "", /s-maxage=7200/);
+  assert.match(response.headers.get("x-nutsnews-cache-policy") ?? "", /public-feed-cache/);
   const payload = await responseJson(response);
   assertArticlePayloadContract(payload, "/api/home-feed payload");
   assertRequiredKeys(payload, ["sections"], "/api/home-feed payload");
   assertHomeSectionsContract(payload.sections, "/api/home-feed sections");
   assert.deepEqual(calls, ["ja"]);
 
-  const emptyHomeRoute = loadModule("web/app/api/home-feed/route.ts", {
-    "next/server": nextServerMock(),
-    "@/lib/cacheHeaders": cacheHeadersMock,
-    "@/lib/edgeFeedSnapshot": {
-      createMaintenanceHomeFeedPayload: (languageCode) =>
-        maintenanceHomeFeed(languageCode),
-      async getHomeFeedDataWithEdgeFallback(languageCode) {
+  const emptyHomeRoute = loadHomeFeedRoute(
+    async (languageCode) => {
         return {
           ...articleResult({ languageCode, articles: [], nextPage: null, nextCursor: null }),
           sections: HOME_SECTION_IDS.map((id) => ({ id, articles: [] })),
         };
-      },
     },
-    "@/lib/languages": languagesMock,
-    "@/lib/logger": loggerMock,
-  });
+  );
   const emptyHomeResponse = await emptyHomeRoute.GET(
     new Request("https://www.nutsnews.com/api/home-feed"),
   );
@@ -819,22 +856,14 @@ async function testHomeFeedContract() {
   assertHomeSectionsContract(emptyHomePayload.sections, "/api/home-feed empty sections");
   assert.deepEqual(emptyHomePayload.articles, []);
 
-  const failedRoute = loadModule("web/app/api/home-feed/route.ts", {
-    "next/server": nextServerMock(),
-    "@/lib/cacheHeaders": cacheHeadersMock,
-    "@/lib/edgeFeedSnapshot": {
-      createMaintenanceHomeFeedPayload: (languageCode) =>
-        maintenanceHomeFeed(languageCode),
-      async getHomeFeedDataWithEdgeFallback() {
+  const failedRoute = loadHomeFeedRoute(
+    async () => {
         throw new Error("feed unavailable");
-      },
     },
-    "@/lib/languages": languagesMock,
-    "@/lib/logger": loggerMock,
-  });
+  );
   const failedResponse = await failedRoute.GET(new Request("https://www.nutsnews.com/api/home-feed"));
   assertStatus(failedResponse, 200, "/api/home-feed maintenance");
-  assert.match(failedResponse.headers.get("cache-control") ?? "", /s-maxage=300/);
+  assert.match(failedResponse.headers.get("cdn-cache-control") ?? "", /s-maxage=7200/);
   assert.equal(failedResponse.headers.get("x-nutsnews-degradation-mode"), "maintenance");
   assert.equal(failedResponse.headers.get("x-nutsnews-degradation-reason"), "home_feed_exception");
   const failedPayload = await responseJson(failedResponse);
@@ -846,37 +875,39 @@ async function testHomeFeedContract() {
 
 async function testSearchContract() {
   const calls = [];
+  async function getCachedSearchResults(query, page, limit, languageCode) {
+    calls.push({ query, page, limit, languageCode });
+
+    if (query === "explode") {
+      throw new Error("search unavailable");
+    }
+
+    if (query.length < 2) {
+      return { articles: [], nextPage: null, query, page, pageSize: limit, languageCode };
+    }
+
+    return {
+      articles: [
+        article({ id: "search-1", requested_language_code: languageCode }),
+        article({ id: "search-2", title: "Second result", requested_language_code: languageCode }),
+      ],
+      nextPage: page + 1,
+      query,
+      page,
+      pageSize: limit,
+      languageCode,
+    };
+  }
   const searchRoute = loadModule("web/app/api/search/route.ts", {
     "next/server": nextServerMock(),
     "@/lib/articles": {
       SEARCH_PAGE_SIZE: 20,
-      async searchPublishedArticles(query, page, limit, languageCode) {
-        calls.push({ query, page, limit, languageCode });
-
-        if (query === "explode") {
-          throw new Error("search unavailable");
-        }
-
-        if (query.length < 2) {
-          return { articles: [], nextPage: null, query, page, pageSize: limit, languageCode };
-        }
-
-        return {
-          articles: [
-            article({ id: "search-1", requested_language_code: languageCode }),
-            article({ id: "search-2", title: "Second result", requested_language_code: languageCode }),
-          ],
-          nextPage: page + 1,
-          query,
-          page,
-          pageSize: limit,
-          languageCode,
-        };
-      },
     },
     "@/lib/cacheHeaders": cacheHeadersMock,
+    "@/lib/cacheTags": cacheTagsMock,
     "@/lib/languages": languagesMock,
     "@/lib/logger": loggerMock,
+    "@/lib/publicCachedData": { getCachedSearchResults },
     "@/lib/runtimeFeatureFlags": {
       async isRuntimeFeatureFlagEnabled() {
         return true;
@@ -890,7 +921,7 @@ async function testSearchContract() {
   );
   assertStatus(response, 200, "/api/search");
   assert.equal(response.headers.get("x-nutsnews-search-fields"), "title,ai_summary,source,category");
-  assert.match(response.headers.get("cache-control") ?? "", /s-maxage=60/);
+  assert.match(response.headers.get("cdn-cache-control") ?? "", /s-maxage=21600/);
   const payload = await responseJson(response);
   assertSearchPayloadContract(payload, "/api/search payload");
   assert.equal(payload.query, "community wins");
@@ -931,7 +962,7 @@ async function testSearchContract() {
   assert.equal(failedPayload.nextPage, null);
   assert.equal(failedPayload.query, "explode");
   assert.equal(failedPayload.page, 7);
-  assert.equal(failedPayload.pageSize, 3);
+  assert.equal(failedPayload.pageSize, 10);
   assert.equal(failedPayload.languageCode, "ja");
 }
 
@@ -1314,7 +1345,9 @@ async function testHealthContract() {
       VERCEL_ENV: undefined,
     },
     async () => {
-      const healthRoute = loadModule("web/app/healthz/route.ts");
+      const healthRoute = loadModule("web/app/healthz/route.ts", {
+        "@/lib/cacheHeaders": cacheHeadersMock,
+      });
       assertMethodExports(healthRoute, ["GET"], "/healthz");
       const response = healthRoute.GET();
       assertStatus(response, 200, "/healthz");
@@ -1341,7 +1374,9 @@ async function testHealthContract() {
       VERCEL: undefined,
     },
     async () => {
-      const healthRoute = loadModule("web/app/healthz/route.ts");
+      const healthRoute = loadModule("web/app/healthz/route.ts", {
+        "@/lib/cacheHeaders": cacheHeadersMock,
+      });
       const payload = await responseJson(healthRoute.GET());
       assert.equal(payload.sourceCommit, "unknown", "Health identity values must reject unsafe environment input");
       assert.equal(payload.buildId, "unknown", "Build ID must fall back to the safe source identity");
@@ -1814,12 +1849,8 @@ async function testConfiguredCachePolicies() {
         return config;
       },
     },
-    "./lib/cacheHeaders": {
-      ARTICLE_API_BROWSER_CACHE_CONTROL: "public, s-maxage=300, stale-while-revalidate=3600",
-      PUBLIC_CDN_CACHE_CONTROL: "public, s-maxage=3600, stale-while-revalidate=86400",
-      PUBLIC_CDN_S_MAXAGE_SECONDS: 3600,
-      PUBLIC_PAGE_CACHE_CONTROL: "public, max-age=0, must-revalidate",
-    },
+    "./lib/cacheHeaders": cacheHeadersMock,
+    "./lib/cacheTags": cacheTagsMock,
     "./lib/securityHeaders": {
       getSecurityHeaders() {
         return {};
@@ -1838,8 +1869,8 @@ async function testConfiguredCachePolicies() {
     return header.value;
   }
 
-  assert.match(headerValue("/api/articles", "Cache-Control"), /s-maxage=300/);
-  assert.match(headerValue("/api/home-feed", "X-NutsNews-Cache-Policy"), /public-home-feed-cache/);
+  assert.match(headerValue("/api/articles", "CDN-Cache-Control"), /s-maxage=7200/);
+  assert.match(headerValue("/api/home-feed", "X-NutsNews-Cache-Policy"), /public-feed-cache/);
   assert.equal(headerValue("/api/contact", "Cache-Control"), "no-store, max-age=0");
   assert.equal(headerValue("/api/engagement", "Cache-Control"), "no-store, max-age=0");
   assert.equal(headerValue("/api/auth/:path*", "Cache-Control"), "no-store, max-age=0");
@@ -1847,16 +1878,16 @@ async function testConfiguredCachePolicies() {
   assert.equal(headerValue("/readyz", "Cache-Control"), "no-store, max-age=0");
   assert.match(headerValue("/healthz", "CDN-Cache-Control"), /s-maxage=60/);
   assert.match(headerValue("/sitemap.xml", "X-NutsNews-Cache-Policy"), /public-sitemap-cache/);
-  assert.match(headerValue("/sitemap-index.xml", "X-NutsNews-Cache-Policy"), /public-sitemap-index-cache/);
+  assert.match(headerValue("/sitemap-index.xml", "X-NutsNews-Cache-Policy"), /public-sitemap-cache/);
   assert.match(
     headerValue("/articles/sitemap/:path*", "X-NutsNews-Cache-Policy"),
-    /public-article-sitemap-cache/,
+    /public-sitemap-cache/,
   );
-  assert.match(headerValue("/robots.txt", "X-NutsNews-Cache-Policy"), /public-robots-cache/);
-  assert.match(headerValue("/opengraph-image", "X-NutsNews-Cache-Policy"), /public-og-image-cache/);
+  assert.match(headerValue("/robots.txt", "X-NutsNews-Cache-Policy"), /public-sitemap-cache/);
+  assert.match(headerValue("/opengraph-image", "X-NutsNews-Cache-Policy"), /public-static-page-cache/);
   assert.match(
     headerValue("/articles/:id/opengraph-image", "X-NutsNews-Cache-Policy"),
-    /public-article-og-image-cache/,
+    /public-article-cache/,
   );
 }
 

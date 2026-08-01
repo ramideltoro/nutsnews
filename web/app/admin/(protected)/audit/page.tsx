@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import {
   type AdminAuditEvent,
   formatAdminAuditDateTime,
@@ -9,8 +10,6 @@ export const metadata = {
   title: "Audit Log | NutsNews Admin",
 };
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 function formatJson(value: Record<string, unknown>) {
   return JSON.stringify(value, null, 2);
@@ -94,6 +93,7 @@ function AuditEventCard({ event }: { event: AdminAuditEvent }) {
 }
 
 export default async function AdminAuditLogPage() {
+  await connection();
   const data = await getAdminAuditLogData();
 
   if (!data.isConfigured) {

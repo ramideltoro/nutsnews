@@ -48,28 +48,24 @@ assertIncludes(articleFeed, "/api/home-feed?", "ArticleFeed.tsx");
 assertExcludes(articleFeed, "loadCategorySections", "ArticleFeed.tsx");
 assertIncludes(homepage, "getHomeFeedDataWithEdgeFallback", "homepage");
 assertExcludes(homepage, "categorySections.map", "homepage");
-assertIncludes(homepage, "export const revalidate = 900", "homepage");
+assertIncludes(homepage, "getCachedHomeFeedData", "homepage");
 
 assertIncludes(articles, "HOME_FEED_SNAPSHOT_SCAN_LIMIT = 250", "articles.ts");
 assertIncludes(articles, "CURSOR_PAGE_SIZE = 15", "articles.ts");
 assertIncludes(articles, "getHomeFeedFromSnapshot", "articles.ts");
 assertIncludes(articles, ".limit(HOME_FEED_SNAPSHOT_SCAN_LIMIT)", "articles.ts");
 assertIncludes(articles, "pageSize: CURSOR_PAGE_SIZE", "articles.ts");
-assertIncludes(articles, "unstable_cache", "articles.ts");
-assertIncludes(articles, "published-article-by-id", "articles.ts");
-assertIncludes(articles, "revalidate: 3600", "articles.ts");
+assertIncludes(articles, '"use cache"', "articles.ts");
+assertIncludes(articles, "cacheTag(articleCacheTag(id))", "articles.ts");
+assertIncludes(articles, "revalidate: 2_592_000", "articles.ts");
 
-assertIncludes(cacheHeaders, "s-maxage=${PUBLIC_CDN_S_MAXAGE_SECONDS}", "cacheHeaders.ts");
-assertIncludes(homeFeedApi, "export const revalidate = 900", "home-feed API");
-assertIncludes(articlesApi, "export const revalidate = 900", "articles API");
-assertIncludes(articlePage, "export const revalidate = 3600", "article page");
+assertIncludes(cacheHeaders, "edgeMaxAgeSeconds: PUBLIC_FEED_EDGE_TTL_SECONDS", "cacheHeaders.ts");
+assertIncludes(homeFeedApi, "getCachedHomeFeedData", "home-feed API");
+assertIncludes(articlesApi, "getCachedPublishedArticles", "articles API");
 assertIncludes(articlePage, "generateStaticParams", "article page");
-assertIncludes(articleOgImage, "export const revalidate = 3600", "article OG image");
-assertIncludes(siteOgImage, "export const revalidate = 3600", "site OG image");
 assertExcludes(articleOgImage, 'runtime = "edge"', "article OG image");
 assertExcludes(siteOgImage, 'runtime = "edge"', "site OG image");
-assertIncludes(healthz, 'dynamic = "force-static"', "healthz route");
-assertIncludes(healthz, "public-healthz-cache-60s", "healthz route");
+assertIncludes(healthz, 'getPublicCacheHeaders("public-health")', "healthz route");
 
 assertExcludes(articlesApi, "request_started", "articles API");
 assertExcludes(searchApi, "request_started", "search API");
@@ -80,8 +76,8 @@ assertIncludes(logger, "shouldSampleInfoEvent", "logger.ts");
 
 assertIncludes(nextConfig, 'source: "/:path*"', "next.config.ts");
 assertIncludes(nextConfig, "GLOBAL_SECURITY_HEADERS", "next.config.ts");
-assertIncludes(nextConfig, "public-home-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s", "next.config.ts");
-assertIncludes(nextConfig, "public-privacy-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s", "next.config.ts");
+assertIncludes(nextConfig, 'publicCacheHeaders("public-feed"', "next.config.ts");
+assertIncludes(nextConfig, 'publicCacheHeaders("public-static-page"', "next.config.ts");
 assertIncludes(middleware, '"/admin/:path*"', "middleware.ts");
 assertExcludes(middleware, '"/api/', "middleware.ts");
 assertExcludes(middleware, '"/monitoring', "middleware.ts");

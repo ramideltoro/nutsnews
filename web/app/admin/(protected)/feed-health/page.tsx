@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { connection } from "next/server";
 import {
     type FeedHealthRow,
     type FeedHealthStatus,
@@ -11,8 +12,6 @@ export const metadata = {
     title: "RSS Feed Health | NutsNews Admin",
 };
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 function formatNumber(value: number) {
     return new Intl.NumberFormat("en-US").format(Math.round(value));
@@ -227,6 +226,7 @@ function FeedList({ feeds, emptyMessage, compact = false }: { feeds: FeedHealthR
 }
 
 export default async function FeedHealthPage() {
+    await connection();
     const data = await getAdminFeedHealthDashboardData();
 
     if (!data.isConfigured) {

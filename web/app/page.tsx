@@ -1,7 +1,5 @@
-import { unstable_cache } from "next/cache";
+import { Suspense } from "react";
 import { connection } from "next/server";
-
-export const revalidate = 900;
 
 import { ArticleFeed } from "./components/ArticleFeed";
 import { HomeArrivalAnimation } from "./components/HomeArrivalAnimation";
@@ -13,12 +11,7 @@ import {
   getHomeFeedDataWithEdgeFallback,
 } from "@/lib/edgeFeedSnapshot";
 import { logError } from "@/lib/logger";
-
-const getCachedHomeFeed = unstable_cache(
-  async () => getHomeFeedDataWithEdgeFallback(),
-  ["homepage-initial-feed"],
-  { revalidate: 900 },
-);
+import { getCachedHomeFeedData } from "@/lib/publicCachedData";
 
 type HomePageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -44,7 +37,7 @@ async function getSafeHomeFeedData(useUncachedFeed: boolean) {
   try {
     return useUncachedFeed
       ? await getHomeFeedDataWithEdgeFallback()
-      : await getCachedHomeFeed();
+      : await getCachedHomeFeedData();
   } catch (error) {
     await logError(
       "web.home_page.home_feed_failed",
@@ -61,7 +54,7 @@ async function getSafeHomeFeedData(useUncachedFeed: boolean) {
   }
 }
 
-export default async function Home({ searchParams }: HomePageProps) {
+async function HomeContent({ searchParams }: HomePageProps) {
   // The immutable container image is built with neutral fixtures. Defer this
   // route only outside Vercel so the running image reads its target's feed,
   // while Vercel retains its established prerender/ISR behavior.
@@ -122,5 +115,25 @@ export default async function Home({ searchParams }: HomePageProps) {
 
       <SiteFooter />
     </main>
+  );
+}
+
+export default function Home(props: HomePageProps) {
+  return (
+    <Suspense
+      fallback={(
+        <main className="newspaper-home-shell min-h-screen text-[var(--theme-text)]" aria-busy="true">
+          <div className="newspaper-page-wrap">
+            <HomeSiteHeader />
+            <p className="px-4 py-16 text-center text-sm text-[var(--theme-muted)]">
+              Loading today&apos;s uplifting stories…
+            </p>
+          </div>
+          <SiteFooter />
+        </main>
+      )}
+    >
+      <HomeContent {...props} />
+    </Suspense>
   );
 }

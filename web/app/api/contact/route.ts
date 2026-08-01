@@ -3,8 +3,6 @@ import { BYPASS_CACHE_HEADERS } from "@/lib/cacheHeaders";
 import { recordQuotaUsageEvent } from "@/lib/quotaUsage";
 import { RuntimeSafetyError, assertExternalSideEffect } from "@/lib/runtimeSafety";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 const DEFAULT_TO_EMAIL = "rami.deltoro@nutsnews.com";
 const DEFAULT_FROM_EMAIL = "NutsNews Contact <onboarding@resend.dev>";

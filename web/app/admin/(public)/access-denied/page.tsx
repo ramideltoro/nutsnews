@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { connection } from "next/server";
 
 export const metadata: Metadata = {
   title: "Admin Sign-in | NutsNews",
@@ -16,8 +17,6 @@ export const metadata: Metadata = {
   },
 };
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 type AccessDeniedPageProps = {
   searchParams?: Promise<{
@@ -44,6 +43,7 @@ function getSingleSearchValue(value: string | string[] | undefined) {
 }
 
 export default async function AccessDeniedPage({ searchParams }: AccessDeniedPageProps) {
+  await connection();
   const resolvedSearchParams = await searchParams;
   const error = getSingleSearchValue(resolvedSearchParams?.error);
   const message = error ? SAFE_ERROR_MESSAGES[error] : undefined;

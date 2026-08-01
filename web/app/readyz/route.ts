@@ -4,8 +4,6 @@ import { BYPASS_CACHE_HEADERS } from "@/lib/cacheHeaders";
 import { evaluateRuntimeReadiness } from "@/lib/runtimeReadiness";
 import { getSupabase } from "@/lib/supabase";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 async function readSchemaContract() {
   const { data, error } = await getSupabase().rpc("nutsnews_migration_schema_contract");

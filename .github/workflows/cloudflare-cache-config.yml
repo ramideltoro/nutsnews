@@ -18,6 +18,8 @@ on:
       - "web/app/sitemap-index.xml/**"
       - "web/app/robots.ts"
       - "scripts/public_cache_policy_regression.mjs"
+      - "scripts/cache_freshness_qualification_regression.mjs"
+      - ".github/deployment/cache-freshness-recovery-runbook.md"
       - ".github/workflows/cloudflare-cache-config.yml"
   push:
     branches: [main]
@@ -36,6 +38,8 @@ on:
       - "web/app/sitemap-index.xml/**"
       - "web/app/robots.ts"
       - "scripts/public_cache_policy_regression.mjs"
+      - "scripts/cache_freshness_qualification_regression.mjs"
+      - ".github/deployment/cache-freshness-recovery-runbook.md"
       - ".github/workflows/cloudflare-cache-config.yml"
   workflow_dispatch:
 
@@ -75,6 +79,9 @@ jobs:
 
       - name: Run public cache policy regression
         run: npm run test:public-cache
+
+      - name: Validate freshness qualification and recovery contract
+        run: npm run test:cache-freshness-qualification
 
       - name: Upload config report
         if: always()

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { connection } from "next/server";
 import { formatAdminDateLabel, formatAdminDateTime } from "@/lib/adminTime";
 import { auth, signOut } from "@/auth";
 import {
@@ -18,8 +19,6 @@ export const metadata = {
     title: "Worker Health | NutsNews Admin",
 };
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 function formatNumber(value: number) {
     return new Intl.NumberFormat("en-US").format(Math.round(value));
@@ -967,6 +966,7 @@ function RecentRunsTable({ runs }: { runs: RecentShardRun[] }) {
 }
 
 export default async function AdminShardsPage() {
+    await connection();
     const session = await auth();
     const dashboardData = await getAdminShardHealthDashboardData();
 

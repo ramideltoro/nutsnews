@@ -2,21 +2,13 @@ import type { NextConfig } from "next";
 import path from "node:path";
 import { withSentryConfig } from "@sentry/nextjs";
 import {
-  ARTICLE_API_BROWSER_CACHE_CONTROL,
-  PUBLIC_CDN_CACHE_CONTROL,
-  PUBLIC_CDN_S_MAXAGE_SECONDS,
-  PUBLIC_PAGE_CACHE_CONTROL,
+  getNoStoreCacheHeaders,
+  getPublicCacheHeaders,
+  toNextHeaderEntries,
+  type PublicCachePolicyName,
 } from "./lib/cacheHeaders";
+import { PUBLIC_FEED_CACHE_TAG, SITE_SHELL_CACHE_TAG } from "./lib/cacheTags";
 import { getSecurityHeaders } from "./lib/securityHeaders";
-
-const PUBLIC_LONG_CDN_CACHE_CONTROL = PUBLIC_CDN_CACHE_CONTROL;
-
-const PUBLIC_LONG_CACHE_CONTROL = PUBLIC_PAGE_CACHE_CONTROL;
-
-const STATIC_ASSET_CACHE_CONTROL =
-  "public, max-age=31536000, immutable";
-
-const NO_STORE_CACHE_CONTROL = "no-store, max-age=0";
 
 const GLOBAL_SECURITY_HEADERS = Object.entries(
   getSecurityHeaders({ isDevelopment: process.env.NODE_ENV !== "production" }),
@@ -29,69 +21,19 @@ const shouldUploadSentrySourceMaps =
   Boolean(process.env.SENTRY_PROJECT);
 
 function publicCacheHeaders(
-  policy: string,
-  cacheControl = PUBLIC_PAGE_CACHE_CONTROL,
-  cdnCacheControl = PUBLIC_CDN_CACHE_CONTROL,
+  policy: PublicCachePolicyName,
+  cacheTags: readonly string[] = [],
 ) {
-  return [
-    {
-      key: "Cache-Control",
-      value: cacheControl,
-    },
-    {
-      key: "CDN-Cache-Control",
-      value: cdnCacheControl,
-    },
-    {
-      key: "Cloudflare-CDN-Cache-Control",
-      value: cdnCacheControl,
-    },
-    {
-      key: "Vercel-CDN-Cache-Control",
-      value: cdnCacheControl,
-    },
-    {
-      key: "X-NutsNews-Cache-Policy",
-      value: policy,
-    },
-    {
-      key: "X-NutsNews-Cache-Issue",
-      value: "7",
-    },
-  ];
+  return toNextHeaderEntries(getPublicCacheHeaders(policy, { cacheTags }));
 }
 
 function noStoreHeaders(policy: string) {
-  return [
-    {
-      key: "Cache-Control",
-      value: NO_STORE_CACHE_CONTROL,
-    },
-    {
-      key: "CDN-Cache-Control",
-      value: "no-store",
-    },
-    {
-      key: "Cloudflare-CDN-Cache-Control",
-      value: "no-store",
-    },
-    {
-      key: "Vercel-CDN-Cache-Control",
-      value: "no-store",
-    },
-    {
-      key: "X-NutsNews-Cache-Policy",
-      value: policy,
-    },
-    {
-      key: "X-NutsNews-Cache-Issue",
-      value: "7",
-    },
-  ];
+  return toNextHeaderEntries(getNoStoreCacheHeaders(policy));
 }
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  cacheComponents: true,
   poweredByHeader: false,
   turbopack: {
     root: path.join(__dirname),
@@ -129,41 +71,51 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/",
-        headers: publicCacheHeaders(`public-home-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`),
+        headers: publicCacheHeaders("public-feed", [PUBLIC_FEED_CACHE_TAG, SITE_SHELL_CACHE_TAG]),
       },
       {
         source: "/about",
-        headers: publicCacheHeaders(`public-about-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`),
+        headers: publicCacheHeaders("public-static-page", [SITE_SHELL_CACHE_TAG]),
       },
       {
         source: "/contact",
-        headers: publicCacheHeaders(`public-contact-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`),
+        headers: publicCacheHeaders("public-static-page", [SITE_SHELL_CACHE_TAG]),
       },
       {
-        source: "/privacy",
-        headers: publicCacheHeaders(`public-privacy-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`),
+        source: "/apps",
+        headers: publicCacheHeaders("public-static-page", [SITE_SHELL_CACHE_TAG]),
+      },
+      {
+        source: "/saved",
+        headers: publicCacheHeaders("public-static-page", [SITE_SHELL_CACHE_TAG]),
+      },
+      {
+        source: "/privacy/:path*",
+        headers: publicCacheHeaders("public-static-page", [SITE_SHELL_CACHE_TAG]),
       },
       {
         source: "/articles/:path*",
-        headers: publicCacheHeaders(`public-article-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`),
+        headers: publicCacheHeaders("public-article"),
       },
       {
         source: "/api/articles",
-        headers: publicCacheHeaders(
-          `public-api-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`,
-          ARTICLE_API_BROWSER_CACHE_CONTROL,
-        ),
+        headers: publicCacheHeaders("public-feed", [PUBLIC_FEED_CACHE_TAG]),
       },
       {
         source: "/api/home-feed",
-        headers: publicCacheHeaders(
-          `public-home-feed-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s`,
-          ARTICLE_API_BROWSER_CACHE_CONTROL,
-        ),
+        headers: publicCacheHeaders("public-feed", [PUBLIC_FEED_CACHE_TAG]),
+      },
+      {
+        source: "/api/search",
+        headers: publicCacheHeaders("public-search", [PUBLIC_FEED_CACHE_TAG]),
+      },
+      {
+        source: "/_next/image",
+        headers: publicCacheHeaders("public-article"),
       },
       {
         source: "/healthz",
-        headers: publicCacheHeaders("public-healthz-cache-60s", PUBLIC_PAGE_CACHE_CONTROL, "public, s-maxage=60, stale-while-revalidate=300"),
+        headers: publicCacheHeaders("public-health"),
       },
       {
         source: "/readyz",
@@ -179,102 +131,39 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/opengraph-image",
-        headers: publicCacheHeaders("public-og-image-cache-3600s", PUBLIC_LONG_CACHE_CONTROL, PUBLIC_LONG_CDN_CACHE_CONTROL),
+        headers: publicCacheHeaders("public-static-page", [SITE_SHELL_CACHE_TAG]),
       },
       {
         source: "/articles/:id/opengraph-image",
-        headers: publicCacheHeaders("public-article-og-image-cache-3600s", PUBLIC_LONG_CACHE_CONTROL, PUBLIC_LONG_CDN_CACHE_CONTROL),
+        headers: publicCacheHeaders("public-article"),
       },
       {
         source: "/icon.png",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: STATIC_ASSET_CACHE_CONTROL,
-          },
-          {
-            key: "CDN-Cache-Control",
-            value: STATIC_ASSET_CACHE_CONTROL,
-          },
-          {
-            key: "Cloudflare-CDN-Cache-Control",
-            value: STATIC_ASSET_CACHE_CONTROL,
-          },
-          {
-            key: "Vercel-CDN-Cache-Control",
-            value: STATIC_ASSET_CACHE_CONTROL,
-          },
-          {
-            key: "X-NutsNews-Cache-Policy",
-            value: "public-static-asset-cache-immutable",
-          },
-        ],
+        headers: publicCacheHeaders("public-static-asset"),
       },
       {
         source: "/apple-icon.png",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: STATIC_ASSET_CACHE_CONTROL,
-          },
-          {
-            key: "CDN-Cache-Control",
-            value: STATIC_ASSET_CACHE_CONTROL,
-          },
-          {
-            key: "Cloudflare-CDN-Cache-Control",
-            value: STATIC_ASSET_CACHE_CONTROL,
-          },
-          {
-            key: "Vercel-CDN-Cache-Control",
-            value: STATIC_ASSET_CACHE_CONTROL,
-          },
-          {
-            key: "X-NutsNews-Cache-Policy",
-            value: "public-static-asset-cache-immutable",
-          },
-        ],
+        headers: publicCacheHeaders("public-static-asset"),
       },
       {
         source: "/favicon.ico",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: STATIC_ASSET_CACHE_CONTROL,
-          },
-          {
-            key: "CDN-Cache-Control",
-            value: STATIC_ASSET_CACHE_CONTROL,
-          },
-          {
-            key: "Cloudflare-CDN-Cache-Control",
-            value: STATIC_ASSET_CACHE_CONTROL,
-          },
-          {
-            key: "Vercel-CDN-Cache-Control",
-            value: STATIC_ASSET_CACHE_CONTROL,
-          },
-          {
-            key: "X-NutsNews-Cache-Policy",
-            value: "public-static-asset-cache",
-          },
-        ],
+        headers: publicCacheHeaders("public-static-asset"),
       },
       {
         source: "/robots.txt",
-        headers: publicCacheHeaders("public-robots-cache-3600s", PUBLIC_LONG_CACHE_CONTROL, PUBLIC_LONG_CDN_CACHE_CONTROL),
+        headers: publicCacheHeaders("public-sitemap", [PUBLIC_FEED_CACHE_TAG]),
       },
       {
         source: "/sitemap.xml",
-        headers: publicCacheHeaders("public-sitemap-cache-3600s", PUBLIC_LONG_CACHE_CONTROL, PUBLIC_LONG_CDN_CACHE_CONTROL),
+        headers: publicCacheHeaders("public-sitemap", [PUBLIC_FEED_CACHE_TAG]),
       },
       {
         source: "/sitemap-index.xml",
-        headers: publicCacheHeaders("public-sitemap-index-cache-3600s", PUBLIC_LONG_CACHE_CONTROL, PUBLIC_LONG_CDN_CACHE_CONTROL),
+        headers: publicCacheHeaders("public-sitemap", [PUBLIC_FEED_CACHE_TAG]),
       },
       {
         source: "/articles/sitemap/:path*",
-        headers: publicCacheHeaders("public-article-sitemap-cache-3600s", PUBLIC_LONG_CACHE_CONTROL, PUBLIC_LONG_CDN_CACHE_CONTROL),
+        headers: publicCacheHeaders("public-sitemap", [PUBLIC_FEED_CACHE_TAG]),
       },
       {
         source: "/admin/:path*",
@@ -291,6 +180,14 @@ const nextConfig: NextConfig = {
       {
         source: "/api/log-test/:path*",
         headers: noStoreHeaders("bypass-log-test-cache"),
+      },
+      {
+        source: "/api/internal/:path*",
+        headers: noStoreHeaders("bypass-internal-api-cache"),
+      },
+      {
+        source: "/api/runtime-config",
+        headers: noStoreHeaders("bypass-runtime-config-cache"),
       },
     ];
   },

@@ -11,6 +11,11 @@ const mocks = vi.hoisted(() => ({
   logWarn: vi.fn(),
 }));
 
+vi.mock("next/cache", () => ({
+  cacheLife: vi.fn(),
+  cacheTag: vi.fn(),
+}));
+
 vi.mock("@/lib/articles", () => ({
   CATEGORY_SECTION_SIZE: 8,
   CURSOR_PAGE_SIZE: 15,

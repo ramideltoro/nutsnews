@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { auth } from "@/auth";
 import { isAllowedAdminEmail } from "@/lib/adminAuth";
 import {
@@ -20,8 +21,6 @@ export const metadata = {
   title: "Feed Management | NutsNews Admin",
 };
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 type FeedManagementPageProps = {
   searchParams?: Promise<{
@@ -498,6 +497,7 @@ function FeedList({ feeds, emptyMessage }: { feeds: ManagedFeed[]; emptyMessage:
 }
 
 export default async function FeedManagementPage({ searchParams }: FeedManagementPageProps) {
+  await connection();
   const resolvedSearchParams = await searchParams;
   const updatedMessage = getSingleSearchValue(resolvedSearchParams?.updated);
   const errorMessage = getSingleSearchValue(resolvedSearchParams?.error);

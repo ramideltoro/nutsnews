@@ -176,6 +176,18 @@ const cacheHeadersMock = {
     "X-NutsNews-Cache-Policy": "bypass-cache",
   },
   PUBLIC_CDN_S_MAXAGE_SECONDS: 3600,
+  getPublicCacheHeaders(policy, options = {}) {
+    return {
+      "Cache-Control": "public, max-age=0, must-revalidate",
+      "CDN-Cache-Control": `public, s-maxage=${policy === "public-search" ? 21600 : 7200}`,
+      "X-NutsNews-Cache-Policy": `${policy}-cache`,
+      ...(options.cacheTags?.length ? { "Cache-Tag": options.cacheTags.join(",") } : {}),
+    };
+  },
+};
+
+const cacheTagsMock = {
+  PUBLIC_FEED_CACHE_TAG: "public-feed",
 };
 
 const languagesMock = {
@@ -196,6 +208,51 @@ const loggerMock = {
 
 async function testArticlesApiContract() {
   const calls = [];
+  const publicCachedData = {
+    async getCachedPublishedArticlesByCursor(cursor, category, languageCode) {
+      calls.push({ name: "cursor", cursor, category, languageCode });
+      return {
+        articles: [article({
+          id: "article-cursor",
+          language_code: "en",
+          requested_language_code: "ja",
+          translation_available: false,
+        })],
+        nextPage: null,
+        nextCursor: "next-cursor-token",
+        dataSource: "articles_fallback",
+        languageCode,
+      };
+    },
+    async getCachedHomeFeedData(languageCode) {
+      calls.push({ name: "home", languageCode });
+      return {
+        articles: [article()],
+        nextPage: null,
+        nextCursor: "home-next-cursor",
+        dataSource: "public_feed_snapshot",
+        languageCode,
+        sections: [],
+      };
+    },
+    async getCachedPublishedArticles(page, category, languageCode) {
+      calls.push({ name: "offset", page, category, languageCode });
+      return {
+        articles: [article({ requested_language_code: languageCode })],
+        nextPage: 1,
+        nextCursor: "offset-next-cursor",
+        dataSource: "public_feed_snapshot",
+        languageCode,
+        edgeSnapshot: {
+          status: "hit",
+          updatedAt: "2026-07-04T12:00:00.000Z",
+          ageSeconds: 10,
+          articleCount: 5,
+          version: 1,
+        },
+      };
+    },
+  };
   const articlesRoute = loadRouteModule("web/app/api/articles/route.ts", {
     "next/server": nextServerMock(),
     "@/lib/articles": {
@@ -277,7 +334,9 @@ async function testArticlesApiContract() {
     },
     "@/lib/languages": languagesMock,
     "@/lib/cacheHeaders": cacheHeadersMock,
+    "@/lib/cacheTags": cacheTagsMock,
     "@/lib/logger": loggerMock,
+    "@/lib/publicCachedData": publicCachedData,
   });
 
   const offsetResponse = await articlesRoute.GET(
@@ -314,6 +373,27 @@ async function testArticlesApiContract() {
 }
 
 async function testSearchApiContract() {
+  const getCachedSearchResults = async (query, page, pageSize, languageCode) => {
+    if (query.length < 2) {
+      return {
+        articles: [],
+        nextPage: null,
+        query,
+        page,
+        pageSize,
+        languageCode,
+      };
+    }
+
+    return {
+      articles: [article({ id: "search-1", requested_language_code: languageCode })],
+      nextPage: null,
+      query,
+      page,
+      pageSize,
+      languageCode,
+    };
+  };
   const searchRoute = loadRouteModule("web/app/api/search/route.ts", {
     "next/server": nextServerMock(),
     "@/lib/articles": {
@@ -341,8 +421,10 @@ async function testSearchApiContract() {
       },
     },
     "@/lib/cacheHeaders": cacheHeadersMock,
+    "@/lib/cacheTags": cacheTagsMock,
     "@/lib/languages": languagesMock,
     "@/lib/logger": loggerMock,
+    "@/lib/publicCachedData": { getCachedSearchResults },
     "@/lib/runtimeFeatureFlags": {
       async isRuntimeFeatureFlagEnabled() {
         return true;
@@ -359,7 +441,7 @@ async function testSearchApiContract() {
   assert.equal(emptyPayload.nextPage, null);
   assert.equal(emptyPayload.query, "a");
   assert.equal(emptyPayload.page, 2);
-  assert.equal(emptyPayload.pageSize, 7);
+  assert.equal(emptyPayload.pageSize, 10);
   assert.equal(emptyPayload.languageCode, "de-CH");
 
   const resultResponse = await searchRoute.GET(
@@ -372,7 +454,7 @@ async function testSearchApiContract() {
   assertArticleContract(resultPayload.articles[0], "/api/search.articles[0]");
   assert.equal(resultPayload.query, "community wins");
   assert.equal(resultPayload.page, 0);
-  assert.equal(resultPayload.pageSize, 3);
+  assert.equal(resultPayload.pageSize, 10);
   assert.equal(resultPayload.languageCode, "fr");
 }
 

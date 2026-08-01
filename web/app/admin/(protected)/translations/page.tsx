@@ -1,12 +1,11 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import { getTranslationQualityDashboardData } from "@/lib/adminTranslationQuality";
 
 export const metadata = {
   title: "Translation Quality | NutsNews Admin",
 };
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 function formatPercent(value: number) {
   return `${Math.round(value * 100)}%`;
@@ -59,6 +58,7 @@ function MetricCard({
 }
 
 export default async function TranslationQualityPage() {
+  await connection();
   const data = await getTranslationQualityDashboardData();
   const summaryTone =
     data.overallStatus === "fail"

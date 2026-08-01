@@ -23,8 +23,6 @@ const packageJson = JSON.parse(read("web/package.json"));
 
 for (const required of [
   'title: "Admin Sign-in | NutsNews"',
-  'export const dynamic = "force-dynamic"',
-  "export const revalidate = 0",
   "searchParams?: Promise",
   "SAFE_ERROR_MESSAGES",
   "AccessDenied",
@@ -55,7 +53,7 @@ for (const forbidden of [
 assertIncludes(auth, 'error: "/admin/access-denied"', "Auth.js error route");
 assertIncludes(nextConfig, 'source: "/admin/:path*"', "admin cache boundary");
 assertIncludes(nextConfig, 'headers: noStoreHeaders("bypass-admin-cache")', "admin no-store headers");
-assertIncludes(middleware, 'matcher: ["/admin/:path*"]', "admin middleware matcher");
+assertIncludes(middleware, 'matcher: ["/admin/:path*", "/articles/:path*"]', "admin middleware matcher");
 assertIncludes(middleware, 'response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive")', "admin discovery boundary");
 
 if (packageJson.scripts?.["test:admin-access-denied"] !== "node ../scripts/admin_access_denied_regression.mjs") {

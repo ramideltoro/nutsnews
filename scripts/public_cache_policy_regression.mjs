@@ -4,132 +4,71 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-
-function read(relativePath) {
-  return fs.readFileSync(path.join(root, relativePath), "utf8");
-}
-
-function assertIncludes(content, needle, label) {
-  if (!content.includes(needle)) {
-    throw new Error(`${label} is missing required cache policy token: ${needle}`);
-  }
-}
-
-function assertExcludes(content, needle, label) {
-  if (content.includes(needle)) {
-    throw new Error(`${label} contains forbidden public cache token: ${needle}`);
-  }
-}
-
-function assertRouteUsesNoStore(config, source, policy) {
-  assertIncludes(config, `source: "${source}"`, "next.config.ts");
-  assertIncludes(config, `headers: noStoreHeaders("${policy}")`, "next.config.ts");
-}
+const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), "utf8");
+const requireText = (content, token, label) => {
+  if (!content.includes(token)) throw new Error(`${label} is missing ${token}`);
+};
 
 const cacheHeaders = read("web/lib/cacheHeaders.ts");
+const cacheTags = read("web/lib/cacheTags.ts");
 const nextConfig = read("web/next.config.ts");
-const articlesApi = read("web/app/api/articles/route.ts");
-const homeFeedApi = read("web/app/api/home-feed/route.ts");
-const healthz = read("web/app/healthz/route.ts");
-const cacheObservability = read("web/cache-observability.config.json");
-const cacheObservabilityLib = read("web/lib/cacheObservability.ts");
-const cacheObservabilityScript = read("web/scripts/cache-observability.mjs");
+const publicCachedData = read("web/lib/publicCachedData.ts");
+const articles = read("web/lib/articles.ts");
+const revalidation = read("web/app/api/internal/cache/revalidate/route.ts");
 const middleware = read("web/middleware.ts");
+const observability = read("web/cache-observability.config.json");
+const observabilityCli = read("web/scripts/cache-observability.mjs");
 
-assertIncludes(cacheHeaders, "DEFAULT_PUBLIC_CDN_S_MAXAGE_SECONDS = 3600", "cacheHeaders.ts");
-assertIncludes(
-  cacheHeaders,
-  "DEFAULT_PUBLIC_CDN_STALE_WHILE_REVALIDATE_SECONDS = 86400",
-  "cacheHeaders.ts",
-);
-assertIncludes(cacheHeaders, "NUTSNEWS_PUBLIC_CDN_S_MAXAGE_SECONDS", "cacheHeaders.ts");
-assertIncludes(
-  cacheHeaders,
-  "NUTSNEWS_PUBLIC_CDN_STALE_WHILE_REVALIDATE_SECONDS",
-  "cacheHeaders.ts",
-);
-assertIncludes(cacheHeaders, '"public, max-age=0, must-revalidate"', "cacheHeaders.ts");
-assertIncludes(cacheHeaders, "s-maxage=${PUBLIC_CDN_S_MAXAGE_SECONDS}", "cacheHeaders.ts");
-assertIncludes(
-  cacheHeaders,
-  "stale-while-revalidate=${PUBLIC_CDN_STALE_WHILE_REVALIDATE_SECONDS}",
-  "cacheHeaders.ts",
-);
+for (const token of [
+  '"public-feed"',
+  '"public-article"',
+  '"public-static-page"',
+  '"public-search"',
+  '"public-sitemap"',
+  "2 * HOUR",
+  "30 * DAY",
+  "6 * HOUR",
+  "staleIfErrorSeconds: 7 * DAY",
+  '"public, max-age=0, must-revalidate"',
+  '"Cloudflare-CDN-Cache-Control"',
+  '"X-NutsNews-Cache-Policy"',
+]) requireText(cacheHeaders, token, "cacheHeaders.ts");
 
-for (const header of [
-  '"CDN-Cache-Control": PUBLIC_CDN_CACHE_CONTROL',
-  '"Cloudflare-CDN-Cache-Control": PUBLIC_CDN_CACHE_CONTROL',
-  '"Vercel-CDN-Cache-Control": PUBLIC_CDN_CACHE_CONTROL',
-]) {
-  assertIncludes(cacheHeaders, header, "cacheHeaders.ts");
+for (const token of ["PUBLIC_FEED_CACHE_TAG", "SITE_SHELL_CACHE_TAG", "articleCacheTag", "isAllowlistedCacheTag"]) {
+  requireText(cacheTags, token, "cacheTags.ts");
 }
+
+for (const token of [
+  "cacheComponents: true",
+  'publicCacheHeaders("public-feed"',
+  'publicCacheHeaders("public-article"',
+  'publicCacheHeaders("public-static-page"',
+  'publicCacheHeaders("public-search"',
+  'publicCacheHeaders("public-sitemap"',
+  'source: "/apps"',
+  'source: "/saved"',
+  'source: "/_next/image"',
+  'source: "/api/internal/:path*"',
+]) requireText(nextConfig, token, "next.config.ts");
+
+requireText(publicCachedData, 'cacheTag(PUBLIC_FEED_CACHE_TAG)', "publicCachedData.ts");
+requireText(publicCachedData, "revalidate: 7_200", "publicCachedData.ts");
+requireText(articles, "revalidate: 2_592_000", "articles.ts");
+requireText(articles, "revalidate: 21_600", "articles.ts");
+requireText(revalidation, "verifyCacheRevalidationSignature", "revalidation route");
+requireText(revalidation, "seenRequestIds", "revalidation route");
+requireText(revalidation, "revalidateTag(tag, { expire: 0 })", "revalidation route");
+requireText(middleware, 'response.headers.set(', "middleware.ts");
+requireText(middleware, '"Cache-Tag"', "middleware.ts");
 
 for (const policy of [
-  "public-home-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s",
-  "public-article-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s",
-  "public-api-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s",
-  "public-home-feed-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s",
-  "public-sitemap-index-cache-3600s",
-  "public-article-sitemap-cache-3600s",
-]) {
-  assertIncludes(nextConfig, policy, "next.config.ts");
-}
-
-assertIncludes(articlesApi, "public-home-feed-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s", "articles API");
-assertIncludes(homeFeedApi, "public-home-feed-cache-${PUBLIC_CDN_S_MAXAGE_SECONDS}s", "home-feed API");
-assertIncludes(healthz, "public-healthz-cache-60s", "healthz route");
-
-for (const route of [
-  '"/"',
-  '"/articles/:path*"',
-  '"/api/articles"',
-  '"/api/home-feed"',
-  '"/healthz"',
-  '"/sitemap-index.xml"',
-  '"/articles/sitemap/:path*"',
-]) {
-  assertIncludes(nextConfig, `source: ${route}`, "next.config.ts");
-}
-
-assertRouteUsesNoStore(nextConfig, "/admin/:path*", "bypass-admin-cache");
-assertRouteUsesNoStore(nextConfig, "/api/auth/:path*", "bypass-auth-cache");
-assertRouteUsesNoStore(nextConfig, "/api/contact", "bypass-contact-api-cache");
-
-assertIncludes(middleware, '"Cloudflare-CDN-Cache-Control": "no-store"', "middleware.ts");
-assertExcludes(middleware, '"/api/', "middleware.ts");
-assertExcludes(middleware, '"/monitoring', "middleware.ts");
-assertIncludes(cacheObservability, '"expectedPolicy": "public-home-cache-3600s"', "cache-observability.config.json");
-assertIncludes(cacheObservability, '"expectedPolicy": "public-article-cache-3600s"', "cache-observability.config.json");
-assertIncludes(cacheObservability, '"expectedPolicy": "public-api-cache-3600s"', "cache-observability.config.json");
-assertIncludes(cacheObservability, '"expectedPolicy": "public-sitemap-index-cache-3600s"', "cache-observability.config.json");
-assertIncludes(cacheObservability, '"expectedPolicy": "public-article-sitemap-cache-3600s"', "cache-observability.config.json");
-assertIncludes(cacheObservability, '"s-maxage=3600"', "cache-observability.config.json");
-assertExcludes(cacheObservability, '"s-maxage=300"', "cache-observability.config.json");
-assertIncludes(cacheObservability, '"hiddenAfterCdnHeaders"', "cache-observability.config.json");
-assertIncludes(cacheObservability, '"cloudflareFrontedHosts"', "cache-observability.config.json");
-assertIncludes(cacheObservability, '"www.nutsnews.com"', "cache-observability.config.json");
-assertIncludes(cacheObservability, '"vps.nutsnews.com"', "cache-observability.config.json");
-
-for (const source of [
-  ["admin cache dashboard loader", cacheObservabilityLib],
-  ["cache observability CLI", cacheObservabilityScript],
-]) {
-  assertIncludes(source[1], "hiddenAfterCdnHeaders", source[0]);
-  assertIncludes(source[1], "urlUsesCloudflareFrontedHost", source[0]);
-  assertIncludes(source[1], "Public edge caching is ambiguous", source[0]);
-  assertIncludes(source[1], "public edge caching was not confirmed", source[0]);
-  assertIncludes(source[1], "BYPASS", source[0]);
-  assertIncludes(source[1], "DYNAMIC", source[0]);
-  assertExcludes(
-    source[1],
-    "This can be normal after Cloudflare processes the origin response.",
-    source[0],
-  );
-  assertExcludes(
-    source[1],
-    "This can be normal after Vercel processes the origin response.",
-    source[0],
-  );
-}
+  "public-feed-cache-7200s",
+  "public-article-cache-2592000s",
+  "public-static-page-cache-2592000s",
+  "public-search-cache-21600s",
+  "public-sitemap-cache-7200s",
+]) requireText(observability, policy, "cache observability config");
+requireText(observability, '"requireCloudflareCacheable": true', "cache observability config");
+requireText(observabilityCli, "route.requireCloudflareCacheable", "cache observability CLI");
 
 console.log("Public cache policy regression safeguards passed.");

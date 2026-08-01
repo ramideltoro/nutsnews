@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import { getEdgeFeedSnapshotStatus } from "@/lib/edgeFeedSnapshot";
 
 export const metadata = {
@@ -43,6 +44,7 @@ function StatCard({ label, value }: { label: string; value: string }) {
 }
 
 export default async function EdgeSnapshotAdminPage() {
+  await connection();
   const status = await getEdgeFeedSnapshotStatus();
   const isHealthy = status.ready === true && status.status === "hit" && status.enabled;
 
