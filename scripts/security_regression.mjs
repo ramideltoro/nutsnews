@@ -91,6 +91,12 @@ async function testSecurityHeaders() {
 
 async function testMiddlewareAdminBoundary() {
   const { middleware } = loadTsModule("web/middleware.ts", {
+    "@/lib/cacheTags": {
+      articleCacheTag(articleId) {
+        return `article:${articleId}`;
+      },
+      SITE_SHELL_CACHE_TAG: "site-shell",
+    },
     "next/server": {
       NextResponse: {
         next() {
@@ -108,6 +114,13 @@ async function testMiddlewareAdminBoundary() {
   const publicResponse = middleware({ nextUrl: { pathname: "/" } });
   assert.equal(publicResponse.headers.get("x-robots-tag"), null, "public routes do not inherit admin robots header");
   assert.equal(publicResponse.headers.get("cache-control"), null, "public routes do not inherit admin no-store header");
+
+  const articleResponse = middleware({ nextUrl: { pathname: "/articles/example-article" } });
+  assert.equal(
+    articleResponse.headers.get("cache-tag"),
+    "site-shell,article:example-article",
+    "public article routes retain their bounded cache tags",
+  );
 }
 
 async function testExternalUrlSafety() {
