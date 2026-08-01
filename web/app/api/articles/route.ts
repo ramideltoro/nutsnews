@@ -9,6 +9,7 @@ import {
 import {
   createMaintenanceHomeFeedPayload,
   getEdgeFeedSnapshotPage,
+  getPublishedArticlesWithEdgeFallback,
 } from "@/lib/edgeFeedSnapshot";
 import { normalizeLanguageCode } from "@/lib/languages";
 import {
@@ -91,6 +92,16 @@ function parsePage(value: string | null) {
   return Math.min(Math.floor(parsedPage), MAX_SAFE_OFFSET_PAGE);
 }
 
+function shouldBypassCacheForStagingQualification(searchParams: URLSearchParams) {
+  const qualification = searchParams.get("qualification")?.trim();
+
+  return (
+    process.env.NUTSNEWS_RUNTIME_ENV === "staging" &&
+    typeof qualification === "string" &&
+    /^nutsnews-test-[a-z0-9-]+$/i.test(qualification)
+  );
+}
+
 export async function GET(request: Request) {
   const startedAt = Date.now();
   const { searchParams } = new URL(request.url);
@@ -101,6 +112,8 @@ export async function GET(request: Request) {
   const homeMode = searchParams.get("home") === "1";
   const languageCode = normalizeLanguageCode(searchParams.get("lang"));
   const paginationMode = homeMode ? "home" : cursor ? "cursor" : "offset";
+  const bypassCacheForQualification =
+    shouldBypassCacheForStagingQualification(searchParams);
 
   try {
     const responsePageSize = homeMode
@@ -112,7 +125,9 @@ export async function GET(request: Request) {
       ? await getCachedHomeFeedData(languageCode)
       : cursor
         ? await getCachedPublishedArticlesByCursor(cursor, category, languageCode)
-        : await getCachedPublishedArticles(page, category, languageCode);
+        : bypassCacheForQualification
+          ? await getPublishedArticlesWithEdgeFallback(page, category, languageCode)
+          : await getCachedPublishedArticles(page, category, languageCode);
 
     await logInfoSampled(
       "api.articles.request_completed",
@@ -128,6 +143,7 @@ export async function GET(request: Request) {
         pageSize: responsePageSize,
         category: category ?? "all",
         languageCode,
+        bypassCacheForQualification,
         articleCount: result.articles.length,
         nextPage: result.nextPage,
         hasNextCursor: Boolean(result.nextCursor),

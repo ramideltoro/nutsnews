@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
   class MockRuntimeSafetyError extends Error {
@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => {
     assertExternalSideEffect: vi.fn(),
     assertOAuthCallback: vi.fn(),
     createMaintenanceHomeFeedPayload: vi.fn(),
+    getCachedPublishedArticles: vi.fn(),
     getEdgeFeedSnapshotPage: vi.fn(),
     getHomeFeedDataWithEdgeFallback: vi.fn(),
     getPublishedArticlesByCursor: vi.fn(),
@@ -65,7 +66,7 @@ vi.mock("@/lib/edgeFeedSnapshot", () => ({
 
 vi.mock("@/lib/publicCachedData", () => ({
   getCachedHomeFeedData: mocks.getHomeFeedDataWithEdgeFallback,
-  getCachedPublishedArticles: mocks.getPublishedArticlesWithEdgeFallback,
+  getCachedPublishedArticles: mocks.getCachedPublishedArticles,
   getCachedPublishedArticlesByCursor: mocks.getPublishedArticlesByCursor,
   getCachedSearchResults: mocks.searchPublishedArticles,
 }));
@@ -173,6 +174,7 @@ beforeEach(() => {
   mocks.createMaintenanceHomeFeedPayload.mockImplementation(() => maintenanceHomeFeedResult());
   mocks.getEdgeFeedSnapshotPage.mockResolvedValue(null);
   mocks.getHomeFeedDataWithEdgeFallback.mockResolvedValue(homeFeedResult());
+  mocks.getCachedPublishedArticles.mockResolvedValue(publicArticlesResult());
   mocks.getPublishedArticlesByCursor.mockResolvedValue(publicArticlesResult({ nextCursor: null }));
   mocks.getPublishedArticlesWithEdgeFallback.mockResolvedValue(publicArticlesResult());
   mocks.getRuntimePublicConfig.mockReturnValue({
@@ -193,6 +195,10 @@ beforeEach(() => {
     pageSize: 20,
     languageCode: "en",
   });
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 describe("public article route handlers", () => {
@@ -217,11 +223,11 @@ describe("public article route handlers", () => {
     expect(response.headers.get("cache-tag")).toBe("public-feed");
     expect(response.headers.get("x-nutsnews-article-pagination")).toBe("offset");
     expect(response.headers.get("x-nutsnews-article-language")).toBe("fr");
-    expect(mocks.getPublishedArticlesWithEdgeFallback).toHaveBeenCalledWith(2, null, "fr");
+    expect(mocks.getCachedPublishedArticles).toHaveBeenCalledWith(2, null, "fr");
   });
 
   it("normalizes malformed article params and falls back to no-store on upstream failure", async () => {
-    mocks.getPublishedArticlesWithEdgeFallback.mockRejectedValueOnce(new Error("fixture failure"));
+    mocks.getCachedPublishedArticles.mockRejectedValueOnce(new Error("fixture failure"));
 
     const { GET } = await import("@/app/api/articles/route");
     const response = await GET(request("https://www.nutsnews.com/api/articles?page=-10&lang=zz"));
@@ -236,7 +242,7 @@ describe("public article route handlers", () => {
     });
     expect(response.headers.get("cache-control")).toBe("no-store, max-age=0");
     expect(response.headers.get("x-nutsnews-cache-policy")).toBe("bypass-cache");
-    expect(mocks.getPublishedArticlesWithEdgeFallback).toHaveBeenCalledWith(0, null, "en");
+    expect(mocks.getCachedPublishedArticles).toHaveBeenCalledWith(0, null, "en");
   });
 
   it("returns localized edge fallback articles after an upstream article read failure", async () => {
@@ -248,7 +254,7 @@ describe("public article route handlers", () => {
       requested_language_code: "fr",
       translation_available: true,
     };
-    mocks.getPublishedArticlesWithEdgeFallback.mockRejectedValueOnce(new Error("fixture outage"));
+    mocks.getCachedPublishedArticles.mockRejectedValueOnce(new Error("fixture outage"));
     mocks.getEdgeFeedSnapshotPage.mockResolvedValueOnce(
       publicArticlesResult({
         articles: [localizedEdgeArticle],
@@ -290,6 +296,21 @@ describe("public article route handlers", () => {
       category: null,
       requestedLanguageCode: "fr",
     });
+  });
+
+  it("bypasses the application cache for a valid isolated staging qualification", async () => {
+    vi.stubEnv("NUTSNEWS_RUNTIME_ENV", "staging");
+
+    const { GET } = await import("@/app/api/articles/route");
+    const response = await GET(
+      request(
+        "https://staging.nutsnews.com/api/articles?page=0&lang=en&qualification=nutsnews-test-run-123",
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.getPublishedArticlesWithEdgeFallback).toHaveBeenCalledWith(0, null, "en");
+    expect(mocks.getCachedPublishedArticles).not.toHaveBeenCalled();
   });
 
   it("returns home-feed shape with the home-feed cache policy", async () => {
