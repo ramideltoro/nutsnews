@@ -160,6 +160,10 @@ jobs:
           const helpers = [
             ["scripts/dual_target_web_smoke.mjs", `${process.env.RUNNER_TEMP}/dual_target_web_smoke.mjs`],
             [
+              "scripts/dual_target_web_smoke_contract.mjs",
+              `${process.env.RUNNER_TEMP}/dual_target_web_smoke_contract.mjs`,
+            ],
+            [
               "scripts/staging_qualification_admin_backend_evidence.mjs",
               `${process.env.RUNNER_TEMP}/staging_qualification_admin_backend_evidence.mjs`,
             ],
@@ -182,6 +186,7 @@ jobs:
           }
           NODE
           node --check "$RUNNER_TEMP/dual_target_web_smoke.mjs"
+          node --check "$RUNNER_TEMP/dual_target_web_smoke_contract.mjs"
           node --check "$RUNNER_TEMP/staging_qualification_admin_backend_evidence.mjs"
 
       - name: Verify VPS staging admin backend operation evidence

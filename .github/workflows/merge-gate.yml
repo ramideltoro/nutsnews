@@ -59,7 +59,7 @@ jobs:
           changed_files="$RUNNER_TEMP/merge-gate-changed-files.txt"
           git diff --name-only "$BASE_SHA" "$HEAD_SHA" | tee "$changed_files"
 
-          if grep -Eq '^(web/|scripts/|tests/|\.github/workflows/(merge-gate|web-ci|container-image)\.yml)$' "$changed_files"; then
+          if grep -Eq '^(web/|scripts/|tests/|\.github/workflows/(merge-gate|web-ci|container-image|vercel-production-release)\.yml$)' "$changed_files"; then
             echo "run_checks=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_checks=false" >> "$GITHUB_OUTPUT"

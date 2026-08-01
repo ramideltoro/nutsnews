@@ -185,6 +185,7 @@ test("browser entries and immutable image inputs do not embed runtime public val
     instrumentation,
     route,
     homePage,
+    publicCachedData,
     runtimeConfig,
     sentryServer,
     sentryEdge,
@@ -198,6 +199,7 @@ test("browser entries and immutable image inputs do not embed runtime public val
     readFile(resolve(root, "web/instrumentation-client.ts"), "utf8"),
     readFile(resolve(root, "web/app/api/runtime-config/route.ts"), "utf8"),
     readFile(resolve(root, "web/app/page.tsx"), "utf8"),
+    readFile(resolve(root, "web/lib/publicCachedData.ts"), "utf8"),
     readFile(resolve(root, "web/runtimePublicConfig.mjs"), "utf8"),
     readFile(resolve(root, "web/sentry.server.config.ts"), "utf8"),
     readFile(resolve(root, "web/sentry.edge.config.ts"), "utf8"),
@@ -209,13 +211,15 @@ test("browser entries and immutable image inputs do not embed runtime public val
   for (const source of [contactForm, layout, instrumentation]) {
     assert.doesNotMatch(source, /process\.env\.NEXT_PUBLIC_/);
   }
-  assert.match(route, /force-dynamic/);
+  assert.match(route, /import \{ connection \} from "next\/server";/);
+  assert.match(route, /await connection\(\);/);
   assert.match(route, /no-store/);
   assert.match(homePage, /process\.env\.VERCEL !== "1"/);
   assert.match(homePage, /await connection\(\)/);
-  assert.match(homePage, /unstable_cache/);
-  assert.match(homePage, /homepage-initial-feed/);
-  assert.match(homePage, /revalidate: 900/);
+  assert.match(homePage, /getCachedHomeFeedData/);
+  assert.match(publicCachedData, /"use cache"/);
+  assert.match(publicCachedData, /cacheLife\(\{ stale: 300, revalidate: 7_200, expire: 604_800 \}\)/);
+  assert.match(publicCachedData, /cacheTag\(PUBLIC_FEED_CACHE_TAG\)/);
   assert.match(homePage, /shouldBypassHomeFeedCacheForQualification/);
   assert.match(homePage, /process\.env\.NUTSNEWS_RUNTIME_ENV === "staging"/);
   assert.match(homePage, /\^nutsnews-test-\[a-z0-9-\]\+\$/);

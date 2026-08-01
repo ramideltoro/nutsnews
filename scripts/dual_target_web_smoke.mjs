@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { assertQualifiedReadinessBody } from "./dual_target_web_smoke_contract.mjs";
+
 const DEFAULT_TIMEOUT_MS = 15_000;
 
 function accessHeaders(env = process.env) {
@@ -232,7 +234,11 @@ const expectedConfigGeneration = required(
 const expectedSideEffectsMode =
   option("--expected-side-effects-mode") || process.env.NUTSNEWS_EXPECTED_SIDE_EFFECTS_MODE;
 const expectedDatabaseProviderMode =
-  option("--expected-database-provider-mode") || process.env.NUTSNEWS_EXPECTED_DATABASE_PROVIDER_MODE;
+  required(
+    option("--expected-database-provider-mode") ||
+      process.env.NUTSNEWS_EXPECTED_DATABASE_PROVIDER_MODE,
+    "--expected-database-provider-mode or NUTSNEWS_EXPECTED_DATABASE_PROVIDER_MODE",
+  );
 const expectedProductionWritesPaused = optionalBoolean(
   option("--expected-production-writes-paused") || process.env.NUTSNEWS_EXPECTED_PRODUCTION_WRITES_PAUSED,
   "--expected-production-writes-paused or NUTSNEWS_EXPECTED_PRODUCTION_WRITES_PAUSED",
@@ -285,9 +291,13 @@ const readinessResponse = await fetchOk(
 );
 const readiness = await readinessResponse.json();
 
-if (readiness?.ok !== true || readiness?.service !== "nutsnews-web" || readiness?.code !== "ready") {
-  throw new Error("Readiness endpoint did not return a qualified runtime response");
-}
+assertQualifiedReadinessBody(readiness, {
+  sourceCommit: expectedSourceCommit,
+  buildId: expectedBuildId,
+  deploymentTarget: expectedDeploymentTarget,
+  configGeneration: expectedConfigGeneration,
+  databaseProviderMode: expectedDatabaseProviderMode,
+});
 
 if (!/no-store/.test(readinessResponse.headers.get("cache-control") ?? "")) {
   throw new Error("Readiness endpoint must be no-store");

@@ -177,6 +177,7 @@ jobs:
             --expected-deployment-target vps-staging \
             --expected-health-deployment-target ci-container \
             --expected-runtime-env staging \
+            --expected-database-provider-mode supabase_primary \
             --expected-supabase-url http://staging-fixture.supabase.test:54321 \
             --expected-side-effects-mode disabled \
             --expected-image-digest "$expected_image_digest" \
@@ -288,6 +289,7 @@ jobs:
             --expected-deployment-target production-vps \
             --expected-health-deployment-target ci-container \
             --expected-runtime-env production \
+            --expected-database-provider-mode supabase_primary \
             --expected-supabase-url http://ci-production-fixture.supabase.co:54322 \
             --expected-side-effects-mode live \
             --expected-turnstile-site-key production-turnstile-site-key \

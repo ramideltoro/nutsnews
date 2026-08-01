@@ -113,6 +113,24 @@ test("Vercel waives only OCI identity while retaining release and database readi
   assert.equal(dependencyReads, 1);
 });
 
+test("Vercel production readiness requires the authoritative production system environment", async () => {
+  for (const vercelEnvironment of [undefined, "preview", "development", "Production"]) {
+    const readiness = await evaluateRuntimeReadiness({
+      env: productionEnvironment({
+        VERCEL: "1",
+        VERCEL_ENV: vercelEnvironment,
+        NUTSNEWS_DEPLOYMENT_TARGET: "vercel-production",
+        NUTSNEWS_EXPECTED_IMAGE_DIGEST: undefined,
+        NUTSNEWS_DEPLOYED_IMAGE_DIGEST: undefined,
+      }),
+      readSchemaContract: async () => validSchemaContract(),
+    });
+
+    assert.equal(readiness.ready, false);
+    assert.equal(readiness.code, "deployment_target_environment_mismatch");
+  }
+});
+
 test("Vercel fails closed on missing release identity and datastore failure", async () => {
   const missingIdentity = await evaluateRuntimeReadiness({
     env: productionEnvironment({

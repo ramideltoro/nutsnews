@@ -90,10 +90,14 @@ function adminBackendOperationPayload(operation) {
   if (!contract) throw new Error(`Unknown operation ${operation}`);
   const expectsSingleSnapshotRow = String(contract.responseShape?.rows ?? "").includes("single");
   if (!expectsSingleSnapshotRow) return { rows: [], rowCount: 0, generatedAt: "2026-07-01T00:00:00.000Z" };
+  const row = Object.fromEntries(
+    (contract.responseShape?.minimalRowFields ?? []).map((field) => [field, []]),
+  );
+  if (operation === "load-admin-article-reviews") {
+    row.versionReportError = null;
+  }
   return {
-    rows: [
-      Object.fromEntries((contract.responseShape?.minimalRowFields ?? []).map((field) => [field, []])),
-    ],
+    rows: [row],
     rowCount: 1,
     generatedAt: "2026-07-01T00:00:00.000Z",
   };
@@ -275,6 +279,15 @@ test("deployment smoke expects staging health and readiness targets", () => {
   assert.equal(smokeEnv.EXISTING_VALUE, "preserved");
   assert.equal(smokeEnv.NUTSNEWS_EXPECTED_DEPLOYMENT_TARGET, "vps-staging");
   assert.equal(smokeEnv.NUTSNEWS_EXPECTED_HEALTH_DEPLOYMENT_TARGET, "vps,vps-staging");
+  assert.equal(smokeEnv.NUTSNEWS_EXPECTED_DATABASE_PROVIDER_MODE, "supabase_primary");
+
+  const backendPrimarySmokeEnv = deploymentSmokeEnvironment(input("unused"), {
+    NUTSNEWS_DATABASE_PROVIDER_MODE: "backend_postgres_primary",
+  });
+  assert.equal(
+    backendPrimarySmokeEnv.NUTSNEWS_EXPECTED_DATABASE_PROVIDER_MODE,
+    "backend_postgres_primary",
+  );
 });
 
 test("anonymous auth session must be null", async () => {

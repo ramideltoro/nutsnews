@@ -455,6 +455,8 @@ export function deploymentSmokeEnvironment(input, env = process.env) {
     NUTSNEWS_EXPECTED_IMAGE_DIGEST: input.expectedImageDigest,
     NUTSNEWS_EXPECTED_CONFIG_GENERATION: input.expectedConfigGeneration,
     NUTSNEWS_EXPECTED_SIDE_EFFECTS_MODE: "disabled",
+    NUTSNEWS_EXPECTED_DATABASE_PROVIDER_MODE:
+      String(env.NUTSNEWS_DATABASE_PROVIDER_MODE ?? "").trim() || "supabase_primary",
   };
 }
 

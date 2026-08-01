@@ -225,6 +225,37 @@ requireText(
   "NUTSNEWS_VERCEL_FAILOVER_PRODUCTION_ALIASES",
   "Vercel production release must name controlled failover aliases separately from secondary targets.",
 );
+for (const identityFlag of [
+  '--build-env "NUTSNEWS_EXPECTED_BUILD_ID=$BUILD_ID"',
+  '--build-env "NUTSNEWS_EXPECTED_SOURCE_COMMIT=$SOURCE_COMMIT"',
+  '--build-env "NUTSNEWS_CONFIG_GENERATION=$VERCEL_CONFIG_GENERATION"',
+  '--build-env "NUTSNEWS_DATABASE_PROVIDER_MODE=$DATABASE_PROVIDER_MODE"',
+  '--build-env "NUTSNEWS_DEPLOYMENT_TARGET=vercel-production"',
+  '--env "NUTSNEWS_EXPECTED_BUILD_ID=$BUILD_ID"',
+  '--env "NUTSNEWS_EXPECTED_SOURCE_COMMIT=$SOURCE_COMMIT"',
+  '--env "NUTSNEWS_CONFIG_GENERATION=$VERCEL_CONFIG_GENERATION"',
+  '--env "NUTSNEWS_DATABASE_PROVIDER_MODE=$DATABASE_PROVIDER_MODE"',
+  '--env "NUTSNEWS_DEPLOYMENT_TARGET=vercel-production"',
+]) {
+  requireText(
+    vercelRecoveryWorkflow,
+    identityFlag,
+    `Vercel production release must preserve the exact staged identity flag: ${identityFlag}`,
+  );
+}
+for (const smokeFlag of [
+  '--expected-source-commit "$SOURCE_COMMIT"',
+  '--expected-build-id "$BUILD_ID"',
+  "--expected-deployment-target vercel-production",
+  '--expected-database-provider-mode "$DATABASE_PROVIDER_MODE"',
+  '--expected-config-generation "$VERCEL_CONFIG_GENERATION"',
+]) {
+  requireText(
+    vercelRecoveryWorkflow,
+    smokeFlag,
+    `Vercel production smoke must bind its expected identity: ${smokeFlag}`,
+  );
+}
 requireText(
   vercelRecoveryWorkflow,
   "staging_qualification_admin_backend_evidence.mjs",
@@ -234,6 +265,21 @@ requireText(
   vercelRecoveryWorkflow,
   '`${process.env.RUNNER_TEMP}/staging_qualification_admin_backend_evidence.mjs`',
   "Vercel production release must export the reviewed staging evidence verifier outside the exact app checkout.",
+);
+requireText(
+  vercelRecoveryWorkflow,
+  '"scripts/dual_target_web_smoke_contract.mjs",',
+  "Vercel production release must export the readiness-body contract beside the reviewed smoke helper.",
+);
+requireText(
+  vercelRecoveryWorkflow,
+  '`${process.env.RUNNER_TEMP}/dual_target_web_smoke_contract.mjs`',
+  "Vercel production release must place the readiness-body contract beside the exported smoke helper.",
+);
+requireText(
+  vercelRecoveryWorkflow,
+  'node --check "$RUNNER_TEMP/dual_target_web_smoke_contract.mjs"',
+  "Vercel production release must syntax-check the exported readiness-body contract.",
 );
 requireText(
   vercelRecoveryWorkflow,

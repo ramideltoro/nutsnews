@@ -194,6 +194,9 @@ export async function evaluateRuntimeReadiness({
   if (isVercel && identity.deploymentTarget !== "vercel-production") {
     return result(policy, identity, false, "deployment_target_invalid");
   }
+  if (isVercel && envValue(env, "VERCEL_ENV") !== "production") {
+    return result(policy, identity, false, "deployment_target_environment_mismatch");
+  }
 
   // Native Vercel deployments have no OCI digest, but they still need an exact
   // release/build identity and the same required datastore check as the VPS.
