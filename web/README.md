@@ -570,6 +570,14 @@ The admin portal gives the operator a private place to view usage and operationa
 
 Better Stack Uptime checks whether the public site is reachable from outside the platform.
 
+Grafana Cloud synthetics use only reader-safe `GET` routes:
+
+* `/` must render real NutsNews content without the maintenance-feed message.
+* `/readyz` is the monitoring source for canonical, direct-VPS, and Vercel-secondary readiness. It returns both `ok` and `ready`, a safe release/deployment identity, and `no-store` headers. A failed runtime-safety, release-identity, or required database check returns `503`.
+* `/api/articles` must return published article content together with the documented public cache and data-source headers.
+
+`/healthz` remains a static, cacheable compatibility liveness route and is not the readiness monitoring source. Synthetic checks must never call refresh, controller, ingestion, or other side-effecting routes. Durable feed, content, and worker telemetry is exported by the backend host; the web process does not maintain synthetic counters.
+
 ### Application error monitoring
 
 Sentry tracks frontend, runtime, and Worker errors so failures can be investigated quickly.

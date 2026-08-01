@@ -1,14 +1,30 @@
 import { connection, NextResponse } from "next/server";
 
 import { BYPASS_CACHE_HEADERS } from "@/lib/cacheHeaders";
+import { callBackendDatabaseOperation } from "@/lib/backendDatabase";
 import { evaluateRuntimeReadiness } from "@/lib/runtimeReadiness";
+import { getDatabaseProviderMode } from "@/lib/runtimeSafety";
 import { getSupabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 async function readSchemaContract() {
-  const { data, error } = await getSupabase().rpc("nutsnews_migration_schema_contract");
+  const backendPrimary = getDatabaseProviderMode() === "backend_postgres_primary";
+  let data: unknown;
+  let error: unknown = null;
+
+  if (backendPrimary) {
+    data = await callBackendDatabaseOperation<unknown[]>(
+      "load-readiness-schema-contract",
+      {},
+      { cache: "no-store" },
+    );
+  } else {
+    const response = await getSupabase().rpc("nutsnews_migration_schema_contract");
+    data = response.data;
+    error = response.error;
+  }
 
   const contract = Array.isArray(data) ? data[0] : data;
   if (!contract || typeof contract !== "object") {
@@ -42,12 +58,17 @@ export async function GET() {
   return NextResponse.json(
     {
       ok: readiness.ready,
+      ready: readiness.ready,
       service: "nutsnews-web",
       runtimeEnv: readiness.runtimeEnv,
       sideEffectsMode: readiness.sideEffectsMode,
       databaseProviderMode: readiness.databaseProviderMode,
       productionWritesPaused: readiness.productionWritesPaused,
       code: readiness.code,
+      sourceCommit: readiness.sourceCommit,
+      buildId: readiness.buildId,
+      deploymentTarget: readiness.deploymentTarget,
+      configGeneration: readiness.configGeneration,
     },
     {
       status: readiness.ready ? 200 : 503,

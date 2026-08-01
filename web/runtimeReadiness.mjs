@@ -12,6 +12,7 @@ const DEFAULT_TIMEOUT_MS = 2000;
 const TARGET_RUNTIME_ENVIRONMENTS = new Map([
   ["vps-staging", "staging"],
   ["production-vps", "production"],
+  ["vercel-production", "production"],
 ]);
 
 function envValue(env, name) {
@@ -97,18 +98,23 @@ export function getRuntimeIdentity(env = process.env) {
   });
 }
 
-function getIdentityReadiness(policy, identity) {
+function getIdentityReadiness(policy, identity, { requireImageIdentity = true } = {}) {
   if (
     identity.sourceCommit === "unknown" ||
     identity.buildId === "unknown" ||
     identity.deploymentTarget === "unknown" ||
-    identity.expectedImageDigest === "unknown" ||
-    identity.deployedImageDigest === "unknown" ||
     identity.expectedSourceCommit === "unknown" ||
     identity.expectedBuildId === "unknown" ||
     identity.configGeneration === "unknown" ||
     identity.expectedSchemaVersion === "unknown" ||
     !identity.timeoutValid
+  ) {
+    return "runtime_identity_invalid";
+  }
+
+  if (
+    requireImageIdentity &&
+    (identity.expectedImageDigest === "unknown" || identity.deployedImageDigest === "unknown")
   ) {
     return "runtime_identity_invalid";
   }
@@ -125,7 +131,7 @@ function getIdentityReadiness(policy, identity) {
   if (
     identity.sourceCommit !== identity.expectedSourceCommit ||
     identity.buildId !== identity.expectedBuildId ||
-    identity.expectedImageDigest !== identity.deployedImageDigest
+    (requireImageIdentity && identity.expectedImageDigest !== identity.deployedImageDigest)
   ) {
     return "release_identity_mismatch";
   }
@@ -168,9 +174,10 @@ function result(policy, identity, ready, code) {
 
 /**
  * Evaluate the server-side qualification gate. The supplied reader must be a
- * single read-only Supabase query that returns the legacy marker, migration
- * head, recorded schema fingerprint, and current schema fingerprint. Public
- * callers receive only the stable code and safe identity above.
+ * single read-only query against the configured primary datastore that returns
+ * the legacy marker, migration head, recorded schema fingerprint, and current
+ * schema fingerprint. Public callers receive only the stable code and safe
+ * identity above.
  */
 export async function evaluateRuntimeReadiness({
   env = process.env,
@@ -183,24 +190,29 @@ export async function evaluateRuntimeReadiness({
     return result(policy, identity, false, policy.code);
   }
 
-  // Vercel remains outside the OCI staging-promotion gate. Retain its existing
-  // #117 readiness semantics instead of requiring image-only attestation
-  // values from a native Vercel deployment.
-  if (env.VERCEL === "1" && !TARGET_RUNTIME_ENVIRONMENTS.has(identity.deploymentTarget)) {
-    return result(policy, identity, true, "ready");
+  const isVercel = env.VERCEL === "1";
+  if (isVercel && identity.deploymentTarget !== "vercel-production") {
+    return result(policy, identity, false, "deployment_target_invalid");
   }
 
-  const identityCode = getIdentityReadiness(policy, identity);
+  // Native Vercel deployments have no OCI digest, but they still need an exact
+  // release/build identity and the same required datastore check as the VPS.
+  const identityCode = getIdentityReadiness(policy, identity, {
+    requireImageIdentity: !isVercel,
+  });
   if (identityCode !== "ready") {
     return result(policy, identity, false, identityCode);
   }
 
-  if (policy.databaseProviderMode === "backend_postgres_primary") {
-    return result(policy, identity, true, "ready");
-  }
-
   if (typeof readSchemaContract !== "function") {
-    return result(policy, identity, false, "supabase_dependency_failed");
+    return result(
+      policy,
+      identity,
+      false,
+      policy.databaseProviderMode === "backend_postgres_primary"
+        ? "backend_dependency_failed"
+        : "supabase_dependency_failed",
+    );
   }
 
   try {
@@ -232,13 +244,15 @@ export async function evaluateRuntimeReadiness({
       return result(policy, identity, false, "schema_drift_detected");
     }
   } catch (error) {
+    const dependency =
+      policy.databaseProviderMode === "backend_postgres_primary" ? "backend" : "supabase";
     return result(
       policy,
       identity,
       false,
       error instanceof ReadinessTimeoutError
-        ? "supabase_dependency_timeout"
-        : "supabase_dependency_failed",
+        ? `${dependency}_dependency_timeout`
+        : `${dependency}_dependency_failed`,
     );
   }
 
