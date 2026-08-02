@@ -12,6 +12,7 @@ import { LocalizedContactPage } from "@/app/contact/LocalizedContactPage";
 import { SavedStoriesPage } from "@/app/saved/SavedStoriesPage";
 import type { Article } from "@/lib/articles";
 import { NUTSNEWS_CONTACT_EMAIL } from "@/lib/contactDetails";
+import { ANALYTICS_CONSENT_STORAGE_KEY } from "@/lib/analyticsConsent";
 import { LANGUAGE_CHANGE_EVENT, LANGUAGE_STORAGE_KEY } from "@/lib/languages";
 import { SAVED_STORIES_STORAGE_KEY } from "@/lib/savedStories";
 
@@ -466,6 +467,38 @@ describe("ThemeSwitcher", () => {
     expect(document.documentElement.lang).toBe("fr");
     expect(window.localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe("fr");
     expect(screen.getAllByText("Français").length).toBeGreaterThan(0);
+  });
+
+  test("lets readers change their analytics choice from settings", async () => {
+    const user = userEvent.setup();
+    render(<ThemeSwitcher />);
+
+    await user.click(screen.getByTestId("nutsnews-settings-toggle"));
+    const analyticsSwitch = screen.getByTestId("nutsnews-settings-analytics");
+
+    await waitFor(() => expect(analyticsSwitch).toBeEnabled());
+    expect(analyticsSwitch).toHaveAttribute("role", "switch");
+    expect(analyticsSwitch).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByText("Analytics off")).toBeInTheDocument();
+
+    await user.click(analyticsSwitch);
+
+    await waitFor(() =>
+      expect(analyticsSwitch).toHaveAttribute("aria-checked", "true"),
+    );
+    expect(window.localStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY)).toBe(
+      "granted",
+    );
+    expect(screen.getByText("Minimal analytics allowed")).toBeInTheDocument();
+
+    await user.click(analyticsSwitch);
+
+    await waitFor(() =>
+      expect(analyticsSwitch).toHaveAttribute("aria-checked", "false"),
+    );
+    expect(window.localStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY)).toBe(
+      "denied",
+    );
   });
 });
 

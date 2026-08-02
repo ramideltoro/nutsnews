@@ -1,56 +1,28 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import Script from "next/script";
 
 import {
-  ANALYTICS_CONSENT_CHANGED_EVENT,
-  ANALYTICS_CONSENT_STORAGE_KEY,
-  type AnalyticsConsentState,
-  browserRequestsAnalyticsOptOut,
   disableGoogleAnalytics,
   enableGoogleAnalytics,
-  getAnalyticsConsentState,
+  isGoogleAnalyticsMeasurementId,
 } from "@/lib/analyticsConsent";
 import { useRuntimePublicConfig } from "@/lib/runtimePublicConfigClient";
-
-function isGoogleAnalyticsMeasurementId(value: string | null | undefined) {
-  return typeof value === "string" && /^G-[A-Z0-9-]+$/i.test(value);
-}
+import { useAnalyticsConsent } from "./useAnalyticsConsent";
 
 export function RuntimeAnalytics() {
   const config = useRuntimePublicConfig();
-  const [analyticsConsent, setAnalyticsConsent] =
-    useState<AnalyticsConsentState>("denied");
-  const [browserOptOut, setBrowserOptOut] = useState(true);
+  const {
+    browserBlocked: browserOptOut,
+    effectiveConsent: analyticsConsent,
+  } = useAnalyticsConsent();
 
   const gaId =
     config?.telemetryEnabled && isGoogleAnalyticsMeasurementId(config.gaId)
       ? config.gaId
       : null;
   const serializedGaId = useMemo(() => JSON.stringify(gaId), [gaId]);
-
-  useEffect(() => {
-    function syncConsent() {
-      setBrowserOptOut(browserRequestsAnalyticsOptOut());
-      setAnalyticsConsent(getAnalyticsConsentState());
-    }
-
-    function syncStorage(event: StorageEvent) {
-      if (event.key === ANALYTICS_CONSENT_STORAGE_KEY) {
-        syncConsent();
-      }
-    }
-
-    syncConsent();
-    window.addEventListener(ANALYTICS_CONSENT_CHANGED_EVENT, syncConsent);
-    window.addEventListener("storage", syncStorage);
-
-    return () => {
-      window.removeEventListener(ANALYTICS_CONSENT_CHANGED_EVENT, syncConsent);
-      window.removeEventListener("storage", syncStorage);
-    };
-  }, []);
 
   useEffect(() => {
     if (gaId && (browserOptOut || analyticsConsent !== "granted")) {

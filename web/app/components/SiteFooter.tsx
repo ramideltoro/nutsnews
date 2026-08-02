@@ -20,6 +20,7 @@ import type { Article } from "@/lib/articles";
 import { DEFAULT_LANGUAGE_CODE, type LanguageCode } from "@/lib/languages";
 import { formatPublisherName, getPublisherAttribution } from "@/lib/publisherAttribution";
 import { MobileSiteNavigation } from "./MobileSiteNavigation";
+import { AnalyticsConsentBanner } from "./AnalyticsConsentBanner";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { OptimizedArticleImage } from "./OptimizedArticleImage";
 import { useSelectedLanguage } from "./useSelectedLanguage";
@@ -784,6 +785,8 @@ export function SiteFooter() {
         openLabel={copy.openMenu}
         closeLabel={copy.closeMenu}
       />
+
+      <AnalyticsConsentBanner />
 
       <footer className="site-footer-modern">
       <div className="site-footer-modern__inner">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { setAnalyticsConsentState } from "@/lib/analyticsConsent";
 import {
   DEFAULT_LANGUAGE_CODE,
   LANGUAGE_CHANGE_EVENT,
@@ -10,6 +11,7 @@ import {
   isSupportedLanguageCode,
   getLanguageLabel,
 } from "@/lib/languages";
+import { useAnalyticsConsent } from "./useAnalyticsConsent";
 
 const THEME_STORAGE_KEY = "nutsnews.web.theme";
 
@@ -64,6 +66,11 @@ export const settingsCopyByLanguage: Record<
     customize: string;
     theme: string;
     language: string;
+    analytics: string;
+    analyticsAllowed: string;
+    analyticsDenied: string;
+    analyticsBlocked: string;
+    analyticsToggle: string;
     backToSettings: string;
     selectedMark: string;
     themeDescriptions: Record<ThemeId, string>;
@@ -76,6 +83,11 @@ export const settingsCopyByLanguage: Record<
     customize: "Customize",
     theme: "Theme",
     language: "Language",
+    analytics: "Analytics",
+    analyticsAllowed: "Minimal analytics allowed",
+    analyticsDenied: "Analytics off",
+    analyticsBlocked: "Blocked by browser privacy",
+    analyticsToggle: "Minimal analytics",
     backToSettings: "Back to settings menu",
     selectedMark: "Selected",
     themeDescriptions: {
@@ -94,6 +106,11 @@ export const settingsCopyByLanguage: Record<
     customize: "Personnaliser",
     theme: "Thème",
     language: "Langue",
+    analytics: "Analyse",
+    analyticsAllowed: "Analyse minimale autorisée",
+    analyticsDenied: "Analyse désactivée",
+    analyticsBlocked: "Bloquée par le navigateur",
+    analyticsToggle: "Analyse minimale",
     backToSettings: "Retour au menu des paramètres",
     selectedMark: "Sélectionné",
     themeDescriptions: {
@@ -112,6 +129,11 @@ export const settingsCopyByLanguage: Record<
     customize: "カスタマイズ",
     theme: "テーマ",
     language: "言語",
+    analytics: "分析",
+    analyticsAllowed: "最小限の分析を許可中",
+    analyticsDenied: "分析はオフ",
+    analyticsBlocked: "ブラウザの設定でブロック中",
+    analyticsToggle: "最小限の分析",
     backToSettings: "設定メニューに戻る",
     selectedMark: "選択中",
     themeDescriptions: {
@@ -131,6 +153,11 @@ export const settingsCopyByLanguage: Record<
     customize: "Anpassen",
     theme: "Design",
     language: "Sprache",
+    analytics: "Analyse",
+    analyticsAllowed: "Minimale Analyse erlaubt",
+    analyticsDenied: "Analyse ausgeschaltet",
+    analyticsBlocked: "Durch Browser-Datenschutz blockiert",
+    analyticsToggle: "Minimale Analyse",
     backToSettings: "Zurück zum Einstellungsmenü",
     selectedMark: "Ausgewählt",
     themeDescriptions: {
@@ -149,6 +176,11 @@ export const settingsCopyByLanguage: Record<
     customize: "Anpassen",
     theme: "Design",
     language: "Sprache",
+    analytics: "Analyse",
+    analyticsAllowed: "Minimale Analyse erlaubt",
+    analyticsDenied: "Analyse ausgeschaltet",
+    analyticsBlocked: "Durch Browser-Datenschutz blockiert",
+    analyticsToggle: "Minimale Analyse",
     backToSettings: "Zurück zum Einstellungsmenü",
     selectedMark: "Ausgewählt",
     themeDescriptions: {
@@ -167,6 +199,11 @@ export const settingsCopyByLanguage: Record<
     customize: "Προσαρμογή",
     theme: "Θέμα",
     language: "Γλώσσα",
+    analytics: "Ανάλυση",
+    analyticsAllowed: "Επιτρέπονται ελάχιστα analytics",
+    analyticsDenied: "Τα analytics είναι ανενεργά",
+    analyticsBlocked: "Μπλοκάρονται από τον browser",
+    analyticsToggle: "Ελάχιστη ανάλυση",
     backToSettings: "Πίσω στο μενού ρυθμίσεων",
     selectedMark: "Επιλεγμένο",
     themeDescriptions: {
@@ -312,6 +349,23 @@ function BackIcon({ className = "" }: { className?: string }) {
   );
 }
 
+function AnalyticsIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+    >
+      <path d="M5 20V10M12 20V4M19 20v-7" />
+    </svg>
+  );
+}
+
 export function ThemeSwitcher() {
   const [selectedTheme, setSelectedTheme] = useState<ThemeId>(() => {
     if (typeof window === "undefined") {
@@ -326,6 +380,7 @@ export function ThemeSwitcher() {
     getStoredLanguage,
     getServerLanguageSnapshot,
   );
+  const { browserBlocked, storedConsent } = useAnalyticsConsent();
   const [isOpen, setIsOpen] = useState(false);
   const [activePanel, setActivePanel] = useState<SettingsPanel>("menu");
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -368,6 +423,12 @@ export function ThemeSwitcher() {
   );
   const activeLanguageLabel = getLanguageLabel(selectedLanguage);
   const copy = settingsCopyByLanguage[selectedLanguage];
+  const analyticsAllowed = storedConsent === "granted";
+  const analyticsStatus = browserBlocked
+    ? copy.analyticsBlocked
+    : analyticsAllowed
+      ? copy.analyticsAllowed
+      : copy.analyticsDenied;
 
   function handleThemeSelect(themeId: ThemeId) {
     setSelectedTheme(themeId);
@@ -375,6 +436,10 @@ export function ThemeSwitcher() {
 
   function handleLanguageSelect(languageCode: LanguageCode) {
     applyLanguage(languageCode);
+  }
+
+  function handleAnalyticsToggle() {
+    setAnalyticsConsentState(analyticsAllowed ? "denied" : "granted");
   }
 
   function handleToggleSettings() {
@@ -462,6 +527,40 @@ export function ThemeSwitcher() {
                     </span>
                   </span>
                   <ArrowIcon className="settings-menu-item__arrow" />
+                </button>
+
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={analyticsAllowed}
+                  aria-label={copy.analyticsToggle}
+                  data-testid="nutsnews-settings-analytics"
+                  className="settings-menu-item"
+                  disabled={browserBlocked && !analyticsAllowed}
+                  title={browserBlocked ? copy.analyticsBlocked : undefined}
+                  onClick={handleAnalyticsToggle}
+                >
+                  <span className="settings-menu-item__icon" aria-hidden="true">
+                    <AnalyticsIcon className="h-5 w-5" />
+                  </span>
+                  <span className="settings-menu-item__copy">
+                    <span className="settings-menu-item__title">
+                      {copy.analytics}
+                    </span>
+                    <span className="settings-menu-item__value">
+                      {analyticsStatus}
+                    </span>
+                  </span>
+                  <span
+                    className={`analytics-switch-indicator ${
+                      analyticsAllowed
+                        ? "analytics-switch-indicator--active"
+                        : ""
+                    }`}
+                    aria-hidden="true"
+                  >
+                    <span className="analytics-switch-indicator__thumb" />
+                  </span>
                 </button>
               </div>
             </>

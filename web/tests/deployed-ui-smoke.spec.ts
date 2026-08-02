@@ -2,6 +2,10 @@ import { expect, test, type Page, type Response } from '@playwright/test';
 
 const LANGUAGE_STORAGE_KEY = 'nutsnews.web.language';
 const THEME_STORAGE_KEY = 'nutsnews.web.theme';
+const ANALYTICS_CONSENT_STORAGE_KEY = 'nutsnews.web.analytics-consent';
+const PRODUCTION_GA_MEASUREMENT_ID = 'G-8VXSG5NWM4';
+const ANALYTICS_CONSENT_TEST_TITLE =
+  'analytics consent stays off until Allow and never sends a smoke-test collection event';
 
 const publicFooterRoutes = [
   { name: 'Apps', path: '/apps', expectedText: /NutsNews for iPhone is here\./i },
@@ -73,13 +77,26 @@ type VisibleArticleCard = {
   title: string;
 };
 
-test.beforeEach(async ({ context }) => {
+type RuntimeConfigResponse = {
+  gaId?: unknown;
+  telemetryEnabled?: unknown;
+};
+
+test.beforeEach(async ({ context }, testInfo) => {
+  const seedAnalyticsDenial = testInfo.title !== ANALYTICS_CONSENT_TEST_TITLE;
+
   await context.addInitScript(
-    ([languageStorageKey, themeStorageKey]) => {
+    ([languageStorageKey, themeStorageKey, analyticsConsentStorageKey, shouldSeedAnalyticsDenial]) => {
       window.localStorage.setItem(languageStorageKey, 'en');
       window.localStorage.setItem(themeStorageKey, 'amber');
+
+      if (shouldSeedAnalyticsDenial) {
+        window.localStorage.setItem(analyticsConsentStorageKey, 'denied');
+      } else {
+        window.localStorage.removeItem(analyticsConsentStorageKey);
+      }
     },
-    [LANGUAGE_STORAGE_KEY, THEME_STORAGE_KEY],
+    [LANGUAGE_STORAGE_KEY, THEME_STORAGE_KEY, ANALYTICS_CONSENT_STORAGE_KEY, seedAnalyticsDenial] as const,
   );
 });
 
@@ -511,6 +528,78 @@ test.describe('Deployed UI smoke regression', () => {
         )
         .toBe(themeId);
     }
+  });
+
+  test(ANALYTICS_CONSENT_TEST_TITLE, async ({ page, request }) => {
+    const runtimeConfigResponse = await request.get('/api/runtime-config');
+    expect(
+      runtimeConfigResponse.ok(),
+      `Expected /api/runtime-config to load, got ${runtimeConfigResponse.status()}.`,
+    ).toBeTruthy();
+    const runtimeConfig = (await runtimeConfigResponse.json()) as RuntimeConfigResponse;
+
+    test.skip(
+      runtimeConfig.telemetryEnabled !== true,
+      'Analytics consent is exercised only on deployed production targets where telemetry is live.',
+    );
+    expect(runtimeConfig.gaId).toBe(PRODUCTION_GA_MEASUREMENT_ID);
+
+    const tagScriptRequests: string[] = [];
+    const collectionRequests: string[] = [];
+
+    await page.route(/^https:\/\/www\.googletagmanager\.com\//, async (route) => {
+      tagScriptRequests.push(route.request().url());
+      await route.abort('blockedbyclient');
+    });
+    await page.route(/^https:\/\/(?:[^/]+\.)?google-analytics\.com\//, async (route) => {
+      collectionRequests.push(route.request().url());
+      await route.abort('blockedbyclient');
+    });
+
+    const response = await page.goto('/', { waitUntil: 'domcontentloaded' });
+    expect(response?.ok(), `Expected homepage to load, got ${response?.status() ?? 'no response'}`).toBeTruthy();
+    await assertNotDeploymentProtectionPage(page);
+
+    const consentBanner = page.getByTestId('nutsnews-analytics-consent-banner');
+    await expect(consentBanner).toBeVisible({ timeout: 15_000 });
+    expect(tagScriptRequests, 'No Google tag script may load before consent.').toEqual([]);
+    expect(collectionRequests, 'No Google Analytics collection may start before consent.').toEqual([]);
+
+    await page.getByTestId('nutsnews-analytics-consent-allow').click();
+
+    await expect(consentBanner).toBeHidden();
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(
+            (storageKey) => window.localStorage.getItem(storageKey),
+            ANALYTICS_CONSENT_STORAGE_KEY,
+          ),
+        {
+          message: 'Expected Allow to persist analytics consent in this browser.',
+          timeout: 10_000,
+        },
+      )
+      .toBe('granted');
+    await expect
+      .poll(
+        () =>
+          tagScriptRequests.some((requestUrl) => {
+            const url = new URL(requestUrl);
+            return url.pathname === '/gtag/js' && url.searchParams.get('id') === PRODUCTION_GA_MEASUREMENT_ID;
+          }),
+        {
+          message: `Expected Allow to request the exact ${PRODUCTION_GA_MEASUREMENT_ID} tag script.`,
+          timeout: 10_000,
+        },
+      )
+      .toBe(true);
+
+    await page.waitForTimeout(250);
+    expect(
+      collectionRequests,
+      'The smoke test blocks the tag loader and must not attempt a real Analytics collection request.',
+    ).toEqual([]);
   });
 
   test('language menu honors translations and English fallback through every supported language', async ({ page }) => {
