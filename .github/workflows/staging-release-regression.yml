@@ -19,8 +19,10 @@ on:
       - "scripts/production_release_workflow_regression.mjs"
       - "scripts/environments_secrets_recovery_doc_regression.mjs"
       - "scripts/pre_merge_deployment_workflow_order_regression.mjs"
+      - "scripts/staging_migration_dispatch.mjs"
       - "scripts/staging_active_use_contract_regression.mjs"
       - "scripts/workflow_check_inventory_regression.mjs"
+      - "tests/staging-migration-dispatch.test.mjs"
   push:
     branches: [main]
     paths:
@@ -39,8 +41,10 @@ on:
       - "scripts/production_release_workflow_regression.mjs"
       - "scripts/environments_secrets_recovery_doc_regression.mjs"
       - "scripts/pre_merge_deployment_workflow_order_regression.mjs"
+      - "scripts/staging_migration_dispatch.mjs"
       - "scripts/staging_active_use_contract_regression.mjs"
       - "scripts/workflow_check_inventory_regression.mjs"
+      - "tests/staging-migration-dispatch.test.mjs"
 
 permissions:
   contents: read
@@ -71,5 +75,6 @@ jobs:
           node scripts/production_release_workflow_regression.mjs
           node scripts/environments_secrets_recovery_doc_regression.mjs
           node scripts/pre_merge_deployment_workflow_order_regression.mjs
+          node --test tests/staging-migration-dispatch.test.mjs
           node scripts/staging_active_use_contract_regression.mjs
           node scripts/workflow_check_inventory_regression.mjs
