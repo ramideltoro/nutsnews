@@ -505,6 +505,7 @@ describe("SiteFooter", () => {
     expect(menuToggle).toHaveAttribute("aria-expanded", "true");
     let menuPanel = screen.getByTestId("nutsnews-footer-menu-panel");
 
+    expect(within(menuPanel).getByText("NutsNews")).toBeInTheDocument();
     expect(within(menuPanel).getByRole("link", { name: "Apps" })).toHaveAttribute("href", "/apps");
     expect(within(menuPanel).getByRole("link", { name: "Saved" })).toHaveAttribute("href", "/saved");
     expect(within(menuPanel).getByRole("link", { name: "About" })).toHaveAttribute("href", "/about");
