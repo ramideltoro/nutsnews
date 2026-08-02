@@ -211,8 +211,8 @@ test("browser entries and immutable image inputs do not embed runtime public val
   for (const source of [contactForm, layout, instrumentation]) {
     assert.doesNotMatch(source, /process\.env\.NEXT_PUBLIC_/);
   }
-  assert.match(route, /import \{ connection \} from "next\/server"/);
-  assert.match(route, /await connection\(\)/);
+  assert.match(route, /import \{ connection \} from "next\/server";/);
+  assert.match(route, /await connection\(\);/);
   assert.match(route, /no-store/);
   assert.match(homePage, /process\.env\.VERCEL !== "1"/);
   assert.match(homePage, /await connection\(\)/);

@@ -91,6 +91,12 @@ async function testSecurityHeaders() {
 
 async function testMiddlewareAdminBoundary() {
   const { middleware } = loadTsModule("web/middleware.ts", {
+    "@/lib/cacheTags": {
+      articleCacheTag(articleId) {
+        return `article:${articleId}`;
+      },
+      SITE_SHELL_CACHE_TAG: "site-shell",
+    },
     "next/server": {
       NextResponse: {
         next() {
