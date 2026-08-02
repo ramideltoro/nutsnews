@@ -63,11 +63,23 @@ test("the fixed-purpose migration policy blocks reverse and unprotected producti
     NUTSNEWS_MIGRATION_PURPOSE: "production-protected",
     NUTSNEWS_MIGRATION_DIRECTION: "up",
     NUTSNEWS_MIGRATION_DATABASE_URL: "postgresql://synthetic",
-    NUTSNEWS_MIGRATION_USE_LINKED_PROJECT: "true",
+    NUTSNEWS_MIGRATION_USE_LINKED_PROJECT: "false",
     NUTSNEWS_PRODUCTION_MIGRATION_APPROVAL: "approved",
     NUTSNEWS_PRODUCTION_BACKUP_COMPLETED_AT: new Date().toISOString(),
   });
-  assert.equal(production.useLinkedProject, true);
+  assert.equal(production.useLinkedProject, false);
+  assert.throws(
+    () => getMigrationWorkflowPolicy({
+      NUTSNEWS_MIGRATION_TARGET: "production",
+      NUTSNEWS_MIGRATION_PURPOSE: "production-protected",
+      NUTSNEWS_MIGRATION_DIRECTION: "up",
+      NUTSNEWS_MIGRATION_DATABASE_URL: "postgresql://synthetic",
+      NUTSNEWS_MIGRATION_USE_LINKED_PROJECT: "true",
+      NUTSNEWS_PRODUCTION_MIGRATION_APPROVAL: "approved",
+      NUTSNEWS_PRODUCTION_BACKUP_COMPLETED_AT: new Date().toISOString(),
+    }),
+    /advisory lock remains valid/,
+  );
   assert.throws(
     () => getMigrationWorkflowPolicy({
       NUTSNEWS_MIGRATION_TARGET: "production",

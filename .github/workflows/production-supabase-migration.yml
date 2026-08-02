@@ -224,7 +224,10 @@ jobs:
           NUTSNEWS_MIGRATION_PURPOSE: production-protected
           NUTSNEWS_MIGRATION_DIRECTION: up
           NUTSNEWS_MIGRATION_SOURCE_ROOT: ${{ github.workspace }}/approved-source
-          NUTSNEWS_MIGRATION_USE_LINKED_PROJECT: "true"
+          # Use the same short-lived direct connection for the advisory lock,
+          # migration, and contract reconciliation. A linked push mints another
+          # CLI credential and invalidates the connection holding the lock.
+          NUTSNEWS_MIGRATION_USE_LINKED_PROJECT: "false"
           NUTSNEWS_PRODUCTION_MIGRATION_APPROVAL: approved
           NUTSNEWS_PRODUCTION_BACKUP_COMPLETED_AT: ${{ needs.preflight.outputs.backup_completed_at }}
         run: |
