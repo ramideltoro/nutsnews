@@ -29,8 +29,10 @@ test("all repository migrations use ordered unique 14-digit filenames and match 
 });
 
 test("the readiness fingerprint hashes catalog attributes without expensive SQL deparsing", async () => {
-  const contract = await getMigrationContract();
-  const migration = await readFile(contract.migrations.at(-1).path, "utf8");
+  const migration = await readFile(
+    resolve(import.meta.dirname, "../supabase/migrations/20260802022105_optimize_schema_fingerprint_rpc.sql"),
+    "utf8",
+  );
 
   assert.match(migration, /procedure\.prosrc/);
   assert.match(migration, /index_definition\.indkey::text/);

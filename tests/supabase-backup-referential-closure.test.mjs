@@ -15,3 +15,12 @@ test("Supabase REST backup keeps article summaries inside the exported article s
   assert.match(backupScript, /row\?\.original_url/);
   assert.match(backupScript, /sourceRowCount/);
 });
+
+test("Supabase REST backup paginates and retries bounded transient failures", () => {
+  assert.match(backupScript, /BACKUP_PAGE_SIZE \|\| 250/);
+  assert.match(backupScript, /offset=\$\{offset\}/);
+  assert.match(backupScript, /MAX_ATTEMPTS = 4/);
+  assert.match(backupScript, /408, 425, 429, 500, 502, 503, 504/);
+  assert.match(backupScript, /page\.rows\.length < pageLimit/);
+  assert.doesNotMatch(backupScript, /select=\*&limit=\$\{LIMIT\}`/);
+});

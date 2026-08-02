@@ -94,9 +94,9 @@ for (const fragment of ["backupRunId", "Supabase Backup", "workflow_dispatch", "
 }
 requireText(runner, "production-protected", "Locked runner must retain its protected production policy.");
 requireText(runner, "NOTIFY pgrst, 'reload schema'", "Locked runner must refresh PostgREST after migration.");
-requireText(runner, "recorded atomically by its head migration", "Linked production must rely on atomic head recording.");
 requireText(migrationContract, "must atomically record its migration contract", "Migration validation must require atomic head recording.");
 requireText(verifier, "nutsnews_migration_schema_contract", "Production verifier must query the database contract.");
+requireText(runner, "SELECT public.nutsnews_record_migration_head('${contract.head}')", "Locked migrations must reconcile the contract even when the head migration was already recorded remotely.");
 requireText(verifier, "NOTIFY pgrst, 'reload schema'", "Production verifier must refresh PostgREST with its fresh connection.");
 requireText(verifier, "legacy_schema_version", "Production verifier must preserve the rollback-compatible schema marker.");
 requireText(regressionWorkflow, "node scripts/production_migration_workflow_regression.mjs", "Regression workflow must run its guard.");

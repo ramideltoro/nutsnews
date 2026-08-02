@@ -26,6 +26,9 @@ const TABLES = String(process.env.BACKUP_TABLES || DEFAULT_BACKUP_TABLES.join(',
   .map((table) => table.trim())
   .filter(Boolean);
 const LIMIT = Math.max(1, Math.min(Number(process.env.BACKUP_LIMIT_PER_TABLE || 5000), 50000));
+const PAGE_SIZE = Math.max(1, Math.min(Number(process.env.BACKUP_PAGE_SIZE || 250), 1000, LIMIT));
+const MAX_ATTEMPTS = 4;
+const RETRYABLE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
 const OUT_DIR = path.join(process.cwd(), 'backups', 'supabase');
 const exportedRowsByTable = new Map();
 
@@ -40,19 +43,68 @@ function sha256(buffer) {
   return createHash('sha256').update(buffer).digest('hex');
 }
 
+const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+async function fetchPage(table, offset, pageLimit) {
+  const url = `${SUPABASE_URL}/rest/v1/${encodeURIComponent(table)}?select=*&limit=${pageLimit}&offset=${offset}`;
+  let lastError;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    let response;
+    try {
+      response = await fetch(url, {
+        headers: {
+          apikey: SERVICE_KEY,
+          Authorization: `Bearer ${SERVICE_KEY}`,
+          Accept: 'application/json',
+          Prefer: 'count=exact',
+        },
+      });
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(`${table} backup page failed`);
+      if (attempt === MAX_ATTEMPTS) throw lastError;
+      await delay(1000 * attempt);
+      continue;
+    }
+
+    const text = await response.text();
+    if (response.ok) {
+      return { rows: text ? JSON.parse(text) : [], contentRange: response.headers.get('content-range') || '' };
+    }
+
+    lastError = new Error(`${table} backup page at offset ${offset} failed ${response.status}: ${text.slice(0, 500)}`);
+    if (!RETRYABLE_STATUSES.has(response.status) || attempt === MAX_ATTEMPTS) throw lastError;
+    await delay(1000 * attempt);
+  }
+
+  throw lastError;
+}
+
+function contentRangeTotal(contentRange) {
+  const total = String(contentRange).match(/\/([0-9]+)$/)?.[1];
+  return total ? Number(total) : null;
+}
+
 async function fetchTable(table) {
-  const url = `${SUPABASE_URL}/rest/v1/${encodeURIComponent(table)}?select=*&limit=${LIMIT}`;
-  const response = await fetch(url, {
-    headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
-      Accept: 'application/json',
-      Prefer: 'count=exact',
-    },
-  });
-  const text = await response.text();
-  if (!response.ok) throw new Error(`${table} backup failed ${response.status}: ${text.slice(0, 500)}`);
-  return { rows: text ? JSON.parse(text) : [], contentRange: response.headers.get('content-range') || '' };
+  const rows = [];
+  let total = null;
+
+  while (rows.length < LIMIT) {
+    const pageLimit = Math.min(PAGE_SIZE, LIMIT - rows.length);
+    const page = await fetchPage(table, rows.length, pageLimit);
+    if (total === null) total = contentRangeTotal(page.contentRange);
+    rows.push(...page.rows);
+
+    if (page.rows.length === 0 || page.rows.length < pageLimit || (total !== null && rows.length >= total)) break;
+  }
+
+  const cappedRows = rows.slice(0, LIMIT);
+  const contentRange = total === null
+    ? ''
+    : cappedRows.length === 0
+      ? `*/${total}`
+      : `0-${cappedRows.length - 1}/${total}`;
+  return { rows: cappedRows, contentRange };
 }
 
 function filterRowsForReferentialClosure(table, rows) {
@@ -80,6 +132,7 @@ const manifest = {
   kind: 'supabase-rest-table-export',
   createdAt: new Date().toISOString(),
   limitPerTable: LIMIT,
+  pageSize: PAGE_SIZE,
   restoreFireDrillCommand: 'node scripts/supabase_restore_fire_drill.mjs --backup-dir backups/supabase --local-supabase',
   tables: [],
 };
