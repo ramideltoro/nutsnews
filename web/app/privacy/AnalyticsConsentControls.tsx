@@ -1,13 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 import {
   type AnalyticsConsentState,
-  browserRequestsAnalyticsOptOut,
-  getAnalyticsConsentState,
   setAnalyticsConsentState,
 } from "@/lib/analyticsConsent";
+import { useAnalyticsConsent } from "@/app/components/useAnalyticsConsent";
 
 export type AnalyticsConsentControlCopy = {
   title: string;
@@ -25,22 +22,10 @@ export function AnalyticsConsentControls({
 }: {
   copy: AnalyticsConsentControlCopy;
 }) {
-  const [consent, setConsent] = useState<AnalyticsConsentState>("denied");
-  const [browserBlocked, setBrowserBlocked] = useState(true);
-
-  useEffect(() => {
-    function syncConsent() {
-      setBrowserBlocked(browserRequestsAnalyticsOptOut());
-      setConsent(getAnalyticsConsentState());
-    }
-
-    syncConsent();
-  }, []);
+  const { browserBlocked, effectiveConsent: consent } = useAnalyticsConsent();
 
   function updateConsent(nextConsent: AnalyticsConsentState) {
     setAnalyticsConsentState(nextConsent);
-    setBrowserBlocked(browserRequestsAnalyticsOptOut());
-    setConsent(getAnalyticsConsentState());
   }
 
   const analyticsAllowed = consent === "granted" && !browserBlocked;

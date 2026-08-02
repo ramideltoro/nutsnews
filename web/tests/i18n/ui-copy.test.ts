@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import { aboutCopyByLanguage } from "@/app/about/LocalizedAboutPage";
 import { appsCopyByLanguage } from "@/app/apps/LocalizedAppsPage";
 import { articleDetailCopyByLanguage } from "@/app/articles/[id]/LocalizedArticleDetail";
+import { analyticsConsentBannerCopyByLanguage } from "@/app/components/AnalyticsConsentBanner";
 import { copyByLanguage as articleFeedCopyByLanguage, dateLocaleByLanguage } from "@/app/components/ArticleFeed";
 import { heroTaglineCopyByLanguage } from "@/app/components/HeroTagline";
 import { homeHeaderCopyByLanguage } from "@/app/components/HomeSiteHeader";
@@ -30,6 +31,7 @@ const supportedCodes = SUPPORTED_LANGUAGES.map((language) => language.code);
 
 const copyMaps: { name: string; value: CopyMap }[] = [
   { name: "about", value: aboutCopyByLanguage },
+  { name: "analyticsConsentBanner", value: analyticsConsentBannerCopyByLanguage },
   { name: "apps", value: appsCopyByLanguage },
   { name: "articleDetail", value: articleDetailCopyByLanguage },
   { name: "articleFeed", value: articleFeedCopyByLanguage },
@@ -46,6 +48,8 @@ const copyMaps: { name: string; value: CopyMap }[] = [
 
 const criticalTranslatedPaths = [
   { map: "about", path: ["heroTitle"] },
+  { map: "analyticsConsentBanner", path: ["title"] },
+  { map: "analyticsConsentBanner", path: ["allowButton"] },
   { map: "apps", path: ["roadmapTitle"] },
   { map: "articleDetail", path: ["backToHome"] },
   { map: "articleDetail", path: ["summaryNote"] },
@@ -72,6 +76,7 @@ const criticalTranslatedPaths = [
   { map: "savedStories", path: ["emptyTitle"] },
   { map: "settings", path: ["openSettings"] },
   { map: "settings", path: ["language"] },
+  { map: "settings", path: ["analytics"] },
 ] as const;
 
 const expectedDateLabels: Record<LanguageCode, string> = {

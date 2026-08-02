@@ -19,16 +19,19 @@ function assertIncludes(source, fragment, label) {
 
 const runtimeAnalytics = read("web/app/components/RuntimeAnalytics.tsx");
 const analyticsConsent = read("web/lib/analyticsConsent.ts");
+const analyticsConsentHook = read("web/app/components/useAnalyticsConsent.ts");
+const analyticsConsentBanner = read("web/app/components/AnalyticsConsentBanner.tsx");
+const globalStyles = read("web/app/globals.css");
 const engagementAnalytics = read("web/lib/engagementAnalytics.ts");
 const consentControls = read("web/app/privacy/AnalyticsConsentControls.tsx");
+const siteFooter = read("web/app/components/SiteFooter.tsx");
+const themeSwitcher = read("web/app/components/ThemeSwitcher.tsx");
+const deployedUiSmoke = read("web/tests/deployed-ui-smoke.spec.ts");
 const privacyPolicy = read("web/app/privacy/ios/LocalizedPrivacyPolicyPage.tsx");
 const packageJson = JSON.parse(read("web/package.json"));
 
 for (const fragment of [
-  "ANALYTICS_CONSENT_STORAGE_KEY",
-  "ANALYTICS_CONSENT_CHANGED_EVENT",
-  "browserRequestsAnalyticsOptOut",
-  "getAnalyticsConsentState",
+  "useAnalyticsConsent",
   "disableGoogleAnalytics",
   "enableGoogleAnalytics",
   "isGoogleAnalyticsMeasurementId",
@@ -47,14 +50,29 @@ for (const fragment of [
   "globalPrivacyControl",
   "doNotTrack",
   "msDoNotTrack",
+  "getStoredAnalyticsConsentState",
+  "subscribeToAnalyticsConsentChanges",
+  "storedState === \"granted\" || storedState === \"denied\"",
   "return \"denied\"",
   "localStorage.setItem",
   "ga-disable-",
   "clearGoogleAnalyticsStorage",
   "enableGoogleAnalytics",
   "_ga_",
+  "hostnameLabels",
+  'domains.add(`.${hostnameLabels.slice(index).join(".")}`)',
 ]) {
   assertIncludes(analyticsConsent, fragment, "analytics consent helper");
+}
+
+for (const fragment of [
+  "useAnalyticsConsent",
+  "browserRequestsAnalyticsOptOut",
+  "getAnalyticsConsentState",
+  "getStoredAnalyticsConsentState",
+  "subscribeToAnalyticsConsentChanges",
+]) {
+  assertIncludes(analyticsConsentHook, fragment, "shared analytics consent synchronization");
 }
 
 for (const fragment of [
@@ -70,13 +88,70 @@ for (const fragment of [
 
 for (const fragment of [
   "AnalyticsConsentControls",
+  "useAnalyticsConsent",
   "setAnalyticsConsentState(nextConsent)",
   "updateConsent(\"denied\")",
   "updateConsent(\"granted\")",
-  "browserRequestsAnalyticsOptOut",
   "statusBlocked",
 ]) {
   assertIncludes(consentControls, fragment, "privacy consent controls");
+}
+
+for (const fragment of [
+  "AnalyticsConsentBanner",
+  "analyticsConsentBannerCopyByLanguage",
+  "storedConsent !== null",
+  "browserBlocked",
+  "telemetryEnabled",
+  "isGoogleAnalyticsMeasurementId",
+  "nutsnews-analytics-consent-deny",
+  "nutsnews-analytics-consent-allow",
+  "analytics-consent-banner fixed",
+  "flex flex-col gap-2",
+  "setAnalyticsConsentState(\"denied\")",
+  "setAnalyticsConsentState(\"granted\")",
+]) {
+  assertIncludes(analyticsConsentBanner, fragment, "first-visit analytics consent banner");
+}
+
+assertIncludes(
+  siteFooter,
+  "<AnalyticsConsentBanner />",
+  "public site footer analytics consent mount",
+);
+
+assertIncludes(
+  globalStyles,
+  ".public-themed-page > section:not(.analytics-consent-banner)",
+  "public page analytics banner positioning",
+);
+
+for (const fragment of [
+  "useAnalyticsConsent",
+  'role="switch"',
+  'data-testid="nutsnews-settings-analytics"',
+  "browserBlocked",
+  "storedConsent",
+  "browserBlocked && !analyticsAllowed",
+  "setAnalyticsConsentState",
+]) {
+  assertIncludes(themeSwitcher, fragment, "settings analytics control");
+}
+
+for (const fragment of [
+  "ANALYTICS_CONSENT_TEST_TITLE",
+  "PRODUCTION_GA_MEASUREMENT_ID",
+  "G-8VXSG5NWM4",
+  "seedAnalyticsDenial",
+  "nutsnews-analytics-consent-banner",
+  "nutsnews-analytics-consent-allow",
+  "www\\.googletagmanager\\.com",
+  "google-analytics\\.com",
+  "blockedbyclient",
+  ".toBe('granted')",
+  "collectionRequests",
+]) {
+  assertIncludes(deployedUiSmoke, fragment, "deployed analytics consent smoke");
 }
 
 for (const fragment of [

@@ -16,7 +16,21 @@ type WindowWithPrivacySignals = Window & {
 };
 
 function canUseBrowserStorage() {
-  return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  try {
+    return typeof window.localStorage !== "undefined";
+  } catch {
+    return false;
+  }
+}
+
+export function isGoogleAnalyticsMeasurementId(
+  value: string | null | undefined,
+) {
+  return typeof value === "string" && /^G-[A-Z0-9-]+$/i.test(value);
 }
 
 export function browserRequestsAnalyticsOptOut() {
@@ -35,18 +49,50 @@ export function browserRequestsAnalyticsOptOut() {
   );
 }
 
-export function getAnalyticsConsentState(): AnalyticsConsentState {
-  if (!canUseBrowserStorage() || browserRequestsAnalyticsOptOut()) {
-    return "denied";
+export function getStoredAnalyticsConsentState(): AnalyticsConsentState | null {
+  if (!canUseBrowserStorage()) {
+    return null;
   }
 
   try {
-    return window.localStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY) === "granted"
-      ? "granted"
-      : "denied";
+    const storedState = window.localStorage.getItem(
+      ANALYTICS_CONSENT_STORAGE_KEY,
+    );
+
+    return storedState === "granted" || storedState === "denied"
+      ? storedState
+      : null;
   } catch {
+    return null;
+  }
+}
+
+export function getAnalyticsConsentState(): AnalyticsConsentState {
+  if (browserRequestsAnalyticsOptOut()) {
     return "denied";
   }
+
+  return getStoredAnalyticsConsentState() === "granted" ? "granted" : "denied";
+}
+
+export function subscribeToAnalyticsConsentChanges(onChange: () => void) {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  function handleStorageChange(event: StorageEvent) {
+    if (event.key === null || event.key === ANALYTICS_CONSENT_STORAGE_KEY) {
+      onChange();
+    }
+  }
+
+  window.addEventListener(ANALYTICS_CONSENT_CHANGED_EVENT, onChange);
+  window.addEventListener("storage", handleStorageChange);
+
+  return () => {
+    window.removeEventListener(ANALYTICS_CONSENT_CHANGED_EVENT, onChange);
+    window.removeEventListener("storage", handleStorageChange);
+  };
 }
 
 export function setAnalyticsConsentState(nextState: AnalyticsConsentState) {
@@ -81,6 +127,11 @@ export function clearGoogleAnalyticsStorage(measurementId: string) {
   const cookieNames = new Set(["_ga", "_gid", "_gat", `_ga_${measurementCookieSuffix}`]);
   const hostname = window.location.hostname;
   const domains = new Set<string | undefined>([undefined, hostname, `.${hostname}`]);
+  const hostnameLabels = hostname.split(".").filter(Boolean);
+
+  for (let index = 1; index < hostnameLabels.length - 1; index += 1) {
+    domains.add(`.${hostnameLabels.slice(index).join(".")}`);
+  }
 
   for (const name of cookieNames) {
     for (const domain of domains) {
