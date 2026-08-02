@@ -184,6 +184,16 @@ requireText(
 );
 requireText(
   automaticReleaseWorkflow,
+  "uses: ./.github/workflows/staging-supabase-migration.yml",
+  "Automatic release must apply verified staging migrations before staging deployment.",
+);
+requireText(
+  automaticReleaseWorkflow,
+  "needs: [prepare-candidate, migrate-staging]",
+  "Automatic release dispatch must depend on candidate validation and staging migration success.",
+);
+requireText(
+  automaticReleaseWorkflow,
   "The infra chain will deploy VPS staging, run qualification, apply VPS production, deploy Vercel production, and roll back VPS automatically if Vercel promotion fails.",
   "Automatic release summary must describe the complete protected release chain.",
 );

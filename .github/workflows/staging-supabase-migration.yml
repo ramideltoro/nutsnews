@@ -1,6 +1,20 @@
 name: Apply Verified NutsNews Staging Supabase Migrations
 
 on:
+  workflow_call:
+    inputs:
+      source_commit:
+        description: Full SHA already reachable from ramideltoro/nutsnews main.
+        required: true
+        type: string
+      migration_head:
+        description: Expected 14-digit head from that source commit's supabase/migrations directory.
+        required: true
+        type: string
+      confirmation:
+        description: Fixed staging-only forward-migration confirmation.
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       source_commit:
