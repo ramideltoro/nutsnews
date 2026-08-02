@@ -160,6 +160,10 @@ jobs:
           const helpers = [
             ["scripts/dual_target_web_smoke.mjs", `${process.env.RUNNER_TEMP}/dual_target_web_smoke.mjs`],
             [
+              "scripts/dual_target_web_smoke_contract.mjs",
+              `${process.env.RUNNER_TEMP}/dual_target_web_smoke_contract.mjs`,
+            ],
+            [
               "scripts/staging_qualification_admin_backend_evidence.mjs",
               `${process.env.RUNNER_TEMP}/staging_qualification_admin_backend_evidence.mjs`,
             ],
@@ -182,6 +186,7 @@ jobs:
           }
           NODE
           node --check "$RUNNER_TEMP/dual_target_web_smoke.mjs"
+          node --check "$RUNNER_TEMP/dual_target_web_smoke_contract.mjs"
           node --check "$RUNNER_TEMP/staging_qualification_admin_backend_evidence.mjs"
 
       - name: Verify VPS staging admin backend operation evidence
@@ -233,11 +238,22 @@ jobs:
             }
           }
           NODE
+          expected_schema_version="$(
+            node --input-type=module -e \
+              'import { LEGACY_COMPATIBLE_SCHEMA_VERSION } from "./web/migrationContract.mjs"; process.stdout.write(LEGACY_COMPATIBLE_SCHEMA_VERSION)'
+          )"
+          if [[ ! "$expected_schema_version" =~ ^[0-9]{14}$ ]]; then
+            echo "Expected schema version must be a 14-digit migration version." >&2
+            exit 1
+          fi
           vercel_identity_flags=(
             --build-env "NUTSNEWS_BUILD_ID=$BUILD_ID"
             --build-env "NUTSNEWS_CONFIG_GENERATION=$VERCEL_CONFIG_GENERATION"
             --build-env "NUTSNEWS_DATABASE_PROVIDER_MODE=$DATABASE_PROVIDER_MODE"
             --build-env "NUTSNEWS_DEPLOYMENT_TARGET=vercel-production"
+            --build-env "NUTSNEWS_EXPECTED_BUILD_ID=$BUILD_ID"
+            --build-env "NUTSNEWS_EXPECTED_SCHEMA_VERSION=$expected_schema_version"
+            --build-env "NUTSNEWS_EXPECTED_SOURCE_COMMIT=$SOURCE_COMMIT"
             --build-env "NUTSNEWS_PRODUCTION_WRITES_PAUSED=$PRODUCTION_WRITES_PAUSED"
             --build-env "NUTSNEWS_SOURCE_COMMIT=$SOURCE_COMMIT"
             --build-env "NEXT_PUBLIC_NUTSNEWS_BUILD_ID=$BUILD_ID"
@@ -246,6 +262,9 @@ jobs:
             --env "NUTSNEWS_CONFIG_GENERATION=$VERCEL_CONFIG_GENERATION"
             --env "NUTSNEWS_DATABASE_PROVIDER_MODE=$DATABASE_PROVIDER_MODE"
             --env "NUTSNEWS_DEPLOYMENT_TARGET=vercel-production"
+            --env "NUTSNEWS_EXPECTED_BUILD_ID=$BUILD_ID"
+            --env "NUTSNEWS_EXPECTED_SCHEMA_VERSION=$expected_schema_version"
+            --env "NUTSNEWS_EXPECTED_SOURCE_COMMIT=$SOURCE_COMMIT"
             --env "NUTSNEWS_PRODUCTION_WRITES_PAUSED=$PRODUCTION_WRITES_PAUSED"
             --env "NUTSNEWS_CACHE_REVALIDATION_SECRET=$NUTSNEWS_CACHE_REVALIDATION_SECRET"
             --env "CLOUDFLARE_CACHE_PURGE_API_TOKEN=$CLOUDFLARE_CACHE_PURGE_API_TOKEN"

@@ -91,19 +91,15 @@ test("readiness stays healthy while exposing a production writer pause", async (
   assert.equal(readiness.productionWritesPaused, true);
 });
 
-test("Vercel retains the existing runtime-safety readiness contract without OCI-only inputs", async () => {
+test("Vercel waives only OCI identity while retaining release and database readiness", async () => {
   let dependencyReads = 0;
   const readiness = await evaluateRuntimeReadiness({
     env: productionEnvironment({
       VERCEL: "1",
       VERCEL_ENV: "production",
-      NUTSNEWS_DEPLOYMENT_TARGET: undefined,
-      NUTSNEWS_EXPECTED_SOURCE_COMMIT: undefined,
-      NUTSNEWS_EXPECTED_BUILD_ID: undefined,
+      NUTSNEWS_DEPLOYMENT_TARGET: "vercel-production",
       NUTSNEWS_EXPECTED_IMAGE_DIGEST: undefined,
       NUTSNEWS_DEPLOYED_IMAGE_DIGEST: undefined,
-      NUTSNEWS_CONFIG_GENERATION: undefined,
-      NUTSNEWS_EXPECTED_SCHEMA_VERSION: undefined,
     }),
     async readSchemaContract() {
       dependencyReads += 1;
@@ -113,29 +109,103 @@ test("Vercel retains the existing runtime-safety readiness contract without OCI-
 
   assert.equal(readiness.ready, true);
   assert.equal(readiness.code, "ready");
-  assert.equal(dependencyReads, 0);
+  assert.equal(readiness.deploymentTarget, "vercel-production");
+  assert.equal(dependencyReads, 1);
 });
 
-test("backend primary readiness can run without a Supabase schema-contract reader", async () => {
-  const readiness = await evaluateRuntimeReadiness({
-    env: stagingEnvironment({
-      NUTSNEWS_SIDE_EFFECTS_MODE: "sandbox",
-      NUTSNEWS_SUPABASE_CREDENTIALS_ENV: undefined,
-      NUTSNEWS_SUPABASE_PROJECT_REF: undefined,
-      NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: undefined,
-      NUTSNEWS_PUBLIC_SUPABASE_URL: undefined,
-      NUTSNEWS_PUBLIC_SUPABASE_ANON_KEY: undefined,
-      NUTSNEWS_DATABASE_PROVIDER_MODE: "backend_postgres_primary",
-      NUTSNEWS_BACKEND_POSTGRES_PRIMARY_CONFIRMATION: "enable-backend-postgres-primary",
-      NUTSNEWS_BACKEND_API_URL: "http://127.0.0.1:8787/api/app/db",
-      NUTSNEWS_BACKEND_API_TOKEN: "server-only-backend-token",
+test("Vercel production readiness requires the authoritative production system environment", async () => {
+  for (const vercelEnvironment of [undefined, "preview", "development", "Production"]) {
+    const readiness = await evaluateRuntimeReadiness({
+      env: productionEnvironment({
+        VERCEL: "1",
+        VERCEL_ENV: vercelEnvironment,
+        NUTSNEWS_DEPLOYMENT_TARGET: "vercel-production",
+        NUTSNEWS_EXPECTED_IMAGE_DIGEST: undefined,
+        NUTSNEWS_DEPLOYED_IMAGE_DIGEST: undefined,
+      }),
+      readSchemaContract: async () => validSchemaContract(),
+    });
+
+    assert.equal(readiness.ready, false);
+    assert.equal(readiness.code, "deployment_target_environment_mismatch");
+  }
+});
+
+test("Vercel fails closed on missing release identity and datastore failure", async () => {
+  const missingIdentity = await evaluateRuntimeReadiness({
+    env: productionEnvironment({
+      VERCEL: "1",
+      VERCEL_ENV: "production",
+      NUTSNEWS_DEPLOYMENT_TARGET: "vercel-production",
+      NUTSNEWS_EXPECTED_BUILD_ID: undefined,
+      NUTSNEWS_EXPECTED_IMAGE_DIGEST: undefined,
+      NUTSNEWS_DEPLOYED_IMAGE_DIGEST: undefined,
     }),
+    readSchemaContract: async () => validSchemaContract(),
+  });
+  const dependencyFailure = await evaluateRuntimeReadiness({
+    env: productionEnvironment({
+      VERCEL: "1",
+      VERCEL_ENV: "production",
+      NUTSNEWS_DEPLOYMENT_TARGET: "vercel-production",
+      NUTSNEWS_EXPECTED_IMAGE_DIGEST: undefined,
+      NUTSNEWS_DEPLOYED_IMAGE_DIGEST: undefined,
+    }),
+    readSchemaContract: async () => {
+      throw new Error("synthetic Vercel dependency failure");
+    },
+  });
+
+  assert.equal(missingIdentity.ready, false);
+  assert.equal(missingIdentity.code, "runtime_identity_invalid");
+  assert.equal(dependencyFailure.ready, false);
+  assert.equal(dependencyFailure.code, "supabase_dependency_failed");
+});
+
+test("backend primary readiness requires its configured datastore schema contract", async () => {
+  const env = stagingEnvironment({
+    NUTSNEWS_SIDE_EFFECTS_MODE: "sandbox",
+    NUTSNEWS_SUPABASE_CREDENTIALS_ENV: undefined,
+    NUTSNEWS_SUPABASE_PROJECT_REF: undefined,
+    NUTSNEWS_PRODUCTION_SUPABASE_PROJECT_REF: undefined,
+    NUTSNEWS_PUBLIC_SUPABASE_URL: undefined,
+    NUTSNEWS_PUBLIC_SUPABASE_ANON_KEY: undefined,
+    NUTSNEWS_DATABASE_PROVIDER_MODE: "backend_postgres_primary",
+    NUTSNEWS_BACKEND_POSTGRES_PRIMARY_CONFIRMATION: "enable-backend-postgres-primary",
+    NUTSNEWS_BACKEND_API_URL: "http://127.0.0.1:8787/api/app/db",
+    NUTSNEWS_BACKEND_API_TOKEN: "server-only-backend-token",
+  });
+  let dependencyReads = 0;
+  const readiness = await evaluateRuntimeReadiness({
+    env,
+    async readSchemaContract() {
+      dependencyReads += 1;
+      return validSchemaContract();
+    },
+  });
+  const missingReader = await evaluateRuntimeReadiness({ env });
+  const dependencyFailure = await evaluateRuntimeReadiness({
+    env,
+    readSchemaContract: async () => {
+      throw new Error("backend URL and token must not leak");
+    },
+  });
+  const dependencyTimeout = await evaluateRuntimeReadiness({
+    env,
+    readSchemaContract: () => new Promise(() => {}),
   });
   const serialized = JSON.stringify(readiness);
 
   assert.equal(readiness.ready, true);
   assert.equal(readiness.code, "ready");
   assert.equal(readiness.databaseProviderMode, "backend_postgres_primary");
+  assert.equal(dependencyReads, 1);
+  assert.equal(missingReader.ready, false);
+  assert.equal(missingReader.code, "backend_dependency_failed");
+  assert.equal(dependencyFailure.ready, false);
+  assert.equal(dependencyFailure.code, "backend_dependency_failed");
+  assert.equal(dependencyTimeout.ready, false);
+  assert.equal(dependencyTimeout.code, "backend_dependency_timeout");
   assert.doesNotMatch(serialized, /server-only-backend-token/);
   assert.doesNotMatch(serialized, /127\.0\.0\.1/);
 });
