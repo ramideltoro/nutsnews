@@ -98,13 +98,18 @@ requireText(
 );
 requireText(
   automaticReleaseWorkflow,
-  "uses: ./.github/workflows/staging-supabase-migration.yml",
+  "node scripts/staging_migration_dispatch.mjs",
   "Automatic releases must advance the protected staging database before deployment.",
 );
 assert.ok(
-  automaticReleaseWorkflow.indexOf("uses: ./.github/workflows/staging-supabase-migration.yml") <
+  automaticReleaseWorkflow.indexOf("node scripts/staging_migration_dispatch.mjs") <
     automaticReleaseWorkflow.indexOf('event_type: "nutsnews-staging-release"'),
   "The staging migration must succeed before the release candidate is dispatched.",
+);
+requireText(
+  automaticReleaseWorkflow,
+  "actions: write",
+  "The isolated staging migration dispatcher must have permission to invoke the protected workflow.",
 );
 requireText(
   automaticReleaseWorkflow,

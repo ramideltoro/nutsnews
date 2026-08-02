@@ -184,7 +184,7 @@ requireText(
 );
 requireText(
   automaticReleaseWorkflow,
-  "uses: ./.github/workflows/staging-supabase-migration.yml",
+  "node scripts/staging_migration_dispatch.mjs",
   "Automatic release must apply verified staging migrations before staging deployment.",
 );
 requireText(

@@ -198,15 +198,28 @@ jobs:
           NODE
 
   migrate-staging:
-    name: Advance staging database before deploying the candidate
+    name: Request and verify the protected staging database migration
     needs: prepare-candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
     permissions:
       contents: read
-    uses: ./.github/workflows/staging-supabase-migration.yml
-    with:
-      source_commit: ${{ needs.prepare-candidate.outputs.source_commit }}
-      migration_head: ${{ needs.prepare-candidate.outputs.migration_head }}
-      confirmation: apply-staging-supabase-migrations
+      actions: write
+
+    steps:
+      - name: Checkout reviewed automatic release automation
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
+        with:
+          persist-credentials: false
+
+      - name: Dispatch and wait for the isolated staging migration
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NUTSNEWS_STAGING_MIGRATION_SOURCE_COMMIT: ${{ needs.prepare-candidate.outputs.source_commit }}
+          NUTSNEWS_STAGING_MIGRATION_HEAD: ${{ needs.prepare-candidate.outputs.migration_head }}
+        run: |
+          set -euo pipefail
+          node scripts/staging_migration_dispatch.mjs
 
   request-staging:
     name: Request protected staging qualification and production promotion
