@@ -203,6 +203,7 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/staging-supabase-migration.yml
+    secrets: inherit
     with:
       source_commit: ${{ needs.prepare-candidate.outputs.source_commit }}
       migration_head: ${{ needs.prepare-candidate.outputs.migration_head }}

@@ -189,6 +189,11 @@ requireText(
 );
 requireText(
   automaticReleaseWorkflow,
+  "secrets: inherit",
+  "Automatic release must pass the staging-supabase environment secret into the reusable migration workflow.",
+);
+requireText(
+  automaticReleaseWorkflow,
   "needs: [prepare-candidate, migrate-staging]",
   "Automatic release dispatch must depend on candidate validation and staging migration success.",
 );
