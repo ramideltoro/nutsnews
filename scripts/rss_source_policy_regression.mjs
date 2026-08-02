@@ -53,7 +53,7 @@ for (const required of [
 
 assertIncludes(
   migrationContract,
-  'MIGRATION_HEAD = "20260717113000"',
+  'MIGRATION_HEAD = "20260802022105"',
   "web/migrationContract.mjs",
 );
 assertIncludes(

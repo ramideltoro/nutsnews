@@ -14,7 +14,7 @@ import {
 test("repository standby manifest matches the Supabase migration contract", async () => {
   const summary = await validateStandbyManifest();
 
-  assert.equal(summary.migrationHead, "20260717113000");
+  assert.equal(summary.migrationHead, "20260802022105");
   assert.match(summary.schemaFingerprint, /^[a-f0-9]{64}$/);
   assert.equal(summary.replicatedTables, 15);
   assert.equal(summary.excludedViews, 7);
