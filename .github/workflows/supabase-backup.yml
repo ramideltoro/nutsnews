@@ -24,6 +24,7 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NUTSNEWS_PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}
       BACKUP_TABLES: articles,article_summaries,rss_feeds,feed_health,worker_runs,article_ai_reviews,ai_usage_runs,quota_usage_events,runtime_feature_flags,release_readiness
       BACKUP_LIMIT_PER_TABLE: "5000"
+      BACKUP_PAGE_SIZE: "250"
     steps:
       - name: Checkout repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5

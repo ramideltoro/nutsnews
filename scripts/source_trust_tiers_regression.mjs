@@ -73,7 +73,7 @@ for (const required of [
 
 assertIncludes(auditLog, "RSS source trust tier updated", "adminAuditLog.ts");
 assertIncludes(adminHome, "source trust tiers", "admin home");
-assertIncludes(migrationContract, 'MIGRATION_HEAD = "20260717113000"', "web/migrationContract.mjs");
+assertIncludes(migrationContract, 'MIGRATION_HEAD = "20260802040522"', "web/migrationContract.mjs");
 assertIncludes(databaseWorkflow, "tests/migration-contract.test.mjs", ".github/workflows/database-migration-gate.yml");
 
 assert.equal(

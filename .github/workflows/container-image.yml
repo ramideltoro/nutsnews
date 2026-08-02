@@ -38,8 +38,36 @@ jobs:
         run: |
           set -euo pipefail
 
+          {
+            IFS= read -r FIXTURE_MIGRATION_HEAD
+            IFS= read -r FIXTURE_SCHEMA_VERSION
+          } < <(
+            node --input-type=module <<'NODE'
+          import { getMigrationContract, readApplicationMigrationContract } from "./scripts/migration_contract.mjs";
+
+          const repositoryContract = await getMigrationContract();
+          const applicationContract = await readApplicationMigrationContract();
+          console.log(repositoryContract.head);
+          console.log(applicationContract.legacyVersion);
+          NODE
+          )
+          FIXTURE_MIGRATION_HEAD="${FIXTURE_MIGRATION_HEAD:-}"
+          FIXTURE_SCHEMA_VERSION="${FIXTURE_SCHEMA_VERSION:-}"
+          if [[ ! "$FIXTURE_MIGRATION_HEAD" =~ ^[0-9]{14}$ || ! "$FIXTURE_SCHEMA_VERSION" =~ ^[0-9]{14}$ ]]; then
+            echo "::error::Unable to derive the container fixture migration contract."
+            exit 1
+          fi
+          export FIXTURE_MIGRATION_HEAD FIXTURE_SCHEMA_VERSION
+
           node --input-type=module <<'NODE' &
           import http from "node:http";
+
+          const migrationContract = JSON.stringify([{
+            legacy_schema_version: process.env.FIXTURE_SCHEMA_VERSION,
+            migration_head: process.env.FIXTURE_MIGRATION_HEAD,
+            expected_schema_fingerprint: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            actual_schema_fingerprint: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          }]);
 
           const fixtureHandler = (request, response) => {
             if (request.method === "OPTIONS") {
@@ -57,7 +85,7 @@ jobs:
                 "Access-Control-Allow-Origin": "*",
                 "Content-Type": "application/json",
               });
-              response.end('[{"legacy_schema_version":"20260712170000","migration_head":"20260717113000","expected_schema_fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","actual_schema_fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]');
+              response.end(migrationContract);
               return;
             }
 
@@ -149,7 +177,7 @@ jobs:
             --env NUTSNEWS_EXPECTED_IMAGE_DIGEST="$expected_image_digest" \
             --env NUTSNEWS_DEPLOYED_IMAGE_DIGEST="$expected_image_digest" \
             --env NUTSNEWS_CONFIG_GENERATION=ci-staging-config-1 \
-            --env NUTSNEWS_EXPECTED_SCHEMA_VERSION=20260712170000 \
+            --env NUTSNEWS_EXPECTED_SCHEMA_VERSION="$FIXTURE_SCHEMA_VERSION" \
             "$image_reference")"
 
           for attempt in $(seq 1 30); do
@@ -256,7 +284,7 @@ jobs:
             --env NUTSNEWS_EXPECTED_IMAGE_DIGEST="$expected_image_digest" \
             --env NUTSNEWS_DEPLOYED_IMAGE_DIGEST="$expected_image_digest" \
             --env NUTSNEWS_CONFIG_GENERATION=ci-production-config-1 \
-            --env NUTSNEWS_EXPECTED_SCHEMA_VERSION=20260712170000 \
+            --env NUTSNEWS_EXPECTED_SCHEMA_VERSION="$FIXTURE_SCHEMA_VERSION" \
             "$image_reference")"
 
           for attempt in $(seq 1 30); do

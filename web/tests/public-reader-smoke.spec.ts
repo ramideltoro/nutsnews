@@ -164,8 +164,14 @@ test.describe('Public reader smoke flows', () => {
 
     const panelBox = await menuPanel.boundingBox();
     expect(panelBox).not.toBeNull();
-    expect(Math.abs((panelBox?.x ?? 0) + (panelBox?.width ?? 0) / 2 - 160)).toBeLessThanOrEqual(1);
-    expect(Math.abs((panelBox?.y ?? 0) + (panelBox?.height ?? 0) / 2 - 284)).toBeLessThanOrEqual(1);
+    expect(panelBox?.x).toBe(0);
+    expect(panelBox?.y).toBe(0);
+    expect(panelBox?.height).toBe(568);
+    expect(panelBox?.width ?? Number.POSITIVE_INFINITY).toBeLessThan(320);
+
+    const backdrop = page.locator('.mobile-site-navigation__backdrop');
+    await expect(backdrop).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(backdrop).toHaveCSS('backdrop-filter', 'none');
 
     for (const route of mobileFooterRoutes) {
       const menuLink = menuPanel.getByRole('link', { name: route.name, exact: true });
@@ -174,7 +180,8 @@ test.describe('Public reader smoke flows', () => {
 
       const labelBox = await menuLink.locator('.mobile-site-navigation__link-label').boundingBox();
       expect(labelBox).not.toBeNull();
-      expect(Math.abs((labelBox?.x ?? 0) + (labelBox?.width ?? 0) / 2 - 160)).toBeLessThanOrEqual(1);
+      expect(labelBox?.x ?? 0).toBeGreaterThanOrEqual(12);
+      expect((labelBox?.x ?? 0) + (labelBox?.width ?? 0)).toBeLessThan(panelBox?.width ?? 0);
     }
 
     await menuToggle.focus();
