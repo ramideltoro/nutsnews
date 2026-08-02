@@ -84,6 +84,30 @@ assert.equal(
   "Homepage Performance Budget must remain the merge-critical performance check.",
 );
 
+const mergeGateWorkflow = await readFile(resolve(workflowDir, "merge-gate.yml"), "utf8");
+const mergeGateScopePatternSource = mergeGateWorkflow.match(/if grep -Eq '([^']+)' "\$changed_files"/)?.[1];
+assert.ok(mergeGateScopePatternSource, "Merge Gate must define a changed-file scope pattern.");
+const mergeGateScopePattern = new RegExp(mergeGateScopePatternSource);
+for (const requiredMergeGatePath of [
+  "web/app/page.tsx",
+  "scripts/feed_ingestion_regression.mjs",
+  "tests/runtime-public-config.test.mjs",
+  ".github/workflows/merge-gate.yml",
+  ".github/workflows/web-ci.yml",
+  ".github/workflows/container-image.yml",
+]) {
+  assert.match(
+    requiredMergeGatePath,
+    mergeGateScopePattern,
+    `Merge Gate scope must run checks for ${requiredMergeGatePath}.`,
+  );
+}
+assert.doesNotMatch(
+  "docs/unrelated-change.md",
+  mergeGateScopePattern,
+  "Merge Gate scope must continue skipping unrelated documentation-only changes.",
+);
+
 const accessibilityWorkflow = await readFile(resolve(workflowDir, "accessibility-ci.yml"), "utf8");
 const accessibilityPullRequest = workflowTriggerBlock(accessibilityWorkflow, "pull_request");
 assert.ok(accessibilityPullRequest.includes("paths:"), "Accessibility CI pull_request trigger must be path-filtered.");
