@@ -100,6 +100,7 @@ export function MobileSiteNavigation({
             aria-label={navigationLabel}
             className="mobile-site-navigation__panel"
           >
+            <p className="mobile-site-navigation__title">NutsNews</p>
             {links.map((link) => (
               <Link
                 key={link.href}
