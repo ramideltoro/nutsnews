@@ -96,6 +96,21 @@ requireText(
   'event_type: "nutsnews-staging-release"',
   "The handoff must start with the protected staging release event.",
 );
+requireText(
+  automaticReleaseWorkflow,
+  "uses: ./.github/workflows/staging-supabase-migration.yml",
+  "Automatic releases must advance the protected staging database before deployment.",
+);
+assert.ok(
+  automaticReleaseWorkflow.indexOf("uses: ./.github/workflows/staging-supabase-migration.yml") <
+    automaticReleaseWorkflow.indexOf('event_type: "nutsnews-staging-release"'),
+  "The staging migration must succeed before the release candidate is dispatched.",
+);
+requireText(
+  automaticReleaseWorkflow,
+  "needs: [prepare-candidate, migrate-staging]",
+  "The staging dispatch must fail closed when candidate validation or migration fails.",
+);
 
 requireText(
   vercelProductionWorkflow,

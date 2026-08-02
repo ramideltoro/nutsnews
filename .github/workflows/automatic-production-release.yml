@@ -17,8 +17,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  request-staging:
-    name: Request protected staging qualification and production promotion
+  prepare-candidate:
+    name: Validate the exact automatic release candidate
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
@@ -26,7 +26,15 @@ jobs:
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: automatic-release
+    outputs:
+      candidate_json: ${{ steps.candidate.outputs.candidate_json }}
+      deployment_id: ${{ steps.candidate.outputs.deployment_id }}
+      source_commit: ${{ steps.candidate.outputs.source_commit }}
+      image_digest: ${{ steps.candidate.outputs.image_digest }}
+      build_id: ${{ steps.candidate.outputs.build_id }}
+      schema_version: ${{ steps.candidate.outputs.schema_version }}
+      migration_head: ${{ steps.candidate.outputs.migration_head }}
+      supabase_project_ref: ${{ steps.candidate.outputs.supabase_project_ref }}
 
     steps:
       - name: Download exact automatic release metadata with retries
@@ -189,10 +197,29 @@ jobs:
           appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join("\n")}\n`, "utf8");
           NODE
 
+  migrate-staging:
+    name: Advance staging database before deploying the candidate
+    needs: prepare-candidate
+    permissions:
+      contents: read
+    uses: ./.github/workflows/staging-supabase-migration.yml
+    with:
+      source_commit: ${{ needs.prepare-candidate.outputs.source_commit }}
+      migration_head: ${{ needs.prepare-candidate.outputs.migration_head }}
+      confirmation: apply-staging-supabase-migrations
+
+  request-staging:
+    name: Request protected staging qualification and production promotion
+    needs: [prepare-candidate, migrate-staging]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: automatic-release
+
+    steps:
       - name: Dispatch exact candidate to the protected release chain
         env:
           NUTSNEWS_INFRA_STAGING_TOKEN: ${{ secrets.NUTSNEWS_INFRA_STAGING_TOKEN }}
-          CANDIDATE_JSON: ${{ steps.candidate.outputs.candidate_json }}
+          CANDIDATE_JSON: ${{ needs.prepare-candidate.outputs.candidate_json }}
         run: |
           set -euo pipefail
 
@@ -254,13 +281,13 @@ jobs:
 
       - name: Summarize automatic production release handoff
         env:
-          SOURCE_COMMIT: ${{ steps.candidate.outputs.source_commit }}
-          IMAGE_DIGEST: ${{ steps.candidate.outputs.image_digest }}
-          BUILD_ID: ${{ steps.candidate.outputs.build_id }}
-          SCHEMA_VERSION: ${{ steps.candidate.outputs.schema_version }}
-          MIGRATION_HEAD: ${{ steps.candidate.outputs.migration_head }}
-          SUPABASE_PROJECT_REF: ${{ steps.candidate.outputs.supabase_project_ref }}
-          DEPLOYMENT_ID: ${{ steps.candidate.outputs.deployment_id }}
+          SOURCE_COMMIT: ${{ needs.prepare-candidate.outputs.source_commit }}
+          IMAGE_DIGEST: ${{ needs.prepare-candidate.outputs.image_digest }}
+          BUILD_ID: ${{ needs.prepare-candidate.outputs.build_id }}
+          SCHEMA_VERSION: ${{ needs.prepare-candidate.outputs.schema_version }}
+          MIGRATION_HEAD: ${{ needs.prepare-candidate.outputs.migration_head }}
+          SUPABASE_PROJECT_REF: ${{ needs.prepare-candidate.outputs.supabase_project_ref }}
+          DEPLOYMENT_ID: ${{ needs.prepare-candidate.outputs.deployment_id }}
         run: |
           {
             echo "## Automatic NutsNews production release"
@@ -272,6 +299,7 @@ jobs:
             echo "- Migration head: \`${MIGRATION_HEAD}\`"
             echo "- Rollback-compatible schema: \`${SCHEMA_VERSION}\`"
             echo "- Production Supabase project ref: \`${SUPABASE_PROJECT_REF}\`"
+            echo "- Staging Supabase migration: verified at the candidate head"
             echo "- Protected release chain: accepted"
             echo
             echo "The infra chain will deploy VPS staging, run qualification, apply VPS production, deploy Vercel production, and roll back VPS automatically if Vercel promotion fails."
