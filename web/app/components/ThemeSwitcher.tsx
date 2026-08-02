@@ -26,7 +26,7 @@ const themes = [
     id: "sakura",
     name: "Sakura",
     description: "Cherry pink matcha calm.",
-    swatches: ["#fde2e7", "#fff7ed", "#7aa95c"],
+    swatches: ["#fde2e7", "#fff7ed", "#456b35"],
   },
   {
     id: "modern-saas",

@@ -30,6 +30,7 @@ const auditedPages: AuditedPage[] = [
 ];
 
 const blockingImpacts = new Set(['critical', 'serious']);
+const THEME_STORAGE_KEY = 'nutsnews.web.theme';
 
 function formatViolations(violations: AxeViolation[]) {
   if (violations.length === 0) {
@@ -80,4 +81,24 @@ test.describe('NutsNews axe accessibility checks', () => {
       expect(blockingViolations, formatViolations(blockingViolations)).toEqual([]);
     });
   }
+
+  test('Sakura home has no serious or critical axe violations', async ({ page }) => {
+    await page.addInitScript((themeStorageKey) => {
+      window.localStorage.setItem(themeStorageKey, 'sakura');
+    }, THEME_STORAGE_KEY);
+
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('html')).toHaveAttribute('data-nutsnews-theme', 'sakura');
+    await expect(page.locator('body')).toBeVisible();
+
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+
+    const blockingViolations = results.violations.filter((violation) =>
+      blockingImpacts.has(violation.impact ?? ''),
+    ) as AxeViolation[];
+
+    expect(blockingViolations, formatViolations(blockingViolations)).toEqual([]);
+  });
 });
