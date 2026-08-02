@@ -9,9 +9,9 @@
   ],
   "source": {
     "migrationContract": "supabase/migrations",
-    "migrationHead": "20260802022105",
-    "migrationSourceFingerprint": "4900a43d603f9bd6e809e44a010b739160a2953015e7f7250f6c835e3aaf6266",
-    "migrationCount": 30
+    "migrationHead": "20260802040522",
+    "migrationSourceFingerprint": "92b53aee17c2500d4ae885b4f5f81aa7cc5bf2a00b53d65b1ac9a62d70ea9454",
+    "migrationCount": 31
   },
   "safety": {
     "primaryDatabase": "backend-postgres-primary-read-write",
@@ -483,5 +483,5 @@
       }
     ]
   },
-  "schemaFingerprint": "578058367cfa4451f452c57d6969d2d5c2854623835d7bf26b92e3b8249fbf44"
+  "schemaFingerprint": "4db5f76a0e20d97e6f13df50667ef5b3abf3a4a5967f53cc9ce5447cd6363d3c"
 }
