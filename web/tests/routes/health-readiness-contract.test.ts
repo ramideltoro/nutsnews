@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MIGRATION_HEAD } from "@/migrationContract.mjs";
+
 const mocks = vi.hoisted(() => ({
   backendOperation: vi.fn(),
   connection: vi.fn(),
@@ -80,7 +82,7 @@ function schemaContractRows() {
   return [
     {
       legacy_schema_version: "20260712170000",
-      migration_head: "20260717113000",
+      migration_head: MIGRATION_HEAD,
       expected_schema_fingerprint: schemaFingerprint,
       actual_schema_fingerprint: schemaFingerprint,
     },
