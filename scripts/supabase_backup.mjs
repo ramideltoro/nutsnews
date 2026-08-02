@@ -21,6 +21,18 @@ const DEFAULT_BACKUP_TABLES = [
   'runtime_feature_flags',
   'release_readiness',
 ];
+const TABLE_ORDER_BY = Object.freeze({
+  articles: 'id.asc',
+  article_summaries: 'id.asc',
+  rss_feeds: 'id.asc',
+  feed_health: 'id.asc',
+  worker_runs: 'id.asc',
+  article_ai_reviews: 'id.asc',
+  ai_usage_runs: 'id.asc',
+  quota_usage_events: 'id.asc',
+  runtime_feature_flags: 'key.asc',
+  release_readiness: 'singleton.asc',
+});
 const TABLES = String(process.env.BACKUP_TABLES || DEFAULT_BACKUP_TABLES.join(','))
   .split(',')
   .map((table) => table.trim())
@@ -46,7 +58,9 @@ function sha256(buffer) {
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 async function fetchPage(table, offset, pageLimit) {
-  const url = `${SUPABASE_URL}/rest/v1/${encodeURIComponent(table)}?select=*&limit=${pageLimit}&offset=${offset}`;
+  const orderBy = TABLE_ORDER_BY[table];
+  if (!orderBy) throw new Error(`${table} backup requires an explicit stable pagination order`);
+  const url = `${SUPABASE_URL}/rest/v1/${encodeURIComponent(table)}?select=*&order=${encodeURIComponent(orderBy)}&limit=${pageLimit}&offset=${offset}`;
   let lastError;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
