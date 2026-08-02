@@ -48,8 +48,12 @@ export function getMigrationWorkflowPolicy(env = process.env, now = Date.now()) 
   if (!Number.isFinite(backupAt) || backupAt > now || now - backupAt > MAX_PRODUCTION_BACKUP_AGE_MS) {
     throw new Error("Production migration requires a current backup freshness preflight.");
   }
-  const useLinkedProject = environmentValue(env, "NUTSNEWS_MIGRATION_USE_LINKED_PROJECT") === "true";
-  return Object.freeze({ target, databaseUrl, useLinkedProject });
+  if (environmentValue(env, "NUTSNEWS_MIGRATION_USE_LINKED_PROJECT") === "true") {
+    throw new Error(
+      "Production migrations must use the protected direct database connection so the advisory lock remains valid.",
+    );
+  }
+  return Object.freeze({ target, databaseUrl, useLinkedProject: false });
 }
 
 export function classifyPostgresLockFailure(stderr) {

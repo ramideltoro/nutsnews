@@ -36,7 +36,7 @@ for (const fragment of [
   "node automation/scripts/verify_production_migration_contract.mjs",
   "NUTSNEWS_PRODUCTION_MIGRATION_APPROVAL: approved",
   "NUTSNEWS_PRODUCTION_BACKUP_COMPLETED_AT",
-  "NUTSNEWS_MIGRATION_USE_LINKED_PROJECT: \"true\"",
+  "NUTSNEWS_MIGRATION_USE_LINKED_PROJECT: \"false\"",
   "ref: ${{ needs.preflight.outputs.source_commit }}",
   "persist-credentials: false",
 ]) {
@@ -93,6 +93,21 @@ for (const fragment of ["backupRunId", "Supabase Backup", "workflow_dispatch", "
   requireText(request, fragment, `Production request validation is missing ${fragment}.`);
 }
 requireText(runner, "production-protected", "Locked runner must retain its protected production policy.");
+requireText(
+  runner,
+  "Production migrations must use the protected direct database connection",
+  "The locked runner must fail closed if production tries to use a linked push.",
+);
+requireText(
+  workflow,
+  "A linked push mints another",
+  "Production migrations must document why they preserve one direct credential for the lock and push.",
+);
+assert.doesNotMatch(
+  workflow,
+  /NUTSNEWS_MIGRATION_USE_LINKED_PROJECT:\s*["']?true/i,
+  "Production migrations must not invalidate the credential holding the advisory lock with a linked push.",
+);
 requireText(runner, "NOTIFY pgrst, 'reload schema'", "Locked runner must refresh PostgREST after migration.");
 requireText(migrationContract, "must atomically record its migration contract", "Migration validation must require atomic head recording.");
 requireText(verifier, "nutsnews_migration_schema_contract", "Production verifier must query the database contract.");
