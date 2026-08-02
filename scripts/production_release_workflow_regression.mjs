@@ -78,6 +78,20 @@ requireText(buildTest, "name: Build and smoke-test production image", "Container
 requireText(buildTest, "docker build", "Container Image must still build the web image.");
 requireText(buildTest, "docker push \"$IMAGE_TAG\"", "Container Image must still verify the image through a registry round trip.");
 requireText(buildTest, "node scripts/dual_target_web_smoke.mjs", "Container Image must still smoke the built image.");
+requireText(buildTest, "getMigrationContract", "Container Image must derive its fixture migration head from the repository contract.");
+requireText(buildTest, "readApplicationMigrationContract", "Container Image must derive its fixture schema marker from the application contract.");
+requireText(buildTest, "FIXTURE_MIGRATION_HEAD", "Container Image must pass the derived migration head to its readiness fixture.");
+requireText(buildTest, "FIXTURE_SCHEMA_VERSION", "Container Image must pass the derived schema marker to fixture containers.");
+assert.doesNotMatch(
+  buildTest,
+  /migration_head\\?\"?:\\?\"?[0-9]{14}/,
+  "Container Image must not hard-code a migration head in its readiness fixture.",
+);
+assert.doesNotMatch(
+  buildTest,
+  /NUTSNEWS_EXPECTED_SCHEMA_VERSION=[0-9]{14}/,
+  "Container Image must not hard-code the application schema marker.",
+);
 
 const publish = workflowJob(containerWorkflow, "publish");
 requireText(publish, "name: Publish immutable image", "Container Image must still publish immutable images.");
