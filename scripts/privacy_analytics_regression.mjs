@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -17,10 +17,17 @@ function assertIncludes(source, fragment, label) {
   );
 }
 
+function assertExcludes(source, fragment, label) {
+  assert.doesNotMatch(
+    source,
+    new RegExp(fragment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    `${label} must not include ${fragment}`,
+  );
+}
+
 const runtimeAnalytics = read("web/app/components/RuntimeAnalytics.tsx");
 const analyticsConsent = read("web/lib/analyticsConsent.ts");
 const analyticsConsentHook = read("web/app/components/useAnalyticsConsent.ts");
-const analyticsConsentBanner = read("web/app/components/AnalyticsConsentBanner.tsx");
 const globalStyles = read("web/app/globals.css");
 const engagementAnalytics = read("web/lib/engagementAnalytics.ts");
 const consentControls = read("web/app/privacy/AnalyticsConsentControls.tsx");
@@ -97,34 +104,24 @@ for (const fragment of [
   assertIncludes(consentControls, fragment, "privacy consent controls");
 }
 
-for (const fragment of [
-  "AnalyticsConsentBanner",
-  "analyticsConsentBannerCopyByLanguage",
-  "storedConsent !== null",
-  "browserBlocked",
-  "telemetryEnabled",
-  "isGoogleAnalyticsMeasurementId",
-  "nutsnews-analytics-consent-deny",
-  "nutsnews-analytics-consent-allow",
-  "analytics-consent-banner fixed",
-  "flex flex-col gap-2",
-  "setAnalyticsConsentState(\"denied\")",
-  "setAnalyticsConsentState(\"granted\")",
-]) {
-  assertIncludes(analyticsConsentBanner, fragment, "first-visit analytics consent banner");
-}
+assert.equal(
+  existsSync(path.join(repoRoot, "web/app/components/AnalyticsConsentBanner.tsx")),
+  false,
+  "the first-visit analytics consent banner component must stay removed",
+);
 
-assertIncludes(
+assertExcludes(
   siteFooter,
   "<AnalyticsConsentBanner />",
-  "public site footer analytics consent mount",
+  "public site footer",
 );
 
 assertIncludes(
   globalStyles,
-  ".public-themed-page > section:not(.analytics-consent-banner)",
-  "public page analytics banner positioning",
+  ".public-themed-page > section,",
+  "public page stacking",
 );
+assertExcludes(globalStyles, ".analytics-consent-banner", "global styles");
 
 for (const fragment of [
   "useAnalyticsConsent",
@@ -144,7 +141,8 @@ for (const fragment of [
   "G-8VXSG5NWM4",
   "seedAnalyticsDenial",
   "nutsnews-analytics-consent-banner",
-  "nutsnews-analytics-consent-allow",
+  "toHaveCount(0)",
+  "nutsnews-settings-analytics",
   "www\\.googletagmanager\\.com",
   "google-analytics\\.com",
   "blockedbyclient",
@@ -153,6 +151,11 @@ for (const fragment of [
 ]) {
   assertIncludes(deployedUiSmoke, fragment, "deployed analytics consent smoke");
 }
+assertExcludes(
+  deployedUiSmoke,
+  "nutsnews-analytics-consent-allow",
+  "deployed analytics consent smoke",
+);
 
 for (const fragment of [
   "Google Analytics 4",

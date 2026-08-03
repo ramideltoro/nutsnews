@@ -1398,7 +1398,7 @@ body {
   animation: float-orb 12s ease-in-out infinite alternate;
 }
 
-.public-themed-page > section:not(.analytics-consent-banner),
+.public-themed-page > section,
 .public-themed-page > article,
 .public-themed-page > nav,
 .public-themed-page > div:not(.site-footer-modern):not(.mobile-site-navigation) {

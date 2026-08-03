@@ -2,7 +2,6 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { AnalyticsConsentBanner } from "@/app/components/AnalyticsConsentBanner";
 import { RuntimeAnalytics } from "@/app/components/RuntimeAnalytics";
 import { ThemeSwitcher } from "@/app/components/ThemeSwitcher";
 import {
@@ -113,47 +112,42 @@ describe("analytics consent", () => {
     runtimeConfigMock.gaId = gaId;
     runtimeConfigMock.telemetryEnabled = telemetryEnabled;
 
-    render(
-      <>
-        <RuntimeAnalytics />
-        <AnalyticsConsentBanner />
-      </>,
-    );
+    render(<RuntimeAnalytics />);
 
     await act(async () => {});
-    expect(
-      screen.queryByTestId("nutsnews-analytics-consent-banner"),
-    ).not.toBeInTheDocument();
     expect(document.querySelector("script#google-analytics")).not.toBeInTheDocument();
     expect(
       document.querySelector(`script[src*="${MEASUREMENT_ID}"]`),
     ).not.toBeInTheDocument();
   });
 
-  test("prompts an undecided visitor and starts GA only after permission", async () => {
+  test("keeps GA off for an undecided visitor without showing a prompt", async () => {
+    render(<RuntimeAnalytics />);
+
+    const analyticsWindow = window as unknown as AnalyticsTestWindow;
+    await waitFor(() =>
+      expect(analyticsWindow[`ga-disable-${MEASUREMENT_ID}`]).toBe(true),
+    );
+    expect(getStoredAnalyticsConsentState()).toBeNull();
+    expect(
+      document.querySelector(`script[src*="${MEASUREMENT_ID}"]`),
+    ).not.toBeInTheDocument();
+    expect(document.querySelector("script#google-analytics")).not.toBeInTheDocument();
+  });
+
+  test("starts GA after a reader opts in through Settings", async () => {
     const user = userEvent.setup();
 
     render(
       <>
         <RuntimeAnalytics />
-        <AnalyticsConsentBanner />
+        <ThemeSwitcher />
       </>,
     );
 
-    expect(
-      await screen.findByTestId("nutsnews-analytics-consent-banner"),
-    ).toBeInTheDocument();
-    expect(
-      document.querySelector(`script[src*="${MEASUREMENT_ID}"]`),
-    ).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("nutsnews-settings-toggle"));
+    await user.click(screen.getByTestId("nutsnews-settings-analytics"));
 
-    await user.click(screen.getByTestId("nutsnews-analytics-consent-allow"));
-
-    await waitFor(() =>
-      expect(
-        screen.queryByTestId("nutsnews-analytics-consent-banner"),
-      ).not.toBeInTheDocument(),
-    );
     expect(window.localStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY)).toBe(
       "granted",
     );
@@ -165,70 +159,27 @@ describe("analytics consent", () => {
     expect(document.querySelector("script#google-analytics")).toBeInTheDocument();
   });
 
-  test("persists denial, dismisses the prompt, and keeps GA unloaded", async () => {
-    const user = userEvent.setup();
-
-    render(
-      <>
-        <RuntimeAnalytics />
-        <AnalyticsConsentBanner />
-      </>,
-    );
-
-    await user.click(
-      await screen.findByTestId("nutsnews-analytics-consent-deny"),
-    );
-
-    await waitFor(() =>
-      expect(
-        screen.queryByTestId("nutsnews-analytics-consent-banner"),
-      ).not.toBeInTheDocument(),
-    );
-    expect(window.localStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY)).toBe(
-      "denied",
-    );
-    expect(
-      document.querySelector(`script[src*="${MEASUREMENT_ID}"]`),
-    ).not.toBeInTheDocument();
-  });
-
-  test("honors a stored denial without showing the first-choice prompt", async () => {
+  test("honors a stored denial", async () => {
     window.localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, "denied");
 
-    render(
-      <>
-        <RuntimeAnalytics />
-        <AnalyticsConsentBanner />
-      </>,
-    );
+    render(<RuntimeAnalytics />);
 
     await act(async () => {});
     expect(
-      screen.queryByTestId("nutsnews-analytics-consent-banner"),
-    ).not.toBeInTheDocument();
-    expect(
       document.querySelector(`script[src*="${MEASUREMENT_ID}"]`),
     ).not.toBeInTheDocument();
   });
 
-  test("honors a stored grant without showing the first-choice prompt", async () => {
+  test("honors a stored grant", async () => {
     window.localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
 
-    render(
-      <>
-        <RuntimeAnalytics />
-        <AnalyticsConsentBanner />
-      </>,
-    );
+    render(<RuntimeAnalytics />);
 
     await waitFor(() =>
       expect(
         document.querySelector(`script[src*="${MEASUREMENT_ID}"]`),
       ).toBeInTheDocument(),
     );
-    expect(
-      screen.queryByTestId("nutsnews-analytics-consent-banner"),
-    ).not.toBeInTheDocument();
   });
 
   test("synchronizes a consent change dispatched by another browser tab", async () => {
@@ -237,15 +188,14 @@ describe("analytics consent", () => {
     render(
       <>
         <RuntimeAnalytics />
-        <AnalyticsConsentBanner />
         <ThemeSwitcher />
         <AnalyticsConsentControls copy={privacyControlCopy} />
       </>,
     );
 
     expect(
-      await screen.findByTestId("nutsnews-analytics-consent-banner"),
-    ).toBeInTheDocument();
+      document.querySelector(`script[src*="${MEASUREMENT_ID}"]`),
+    ).not.toBeInTheDocument();
 
     window.localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
     act(() =>
@@ -263,9 +213,6 @@ describe("analytics consent", () => {
       ).toBeInTheDocument(),
     );
     expect(
-      screen.queryByTestId("nutsnews-analytics-consent-banner"),
-    ).not.toBeInTheDocument();
-    expect(
       screen.getByText((_, element) =>
         element?.textContent ===
         "Current status: Minimal analytics is allowed",
@@ -279,14 +226,13 @@ describe("analytics consent", () => {
     );
   });
 
-  test("keeps the prompt and GA off when the browser sends GPC", async () => {
+  test("keeps GA off when the browser sends GPC", async () => {
     const user = userEvent.setup();
     setGlobalPrivacyControl(true);
 
     render(
       <>
         <RuntimeAnalytics />
-        <AnalyticsConsentBanner />
         <ThemeSwitcher />
       </>,
     );
@@ -296,9 +242,6 @@ describe("analytics consent", () => {
       expect(analyticsWindow[`ga-disable-${MEASUREMENT_ID}`]).toBe(true),
     );
     expect(
-      screen.queryByTestId("nutsnews-analytics-consent-banner"),
-    ).not.toBeInTheDocument();
-    expect(
       document.querySelector(`script[src*="${MEASUREMENT_ID}"]`),
     ).not.toBeInTheDocument();
 
@@ -307,24 +250,16 @@ describe("analytics consent", () => {
     expect(screen.getByText("Blocked by browser privacy")).toBeInTheDocument();
   });
 
-  test("keeps the prompt and GA off when the browser sends Do Not Track", async () => {
+  test("keeps GA off when the browser sends Do Not Track", async () => {
     window.localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
     setDoNotTrack("1");
 
-    render(
-      <>
-        <RuntimeAnalytics />
-        <AnalyticsConsentBanner />
-      </>,
-    );
+    render(<RuntimeAnalytics />);
 
     const analyticsWindow = window as unknown as AnalyticsTestWindow;
     await waitFor(() =>
       expect(analyticsWindow[`ga-disable-${MEASUREMENT_ID}`]).toBe(true),
     );
-    expect(
-      screen.queryByTestId("nutsnews-analytics-consent-banner"),
-    ).not.toBeInTheDocument();
     expect(
       document.querySelector(`script[src*="${MEASUREMENT_ID}"]`),
     ).not.toBeInTheDocument();

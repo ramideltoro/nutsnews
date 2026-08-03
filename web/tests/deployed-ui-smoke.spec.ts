@@ -5,7 +5,7 @@ const THEME_STORAGE_KEY = 'nutsnews.web.theme';
 const ANALYTICS_CONSENT_STORAGE_KEY = 'nutsnews.web.analytics-consent';
 const PRODUCTION_GA_MEASUREMENT_ID = 'G-8VXSG5NWM4';
 const ANALYTICS_CONSENT_TEST_TITLE =
-  'analytics consent stays off until Allow and never sends a smoke-test collection event';
+  'analytics stays off until enabled in Settings and never sends a smoke-test collection event';
 
 const publicFooterRoutes = [
   { name: 'Apps', path: '/apps', expectedText: /NutsNews for iPhone is here\./i },
@@ -560,14 +560,15 @@ test.describe('Deployed UI smoke regression', () => {
     expect(response?.ok(), `Expected homepage to load, got ${response?.status() ?? 'no response'}`).toBeTruthy();
     await assertNotDeploymentProtectionPage(page);
 
-    const consentBanner = page.getByTestId('nutsnews-analytics-consent-banner');
-    await expect(consentBanner).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('nutsnews-analytics-consent-banner')).toHaveCount(0);
     expect(tagScriptRequests, 'No Google tag script may load before consent.').toEqual([]);
     expect(collectionRequests, 'No Google Analytics collection may start before consent.').toEqual([]);
 
-    await page.getByTestId('nutsnews-analytics-consent-allow').click();
+    await openSettingsPanel(page);
+    const analyticsSwitch = page.getByTestId('nutsnews-settings-analytics');
+    await expect(analyticsSwitch).toHaveAttribute('aria-checked', 'false');
+    await analyticsSwitch.click();
 
-    await expect(consentBanner).toBeHidden();
     await expect
       .poll(
         async () =>
@@ -576,7 +577,7 @@ test.describe('Deployed UI smoke regression', () => {
             ANALYTICS_CONSENT_STORAGE_KEY,
           ),
         {
-          message: 'Expected Allow to persist analytics consent in this browser.',
+          message: 'Expected Settings to persist analytics consent in this browser.',
           timeout: 10_000,
         },
       )
