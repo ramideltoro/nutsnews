@@ -38,7 +38,7 @@ const themes = [
     id: "san-juan",
     name: "Foxy",
     description: "Pastel streets tropical glow.",
-    swatches: ["#f6c453", "#e76f51", "#2a9df4", "#2f9e44"],
+    swatches: ["#f6c453", "#e76f51", "#005f8f", "#2f9e44"],
   },
   {
     id: "creative-premium",
