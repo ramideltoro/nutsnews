@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
@@ -100,25 +101,45 @@ export function MobileSiteNavigation({
             aria-label={navigationLabel}
             className="mobile-site-navigation__panel"
           >
-            <p className="mobile-site-navigation__title">NutsNews</p>
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="mobile-site-navigation__link"
-                onClick={() => setIsOpen(false)}
-              >
-                <span className="mobile-site-navigation__link-label">
-                  {link.label}
-                </span>
-                <span
-                  aria-hidden="true"
-                  className="mobile-site-navigation__link-arrow"
+            <p
+              className="mobile-site-navigation__title"
+              aria-label="NutsNews"
+              data-testid="nutsnews-sidebar-wordmark"
+            >
+              <span>Nuts</span>
+              <span className="mobile-site-navigation__title-mark">
+                <Image
+                  src="/nutsnews-logo.png"
+                  alt=""
+                  width={48}
+                  height={48}
+                  unoptimized
+                  className="h-full w-full object-contain"
+                />
+              </span>
+              <span>News</span>
+            </p>
+
+            <div className="mobile-site-navigation__links">
+              {links.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="mobile-site-navigation__link"
+                  onClick={() => setIsOpen(false)}
                 >
-                  →
-                </span>
-              </Link>
-            ))}
+                  <span className="mobile-site-navigation__link-label">
+                    {link.label}
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className="mobile-site-navigation__link-arrow"
+                  >
+                    →
+                  </span>
+                </Link>
+              ))}
+            </div>
           </nav>
         ) : null}
       </div>

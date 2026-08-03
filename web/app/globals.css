@@ -45,7 +45,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 html {
@@ -1144,13 +1144,13 @@ body {
   box-sizing: border-box;
   width: min(20rem, calc(100vw - 3.75rem));
   height: 100dvh;
-  gap: 0.25rem;
   overflow-y: auto;
   overscroll-behavior: contain;
   border-right: 1px solid var(--theme-border);
-  background: color-mix(in srgb, var(--theme-surface) 99%, black);
-  padding: 0 0.75rem max(1rem, env(safe-area-inset-bottom));
-  box-shadow: 14px 0 42px rgba(0, 0, 0, 0.46), inset -1px 0 0 rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--theme-surface) 96%, var(--theme-bg));
+  padding: 0 0.9rem max(1rem, env(safe-area-inset-bottom));
+  box-shadow: 14px 0 42px rgba(0, 0, 0, 0.38), inset -1px 0 0 rgba(255, 255, 255, 0.04);
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   animation: mobile-navigation-drawer-in 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
@@ -1158,30 +1158,52 @@ body {
   display: flex;
   flex: 0 0 auto;
   box-sizing: border-box;
-  min-height: calc(4.5rem + env(safe-area-inset-top));
+  min-height: calc(5rem + env(safe-area-inset-top));
   align-items: center;
+  justify-content: center;
+  gap: 0.28rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--theme-border) 72%, transparent);
   margin: 0;
-  padding: env(safe-area-inset-top) 0 0 4.1rem;
+  padding: env(safe-area-inset-top) 0.5rem 0 3.45rem;
   color: var(--theme-heading);
-  font-size: 0.78rem;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.42rem;
+  font-weight: 950;
+  letter-spacing: -0.065em;
+  line-height: 1;
+  text-shadow: 0 0 18px var(--theme-glow-soft);
+}
+
+.mobile-site-navigation__title-mark {
+  display: inline-grid;
+  width: 1.65rem;
+  height: 1.65rem;
+  flex: 0 0 auto;
+  place-items: center;
+  filter: drop-shadow(0 0 10px var(--theme-glow-soft));
+}
+
+.mobile-site-navigation__links {
+  display: grid;
+  gap: 0.2rem;
+  padding-top: 0.75rem;
 }
 
 .mobile-site-navigation__link {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   flex: 0 0 auto;
-  min-height: 2.75rem;
+  min-height: 3rem;
   align-items: center;
   gap: 1rem;
-  border-radius: 0.72rem;
+  border-radius: 0.65rem;
   color: var(--theme-heading);
-  font-size: 0.86rem;
-  font-weight: 900;
-  line-height: 1.2;
-  padding: 0.78rem 0.9rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  line-height: 1.35;
+  padding: 0.74rem 0.82rem;
   text-decoration: none;
   transition: background 160ms ease, color 160ms ease, transform 160ms ease;
 }
@@ -1195,13 +1217,22 @@ body {
   grid-column: 2;
   justify-self: end;
   color: var(--theme-accent-ink, var(--theme-accent-soft));
-  font-size: 1rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  opacity: 0.72;
+  transition: opacity 160ms ease, transform 160ms ease;
 }
 
 .mobile-site-navigation__link:hover,
 .mobile-site-navigation__link:focus-visible {
   background: var(--theme-glow-soft);
   color: var(--theme-accent-ink, var(--theme-accent-soft));
+  transform: translateX(2px);
+}
+
+.mobile-site-navigation__link:hover .mobile-site-navigation__link-arrow,
+.mobile-site-navigation__link:focus-visible .mobile-site-navigation__link-arrow {
+  opacity: 1;
   transform: translateX(2px);
 }
 
@@ -1223,7 +1254,7 @@ body {
   border-radius: 9999px;
   color: var(--theme-accent-ink, var(--theme-accent-soft));
   font-size: 0.64rem;
-  font-weight: 750;
+  font-weight: 650;
   padding: 0.18rem 0.68rem;
   transition: background 160ms ease, color 160ms ease;
   white-space: nowrap;
@@ -1787,10 +1818,10 @@ body {
 
 .newspaper-primary-nav a {
   color: var(--theme-heading);
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 0.86rem;
-  font-weight: 900;
-  letter-spacing: 0.03em;
+  font-family: inherit;
+  font-size: 0.84rem;
+  font-weight: 650;
+  letter-spacing: 0.005em;
   text-decoration: none;
   transition: color 180ms ease, transform 180ms ease;
 }
