@@ -29,11 +29,12 @@
   --theme-text: #4f3424;
   --theme-muted: #75513d;
   --theme-muted-strong: #94684f;
-  --theme-accent: #0077b6;
+  --theme-accent: #005f8f;
   --theme-accent-rich: #e76f51;
   --theme-accent-soft: #ccefff;
   --theme-accent-deep: #005f73;
-  --theme-border: rgba(0, 119, 182, 0.26);
+  --theme-accent-ink: #00537a;
+  --theme-border: rgba(0, 95, 143, 0.30);
   --theme-border-strong: rgba(231, 111, 81, 0.46);
   --theme-glow: rgba(42, 157, 244, 0.30);
   --theme-glow-soft: rgba(231, 111, 81, 0.16);
@@ -1614,7 +1615,7 @@ body {
 /* San Juan theme: Old San Juan pastels, blue adoquin accents, tropical greenery. */
 :root[data-nutsnews-theme="san-juan"] .hero-modern,
 :root[data-nutsnews-theme="san-juan"] .article-card-modern {
-  border-color: rgba(0, 119, 182, 0.24);
+  border-color: rgba(0, 95, 143, 0.28);
   background: radial-gradient(circle at 88% 0%, rgba(42, 157, 244, 0.16), transparent 34%), radial-gradient(circle at 12% 100%, rgba(47, 158, 68, 0.12), transparent 30%), linear-gradient(145deg, rgba(255, 248, 229, 0.96), rgba(255, 255, 255, 0.78));
   box-shadow: 0 22px 65px rgba(120, 69, 36, 0.18), 0 0 34px rgba(42, 157, 244, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.78);
 }
@@ -1635,7 +1636,7 @@ body {
 :root[data-nutsnews-theme="san-juan"] .home-floating-button,
 :root[data-nutsnews-theme="san-juan"] .theme-gear-button,
 :root[data-nutsnews-theme="san-juan"] .footer-icon-button {
-  border-color: rgba(0, 119, 182, 0.22);
+  border-color: rgba(0, 95, 143, 0.26);
   background: rgba(255, 255, 255, 0.58);
   box-shadow: 0 16px 42px rgba(120, 69, 36, 0.15), 0 0 24px rgba(42, 157, 244, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.76);
 }
@@ -1657,7 +1658,7 @@ body {
 }
 
 :root[data-nutsnews-theme="san-juan"] .hero-tagline__word--accent {
-  color: #005f73;
+  color: var(--theme-accent-ink);
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.76), 0 0 16px rgba(42, 157, 244, 0.18);
 }
 
@@ -1667,7 +1668,7 @@ body {
 :root[data-nutsnews-theme="san-juan"] .settings-menu-item__arrow,
 :root[data-nutsnews-theme="san-juan"] .theme-option__check,
 :root[data-nutsnews-theme="san-juan"] .site-footer-modern__link {
-  color: #005f73;
+  color: var(--theme-accent-ink);
 }
 
 :root[data-nutsnews-theme="san-juan"] .theme-option--active .theme-option__name,

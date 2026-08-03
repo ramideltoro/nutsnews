@@ -101,4 +101,24 @@ test.describe('NutsNews axe accessibility checks', () => {
 
     expect(blockingViolations, formatViolations(blockingViolations)).toEqual([]);
   });
+
+  test('Foxy home has no serious or critical axe violations', async ({ page }) => {
+    await page.addInitScript((themeStorageKey) => {
+      window.localStorage.setItem(themeStorageKey, 'san-juan');
+    }, THEME_STORAGE_KEY);
+
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('html')).toHaveAttribute('data-nutsnews-theme', 'san-juan');
+    await expect(page.locator('body')).toBeVisible();
+
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+
+    const blockingViolations = results.violations.filter((violation) =>
+      blockingImpacts.has(violation.impact ?? ''),
+    ) as AxeViolation[];
+
+    expect(blockingViolations, formatViolations(blockingViolations)).toEqual([]);
+  });
 });
