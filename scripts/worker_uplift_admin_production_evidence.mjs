@@ -51,6 +51,16 @@ const ALLOWED_OWNERS = new Set([
   "rollback",
   "unknown",
 ]);
+const EXPECTED_PROJECTION_STATES = Object.freeze({
+  shadow: Object.freeze({
+    owner: "legacy shards",
+    writePolicy: "shadow",
+  }),
+  cutover_active: Object.freeze({
+    owner: "worker uplift",
+    writePolicy: "production",
+  }),
+});
 const VERCEL_SECRET_TYPES = new Set(["encrypted", "secret", "sensitive"]);
 const ENCRYPTED_ENVELOPE_KEYS = new Set([
   "encrypted",
@@ -225,30 +235,34 @@ export function validateEvidence(evidence) {
     throw new Error("authorized access evidence is incomplete");
   }
 
+  const expectedState = EXPECTED_PROJECTION_STATES[evidence.expected_state];
+  if (!expectedState) {
+    throw new Error("expected projection state is invalid");
+  }
   const projection = evidence.projection;
   if (projection?.available !== true) {
-    throw new Error("current shadow projection is unavailable");
+    throw new Error("current projection is unavailable");
   }
-  if (projection.active_ingestion_owner !== "legacy shards") {
-    throw new Error("current shadow projection owner is invalid");
+  if (projection.active_ingestion_owner !== expectedState.owner) {
+    throw new Error("current projection owner is invalid");
   }
-  if (projection.write_policy !== "shadow") {
-    throw new Error("current shadow projection write policy is invalid");
+  if (projection.write_policy !== expectedState.writePolicy) {
+    throw new Error("current projection write policy is invalid");
   }
   if (!ALLOWED_OVERALL_STATUSES.has(projection.overall_status)) {
-    throw new Error("current shadow projection overall status is invalid");
+    throw new Error("current projection overall status is invalid");
   }
   if (!Number.isInteger(projection.schema_version) || projection.schema_version < 1) {
-    throw new Error("current shadow projection schema version is invalid");
+    throw new Error("current projection schema version is invalid");
   }
   if (projection.stage_count !== EXPECTED_STAGES.length) {
-    throw new Error("current shadow projection stage count is invalid");
+    throw new Error("current projection stage count is invalid");
   }
   if (typeof projection.queue_age !== "string" || projection.queue_age.trim() === "") {
-    throw new Error("current shadow projection queue age is invalid");
+    throw new Error("current projection queue age is invalid");
   }
   if (!Number.isInteger(projection.dlq_total) || projection.dlq_total < 0) {
-    throw new Error("current shadow projection DLQ total is invalid");
+    throw new Error("current projection DLQ total is invalid");
   }
   if (
     !Array.isArray(projection.stages) ||
@@ -260,7 +274,7 @@ export function validateEvidence(evidence) {
     if (!ALLOWED_STAGE_STATUSES.has(row.status)) {
       throw new Error(`unexpected stage status for ${row.stage}`);
     }
-    if (!ALLOWED_OWNERS.has(row.owner) || row.owner !== "legacy shards") {
+    if (!ALLOWED_OWNERS.has(row.owner) || row.owner !== expectedState.owner) {
       throw new Error(`unexpected stage owner for ${row.stage}`);
     }
     if (
@@ -333,7 +347,7 @@ export function validateEvidence(evidence) {
   return evidence;
 }
 
-export function parsePipelineProjection(raw) {
+export function parsePipelineProjection(raw, expectedStateName = "shadow") {
   if (!raw || typeof raw !== "object" || !Array.isArray(raw.metrics) || !Array.isArray(raw.rows)) {
     throw new Error("worker-uplift section could not be parsed");
   }
@@ -346,11 +360,15 @@ export function parsePipelineProjection(raw) {
       throw new Error(`worker-uplift metric ${label} is missing`);
     }
   }
-  if (normalizeLabel(metrics.owner) !== "legacy shards") {
-    throw new Error("legacy shards are not the displayed ingestion owner");
+  const expectedState = EXPECTED_PROJECTION_STATES[expectedStateName];
+  if (!expectedState) {
+    throw new Error("expected projection state is invalid");
   }
-  if (normalizeLabel(metrics.writes) !== "shadow") {
-    throw new Error("worker-uplift production writes are not disabled");
+  if (normalizeLabel(metrics.owner) !== expectedState.owner) {
+    throw new Error("displayed ingestion owner does not match the expected state");
+  }
+  if (normalizeLabel(metrics.writes) !== expectedState.writePolicy) {
+    throw new Error("displayed write policy does not match the expected state");
   }
   const stages = raw.rows.map((cells, index) => {
     if (!Array.isArray(cells) || cells.length < 11) {
@@ -701,14 +719,15 @@ export function classifyEvidenceContractError(error) {
     ["unauthenticated access rejection evidence is incomplete", "unauthenticated_access"],
     ["authorized access evidence is incomplete", "authorized_access"],
     ["current shadow projection evidence is incomplete or unsafe", "projection_summary"],
-    ["current shadow projection is unavailable", "projection_availability"],
-    ["current shadow projection owner is invalid", "projection_owner"],
-    ["current shadow projection write policy is invalid", "projection_write_policy"],
-    ["current shadow projection overall status is invalid", "projection_overall_status"],
-    ["current shadow projection schema version is invalid", "projection_schema_version"],
-    ["current shadow projection stage count is invalid", "projection_stage_count"],
-    ["current shadow projection queue age is invalid", "projection_queue_age"],
-    ["current shadow projection DLQ total is invalid", "projection_dlq_total"],
+    ["expected projection state is invalid", "projection_expected_state"],
+    ["current projection is unavailable", "projection_availability"],
+    ["current projection owner is invalid", "projection_owner"],
+    ["current projection write policy is invalid", "projection_write_policy"],
+    ["current projection overall status is invalid", "projection_overall_status"],
+    ["current projection schema version is invalid", "projection_schema_version"],
+    ["current projection stage count is invalid", "projection_stage_count"],
+    ["current projection queue age is invalid", "projection_queue_age"],
+    ["current projection DLQ total is invalid", "projection_dlq_total"],
     ["projection stage identity or ordering does not match the contract", "stage_order"],
     ["scheduler must not claim a main-queue consumer count", "scheduler_consumers"],
     ["safe-state contract evidence is incomplete", "safe_state"],
@@ -781,6 +800,13 @@ export async function runLiveEvidence(environment = process.env) {
   }
   if (environment.CONFIRM_READ_ONLY !== "verify-authenticated-admin-read-only") {
     throw new Error("read-only confirmation is missing");
+  }
+  const expectedStateName = requireNonEmptyString(
+    environment.EXPECTED_STATE,
+    "EXPECTED_STATE",
+  );
+  if (!EXPECTED_PROJECTION_STATES[expectedStateName]) {
+    throw new Error("EXPECTED_STATE must be shadow or cutover_active");
   }
 
   const adminEvidenceIdentity = requireNonEmptyString(
@@ -911,7 +937,7 @@ export async function runLiveEvidence(environment = process.env) {
     }
     process.stdout.write("Evidence phase passed: authorized_projection_collection\n");
     const projection = await runReadPhase("projection_contract", () =>
-      parsePipelineProjection(rawProjection),
+      parsePipelineProjection(rawProjection, expectedStateName),
     );
     await authenticated.close();
 
@@ -919,6 +945,7 @@ export async function runLiveEvidence(environment = process.env) {
       schema_version: 1,
       result: "pass",
       checked_at: new Date().toISOString(),
+      expected_state: expectedStateName,
       candidate: {
         source_repository: sourceRepository,
         source_commit: sourceCommit,
