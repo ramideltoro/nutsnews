@@ -1,9 +1,7 @@
 # AGENTS.md
 
-
 ## Purpose
 This repo is for NutsNews app work. Keep changes here unless the task explicitly requires coordinated edits in another NutsNews repo.
-
 
 ## Repo Boundaries
 - `ramideltoro/nutsnews`: app work.
@@ -12,7 +10,6 @@ This repo is for NutsNews app work. Keep changes here unless the task explicitly
 - `ramideltoro/nutsnews-worker`: queues, workers, and integration tasks.
 - `ramideltoro/nutsnews-ios`: mobile/iOS tasks.
 - `ramideltoro/nutsnews-backend`: backend server/runtime work.
-
 
 ## Operating Mode
 - Work autonomously. Make reasonable assumptions and keep moving.
@@ -23,7 +20,6 @@ This repo is for NutsNews app work. Keep changes here unless the task explicitly
 - Start new work in a fresh Codex thread when the interface supports it.
 - Keep this file simple; add repo-specific instructions only when they are stable and necessary.
 
-
 ## Access And Automation
 - API credentials live at `/Users/ramideltoro/NutsNews-Files/credentials.env`. Use them for appropriate automation, including Supabase, Grafana Cloud, GitHub, and similar services.
 - Do not print, commit, or paste secrets.
@@ -31,14 +27,12 @@ This repo is for NutsNews app work. Keep changes here unless the task explicitly
 - Use `ssh -i ~/.ssh/servercheap_65_75_201_18 rami@65.75.201.18` for backend verification when needed.
 - Use `chrome-devtools` MCP only for browser verification. Do not use the ChatGPT Chrome plugin.
 
-
 ## Git And Issues
 - Start each task on a fresh branch before making changes.
 - When working through GitHub issues, handle one issue at a time unless coordination is necessary.
 - If an issue is blocked, add a GitHub issue comment with the blocker, evidence, commands run, and next suggested step.
 - If you find a new issue that should be handled, create a GitHub issue immediately with concise reproduction/context.
 - Do not revert user changes unless explicitly asked.
-
 
 ## Validation
 - Run the smallest useful validation first; expand as needed based on risk.
