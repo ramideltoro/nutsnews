@@ -1,7 +1,9 @@
 # AGENTS.md
 
+
 ## Purpose
 This repo is for NutsNews app work. Keep changes here unless the task explicitly requires coordinated edits in another NutsNews repo.
+
 
 ## Repo Boundaries
 - `ramideltoro/nutsnews`: app work.
@@ -10,6 +12,7 @@ This repo is for NutsNews app work. Keep changes here unless the task explicitly
 - `ramideltoro/nutsnews-worker`: queues, workers, and integration tasks.
 - `ramideltoro/nutsnews-ios`: mobile/iOS tasks.
 - `ramideltoro/nutsnews-backend`: backend server/runtime work.
+
 
 ## Operating Mode
 - Work autonomously. Make reasonable assumptions and keep moving.
@@ -20,12 +23,14 @@ This repo is for NutsNews app work. Keep changes here unless the task explicitly
 - Start new work in a fresh Codex thread when the interface supports it.
 - Keep this file simple; add repo-specific instructions only when they are stable and necessary.
 
+
 ## Access And Automation
 - API credentials live at `/Users/ramideltoro/NutsNews-Files/credentials.env`. Use them for appropriate automation, including Supabase, Grafana Cloud, GitHub, and similar services.
 - Do not print, commit, or paste secrets.
 - Use `ssh nutsnews-vps` for read-only VPS verification when needed.
 - Use `ssh -i ~/.ssh/servercheap_65_75_201_18 rami@65.75.201.18` for backend verification when needed.
 - Use `chrome-devtools` MCP only for browser verification. Do not use the ChatGPT Chrome plugin.
+
 
 ## Git And Issues
 - Start each task on a fresh branch before making changes.
@@ -34,8 +39,19 @@ This repo is for NutsNews app work. Keep changes here unless the task explicitly
 - If you find a new issue that should be handled, create a GitHub issue immediately with concise reproduction/context.
 - Do not revert user changes unless explicitly asked.
 
+
 ## Validation
 - Run the smallest useful validation first; expand as needed based on risk.
 - Use bounded waits for long-running checks. Capture IDs/URLs, wait 60 seconds before polling again, and repeat until success or a real blocker.
 - For code work, the definition of done is: PR opened, checks pass, merged to main, main checks pass, deployment monitored, and the final post-merge pipeline stage succeeds.
 - Stop before that only when blocked, and record the blocker where future Codex work can resume.
+
+## Isolated Git Workflow and Cleanup
+
+- Before changing files, fetch the latest remote default branch and create a new task-specific branch in a disposable clone or isolated `git worktree`. Never make task changes in a shared checkout or directly on `main` or `master`.
+- Use a fresh branch, worktree, and directory for every task. Do not reuse a prior task's branch or checkout.
+- Keep the task checkout isolated from unrelated repositories and user work. Preserve all pre-existing changes.
+- After the work is safely committed and pushed, the pull request is opened or merged as required, and validation results are recorded, remove the disposable local checkout to avoid consuming disk space.
+- For a disposable clone, verify `git status --short` is clean and all required commits exist on the remote, then delete only that exact clone directory. For a worktree, run `git worktree remove <exact-path>` from the owning repository and then `git worktree prune`.
+- Delete the local task branch only after confirming it is merged or no longer needed and no unpushed commits remain.
+- Never delete a shared or canonical clone, the current working directory, an unverified path, or a checkout containing uncommitted, untracked, unpushed, or unrelated work. If cleanup cannot be proven safe, stop and report the exact path and blocker instead of deleting it.
