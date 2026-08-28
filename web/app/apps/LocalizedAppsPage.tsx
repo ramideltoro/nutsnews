@@ -13,6 +13,8 @@ const APP_STORE_BADGE_SRC =
   "https://tools.applemediaservices.com/api/badges/download-on-the-app-store/black/en-us?size=250x83";
 
 const DEFAULT_APP_STORE_URL = "https://apps.apple.com/";
+const GOOGLE_PLAY_URL =
+  "https://play.google.com/store/apps/details?id=com.nutsnews.app";
 
 type RoadmapItem = {
   label: string;
@@ -25,6 +27,7 @@ type AppsCopy = {
   heroTitle: string;
   heroBody: string;
   appStoreAlt: string;
+  googlePlayLabel: string;
   roadmapEyebrow: string;
   roadmapTitle: string;
   roadmapBody: string;
@@ -34,21 +37,16 @@ type AppsCopy = {
 export const appsCopyByLanguage: Record<LanguageCode, AppsCopy> = {
   en: {
     heroEyebrow: "NutsNews apps",
-    heroTitle: "NutsNews for iPhone is here.",
+    heroTitle: "NutsNews for iPhone and Android is here.",
     heroBody:
       "Open a calmer feed of positive headlines, quick summaries, and good stories whenever you want a lighter scroll.",
     appStoreAlt: "Download on the App Store",
+    googlePlayLabel: "Get it on Google Play",
     roadmapEyebrow: "Coming next",
     roadmapTitle: "More ways to read NutsNews",
     roadmapBody:
       "This page keeps every NutsNews platform in one clean place as the app grows.",
     roadmapItems: [
-      {
-        label: "Android",
-        status: "Next",
-        description:
-          "The next mobile platform planned after the first iPhone release.",
-      },
       {
         label: "iPad",
         status: "Planned",
@@ -71,21 +69,16 @@ export const appsCopyByLanguage: Record<LanguageCode, AppsCopy> = {
   },
   fr: {
     heroEyebrow: "Apps NutsNews",
-    heroTitle: "NutsNews pour iPhone est disponible.",
+    heroTitle: "NutsNews pour iPhone et Android est disponible.",
     heroBody:
       "Ouvrez un fil plus calme avec des titres positifs, des résumés courts et de bonnes histoires quand vous voulez faire défiler sans bruit.",
     appStoreAlt: "Download on the App Store",
+    googlePlayLabel: "Disponible sur Google Play",
     roadmapEyebrow: "À venir",
     roadmapTitle: "Plus de façons de lire NutsNews",
     roadmapBody:
       "Cette page garde chaque plateforme NutsNews dans un seul endroit clair à mesure que l’app grandit.",
     roadmapItems: [
-      {
-        label: "Android",
-        status: "Ensuite",
-        description:
-          "La prochaine plateforme mobile prévue après la première version iPhone.",
-      },
       {
         label: "iPad",
         status: "Prévu",
@@ -108,20 +101,16 @@ export const appsCopyByLanguage: Record<LanguageCode, AppsCopy> = {
   },
   ja: {
     heroEyebrow: "NutsNewsアプリ",
-    heroTitle: "iPhone向けNutsNewsが登場しました。",
+    heroTitle: "iPhoneとAndroid向けNutsNewsが登場しました。",
     heroBody:
       "ポジティブな見出し、短い要約、よいニュースを、落ち着いたフィードで気軽に読めます。",
     appStoreAlt: "Download on the App Store",
+    googlePlayLabel: "Google Play で手に入れよう",
     roadmapEyebrow: "次に来るもの",
     roadmapTitle: "NutsNewsを読む方法を増やしていきます",
     roadmapBody:
       "このページに、NutsNewsの各プラットフォームをすっきりまとめていきます。",
     roadmapItems: [
-      {
-        label: "Android",
-        status: "次",
-        description: "最初のiPhone版の次に予定しているモバイルプラットフォームです。",
-      },
       {
         label: "iPad",
         status: "予定",
@@ -141,21 +130,16 @@ export const appsCopyByLanguage: Record<LanguageCode, AppsCopy> = {
   },
   "de-CH": {
     heroEyebrow: "NutsNews Apps",
-    heroTitle: "NutsNews für iPhone ist da.",
+    heroTitle: "NutsNews für iPhone und Android ist da.",
     heroBody:
       "Öffne einen ruhigeren Feed mit positiven Schlagzeilen, kurzen Zusammenfassungen und guten Geschichten, wenn du leichter scrollen möchtest.",
     appStoreAlt: "Download on the App Store",
+    googlePlayLabel: "Jetzt bei Google Play",
     roadmapEyebrow: "Als Nächstes",
     roadmapTitle: "Mehr Wege, NutsNews zu lesen",
     roadmapBody:
       "Diese Seite hält jede NutsNews-Plattform an einem klaren Ort, während die App wächst.",
     roadmapItems: [
-      {
-        label: "Android",
-        status: "Nächstes",
-        description:
-          "Die nächste mobile Plattform nach der ersten iPhone-Version.",
-      },
       {
         label: "iPad",
         status: "Geplant",
@@ -178,21 +162,16 @@ export const appsCopyByLanguage: Record<LanguageCode, AppsCopy> = {
   },
   de: {
     heroEyebrow: "NutsNews Apps",
-    heroTitle: "NutsNews für iPhone ist da.",
+    heroTitle: "NutsNews für iPhone und Android ist da.",
     heroBody:
       "Öffne einen ruhigeren Feed mit positiven Schlagzeilen, kurzen Zusammenfassungen und guten Geschichten, wenn du leichter scrollen möchtest.",
     appStoreAlt: "Download on the App Store",
+    googlePlayLabel: "Jetzt bei Google Play",
     roadmapEyebrow: "Als Nächstes",
     roadmapTitle: "Mehr Wege, NutsNews zu lesen",
     roadmapBody:
       "Diese Seite hält jede NutsNews-Plattform an einem klaren Ort, während die App wächst.",
     roadmapItems: [
-      {
-        label: "Android",
-        status: "Nächstes",
-        description:
-          "Die nächste mobile Plattform nach der ersten iPhone-Version.",
-      },
       {
         label: "iPad",
         status: "Geplant",
@@ -215,21 +194,16 @@ export const appsCopyByLanguage: Record<LanguageCode, AppsCopy> = {
   },
   el: {
     heroEyebrow: "Εφαρμογές NutsNews",
-    heroTitle: "Το NutsNews για iPhone είναι διαθέσιμο.",
+    heroTitle: "Το NutsNews για iPhone και Android είναι διαθέσιμο.",
     heroBody:
       "Άνοιξε μια πιο ήρεμη ροή με θετικούς τίτλους, σύντομες περιλήψεις και όμορφες ιστορίες όταν θέλεις ένα πιο ανάλαφρο scroll.",
     appStoreAlt: "Download on the App Store",
+    googlePlayLabel: "Αποκτήστε το στο Google Play",
     roadmapEyebrow: "Έρχεται μετά",
     roadmapTitle: "Περισσότεροι τρόποι να διαβάζεις NutsNews",
     roadmapBody:
       "Αυτή η σελίδα κρατά κάθε πλατφόρμα του NutsNews σε ένα καθαρό σημείο όσο μεγαλώνει η εφαρμογή.",
     roadmapItems: [
-      {
-        label: "Android",
-        status: "Επόμενο",
-        description:
-          "Η επόμενη mobile πλατφόρμα που σχεδιάζεται μετά την πρώτη έκδοση για iPhone.",
-      },
       {
         label: "iPad",
         status: "Σχεδιασμένο",
@@ -299,7 +273,7 @@ export function LocalizedAppsPage() {
               </p>
             </div>
 
-            <div className="rounded-[1.5rem] border border-amber-300/15 bg-neutral-950/70 p-5 text-center shadow-xl shadow-black/30">
+            <div className="flex flex-col items-center gap-4 rounded-[1.5rem] border border-amber-300/15 bg-neutral-950/70 p-5 text-center shadow-xl shadow-black/30">
               <a
                 href={appStoreUrl}
                 target="_blank"
@@ -314,6 +288,14 @@ export function LocalizedAppsPage() {
                   height="63"
                   className="h-auto w-[190px] max-w-full"
                 />
+              </a>
+              <a
+                href={GOOGLE_PLAY_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-12 w-[190px] max-w-full items-center justify-center rounded-xl border border-amber-300/30 bg-amber-400/10 px-4 py-3 text-sm font-bold text-amber-100 transition hover:border-amber-200/60 hover:bg-amber-300 hover:text-neutral-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-200"
+              >
+                {copy.googlePlayLabel}
               </a>
             </div>
           </div>
@@ -330,7 +312,7 @@ export function LocalizedAppsPage() {
             {copy.roadmapBody}
           </p>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {copy.roadmapItems.map((item) => (
               <article
                 key={item.label}
