@@ -1149,9 +1149,14 @@ async function runBrowserChecks() {
   }
 
   await clickFooterLink("Apps", "/apps", /\/apps$/);
-  await expect(page.locator("main").getByText("NutsNews for iPhone is here.", { exact: true })).toBeVisible({
+  await expect(page.locator("main").getByText("NutsNews for iPhone and Android is here.", { exact: true })).toBeVisible({
     timeout: footerNavigationTimeoutMs,
   });
+  await expect(page.getByRole("link", { name: "Get it on Google Play" })).toHaveAttribute(
+    "href",
+    "https://play.google.com/store/apps/details?id=com.nutsnews.app",
+  );
+  await expect(page.getByRole("heading", { level: 3, name: "Android", exact: true })).toHaveCount(0);
 
   await clickFooterLink("About", "/about", /\/about$/);
   await expect(page.locator("main").getByText("About NutsNews", { exact: true })).toBeVisible({

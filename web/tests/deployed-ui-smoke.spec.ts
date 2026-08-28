@@ -8,7 +8,7 @@ const ANALYTICS_CONSENT_TEST_TITLE =
   'analytics stays off until enabled in Settings and never sends a smoke-test collection event';
 
 const publicFooterRoutes = [
-  { name: 'Apps', path: '/apps', expectedText: /NutsNews for iPhone is here\./i },
+  { name: 'Apps', path: '/apps', expectedText: /NutsNews for iPhone and Android is here\./i },
   { name: 'About', path: '/about', expectedText: /About NutsNews/i },
   { name: 'Contact', path: '/contact', expectedText: /Send a message/i },
   { name: 'Privacy', path: '/privacy', expectedText: /Choose your privacy policy/i },
