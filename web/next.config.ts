@@ -32,7 +32,9 @@ function noStoreHeaders(policy: string) {
 }
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // Vercel's adapter owns its output; Docker/VPS still needs standalone files.
+  // https://github.com/vercel/next.js/issues/96646
+  output: process.env.VERCEL === "1" ? undefined : "standalone",
   cacheComponents: true,
   poweredByHeader: false,
   turbopack: {
