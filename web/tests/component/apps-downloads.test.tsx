@@ -30,8 +30,17 @@ beforeEach(() => {
 });
 
 describe("NutsNews app downloads", () => {
+  const expectedGooglePlayBadgeByLanguage: Record<LanguageCode, string> = {
+    en: "/google-play-badges/en.svg",
+    fr: "/google-play-badges/fr.svg",
+    ja: "/google-play-badges/ja.svg",
+    "de-CH": "/google-play-badges/de.svg",
+    de: "/google-play-badges/de.svg",
+    el: "/google-play-badges/el.svg",
+  };
+
   test.each(SUPPORTED_LANGUAGES)(
-    "offers both mobile apps and removes Android from the roadmap in $code",
+    "offers both mobile apps with a localized official Google Play badge in $code",
     ({ code }) => {
       runtime.language = code;
       const copy = appsCopyByLanguage[code];
@@ -51,6 +60,17 @@ describe("NutsNews app downloads", () => {
       );
       expect(googlePlayLink).toHaveAttribute("target", "_blank");
       expect(googlePlayLink).toHaveAttribute("rel", "noreferrer");
+      expect(googlePlayLink).toHaveClass("p-3", "sm:p-4");
+      const googlePlayBadge = screen.getByRole("img", {
+        name: copy.googlePlayLabel,
+      });
+      expect(googlePlayBadge).toHaveAttribute(
+        "src",
+        expectedGooglePlayBadgeByLanguage[code],
+      );
+      expect(googlePlayBadge).toHaveAttribute("width", "239");
+      expect(googlePlayBadge).toHaveAttribute("height", "71");
+      expect(googlePlayBadge).toHaveClass("h-10", "w-auto", "sm:h-[63px]");
       expect(screen.getByRole("link", { name: copy.appStoreAlt })).toHaveAttribute(
         "href",
         runtime.iosAppStoreUrl,
