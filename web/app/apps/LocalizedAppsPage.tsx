@@ -24,6 +24,9 @@ const GOOGLE_PLAY_BADGE_SRC_BY_LANGUAGE: Record<LanguageCode, string> = {
   de: "/google-play-badges/de.svg",
   el: "/google-play-badges/el.svg",
 };
+const STORE_BADGE_LINK_CLASS_NAME =
+  "inline-block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-200";
+const STORE_BADGE_CLASS_NAME = "h-10 w-auto sm:h-[63px]";
 
 type RoadmapItem = {
   label: string;
@@ -290,7 +293,7 @@ export function LocalizedAppsPage() {
                 href={appStoreUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-200"
+                className={STORE_BADGE_LINK_CLASS_NAME}
                 aria-label={copy.appStoreAlt}
               >
                 <img
@@ -298,21 +301,21 @@ export function LocalizedAppsPage() {
                   alt={copy.appStoreAlt}
                   width="190"
                   height="63"
-                  className="h-10 w-auto sm:h-[63px]"
+                  className={STORE_BADGE_CLASS_NAME}
                 />
               </a>
               <a
                 href={GOOGLE_PLAY_URL}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center justify-center bg-neutral-950 p-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-200 sm:p-4"
+                className={STORE_BADGE_LINK_CLASS_NAME}
               >
                 <Image
                   src={googlePlayBadgeSrc}
                   alt={copy.googlePlayLabel}
                   width={239}
                   height={71}
-                  className="h-10 w-auto sm:h-[63px]"
+                  className={STORE_BADGE_CLASS_NAME}
                 />
               </a>
             </div>

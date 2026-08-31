@@ -60,7 +60,6 @@ describe("NutsNews app downloads", () => {
       );
       expect(googlePlayLink).toHaveAttribute("target", "_blank");
       expect(googlePlayLink).toHaveAttribute("rel", "noreferrer");
-      expect(googlePlayLink).toHaveClass("p-3", "sm:p-4");
       const googlePlayBadge = screen.getByRole("img", {
         name: copy.googlePlayLabel,
       });
@@ -71,10 +70,14 @@ describe("NutsNews app downloads", () => {
       expect(googlePlayBadge).toHaveAttribute("width", "239");
       expect(googlePlayBadge).toHaveAttribute("height", "71");
       expect(googlePlayBadge).toHaveClass("h-10", "w-auto", "sm:h-[63px]");
-      expect(screen.getByRole("link", { name: copy.appStoreAlt })).toHaveAttribute(
+      const appStoreLink = screen.getByRole("link", { name: copy.appStoreAlt });
+      const appStoreBadge = screen.getByRole("img", { name: copy.appStoreAlt });
+      expect(appStoreLink).toHaveAttribute(
         "href",
         runtime.iosAppStoreUrl,
       );
+      expect(googlePlayLink.className).toBe(appStoreLink.className);
+      expect(googlePlayBadge.className).toBe(appStoreBadge.className);
 
       expect(
         screen.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent),
