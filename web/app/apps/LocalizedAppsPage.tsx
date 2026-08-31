@@ -2,6 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
+import Image from "next/image";
 import Link from "next/link";
 
 import type { LanguageCode } from "@/lib/languages";
@@ -15,6 +16,14 @@ const APP_STORE_BADGE_SRC =
 const DEFAULT_APP_STORE_URL = "https://apps.apple.com/";
 const GOOGLE_PLAY_URL =
   "https://play.google.com/store/apps/details?id=com.nutsnews.app";
+const GOOGLE_PLAY_BADGE_SRC_BY_LANGUAGE: Record<LanguageCode, string> = {
+  en: "/google-play-badges/en.svg",
+  fr: "/google-play-badges/fr.svg",
+  ja: "/google-play-badges/ja.svg",
+  "de-CH": "/google-play-badges/de.svg",
+  de: "/google-play-badges/de.svg",
+  el: "/google-play-badges/el.svg",
+};
 
 type RoadmapItem = {
   label: string;
@@ -231,6 +240,9 @@ export function LocalizedAppsPage() {
   const runtimeConfig = useRuntimePublicConfig();
   const copy = appsCopyByLanguage[selectedLanguage] ?? appsCopyByLanguage.en;
   const appStoreUrl = runtimeConfig?.iosAppStoreUrl ?? DEFAULT_APP_STORE_URL;
+  const googlePlayBadgeSrc =
+    GOOGLE_PLAY_BADGE_SRC_BY_LANGUAGE[selectedLanguage] ??
+    GOOGLE_PLAY_BADGE_SRC_BY_LANGUAGE.en;
 
   return (
     <main
@@ -273,7 +285,7 @@ export function LocalizedAppsPage() {
               </p>
             </div>
 
-            <div className="flex flex-col items-center gap-4 rounded-[1.5rem] border border-amber-300/15 bg-neutral-950/70 p-5 text-center shadow-xl shadow-black/30">
+            <div className="flex flex-col items-center gap-4 rounded-[1.5rem] border border-amber-300/15 bg-neutral-950/70 p-3 text-center shadow-xl shadow-black/30 sm:p-5">
               <a
                 href={appStoreUrl}
                 target="_blank"
@@ -286,16 +298,22 @@ export function LocalizedAppsPage() {
                   alt={copy.appStoreAlt}
                   width="190"
                   height="63"
-                  className="h-auto w-[190px] max-w-full"
+                  className="h-10 w-auto sm:h-[63px]"
                 />
               </a>
               <a
                 href={GOOGLE_PLAY_URL}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex min-h-12 w-[190px] max-w-full items-center justify-center rounded-xl border border-amber-300/30 bg-amber-400/10 px-4 py-3 text-sm font-bold text-amber-100 transition hover:border-amber-200/60 hover:bg-amber-300 hover:text-neutral-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-200"
+                className="inline-flex items-center justify-center bg-neutral-950 p-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-200 sm:p-4"
               >
-                {copy.googlePlayLabel}
+                <Image
+                  src={googlePlayBadgeSrc}
+                  alt={copy.googlePlayLabel}
+                  width={239}
+                  height={71}
+                  className="h-10 w-auto sm:h-[63px]"
+                />
               </a>
             </div>
           </div>
