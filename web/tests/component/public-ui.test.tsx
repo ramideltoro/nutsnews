@@ -57,6 +57,51 @@ function article(overrides: Partial<Article> = {}): Article {
 }
 
 describe("ArticleFeed", () => {
+  test("loads previous stories into More Good News when the sentinel enters view", async () => {
+    const olderArticle = article({
+      id: "older-story",
+      title: "Neighbors restore a century-old community hall",
+    });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        articles: [olderArticle],
+        nextPage: null,
+        nextCursor: null,
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <ArticleFeed
+        initialArticles={Array.from({ length: 5 }, (_, index) =>
+          article({ id: `initial-${index + 1}` }),
+        )}
+        initialNextPage={1}
+        initialNextCursor={null}
+        initialCategorySections={[]}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/articles?page=1", {
+        cache: "default",
+        headers: { Accept: "application/json" },
+      }),
+    );
+    expect(
+      await screen.findByRole("heading", {
+        name: "Neighbors restore a century-old community hall",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "More Good News" })).getByRole(
+        "heading",
+        { name: "Neighbors restore a century-old community hall" },
+      ),
+    ).toBeInTheDocument();
+  });
+
   test("renders article cards with missing-image fallback and source/date metadata", async () => {
     const first = article({
       id: "lead",
