@@ -228,7 +228,7 @@ test.describe('Public reader smoke flows', () => {
     page.on('response', (response) => {
       const url = response.url();
 
-      if (url.includes('/api/articles?') && url.includes('cursor=')) {
+      if (url.includes('/api/articles?') && url.includes('page=1')) {
         paginationResponses.push(response);
       }
     });
@@ -238,7 +238,7 @@ test.describe('Public reader smoke flows', () => {
 
     await expect
       .poll(async () => paginationResponses.length, {
-        message: 'Expected infinite scroll to request another article page using cursor pagination.',
+        message: 'Expected infinite scroll to request the next article page.',
         timeout: 20_000,
       })
       .toBeGreaterThan(0);

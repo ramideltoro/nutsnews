@@ -175,6 +175,47 @@ describe("published article localization", () => {
 });
 
 describe("backend primary article localization", () => {
+  it("continues the homepage feed with snapshot page pagination", async () => {
+    mocks.providerMode = "backend_postgres_primary";
+    const sectionCategories = [
+      "community",
+      "animals",
+      "science",
+      "wellness",
+      "travel",
+      "culture",
+      "achievement",
+    ];
+    const backendRows = [
+      ...Array.from({ length: 5 }, (_, index) => ({
+        ...snapshotArticle(index + 1),
+        category: "general",
+      })),
+      ...sectionCategories.map((category, index) => ({
+        ...snapshotArticle(index + 6),
+        category,
+      })),
+    ];
+    mocks.callBackendDatabaseOperation.mockResolvedValueOnce(backendRows);
+
+    const { getHomeFeedFromSnapshot } = await import("@/lib/articles");
+    const result = await getHomeFeedFromSnapshot("en");
+
+    expect(mocks.callBackendDatabaseOperation).toHaveBeenCalledWith(
+      "load-home-feed-snapshot",
+      {
+        limit: 250,
+        offset: 0,
+        requestedLanguageCode: "en",
+      },
+    );
+    expect(result).toMatchObject({
+      nextPage: 1,
+      nextCursor: null,
+      dataSource: "public_feed_snapshot",
+    });
+  });
+
   it("passes requested language to backend feed reads and preserves localized rows", async () => {
     mocks.providerMode = "backend_postgres_primary";
     const backendRows = Array.from({ length: 6 }, (_, index) => ({

@@ -902,18 +902,13 @@ export async function getHomeFeedFromSnapshot(
       })
       .filter((entry): entry is readonly [string, Article] => Boolean(entry)),
   );
-  const lastMainArticle = mainBaseArticles.at(-1);
-
   return {
     articles: mainBaseArticles.map((article) => {
       const articleKey = getArticleIdentityKey(article);
       return articleKey ? localizedByKey.get(articleKey) ?? article : article;
     }),
-    nextPage: null,
-    nextCursor:
-      rows.length > PAGE_SIZE && lastMainArticle
-        ? encodeArticleCursor(lastMainArticle)
-        : null,
+    nextPage: rows.length > PAGE_SIZE ? 1 : null,
+    nextCursor: null,
     dataSource: "public_feed_snapshot",
     languageCode,
     sections: completedSections.map((section) => ({
