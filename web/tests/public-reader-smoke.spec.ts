@@ -7,7 +7,6 @@ const FIRST_ARTICLE_TITLE = 'Public smoke readers celebrate neighborhood gardens
 const FIRST_ARTICLE_FRENCH_TITLE = 'Jardins de quartier pour le test public';
 const mobileFooterRoutes = [
   { name: 'Apps', path: '/apps' },
-  { name: 'Saved', path: '/saved' },
   { name: 'About', path: '/about' },
   { name: 'Contact', path: '/contact' },
   { name: 'Privacy', path: '/privacy' },
@@ -352,4 +351,10 @@ test.describe('Public reader smoke flows', () => {
     await expect(page.getByRole('link', { name: 'Read full story' })).toHaveAttribute('href', /mock\.nutsnews\.test/);
     await expect(page.getByRole('link', { name: /Back to NutsNews/i })).toHaveAttribute('href', '/');
   });
+});
+
+ test('retired saved stories links redirect to the homepage', async ({ page }) => {
+  await page.goto('/saved');
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByTestId('nutsnews-save-story-button')).toHaveCount(0);
 });
