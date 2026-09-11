@@ -352,3 +352,9 @@ test.describe('Public reader smoke flows', () => {
     await expect(page.getByRole('link', { name: /Back to NutsNews/i })).toHaveAttribute('href', '/');
   });
 });
+
+ test('retired saved stories links redirect to the homepage', async ({ page }) => {
+  await page.goto('/saved');
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByTestId('nutsnews-save-story-button')).toHaveCount(0);
+});

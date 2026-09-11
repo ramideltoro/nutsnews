@@ -62,7 +62,7 @@ test.beforeEach(async ({ context }) => {
 test.describe('public visual regression snapshots', () => {
   test('homepage is stable on desktop and mobile', async ({ page }, testInfo) => {
     await openHomeWithArticles(page);
-    await expect(page.getByTestId('nutsnews-save-story-button').first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('nutsnews-save-story-button')).toHaveCount(0);
     if (testInfo.project.name === 'mobile') {
       await expect(page.getByTestId('nutsnews-footer-menu')).toBeVisible({ timeout: 15_000 });
     }
