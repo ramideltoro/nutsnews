@@ -9,12 +9,10 @@ import { ThemeSwitcher } from "@/app/components/ThemeSwitcher";
 import { LocalizedArticleDetail } from "@/app/articles/[id]/LocalizedArticleDetail";
 import { ContactForm } from "@/app/contact/ContactForm";
 import { LocalizedContactPage } from "@/app/contact/LocalizedContactPage";
-import { SavedStoriesPage } from "@/app/saved/SavedStoriesPage";
 import type { Article } from "@/lib/articles";
 import { NUTSNEWS_CONTACT_EMAIL } from "@/lib/contactDetails";
 import { ANALYTICS_CONSENT_STORAGE_KEY } from "@/lib/analyticsConsent";
 import { LANGUAGE_CHANGE_EVENT, LANGUAGE_STORAGE_KEY } from "@/lib/languages";
-import { SAVED_STORIES_STORAGE_KEY } from "@/lib/savedStories";
 
 vi.mock("@/lib/runtimePublicConfigClient", () => ({
   useRuntimePublicConfig: () => ({
@@ -231,59 +229,10 @@ describe("ArticleFeed", () => {
     expect(document.documentElement.lang).toBe("fr");
   });
 
-  test("saves and unsaves story cards in local browser storage", async () => {
-    const user = userEvent.setup();
-    const savedArticle = article({
-      id: "local-save",
-      title: "Neighborhood choir brings music to hospital rooms",
-      source: "Bright Daily",
-    });
-
-    render(
-      <ArticleFeed
-        initialArticles={[savedArticle]}
-        initialNextPage={null}
-        initialNextCursor={null}
-        initialCategorySections={[]}
-      />,
-    );
-
-    const saveButton = await screen.findByRole("button", {
-      name: "Save story: Neighborhood choir brings music to hospital rooms",
-    });
-
-    await user.click(saveButton);
-
-    await waitFor(() => expect(saveButton).toHaveTextContent("Saved"));
-
-    const storedPayload = JSON.parse(
-      window.localStorage.getItem(SAVED_STORIES_STORAGE_KEY) ?? "{}",
-    );
-
-    expect(storedPayload).toMatchObject({
-      version: 1,
-      stories: [
-        {
-          id: "local-save",
-          source: "Bright Daily",
-          title: "Neighborhood choir brings music to hospital rooms",
-          original_url: "https://example.test/articles/local-save",
-        },
-      ],
-    });
-    expect(storedPayload.stories[0].positivity_score).toBeUndefined();
-
-    await user.click(
-      screen.getByRole("button", {
-        name: "Remove saved story: Neighborhood choir brings music to hospital rooms",
-      }),
-    );
-
-    await waitFor(() => expect(saveButton).toHaveTextContent("Save"));
-    expect(
-      JSON.parse(window.localStorage.getItem(SAVED_STORIES_STORAGE_KEY) ?? "{}")
-        .stories,
-    ).toHaveLength(0);
+  test("article cards offer reading without save controls", () => {
+    render(<ArticleFeed initialArticles={[article({ id: "no-save", title: "Neighborhood choir" })]} initialNextPage={null} initialNextCursor={null} initialCategorySections={[]} />);
+    expect(screen.queryByRole("button", { name: /save story|remove saved story/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Neighborhood choir/i })).toBeInTheDocument();
   });
 });
 
@@ -440,57 +389,6 @@ describe("LocalizedArticleDetail", () => {
   });
 });
 
-describe("SavedStoriesPage", () => {
-  test("renders locally saved stories and removes them without login", async () => {
-    const user = userEvent.setup();
-    const savedArticle = article({
-      id: "saved-page-story",
-      title: "Students restore a city park mural",
-      source: "Kindness Ledger",
-      ai_summary: "Students worked with neighbors to restore a mural.",
-    });
-
-    window.localStorage.setItem(
-      SAVED_STORIES_STORAGE_KEY,
-      JSON.stringify({
-        version: 1,
-        stories: [
-          {
-            ...savedArticle,
-            saved_at: "2026-07-17T12:00:00Z",
-          },
-        ],
-      }),
-    );
-
-    render(<SavedStoriesPage />);
-
-    expect(
-      await screen.findByRole("heading", {
-        name: "Students restore a city park mural",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("1 saved story")).toBeInTheDocument();
-    expect(
-      screen.getByText("Students worked with neighbors to restore a mural."),
-    ).toBeInTheDocument();
-
-    await user.click(
-      screen.getByRole("button", {
-        name: "Remove saved story: Students restore a city park mural",
-      }),
-    );
-
-    await waitFor(() =>
-      expect(screen.getByText("No saved stories yet")).toBeInTheDocument(),
-    );
-    expect(
-      JSON.parse(window.localStorage.getItem(SAVED_STORIES_STORAGE_KEY) ?? "{}")
-        .stories,
-    ).toHaveLength(0);
-  });
-});
-
 describe("ThemeSwitcher", () => {
   test("opens settings and applies deterministic theme and language choices", async () => {
     const user = userEvent.setup();
@@ -589,7 +487,7 @@ describe("SiteFooter", () => {
       sidebarWordmark.querySelector('img[src="/nutsnews-logo.png"]'),
     ).toHaveAttribute("alt", "");
     expect(within(menuPanel).getByRole("link", { name: "Apps" })).toHaveAttribute("href", "/apps");
-    expect(within(menuPanel).getByRole("link", { name: "Saved" })).toHaveAttribute("href", "/saved");
+    expect(within(menuPanel).queryByRole("link", { name: "Saved" })).not.toBeInTheDocument();
     expect(within(menuPanel).getByRole("link", { name: "About" })).toHaveAttribute("href", "/about");
     expect(within(menuPanel).getByRole("link", { name: "Contact" })).toHaveAttribute("href", "/contact");
     expect(within(menuPanel).getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "/privacy");

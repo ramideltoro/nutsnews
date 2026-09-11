@@ -21,7 +21,6 @@ type AuditedPage = {
 
 const auditedPages: AuditedPage[] = [
   { name: 'Home', path: '/' },
-  { name: 'Saved', path: '/saved' },
   { name: 'About', path: '/about' },
   { name: 'Privacy selector', path: '/privacy' },
   { name: 'Android privacy', path: '/privacy/android' },

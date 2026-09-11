@@ -7,7 +7,6 @@ const FIRST_ARTICLE_TITLE = 'Public smoke readers celebrate neighborhood gardens
 const FIRST_ARTICLE_FRENCH_TITLE = 'Jardins de quartier pour le test public';
 const mobileFooterRoutes = [
   { name: 'Apps', path: '/apps' },
-  { name: 'Saved', path: '/saved' },
   { name: 'About', path: '/about' },
   { name: 'Contact', path: '/contact' },
   { name: 'Privacy', path: '/privacy' },
