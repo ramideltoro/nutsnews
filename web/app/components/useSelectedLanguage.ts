@@ -26,12 +26,16 @@ export function useSelectedLanguage() {
   useEffect(() => {
     const applyLanguage = (languageCode: LanguageCode) => {
       document.documentElement.lang = languageCode;
-      window.setTimeout(() => setSelectedLanguage(languageCode), 0);
+      setSelectedLanguage(languageCode);
     };
 
-    applyLanguage(readStoredLanguage());
+    const initialLanguageTimer = window.setTimeout(
+      () => applyLanguage(readStoredLanguage()),
+      0,
+    );
 
     const handleLanguageChange = (event: Event) => {
+      window.clearTimeout(initialLanguageTimer);
       const nextLanguage = (event as CustomEvent<{ languageCode?: string }>)
         .detail?.languageCode;
 
@@ -44,10 +48,11 @@ export function useSelectedLanguage() {
     };
 
     const handleStorageChange = (event: StorageEvent) => {
-      if (event.key !== LANGUAGE_STORAGE_KEY) {
+      if (event.key !== LANGUAGE_STORAGE_KEY && event.key !== null) {
         return;
       }
 
+      window.clearTimeout(initialLanguageTimer);
       applyLanguage(normalizeLanguageCode(event.newValue));
     };
 
@@ -55,6 +60,7 @@ export function useSelectedLanguage() {
     window.addEventListener("storage", handleStorageChange);
 
     return () => {
+      window.clearTimeout(initialLanguageTimer);
       window.removeEventListener(LANGUAGE_CHANGE_EVENT, handleLanguageChange);
       window.removeEventListener("storage", handleStorageChange);
     };

@@ -85,6 +85,7 @@ describe("ArticleFeed", () => {
       expect(fetchMock).toHaveBeenCalledWith("/api/articles?page=1", {
         cache: "default",
         headers: { Accept: "application/json" },
+        signal: expect.any(AbortSignal),
       }),
     );
     expect(
@@ -214,6 +215,7 @@ describe("ArticleFeed", () => {
       expect(fetchMock).toHaveBeenCalledWith("/api/articles?home=1&lang=fr", {
         cache: "default",
         headers: { Accept: "application/json" },
+        signal: expect.any(AbortSignal),
       }),
     );
     expect(
