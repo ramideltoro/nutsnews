@@ -13,6 +13,7 @@ import {
   LANGUAGE_STORAGE_KEY,
   type LanguageCode,
   isSupportedLanguageCode,
+  normalizeLanguageCode,
 } from "@/lib/languages";
 import { OptimizedArticleImage } from "./OptimizedArticleImage";
 import { formatPublisherName, getPublisherAttribution } from "@/lib/publisherAttribution";
@@ -505,6 +506,7 @@ export function ArticleFeed({
   const [loadError, setLoadError] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const isReloadingFirstPageRef = useRef(false);
+  const languageRequestRef = useRef<AbortController | null>(null);
   const initialEnglishArticlesRef = useRef(initialUniqueArticles);
   const initialEnglishNextPageRef = useRef(initialNextPage);
   const initialEnglishNextCursorRef = useRef(initialNextCursor);
@@ -549,11 +551,13 @@ export function ArticleFeed({
       cursor,
       languageCode,
       categoryId = "all",
+      signal,
     }: {
       page: number | null;
       cursor: string | null;
       languageCode: LanguageCode;
       categoryId?: CategoryId;
+      signal?: AbortSignal;
     }) => {
       const query = new URLSearchParams();
       const categoryQuery = getCategoryQuery(categoryId);
@@ -577,6 +581,7 @@ export function ArticleFeed({
         headers: {
           Accept: "application/json",
         },
+        signal,
       });
 
       if (!response.ok) {
@@ -596,6 +601,9 @@ export function ArticleFeed({
 
   const loadLocalizedHomeFeed = useCallback(
     async (languageCode: LanguageCode) => {
+      languageRequestRef.current?.abort();
+      const controller = new AbortController();
+      languageRequestRef.current = controller;
       isReloadingFirstPageRef.current = true;
       setIsLoading(true);
       setLoadError(null);
@@ -611,6 +619,7 @@ export function ArticleFeed({
         let response = await fetch(`/api/articles?${homeQuery.toString()}`, {
           cache: "default",
           headers: { Accept: "application/json" },
+          signal: controller.signal,
         });
 
         if (!response.ok) {
@@ -623,6 +632,7 @@ export function ArticleFeed({
           response = await fetch(`/api/home-feed?${fallbackQuery.toString()}`, {
             cache: "default",
             headers: { Accept: "application/json" },
+            signal: controller.signal,
           });
         }
 
@@ -631,6 +641,10 @@ export function ArticleFeed({
         }
 
         const data = (await response.json()) as HomeFeedResponse;
+
+        if (controller.signal.aborted) {
+          return;
+        }
 
         if (data.error) {
           throw new Error(data.error);
@@ -646,14 +660,19 @@ export function ArticleFeed({
         setFeedDegradation(data.degradation ?? null);
         document.documentElement.lang = languageCode;
       } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
         setLoadError(
           error instanceof Error
             ? error.message
             : copyByLanguage[languageCode].loadError,
         );
       } finally {
-        isReloadingFirstPageRef.current = false;
-        setIsLoading(false);
+        if (!controller.signal.aborted) {
+          isReloadingFirstPageRef.current = false;
+          setIsLoading(false);
+        }
       }
     },
     [],
@@ -674,15 +693,11 @@ export function ArticleFeed({
       }
     }, 0);
 
-    const handleLanguageChange = (event: Event) => {
-      const nextLanguage = (event as CustomEvent<{ languageCode?: string }>)
-        .detail?.languageCode;
-
-      if (!isSupportedLanguageCode(nextLanguage)) {
-        return;
-      }
-
+    const changeLanguage = (nextLanguage: LanguageCode) => {
+      window.clearTimeout(initialRefreshTimer);
+      languageRequestRef.current?.abort();
       setSelectedLanguage(nextLanguage);
+      document.documentElement.lang = nextLanguage;
 
       if (nextLanguage === DEFAULT_LANGUAGE_CODE) {
         setArticles(initialEnglishArticlesRef.current);
@@ -691,18 +706,38 @@ export function ArticleFeed({
         setCategorySections(initialEnglishCategorySectionsRef.current);
         setFeedDegradation(initialEnglishDegradationRef.current);
         setLoadError(null);
-        document.documentElement.lang = DEFAULT_LANGUAGE_CODE;
+        isReloadingFirstPageRef.current = false;
+        setIsLoading(false);
+        if (initialEnglishArticlesRef.current.length === 0) {
+          void loadLocalizedHomeFeed(nextLanguage);
+        }
         return;
       }
 
       void loadLocalizedHomeFeed(nextLanguage);
     };
 
+    const handleLanguageChange = (event: Event) => {
+      const nextLanguage = (event as CustomEvent<{ languageCode?: string }>)
+        .detail?.languageCode;
+      if (isSupportedLanguageCode(nextLanguage)) {
+        changeLanguage(nextLanguage);
+      }
+    };
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === LANGUAGE_STORAGE_KEY || event.key === null) {
+        changeLanguage(normalizeLanguageCode(event.newValue));
+      }
+    };
+
     window.addEventListener(LANGUAGE_CHANGE_EVENT, handleLanguageChange);
+    window.addEventListener("storage", handleStorageChange);
 
     return () => {
       window.clearTimeout(initialRefreshTimer);
       window.removeEventListener(LANGUAGE_CHANGE_EVENT, handleLanguageChange);
+      window.removeEventListener("storage", handleStorageChange);
+      languageRequestRef.current?.abort();
     };
   }, [loadLocalizedHomeFeed]);
 
@@ -717,13 +752,20 @@ export function ArticleFeed({
 
     setIsLoading(true);
     setLoadError(null);
+    const controller = new AbortController();
+    languageRequestRef.current = controller;
 
     try {
       const data = await fetchArticles({
         page: nextPage,
         cursor: nextCursor,
         languageCode: selectedLanguage,
+        signal: controller.signal,
       });
+
+      if (controller.signal.aborted) {
+        return;
+      }
 
       setArticles((currentArticles) =>
         dedupeArticlesByIdentity([...currentArticles, ...data.articles]),
@@ -731,13 +773,18 @@ export function ArticleFeed({
       setNextPage(Number.isFinite(data.nextPage) ? data.nextPage : null);
       setNextCursor(data.nextCursor ?? null);
     } catch (error) {
+      if (controller.signal.aborted) {
+        return;
+      }
       setLoadError(
         error instanceof Error
           ? error.message
           : copyByLanguage[selectedLanguage].loadError,
       );
     } finally {
-      setIsLoading(false);
+      if (!controller.signal.aborted) {
+        setIsLoading(false);
+      }
     }
   }, [fetchArticles, isLoading, nextCursor, nextPage, selectedLanguage]);
 
