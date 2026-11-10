@@ -12,8 +12,8 @@ const RUN_LIMIT = Math.max(1, Math.min(Number(process.env.WORKER_RUN_LIMIT || 10
 const OUT_DIR = path.join(process.cwd(), 'reports', 'feed-health');
 
 if (!SUPABASE_URL || !SERVICE_KEY) {
-  console.log('Skipping feed health report because SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not set.');
-  process.exit(0);
+  console.error('Cannot generate the production feed health report: Supabase URL or service role key is missing.');
+  process.exit(1);
 }
 
 mkdirSync(OUT_DIR, { recursive: true });
@@ -27,30 +27,44 @@ async function supabase(pathname) {
   return text ? JSON.parse(text) : [];
 }
 
-const feeds = await supabase(`/rest/v1/rss_feeds?select=id,source,url,is_active,is_positive_source&order=is_active.desc,source.asc&limit=${FEED_LIMIT}`);
-let runs = [];
-try {
-  runs = await supabase(`/rest/v1/worker_runs?select=run_started_at,run_completed_at,shard_index,feed_count,feed_fetch_success_count,feed_fetch_failure_count,failed_feeds,fetched_count,candidate_count,accepted_count,rejected_count,no_thumbnail_rejected_count,image_hydration_found_count,success&order=run_started_at.desc&limit=${RUN_LIMIT}`);
-} catch (error) {
-  console.warn(`Could not load worker_runs: ${error.message}`);
-}
+const [feeds, runs, feedHealth] = await Promise.all([
+  supabase(`/rest/v1/rss_feeds?select=id,source,url,is_active,is_positive_source&order=is_active.desc,source.asc&limit=${FEED_LIMIT}`),
+  supabase(`/rest/v1/worker_runs?select=run_started_at,run_completed_at,run_source,shard_index,feed_count,fetched_count,candidate_count,accepted_count,rejected_count,success,error_name&order=run_started_at.desc&limit=${RUN_LIMIT}`),
+  supabase(`/rest/v1/feed_health?select=source,feed_url,last_checked_at,last_success_at,last_failure_at,last_status,consecutive_failure_count,last_article_count,last_accepted_count,last_rejected_count&order=last_checked_at.desc&limit=${FEED_LIMIT}`),
+]);
 
+if (![feeds, runs, feedHealth].every(Array.isArray)) {
+  throw new Error('Supabase returned an unexpected response for the feed health report.');
+}
 const activeFeeds = feeds.filter((feed) => feed.is_active !== false);
 const inactiveFeeds = feeds.length - activeFeeds.length;
 const activeGoogleFeedCount = activeFeeds.filter((feed) =>
   /news\.google\.com/i.test(String(feed.url || '')),
 ).length;
-const failedFeedCounts = new Map();
-for (const run of runs) {
-  for (const failed of run.failed_feeds || []) {
-    const label = typeof failed === 'string' ? failed : failed.url || failed.source || JSON.stringify(failed);
-    failedFeedCounts.set(label, (failedFeedCounts.get(label) || 0) + 1);
-  }
-}
-const repeatedFailures = [...failedFeedCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 25);
-const latestRun = runs[0];
+const now = Date.now();
+const staleHealthRecords = feedHealth.filter((record) => {
+  const checkedAt = Date.parse(record.last_checked_at || '');
+  return !Number.isFinite(checkedAt) || now - checkedAt > 24 * 60 * 60 * 1000;
+});
+const failedFeeds = feedHealth
+  .filter((record) => Number(record.consecutive_failure_count || 0) > 0)
+  .sort((a, b) => Number(b.consecutive_failure_count || 0) - Number(a.consecutive_failure_count || 0))
+  .slice(0, 25);
+const latestRun = runs[0] || null;
+const latestHealthCheckAt = feedHealth[0]?.last_checked_at || null;
 
-const report = { createdAt: new Date().toISOString(), feedCount: feeds.length, activeFeedCount: activeFeeds.length, inactiveFeedCount: inactiveFeeds, activeGoogleFeedCount, latestRun, repeatedFailures };
+const report = {
+  createdAt: new Date().toISOString(),
+  feedCount: feeds.length,
+  activeFeedCount: activeFeeds.length,
+  inactiveFeedCount: inactiveFeeds,
+  activeGoogleFeedCount,
+  feedHealthRecordCount: feedHealth.length,
+  staleHealthRecordCount: staleHealthRecords.length,
+  latestHealthCheckAt,
+  latestRun,
+  failedFeeds,
+};
 const markdown = [
   '# NutsNews Feed Health Report',
   '',
@@ -60,11 +74,15 @@ const markdown = [
   `- Active feeds: ${activeFeeds.length}`,
   `- Inactive feeds: ${inactiveFeeds}`,
   `- Active Google News RSS feeds: ${activeGoogleFeedCount}`,
-  latestRun ? `- Latest run: shard ${latestRun.shard_index}, success=${latestRun.success}, feed success=${latestRun.feed_fetch_success_count}, feed failures=${latestRun.feed_fetch_failure_count}, accepted=${latestRun.accepted_count}` : '- Latest run: none found',
+  `- Feed health records: ${feedHealth.length}`,
+  `- Feed health records stale by more than 24 hours: ${staleHealthRecords.length}`,
+  `- Latest feed health check: ${latestHealthCheckAt || 'none recorded'}`,
+  latestRun ? `- Latest worker run: source=${latestRun.run_source}, shard=${latestRun.shard_index}, success=${latestRun.success}, feeds=${latestRun.feed_count}, fetched=${latestRun.fetched_count}, candidates=${latestRun.candidate_count}, accepted=${latestRun.accepted_count}` : '- Latest worker run: none found',
   '',
-  '## Repeated failed feeds from recent worker runs',
+  '## Feeds with consecutive failures',
   '',
-  repeatedFailures.length ? '| Feed | Recent failure count |\n|---|---:|\n' + repeatedFailures.map(([feed, count]) => `| ${String(feed).replace(/\|/g, '\\|')} | ${count} |`).join('\n') : 'No repeated failed feeds found in recent worker runs.',
+  'Feeds with consecutive failures: ' + failedFeeds.length,
+  ...failedFeeds.map((feed) => '- ' + String(feed.source || feed.feed_url || 'unknown') + ': ' + Number(feed.consecutive_failure_count || 0) + ' consecutive failure(s), last checked ' + (feed.last_checked_at || 'never')) ,
   '',
 ].join('\n');
 

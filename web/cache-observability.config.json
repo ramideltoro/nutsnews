@@ -157,7 +157,7 @@
       "label": "Saved page",
       "path": "/saved",
       "method": "HEAD",
-      "expectedStatuses": [200],
+      "expectedStatuses": [308],
       "expectedPolicy": "public-static-page-cache-2592000s",
       "expectedCacheIncludes": ["public"],
       "expectedCdnIncludes": ["s-maxage=2592000"],
