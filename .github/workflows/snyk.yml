@@ -50,9 +50,11 @@ jobs:
         run: npm ci
 
       - name: Setup Snyk CLI
+        if: ${{ secrets.SNYK_TOKEN != '' }}
         uses: snyk/actions/setup@9adf32b1121593767fc3c057af55b55db032dc04  # v1 (replaces master)
 
       - name: Snyk test dependencies
+        if: ${{ secrets.SNYK_TOKEN != '' }}
         working-directory: ${{ matrix.project.path }}
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -63,8 +65,13 @@ jobs:
             --severity-threshold=high \
             --project-name=nutsnews-${{ matrix.project.name }}
 
+      - name: Dependency audit fallback when Snyk is not configured
+        if: ${{ secrets.SNYK_TOKEN == '' }}
+        working-directory: ${{ matrix.project.path }}
+        run: npm audit --audit-level=high
+
       - name: Upload project snapshot to Snyk dashboard
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.SNYK_TOKEN != ''
         working-directory: ${{ matrix.project.path }}
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
