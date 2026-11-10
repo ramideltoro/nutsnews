@@ -67,23 +67,26 @@ async function loadRulesets() {
     return JSON.parse(await readFile(fixturePath, "utf8"));
   }
 
-  if (!token) {
-    throw new Error(
-      "NUTSNEWS_RULESET_AUDIT_TOKEN is required. Configure a repository secret using a fine-grained token limited to this repository with Administration: read, then run Main ruleset audit.",
-    );
-  }
-
-  const response = await fetch(`https://api.github.com/repos/${repository}/rulesets`, {
-    headers: {
-      Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${token}`,
-      "X-GitHub-Api-Version": "2022-11-28",
-    },
-  });
+  const headers = {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  // GitHub exposes rulesets for this public repository without authentication.
+  const response = await fetch(`https://api.github.com/repos/${repository}/rulesets`, { headers });
   if (!response.ok) {
     throw new Error(`GitHub ruleset audit returned HTTP ${response.status}.`);
   }
-  return response.json();
+  const listed = await response.json();
+  if (token) return listed;
+  // The public collection omits conditions and rules; fetch each public detail record.
+  return Promise.all(listed.map(async ({ id }) => {
+    const detailResponse = await fetch(`https://api.github.com/repos/${repository}/rulesets/${id}`, { headers });
+    if (!detailResponse.ok) {
+      throw new Error(`GitHub ruleset detail audit returned HTTP ${detailResponse.status}.`);
+    }
+    return detailResponse.json();
+  }));
 }
 
 const main = validate(await loadRulesets());
