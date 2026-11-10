@@ -56,6 +56,7 @@ jobs:
         uses: snyk/actions/setup@9adf32b1121593767fc3c057af55b55db032dc04  # v1 (replaces master)
 
       - name: Snyk test dependencies
+        id: snyk_test
         if: ${{ env.SNYK_TOKEN != '' }}
         working-directory: ${{ matrix.project.path }}
         env:
@@ -71,9 +72,12 @@ jobs:
           cat "$RUNNER_TEMP/snyk-output.txt"
           if grep -q "Authentication error (SNYK-0005)" "$RUNNER_TEMP/snyk-output.txt"; then
             echo "Snyk credentials are invalid; checking dependency advisories with npm audit instead."
+            echo "authenticated=false" >> "$GITHUB_OUTPUT"
             npm audit --audit-level=high
           elif [ "$snyk_status" -ne 0 ]; then
             exit "$snyk_status"
+          else
+            echo "authenticated=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Dependency audit fallback when Snyk is not configured
@@ -82,7 +86,7 @@ jobs:
         run: npm audit --audit-level=high
 
       - name: Upload project snapshot to Snyk dashboard
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.SNYK_TOKEN != ''
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.SNYK_TOKEN != '' && steps.snyk_test.outputs.authenticated == 'true'
         working-directory: ${{ matrix.project.path }}
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
