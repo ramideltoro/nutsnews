@@ -77,7 +77,16 @@ async function loadRulesets() {
   if (!response.ok) {
     throw new Error(`GitHub ruleset audit returned HTTP ${response.status}.`);
   }
-  return response.json();
+  const listed = await response.json();
+  if (token) return listed;
+  // The public collection omits conditions and rules; fetch each public detail record.
+  return Promise.all(listed.map(async ({ id }) => {
+    const detailResponse = await fetch(`https://api.github.com/repos/${repository}/rulesets/${id}`, { headers });
+    if (!detailResponse.ok) {
+      throw new Error(`GitHub ruleset detail audit returned HTTP ${detailResponse.status}.`);
+    }
+    return detailResponse.json();
+  }));
 }
 
 const main = validate(await loadRulesets());
