@@ -23,8 +23,6 @@ jobs:
         with:
           node-version: 22
 
-      # ACTIONS_READ_TOKEN is a fine-grained read-only credential for repository rulesets.
+      # This repository and its rulesets are public, so no token is needed.
       - name: Audit live GitHub ruleset settings
-        env:
-          NUTSNEWS_RULESET_AUDIT_TOKEN: ${{ secrets.ACTIONS_READ_TOKEN }}
         run: node scripts/main_ruleset_audit.mjs
