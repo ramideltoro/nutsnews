@@ -67,19 +67,13 @@ async function loadRulesets() {
     return JSON.parse(await readFile(fixturePath, "utf8"));
   }
 
-  if (!token) {
-    throw new Error(
-      "NUTSNEWS_RULESET_AUDIT_TOKEN is required. Configure a repository secret using a fine-grained token limited to this repository with Administration: read, then run Main ruleset audit.",
-    );
-  }
-
-  const response = await fetch(`https://api.github.com/repos/${repository}/rulesets`, {
-    headers: {
-      Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${token}`,
-      "X-GitHub-Api-Version": "2022-11-28",
-    },
-  });
+  const headers = {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  // GitHub exposes rulesets for this public repository without authentication.
+  const response = await fetch(`https://api.github.com/repos/${repository}/rulesets`, { headers });
   if (!response.ok) {
     throw new Error(`GitHub ruleset audit returned HTTP ${response.status}.`);
   }
