@@ -9,7 +9,20 @@ Sentry.init({
     release: config.sourceCommit || config.buildId || undefined,
     tracesSampleRate: config.telemetryEnabled ? 0.1 : 0,
 
-    enableLogs: true,
+    dataCollection: {
+        userInfo: false,
+        cookies: false,
+        httpHeaders: {
+            request: { deny: ["forwarded", "-ip", "remote-", "via", "-user"] },
+            response: { deny: ["forwarded", "-ip", "remote-", "via", "-user"] },
+        },
+        httpBodies: [],
+        urlQueryParams: { deny: ["forwarded", "-ip", "remote-", "via", "-user"] },
+        genAI: { inputs: false, outputs: false },
+        databaseQueryData: false,
+        queues: false,
+        graphQL: { document: false, variables: false },
+    },
 
     beforeSend(event) {
         if (event.request?.headers) {

@@ -1859,7 +1859,7 @@ async function testMetadataAndOpenGraphContracts() {
 
 async function testConfiguredCachePolicies() {
   const configModule = loadModule("web/next.config.ts", {
-    "@sentry/nextjs": {
+    "@sentry/nextjs/config": {
       withSentryConfig(config) {
         return config;
       },
